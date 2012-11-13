@@ -807,12 +807,23 @@ found   : (String, Iterator[evalobj.TEvalRes])
 ): CellGridEvaluator[SphereCoord] = {
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereCellGridEvaluator(strategy, stratname, this)
+        new RankedSphereCellGridEvaluator(strategy, stratname, this,
+          new GroupedSphereDocumentEvalStats(this,
+            strategy.cell_grid, results_by_range = params.results_by_range,
+            create_stats = (driver_stats, prefix) =>
+              new RankedSphereDocumentEvalStats(driver_stats, prefix)
+          )
+        )
       case "mean-shift" =>
-        new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
-            params.k_best, params.mean_shift_window,
-            params.mean_shift_max_stddev,
-            params.mean_shift_max_iterations)
+        new MeanShiftCellGridEvaluator[SphereCoord](strategy, stratname, this,
+          new GroupedSphereDocumentEvalStats(this,
+            strategy.cell_grid, results_by_range = params.results_by_range,
+            create_stats = (driver_stats, prefix) =>
+              new CoordSphereDocumentEvalStats(driver_stats, prefix)),
+          params.k_best,
+          new SphereMeanShift(params.mean_shift_window,
+            params.mean_shift_max_stddev, params.mean_shift_max_iterations)
+        )
     }
   }
 
