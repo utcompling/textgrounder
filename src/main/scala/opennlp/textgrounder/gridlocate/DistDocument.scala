@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  DistDocument.scala
+//  GDoc.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
@@ -156,16 +156,16 @@ object DocumentCounterTracker {
 
 
 /////////////////////////////////////////////////////////////////////////////
-//                          DistDocument tables                            //
+//                          GDoc tables                            //
 /////////////////////////////////////////////////////////////////////////////
 
-//////////////////////  DistDocument table
+//////////////////////  GDoc table
 
 /**
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class DistDocumentTable[TCoord : Serializer](
+abstract class GDocTable[TCoord : Serializer](
   val driver: GridLocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
@@ -239,7 +239,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
   val word_tokens_of_recorded_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
-  def create_document(schema: Schema): DistDocument[TCoord]
+  def create_document(schema: Schema): GDoc[TCoord]
 
   /**
    * Implementation of `create_and_init_document`.  Subclasses should
@@ -311,7 +311,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
         }
         // SCALABUG, same bug with null and a generic type inheriting from
         // a reference type
-        null.asInstanceOf[DistDocument[TCoord]]
+        null.asInstanceOf[GDoc[TCoord]]
       }
       if (doc.has_coord) {
         num_documents_with_coordinates_by_split(split) += 1
@@ -341,7 +341,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
       schema: Schema, record_in_table: Boolean
-    ): DocumentStatus[DistDocument[TCoord]] = {
+    ): DocumentStatus[GDoc[TCoord]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
@@ -363,7 +363,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
           }
         }
       }
-    DocumentStatus[DistDocument[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
+    DocumentStatus[GDoc[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
   }
 
   /**
@@ -376,7 +376,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
    */
   def line_to_document(filehand: FileHandler, file: String, line: String,
       lineno: Long, schema: Schema, record_in_table: Boolean
-    ): DocumentStatus[DistDocument[TCoord]] = {
+    ): DocumentStatus[GDoc[TCoord]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
       record_in_table)
@@ -589,7 +589,7 @@ abstract class DistDocumentTable[TCoord : Serializer](
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                             DistDocuments                               //
+//                             GDocs                               //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -642,12 +642,12 @@ case class DocumentValidationException(
  * split: Evaluation split of document ("training", "dev", "test"), usually
  *   stored as a fixed field in the schema.
  */
-abstract class DistDocument[TCoord : Serializer](
+abstract class GDoc[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[TCoord]
+  val table: GDocTable[TCoord]
 ) {
 
-  import DistDocumentConverters._
+  import GDocConverters._
 
   /**
    * Title of the document -- something that uniquely identifies it,
@@ -771,7 +771,7 @@ abstract class DistDocument[TCoord : Serializer](
     }
   }
 
-  // def __repr__ = "DistDocument(%s)" format toString.encode("utf-8")
+  // def __repr__ = "GDoc(%s)" format toString.encode("utf-8")
 
   def shortstr = "%s" format title
 
@@ -797,7 +797,7 @@ abstract class DistDocument[TCoord : Serializer](
 //                           Conversion functions                          //
 /////////////////////////////////////////////////////////////////////////////
 
-object DistDocumentConverters {
+object GDocConverters {
   def yesno_to_boolean(foo: String)  = {
     foo match {
       case "yes" => true
@@ -901,21 +901,21 @@ object DistDocumentConverters {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                       DistDocument File Processors                      //
+//                       GDoc File Processors                      //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * A writer class for writing DistDocuments out to a corpus.
+ * A writer class for writing GDocs out to a corpus.
  *
  * @param schema schema describing the fields in the document files
  * @param suffix suffix used for identifying the particular corpus in a
  *  directory
  */
-class DistDocumentWriter[TCoord : Serializer](
+class GDocWriter[TCoord : Serializer](
   schema: Schema,
   suffix: String
 ) extends TextDBWriter(schema, suffix) {
-  def output_document(outstream: PrintStream, doc: DistDocument[TCoord]) {
+  def output_document(outstream: PrintStream, doc: GDoc[TCoord]) {
     schema.output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }

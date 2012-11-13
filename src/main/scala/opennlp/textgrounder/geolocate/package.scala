@@ -29,8 +29,8 @@ package object geolocate {
     stats: DocumentEvaluationResult[SphereCoord]
   ) = new SphereDocumentEvaluationResult(stats)
 
-  type SphereDocument = DistDocument[SphereCoord]
-  type SphereCell = GeoCell[SphereCoord]
+  type SphereDocument = GDoc[SphereCoord]
+  type SphereCell = GCell[SphereCoord]
   type SphereCellGrid = CellGrid[SphereCoord]
   def get_sphere_doctable(grid: SphereCellGrid) =
     grid.table.asInstanceOf[SphereDocumentTable]

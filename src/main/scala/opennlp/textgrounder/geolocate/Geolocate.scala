@@ -83,10 +83,10 @@ The Geolocate code works as follows:
 In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
 
--- Classes exist in `gridlocate` for an individual document (DistDocument),
-   the table of all documents (DistDocumentTable), the grid containing cells
+-- Classes exist in `gridlocate` for an individual document (GDoc),
+   the table of all documents (GDocTable), the grid containing cells
    into which the documents are placed (CellGrid), and the individual cells
-   in the grid (GeoCell).  There also needs to be a class specifying a
+   in the grid (GCell).  There also needs to be a class specifying a
    coordinate identifying a document (e.g. time or latitude/longitude pair).
    Specific versions of all of these are created for Geolocate, identified
    by the word "Sphere" (SphereDocument, SphereCell, SphereCoord, etc.),

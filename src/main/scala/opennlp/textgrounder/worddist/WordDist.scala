@@ -20,15 +20,15 @@ package opennlp.textgrounder.worddist
 
 import math._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.ioutil.FileHandler
-import tgutil.printutil.{errprint, warning}
-import tgutil.Serializer
+import opennlp.{textgrounder=>tg}
+import tg.util.ioutil.FileHandler
+import tg.util.printutil.{errprint, warning}
+import tg.util.Serializer
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
-import opennlp.textgrounder.gridlocate.GenericTypes._
+import tg.gridlocate.GridLocateDriver.Debug._
+import tg.gridlocate.GDoc
 // FIXME! For reference to GridLocateDriver.Params
-import opennlp.textgrounder.gridlocate.GridLocateDriver
+import tg.gridlocate.GridLocateDriver
 
 import WordDist.memoizer._
 
@@ -203,7 +203,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    *   Generally, global (e.g. back-off) statistics should be initialized
    *   only from training-set documents.
    */
-  def initialize_distribution(doc: GenericDistDocument, countstr: String,
+  def initialize_distribution(doc: GDoc[_], countstr: String,
       is_training_set: Boolean)
 }
 

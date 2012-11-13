@@ -25,15 +25,15 @@ import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil.warning
 
-import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable}
-import opennlp.textgrounder.gridlocate.DistDocumentConverters._
+import opennlp.textgrounder.gridlocate.{GDoc,GDocTable}
+import opennlp.textgrounder.gridlocate.GDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 
 abstract class RealSphereDocument(
   schema: Schema,
   table: SphereDocumentTable
-) extends DistDocument[SphereCoord](schema, table) {
+) extends GDoc[SphereCoord](schema, table) {
   var coord: SphereCoord = _
   def has_coord = coord != null
 
@@ -81,7 +81,7 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
 }
 
 /**
- * A DistDocumentTable specifically for documents with coordinates described
+ * A GDocTable specifically for documents with coordinates described
  * by a SphereCoord (latitude/longitude coordinates on the Earth).
  * We delegate the actual document creation to a subtable specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
@@ -89,7 +89,7 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
 class SphereDocumentTable(
   override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[SphereCoord](
+) extends GDocTable[SphereCoord](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subtable =
