@@ -25,15 +25,15 @@ import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil._
 
-import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}
-import opennlp.textgrounder.gridlocate.DistDocumentConverters._
+import opennlp.textgrounder.gridlocate.{GDoc,GDocTable,CellGrid}
+import opennlp.textgrounder.gridlocate.GDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 
 class TimeDocument(
   schema: Schema,
   table: TimeDocumentTable
-) extends DistDocument[TimeCoord](schema, table) {
+) extends GDoc[TimeCoord](schema, table) {
   var coord: TimeCoord = _
   var user: String = _
   def has_coord = coord != null
@@ -67,7 +67,7 @@ class TimeDocument(
 }
 
 /**
- * A DistDocumentTable specifically for documents with coordinates described
+ * A GDocTable specifically for documents with coordinates described
  * by a TimeCoord.
  * We delegate the actual document creation to a subtable specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
@@ -75,7 +75,7 @@ class TimeDocument(
 class TimeDocumentTable(
   override val driver: PoligrounderDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[TimeCoord](
+) extends GDocTable[TimeCoord](
   driver, word_dist_factory
 ) {
   def create_document(schema: Schema) = new TimeDocument(schema, this)

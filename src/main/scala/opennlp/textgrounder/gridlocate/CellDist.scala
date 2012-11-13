@@ -35,17 +35,15 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 class CellDist[TCoord](
   val cell_grid: CellGrid[TCoord]
 ) {
-  type TCell = GeoCell[TCoord]
-
-  val cellprobs = mutable.Map[TCell, Double]()
+  val cellprobs = mutable.Map[GCell[TCoord], Double]()
 
   def set_cell_probabilities(
-      probs: collection.Map[TCell, Double]) {
+      probs: collection.Map[GCell[TCoord], Double]) {
     cellprobs.clear()
     cellprobs ++= probs
   }
 
-  def get_ranked_cells(include: Iterable[TCell]) = {
+  def get_ranked_cells(include: Iterable[GCell[TCoord]]) = {
     val probs =
       if (include.size == 0)
         cellprobs
@@ -137,9 +135,7 @@ abstract class CellDistFactory[TCoord](
   val lru_cache_size: Int
 ) {
   type TCellDist <: WordCellDist[TCoord]
-  type TCell = GeoCell[TCoord]
-  type TGrid = CellGrid[TCoord]
-  def create_word_cell_dist(cell_grid: TGrid, word: Word): TCellDist
+  def create_word_cell_dist(cell_grid: CellGrid[TCoord], word: Word): TCellDist
 
   var cached_dists: LRUCache[Word, TCellDist] = null
 
@@ -147,7 +143,7 @@ abstract class CellDistFactory[TCoord](
    * Return a cell distribution over a single word, using a least-recently-used
    * cache to optimize access.
    */
-  def get_cell_dist(cell_grid: TGrid, word: Word) = {
+  def get_cell_dist(cell_grid: CellGrid[TCoord], word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
@@ -165,12 +161,12 @@ abstract class CellDistFactory[TCoord](
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cell_grid: TGrid, xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(cell_grid: CellGrid[TCoord], xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[TCell]()
+    val cellprobs = doublemap[GCell[TCoord]]()
     for ((word, count) <- word_dist.model.iter_items) {
       val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)

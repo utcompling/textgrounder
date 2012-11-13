@@ -77,7 +77,7 @@ class CombinedWordDist(factory: WordDistFactory) {
    *  `partial` is a scaling factor (between 0.0 and 1.0) used for
    *  interpolating multiple distributions.
    */
-  def add_document(doc: DistDocument[_], partial: Double = 1.0) {
+  def add_document(doc: GDoc[_], partial: Double = 1.0) {
     /* Formerly, we arranged things so that we were passed in all documents,
        regardless of the split.  The reason for this was that the decision
        was made to accumulate link counts from all documents, even in the
@@ -147,12 +147,12 @@ class CombinedWordDist(factory: WordDistFactory) {
  * @tparam TCoord The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
  */
-abstract class GeoCell[TCoord](
+abstract class GCell[TCoord](
     val cell_grid: CellGrid[TCoord]
 ) {
   val combined_dist =
     new CombinedWordDist(cell_grid.table.word_dist_factory)
-  var most_popular_document: DistDocument[TCoord] = _
+  var most_popular_document: GDoc[TCoord] = _
   var mostpopdoc_links = 0
 
   /**
@@ -192,7 +192,7 @@ abstract class GeoCell[TCoord](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %s types, %s tokens, %d links)" format (
+    "GCell(%s%s%s, %d documents(dist), %d documents(links), %s types, %s tokens, %d links)" format (
       describe_location(), unfinished, contains,
       combined_dist.num_docs_for_word_dist,
       combined_dist.num_docs_for_links,
@@ -222,7 +222,7 @@ abstract class GeoCell[TCoord](
    * debugging-output purposes, so the exact representation isn't too important.
    */
   def struct() =
-    <GeoCell>
+    <GCell>
       <bounds>{ describe_location() }</bounds>
       <finished>{ finished }</finished>
       {
@@ -233,12 +233,12 @@ abstract class GeoCell[TCoord](
       <numDocumentsDist>{ combined_dist.num_docs_for_word_dist }</numDocumentsDist>
       <numDocumentsLink>{ combined_dist.num_docs_for_links }</numDocumentsLink>
       <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
-    </GeoCell>
+    </GCell>
 
   /**
    * Add a document to the distribution for the cell.
    */
-  def add_document(doc: DistDocument[TCoord]) {
+  def add_document(doc: GDoc[TCoord]) {
     assert(!finished)
     combined_dist.add_document(doc)
     if (doc.incoming_links != None &&
@@ -259,7 +259,7 @@ abstract class GeoCell[TCoord](
 }
 
 /**
- * A mix-in trait for GeoCells that create their distribution by remembering
+ * A mix-in trait for GCells that create their distribution by remembering
  * all the documents that go into the distribution, and then generating
  * the distribution from them at the end.
  *
@@ -270,16 +270,16 @@ abstract class GeoCell[TCoord](
  * the cells and create the cells appropriately, and another to add the
  * document distributions to those cells.  If so, we should add a function
  * to cell grids indicating whether they want the documents given to them
- * in two passes, and modify the code in DistDocumentTable (DistDocument.scala)
+ * in two passes, and modify the code in GDocTable (GDoc.scala)
  * so that it does two passes over the documents if so requested.
  */
 trait DocumentRememberingCell[TCoord] {
-  this: GeoCell[TCoord] =>
+  this: GCell[TCoord] =>
 
   /**
    * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_documents(): Iterable[DistDocument[TCoord]]
+  def iterate_documents(): Iterable[GDoc[TCoord]]
 
   /**
    * Generate the distribution for the cell from the documents in it.
@@ -295,7 +295,7 @@ trait DocumentRememberingCell[TCoord] {
 /**
  * Abstract class for a general grid of cells.  The grid is defined over
  * a continuous space (e.g. the surface of the Earth).  The space is indexed
- * by coordinates (of type TCoord).  Each cell (of type TCell) covers
+ * by coordinates (of type TCoord).  Each cell (of type GCell[TCoord]) covers
  * some portion of the space.  There is also a set of documents (of type
  * TDoc), each of which is indexed by a coordinate and which has a
  * distribution describing the contents of the document.  The distributions
@@ -332,10 +332,8 @@ trait DocumentRememberingCell[TCoord] {
  *     `iter_nonempty_cells`.
  */
 abstract class CellGrid[TCoord](
-    val table: DistDocumentTable[TCoord]
+    val table: GDocTable[TCoord]
 ) {
-
-  type TCell = GeoCell[TCoord]
 
   /**
    * Total number of cells in the grid.
@@ -364,13 +362,13 @@ abstract class CellGrid[TCoord](
    * existing cells and determining its center.  The reason for not recording
    * such cells is to make sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_document(doc: DistDocument[TCoord], create_non_recorded: Boolean):
-    GeoCell[TCoord]
+  def find_best_cell_for_document(doc: GDoc[TCoord], create_non_recorded: Boolean):
+    GCell[TCoord]
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DistDocument[TCoord]): Unit
+  def add_document_to_cell(document: GDoc[TCoord]): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -393,7 +391,7 @@ abstract class CellGrid[TCoord](
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
-    Iterable[GeoCell[TCoord]]
+    Iterable[GCell[TCoord]]
   
   /**
    * Iterate over all non-empty cells.
@@ -406,7 +404,7 @@ abstract class CellGrid[TCoord](
    *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells_including(include: Iterable[GeoCell[TCoord]],
+  def iter_nonempty_cells_including(include: Iterable[GCell[TCoord]],
       nonempty_word_dist: Boolean = false) = {
     val cells = iter_nonempty_cells(nonempty_word_dist)
     if (include.size == 0)

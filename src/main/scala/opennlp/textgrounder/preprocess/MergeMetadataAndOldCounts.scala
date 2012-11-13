@@ -25,7 +25,7 @@ import collection.mutable
 import java.io.{InputStream, PrintStream}
 
 import opennlp.textgrounder.worddist.IdentityMemoizer._
-import opennlp.textgrounder.gridlocate.DistDocument
+import opennlp.textgrounder.gridlocate.GDoc
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.argparser._

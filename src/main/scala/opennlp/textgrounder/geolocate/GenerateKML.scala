@@ -27,8 +27,7 @@ import tgutil.argparser._
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
  
-import opennlp.textgrounder.gridlocate.DistDocument
-import opennlp.textgrounder.gridlocate.GenericTypes._
+import opennlp.textgrounder.gridlocate.GDoc
 
 import opennlp.textgrounder.worddist._
 import WordDist.memoizer._
