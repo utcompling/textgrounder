@@ -30,7 +30,7 @@ import opennlp.textgrounder.gridlocate.DistDocumentConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 
-abstract class SphereDocument(
+abstract class RealSphereDocument(
   schema: Schema,
   table: SphereDocumentTable
 ) extends DistDocument[SphereCoord](schema, table) {
@@ -45,7 +45,6 @@ abstract class SphereDocument(
   }
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
-  def degree_distance_to_coord(coord2: SphereCoord) = degree_dist(coord, coord2)
   def output_distance(dist: Double) = km_and_miles(dist)
 }
 
@@ -163,7 +162,7 @@ class SphereDocumentTable(
 class GenericSphereDocument(
   schema: Schema,
   subtable: GenericSphereDocumentSubtable
-) extends SphereDocument(schema, subtable.table) {
+) extends RealSphereDocument(schema, subtable.table) {
   var title: String = _
 
   override def set_field(name: String, value: String) {
