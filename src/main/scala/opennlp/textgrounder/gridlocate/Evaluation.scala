@@ -270,7 +270,7 @@ class RankedDocumentEvaluationResult[TCoord](
   val pred_cell: GCell[TCoord],
   val true_rank: Int
 ) extends DocumentEvaluationResult[TCoord](
-  document, pred_cell.cell_grid.asInstanceOf[CellGrid[TCoord]],
+  document, pred_cell.cell_grid,
   pred_cell.get_center_coord()
 ) {
   override def record_result(stats: DocumentEvalStats) {
@@ -351,17 +351,17 @@ abstract class RankedDocumentEvalStats(
  *   subresults.  Not on by default because Hadoop may choke on the large
  *   number of counters created this way.
  */
-abstract class GroupedDocumentEvalStats[TCoord](
+class GroupedDocumentEvalStats[TCoord](
   driver_stats: ExperimentDriverStats,
   cell_grid: CellGrid[TCoord],
-  results_by_range: Boolean
+  results_by_range: Boolean,
+  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
 ) {
   type TEvalRes = DocumentEvaluationResult[TCoord]
-  def create_stats(prefix: String): DocumentEvalStats
   def create_stats_for_range[T](prefix: String, range: T) =
-    create_stats(prefix + ".byrange." + range)
+    create_stats(driver_stats, prefix + ".byrange." + range)
 
-  val all_document = create_stats("")
+  val all_document = create_stats(driver_stats, "")
 
   // naitr = "num documents in true cell"
   val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100),
@@ -622,6 +622,12 @@ abstract class CorpusEvaluator(
   }
 }
 
+trait GroupedEvalStatsCreator[TCoord] {
+  def apply(driver: GridLocateDocumentDriver[TCoord],
+    cell_grid: CellGrid[TCoord], results_by_range: Boolean
+  ): GroupedDocumentEvalStats[TCoord]
+}
+
 /**
  * Abstract class for evaluating a test document by comparing it against each
  * of the cells in a cell grid, where each cell has an associated
@@ -646,29 +652,20 @@ abstract class CorpusEvaluator(
  * @param stratname Name of the strategy used for performing evaluation.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
- *
- * Note that we are forced to use the strange name `TCoord` because of an
- * apparent Scala bug that prevents use of the more obvious name `TCoord`
- * due to a naming clash.  Possibly there is a solution to this problem
- * but if so I can't figure it out.
  */
 abstract class CellGridEvaluator[TCoord](
   val strategy: GridLocateDocumentStrategy[TCoord],
   val stratname: String,
-  override val driver: GridLocateDocumentDriver[TCoord]
+  override val driver: GridLocateDocumentDriver[TCoord],
+  evalstats: GroupedDocumentEvalStats[TCoord]
 ) extends CorpusEvaluator(stratname, driver) {
   type TEvalDoc = GDoc[TCoord]
   override type TEvalRes <: DocumentEvaluationResult[TCoord]
-  def create_grouped_eval_stats(
-    driver: GridLocateDocumentDriver[TCoord],
-    cell_grid: CellGrid[TCoord],
-    results_by_range: Boolean
-  ): GroupedDocumentEvalStats[TCoord]
+
+  // val evalstats = grouped_eval_stats_creator(driver,
+  //  strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
   val ranker = driver.create_ranker(strategy)
-
-  val evalstats = create_grouped_eval_stats(driver,
-    strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -743,7 +740,7 @@ abstract class CellGridEvaluator[TCoord](
    * Evaluate a document, record statistics about it, etc.  Calls
    * `imp_evaluate_document` to do the document evaluation and optionally
    * print out information on the results, and records the results in
-   * `evalstat`.
+   * `evalstats`.
    *
    * Return an object describing the results of the evaluation.
    *
@@ -789,12 +786,13 @@ abstract class CellGridEvaluator[TCoord](
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class RankedCellGridEvaluator[TCoord](
+class RankedCellGridEvaluator[TCoord](
   strategy: GridLocateDocumentStrategy[TCoord],
   stratname: String,
-  driver: GridLocateDocumentDriver[TCoord]
+  driver: GridLocateDocumentDriver[TCoord],
+  evalstats: GroupedDocumentEvalStats[TCoord]
 ) extends CellGridEvaluator[TCoord] (
-  strategy, stratname, driver
+  strategy, stratname, driver, evalstats
 ) {
   type TEvalRes = RankedDocumentEvaluationResult[TCoord]
 
@@ -889,8 +887,11 @@ abstract class RankedCellGridEvaluator[TCoord](
 abstract class CoordCellGridEvaluator[TCoord](
   strategy: GridLocateDocumentStrategy[TCoord],
   stratname: String,
-  driver: GridLocateDocumentDriver[TCoord]
-) extends CellGridEvaluator[TCoord](strategy, stratname, driver) {
+  driver: GridLocateDocumentDriver[TCoord],
+  evalstats: GroupedDocumentEvalStats[TCoord]
+) extends CellGridEvaluator[TCoord](
+  strategy, stratname, driver, evalstats
+) {
   type TEvalRes = CoordDocumentEvaluationResult[TCoord]
 
   /**
@@ -940,23 +941,16 @@ abstract class CoordCellGridEvaluator[TCoord](
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class MeanShiftCellGridEvaluator[TCoord](
+class MeanShiftCellGridEvaluator[TCoord](
   strategy: GridLocateDocumentStrategy[TCoord],
   stratname: String,
   driver: GridLocateDocumentDriver[TCoord],
+  evalstats: GroupedDocumentEvalStats[TCoord],
   k_best: Int,
-  mean_shift_window: Double,
-  mean_shift_max_stddev: Double,
-  mean_shift_max_iterations: Int
+  mean_shift_obj: MeanShift[TCoord]
 ) extends CoordCellGridEvaluator[TCoord](
-  strategy, stratname, driver
+  strategy, stratname, driver, evalstats
 ) {
-  def create_mean_shift_obj(h: Double, max_stddev: Double,
-    max_iterations: Int): MeanShift[TCoord]
-
-  val mean_shift_obj = create_mean_shift_obj(mean_shift_window,
-    mean_shift_max_stddev, mean_shift_max_iterations)
-
   def find_best_point(document: GDoc[TCoord], true_cell: GCell[TCoord]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
     val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toSeq
