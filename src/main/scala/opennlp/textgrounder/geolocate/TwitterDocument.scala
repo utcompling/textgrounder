@@ -25,7 +25,7 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 class TwitterTweetDocument(
   schema: Schema,
   subtable: TwitterTweetDocumentSubtable
-) extends SphereDocument(schema, subtable.table) {
+) extends RealSphereDocument(schema, subtable.table) {
   var id = 0L
   def title = id.toString
 
@@ -55,7 +55,7 @@ class TwitterTweetDocumentSubtable(
 class TwitterUserDocument(
   schema: Schema,
   subtable: TwitterUserDocumentSubtable
-) extends SphereDocument(schema, subtable.table) {
+) extends RealSphereDocument(schema, subtable.table) {
   var userind = blank_memoized_string
   def title = unmemoize_string(userind)
 

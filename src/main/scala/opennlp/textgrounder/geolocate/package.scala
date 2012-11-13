@@ -17,20 +17,19 @@ package object geolocate {
      * Distance in degrees between document's coordinate and central
      * point of true cell
      */
-    val true_degdist =
-      stats.document.degree_distance_to_coord(stats.true_center)
+    val true_degdist = degree_dist(stats.document.coord, stats.true_center)
     /**
      * Distance in degrees between doc's coordinate and predicted
      * coordinate
      */
-    val pred_degdist =
-      stats.document.degree_distance_to_coord(stats.pred_coord)
+    val pred_degdist = degree_dist(stats.document.coord, stats.pred_coord)
   }
 
   implicit def to_SphereDocumentEvaluationResult(
     stats: DocumentEvaluationResult[SphereCoord, SphereDocument]
   ) = new SphereDocumentEvaluationResult(stats)
 
+  type SphereDocument = DistDocument[SphereCoord]
   type SphereCell = GeoCell[SphereCoord, SphereDocument]
   type SphereCellGrid = CellGrid[SphereCoord, SphereDocument]
   def get_sphere_doctable(grid: SphereCellGrid) =
