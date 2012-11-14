@@ -251,11 +251,11 @@ abstract class GeoDocTable[Co : Serializer](
    * in the main table.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], record_in_table: Boolean) = {
+      fieldvals: Seq[String], record_in_table: Boolean
+  ): Option[GeoDoc[Co]] = {
     val doc = create_document(schema)
-    if (doc != null)
-      doc.set_fields(fieldvals)
-    doc
+    doc.set_fields(fieldvals)
+    Some(doc)
   }
 
   /**
@@ -271,15 +271,13 @@ abstract class GeoDocTable[Co : Serializer](
    *   in any subsidiary tables, subclasses, etc.  This does not record
    *   the document in the cell grid; the caller needs to do that if
    *   needed.
-   * @param must_have_coord If true, the document must have a coordinate;
-   *   if not, it will be skipped, and null will be returned.
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean, must_have_coord: Boolean = true) = {
+      record_in_table: Boolean) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     if (record_in_table)
       num_records_by_split(split) += 1
-    val doc = try {
+    val maybedoc = try {
       imp_create_and_init_document(schema, fieldvals, record_in_table)
     } catch {
       case e:Exception => {
@@ -287,46 +285,44 @@ abstract class GeoDocTable[Co : Serializer](
         throw e
       }
     }
-    if (doc == null) {
-      num_non_error_skipped_records_by_split(split) += 1
-      doc 
-    } else {
-      assert(doc.split == split)
-      assert(doc.dist != null)
-      val double_tokens = doc.dist.model.num_tokens
-      val tokens = double_tokens.toInt
-      // Partial counts should not occur in training documents.
-      assert(double_tokens == tokens)
-      if (record_in_table) {
-        num_documents_by_split(split) += 1
-        word_tokens_of_documents_by_split(split) += tokens
+    maybedoc match {
+      case None => {
+        num_non_error_skipped_records_by_split(split) += 1
+        None
       }
-      if (!doc.has_coord && must_have_coord) {
-        errprint("Document %s skipped because it has no coordinate", doc)
-        num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-        word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+      case Some(doc) => {
+        assert(doc.split == split)
+        assert(doc.dist != null)
+        val double_tokens = doc.dist.model.num_tokens
+        val tokens = double_tokens.toInt
+        // Partial counts should not occur in training documents.
+        assert(double_tokens == tokens)
         if (record_in_table) {
-          num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-          word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+          num_documents_by_split(split) += 1
+          word_tokens_of_documents_by_split(split) += tokens
         }
-        // SCALABUG, same bug with null and a generic type inheriting from
-        // a reference type
-        null.asInstanceOf[GeoDoc[Co]]
+        if (!doc.has_coord) {
+          errprint("Document %s skipped because it has no coordinate", doc)
+          num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+          word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+          if (record_in_table) {
+            num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+            word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+          }
+          None
+        } else {
+          num_documents_with_coordinates_by_split(split) += 1
+          word_tokens_of_documents_with_coordinates_by_split(split) += tokens
+          if (record_in_table) {
+            num_recorded_documents_by_split(split) += 1
+            word_tokens_of_recorded_documents_by_split(split) += tokens
+            num_recorded_documents_with_coordinates_by_split(split) += 1
+            (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+              += tokens)
+          }
+          maybedoc
+        }
       }
-      if (doc.has_coord) {
-        num_documents_with_coordinates_by_split(split) += 1
-        word_tokens_of_documents_with_coordinates_by_split(split) += tokens
-      }
-      if (record_in_table) {
-        num_recorded_documents_by_split(split) += 1
-        word_tokens_of_recorded_documents_by_split(split) += tokens
-      }
-      if (doc.has_coord && record_in_table) {
-        num_recorded_documents_with_coordinates_by_split(split) += 1
-        (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
-          += tokens)
-      }
-      doc
     }
   }
 
@@ -347,30 +343,31 @@ abstract class GeoDocTable[Co : Serializer](
         case None => (None, "bad", "badly formatted database row", "")
         case Some(fieldvals) => {
           try {
-            val doc = create_and_init_document(schema, fieldvals,
-              record_in_table)
-            if (doc == null)
-              (None, "skipped", "unable to create document",
-                schema.get_field_or_else(fieldvals, "title",
-                  "unknown title??"))
-            else {
-              if (doc.dist != null) {
-                if (note_globally) {
-                  val factory = doc.table.word_dist_factory
-                  // Don't use the eval set's distributions in computing
-                  // global smoothing values and such, to avoid contaminating
-                  // the results (training on your eval set). In addition, if
-                  // this isn't the training or eval set, we shouldn't be
-                  // loading at all.
-                  //
-                  // Add the distribution to the global stats before
-                  // eliminating infrequent words through
-                  // `finish_before_global`.
-                  factory.note_dist_globally(doc.dist)
-                }
-                doc.dist.finish_before_global()
+            create_and_init_document(schema, fieldvals, record_in_table) match {
+              case None => {
+                (None, "skipped", "unable to create document",
+                  schema.get_field_or_else(fieldvals, "title",
+                    "unknown title??"))
               }
-              (Some(doc), "processed", "", "")
+              case Some(doc) => {
+                if (doc.dist != null) {
+                  if (note_globally) {
+                    val factory = doc.table.word_dist_factory
+                    // Don't use the eval set's distributions in computing
+                    // global smoothing values and such, to avoid contaminating
+                    // the results (training on your eval set). In addition, if
+                    // this isn't the training or eval set, we shouldn't be
+                    // loading at all.
+                    //
+                    // Add the distribution to the global stats before
+                    // eliminating infrequent words through
+                    // `finish_before_global`.
+                    factory.note_dist_globally(doc.dist)
+                  }
+                  doc.dist.finish_before_global()
+                }
+                (Some(doc), "processed", "", "")
+              }
             }
           } catch {
             case e:DocumentValidationException => {

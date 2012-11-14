@@ -206,18 +206,18 @@ class WikipediaDocumentSubtable(
       errprint("Skipped document %s, namespace %s is not Main",
         schema.get_field_or_else(fieldvals, "title", "unknown title??"),
         namespace)
-      null
+      None
     } else {
       val doc = create_document(schema)
       doc.set_fields(fieldvals)
       if (doc.redir.length > 0) {
         if (record_in_table)
           redirects += doc
-        null
+        None
       } else {
         if (record_in_table)
           record_document(doc, doc)
-        doc
+        Some(doc)
       }
     }
   }
