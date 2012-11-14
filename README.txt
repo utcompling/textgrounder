@@ -40,12 +40,17 @@ coding Java-type apps easier, faster and less painful.
 Requirements
 ============
 
+Always required:
+----------------
 * Version 1.6 of the Java 2 SDK (http://java.sun.com)
-* git, for downloading the code of TextGrounder and Scoobi
-* A modified version of Scoobi (see below)
-* Version 0.12 of SBT (used for building Scala apps, particularly Scoobi)
-* Hadoop 0.20.2, particularly the Cloudera cdh3 build
 * Appropriate data files, consisting of tweets (see below)
+
+Sometimes required:
+-------------------
+* git, for downloading the code of TextGrounder (if you don't already have
+  it or want to get a new version)
+* Hadoop 0.20.2, particularly the Cloudera cdh3 build (if you are using
+  Hadoop or one of the Hadoop-dependent applications)
 
 ===========
 Subprojects
@@ -98,7 +103,7 @@ putational Linguistics: Human Language Technologies},
 }
 }}}
 
-There are three main apps, each of which does a different task:
+There are two main apps, each of which does a different task:
 
 1. Document geolocation.  This identifies the location of a document.
    Training documents are currently described simply by (smoothed) unigram
@@ -113,24 +118,12 @@ There are three main apps, each of which does a different task:
    same source as the training documents, or from some other source, e.g.
    chapters from books stored in PCL-Travel format.
 
-2. Toponym geolocation.  This is an old, partly-written application that
-   is kept around mostly for test purposes.  The real toponym-disambiguation
-   applications are part of the Toponym subproject; see below.
-
-   (Original documentation: This disambiguates each toponym in a document,
-   where a toponym is a word such as "London" or "Georgia" that refers
-   to a geographic entity such as a city, state, province or country.
-   A statistical model is created from document data, as above, but a
-   gazetteer can also be used as an additional source of data listing
-   valid toponyms.  Evaluation is either on the geographic names in a
-   TR-CONLL corpus or links extracted from a Wikipedia article.)
-
-3. KML generation.  This generates per-word cell distributions of the
+2. KML generation.  This generates per-word cell distributions of the
    sort used in the ACP strategy (--strategy=average-cell-probability),
    then outputs KML files for given words showing the distribution of
    the words across the Earth.
 
-A fourth, not-yet-written app is for simultaneous segmentation and
+A third, not-yet-written app is for simultaneous segmentation and
 geolocation.  This assumes that a document is composed of segments of
 unknown size, each of which refers to a different location, and
 simultaneously finds the best segmentation and best location of each
@@ -163,81 +156,18 @@ Building the system
 The following describes how to quickly get TextGrounder up and running and to
 test that everything is in place and working.
 
------- I. Java and Git ------
+------ I. Java  ------
 
 1. Make sure you have Java installed.  TextGrounder is developed and tested
-   on Java 6, but it might work on Java 5 (definitely not earlier).  Scoobi
-   and SBT also both depend on Java, preferably Java 6.
+   on Java 6, but it might work on Java 5 (definitely not earlier).
 
 2. Set your JAVA_HOME environment variable to the top level of the Java
    installation tree.  On Mac OS X it's probably /Library/Java/Home.  On
    the University of Maryland (UMD) CLIP machines running Red Hat Enterprise
    Linux, it's probably /usr/lib/jvm/jre-1.6.0-sun.x86_64.
 
-3. Make sure you have Git installed. 
 
-
-II. Download SBT ------
-
-1. Download SBT version 0.12 or later.  The download page is as follows:
-
-   http://www.scala-sbt.org/download.html
-
-   Near the bottom, in the "by hand" section, there is a link to 'sbt-launch.jar'.
-   Currently, the following link works, but might move:
-
-   http://typesafe.artifactoryonline.com/typesafe/ivy-releases/org.scala-sbt/sbt-launch/0.12.0/sbt-launch.jar
-
-2. Save the file "sbt-launch.jar" to your bin directory.  It is best to rename
-   this to reflect the appropriate version, since SBT-based apps tend to be
-   rather sensitive to the particular version of SBT.  E.g. in this case,
-   rename the file to 'sbt-launch-0.12.0.jar'.
-
-3. Create a script to run SBT.  Call it 'sbt' and put it in your bin directory,
-   where you saved 'sbt-launch.jar'.  It should look as follows:
-
-   ---------------------------------- cut ------------------------------------ 
-   #!/bin/sh
-
-   java -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar `dirname $0`/sbt-launch-0.12.0.jar "$@"
-   ---------------------------------- cut ------------------------------------ 
-
-4. Make your script executable, and make sure it's in your PATH.
-
-
------- III. Download and build Ben's modified Scoobi ------
-
-This app uses a patched version of Scoobi (https://github.com/nicta/scoobi),
-which is a toolkit for building higher-level Hadoop-based apps using Scala.
-Scoobi uses Hadoop under the hood, but provides a much higher-level interface
-that lets you do functional-programming-style data processing (mapping,
-filtering, etc. of lists) almost exactly as if the data was stored as lists
-in local memory.  The operations are automatically converted under the hood
-into MapReduce steps.
-
-
-1. Download the patched version of Scoobi.
-
-   In some work directory, execute the following commands:
-
-   $ git clone https://github.com/benwing/scoobi
-   $ cd scoobi
-   $ git checkout benwing-latest-cdh3
-
-2. Build Scoobi.
-
-   In the same top-level Scoobi directory, execute the following:
-
-   $ sbt publish-local
-
-   This uses the SBT script you created above.  It should download a bunch
-   of libraries into ~/.ivy2 (including the Scala compiler and runtime
-   libraries as well as Hadoop 0.20.2 Cloudera cdh3 libraries, among others),
-   and then compile Scoobi, and eventually "publish" the built JAR files
-   under ~/.ivy2/local.
-
-
------- IV. Download and build TextGrounder ------
+------ II. Download and build TextGrounder ------
 
 1. Download TextGrounder.
 
@@ -269,7 +199,7 @@ into MapReduce steps.
    downloaded, and then TextGrounder gets compiled.
 
 
------- V. Get the data ------
+------ III. Get the data ------
 
 The data necessary for running depends on the intended application.
 
@@ -317,7 +247,7 @@ The UMD data is in /fs/clip-political.  The tweets in particular are under
 using the Twitter "spritzer" mechanism.
 
 
------- VI. Test locally ------
+------ IV. Test locally ------
 
 Again, this depends somewhat on the intended application.  In general, there
 are three possible running modes, some or all of which may be implemented
@@ -460,7 +390,7 @@ NALEO   215752394993180672      file:/Users/benwing/devel/pg-exp/input-naleo-jun
 See below for more information about the output format.
 
 
------- VII. Test under Hadoop ------
+------ V. Test under Hadoop ------
 
 To run under Hadoop (normally using a cluster, i.e. not in non-distributed
 mode), you will need to do the following steps, in general:
@@ -696,6 +626,8 @@ Use 'hadoop fs -get'.
 About SBT
 =========
 
+------ Intro ------
+
 SBT ("Scala Build Tool", originally "Simple Build Tool") is a build tool
 for building Scala-based or mixed Scala/Java-based applications.  It is
 similar to 'ant' or 'maven' in that it provides the basic functionality
@@ -720,9 +652,7 @@ after the 'sbt' script or after 'textgrounder build'.
 
    'clean': Delete all the built files (e.g. compiled Java class files).
 
-   'update': Download the necessary JAR's.  Note that this will locate
-      the version of Scoobi built above, which is version
-      '0.6.0-cdh3-SNAPSHOT-benwing'.
+   'update': Download the necessary JAR's.
 
    'compile': Build the Java class files.  These are stored in the
       subdirectory 'target' of the project.
@@ -747,11 +677,92 @@ Note that more than one task can be given in a single command line, e.g.
    $ textgrounder build clean update compile
 
 
-If you run 'sbt' or 'textgrounder build' with no further arguments, you
-will be dropped into the SBT console.  From here, you can type in tasks,
-which will be executed.  An additionally useful directive from the
-console is '~ compile', which will watch for changes to source files and
-then automatically recompile any time a change is seen.
+If you run 'textgrounder build' with no further arguments (or 'sbt' if
+you have installed SBT independently), you will be dropped into the SBT
+console.  From here, you can type in tasks, which will be executed.  An
+additionally useful directive from the console is '~ compile', which will
+watch for changes to source files and then automatically recompile any time
+a change is seen.
+
+
+------ How to download and install SBT ------
+
+TextGrounder includes a copy of SBT within it.  However, if for some
+reason you need or want to install SBT independently, you can do it as
+follows:
+
+1. Download SBT version 0.12 or later.  The download page is as follows:
+
+   http://www.scala-sbt.org/download.html
+
+   Near the bottom, in the "by hand" section, there is a link to 'sbt-launch.jar'.
+   Currently, the following link works, but might move:
+
+   http://typesafe.artifactoryonline.com/typesafe/ivy-releases/org.scala-sbt/sbt-launch/0.12.0/sbt-launch.jar
+
+2. Save the file "sbt-launch.jar" to your bin directory.  It is best to rename
+   this to reflect the appropriate version, since SBT-based apps tend to be
+   rather sensitive to the particular version of SBT.  E.g. in this case,
+   rename the file to 'sbt-launch-0.12.0.jar'.
+
+3. Create a script to run SBT.  Call it 'sbt' and put it in your bin directory,
+   where you saved 'sbt-launch.jar'.  It should look as follows:
+
+   ---------------------------------- cut ------------------------------------ 
+   #!/bin/sh
+
+   java -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar `dirname $0`/sbt-launch-0.12.0.jar "$@"
+   ---------------------------------- cut ------------------------------------ 
+
+4. Make your script executable, and make sure it's in your PATH.
+
+
+============
+About Scoobi
+============
+
+TextGrounder uses a patched version of Scoobi (https://github.com/nicta/scoobi),
+which is a toolkit for building higher-level Hadoop-based apps using Scala.
+Scoobi uses Hadoop under the hood, but provides a much higher-level interface
+that lets you do functional-programming-style data processing (mapping,
+filtering, etc. of lists) almost exactly as if the data was stored as lists
+in local memory.  The operations are automatically converted under the hood
+into MapReduce steps, eliminating most of the normal bookkeeping associated
+with Hadoop applications.
+
+The following is an example of a word-count application:
+
+    val counts = TextInput.fromTextFile(args(0))
+                          .flatMap(_.split(" "))
+                          .map(word => (word, 1))
+                          .groupByKey
+                          .combine((a: Int, b: Int) => a + b)
+    persist(toTextFile(counts, args(1)))
+
+This version is included with TextGrounder, and under normal circumstances
+you never have to worry about it.  If, however, for some reason you want
+or need to rebuild the library (which has the patched version name
+'0.6.0-cdh3-SNAPSHOT-benwing'), you can do so as follows:
+
+1. Download the patched version of Scoobi.
+
+   In some work directory, execute the following commands:
+
+   $ git clone https://github.com/benwing/scoobi
+   $ cd scoobi
+   $ git checkout benwing-latest-cdh3
+
+2. Build Scoobi.
+
+   In the same top-level Scoobi directory, execute the following:
+
+   $ sbt publish-local
+
+   This uses the SBT script you created above.  It should download a bunch
+   of libraries into ~/.ivy2 (including the Scala compiler and runtime
+   libraries as well as Hadoop 0.20.2 Cloudera cdh3 libraries, among others),
+   and then compile Scoobi, and eventually "publish" the built JAR files
+   under ~/.ivy2/local.
 
 
 ===========
