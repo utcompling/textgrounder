@@ -66,11 +66,10 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean) = {
+      record_in_table: Boolean): Option[TDoc] = {
     val doc = create_document(schema)
-    if (doc != null)
-      doc.set_fields(fieldvals)
-    doc
+    doc.set_fields(fieldvals)
+    Some(doc)
   }
 
   /**
