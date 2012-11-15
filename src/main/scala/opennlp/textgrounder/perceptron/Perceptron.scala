@@ -344,9 +344,15 @@ trait LinearClassifierTrainer {
 
   /** Check that all instances have the same length. */
   def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) {
-    val len = data.head._1.length
-    for ((inst, label) <- data)
+    // Written this way because the length might change as we iterate
+    // the first time through the data (this will be the case if we are
+    // using SparseFeatureVector). The call to `max` iterates through the
+    // whole data first before checking the length again. (Previously we
+    // compared the first against the rest, which ran into problems.)
+    val len = data.map(_._1.length).max
+    for ((inst, label) <- data) {
       assert(inst.length == len)
+    }
   }
 
   /** Train a linear classifier given a set of labeled instances. */
