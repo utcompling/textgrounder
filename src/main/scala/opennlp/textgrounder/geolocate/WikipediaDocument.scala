@@ -26,7 +26,7 @@ import tgutil.textdbutil.Schema
 import tgutil.printutil.{errprint, warning}
 import tgutil.textutil.capfirst
 
-import opennlp.textgrounder.gridlocate.GDocConverters._
+import opennlp.textgrounder.gridlocate.GeoDocConverters._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
 import opennlp.textgrounder.worddist.WordDist.memoizer._

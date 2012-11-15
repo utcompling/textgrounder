@@ -31,7 +31,7 @@ import tgutil.ioutil._
 import tgutil.MeteredTask
 import tgutil.printutil.warning
 
-import opennlp.textgrounder.gridlocate.GDoc
+import opennlp.textgrounder.gridlocate.GeoDoc
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

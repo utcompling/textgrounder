@@ -26,7 +26,7 @@ import tg.util.printutil.{errprint, warning}
 import tg.util.Serializer
 
 import tg.gridlocate.GridLocateDriver.Debug._
-import tg.gridlocate.GDoc
+import tg.gridlocate.GeoDoc
 // FIXME! For reference to GridLocateDriver.Params
 import tg.gridlocate.GridLocateDriver
 
@@ -200,7 +200,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    * @param doc Document to set the distribution of.
    * @param diststr String from the document file, describing the distribution.
    */
-  def initialize_distribution(doc: GDoc[_], countstr: String)
+  def initialize_distribution(doc: GeoDoc[_], countstr: String)
 }
 
 class KLDivergenceCache {

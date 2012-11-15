@@ -21,7 +21,7 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.distances._
 
-import opennlp.textgrounder.gridlocate.{GCell,GGrid}
+import opennlp.textgrounder.gridlocate.{GeoCell,GeoGrid}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //

@@ -196,7 +196,7 @@ class PoligrounderDriver extends
   protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new TimeDocumentTable(this, word_dist_factory)
 
-  protected def initialize_grid(table: GDocTable[TimeCoord]) = {
+  protected def initialize_grid(table: GeoDocTable[TimeCoord]) = {
     val timetab = table.asInstanceOf[TimeDocumentTable]
     if (params.ideological_user_corpus == null)
       new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)

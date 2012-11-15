@@ -191,8 +191,8 @@ class EvalStatsWithRank(
  * @param pred_coord predicted coordinate of the document
  */
 class DocumentEvaluationResult[TCoord](
-  val document: GDoc[TCoord],
-  val grid: GGrid[TCoord],
+  val document: GeoDoc[TCoord],
+  val grid: GeoGrid[TCoord],
   val pred_coord: TCoord
 ) {
   /**
@@ -234,8 +234,8 @@ class DocumentEvaluationResult[TCoord](
  * @param pred_coord predicted coordinate of the document
  */
 class CoordDocumentEvaluationResult[TCoord](
-  document: GDoc[TCoord],
-  grid: GGrid[TCoord],
+  document: GeoDoc[TCoord],
+  grid: GeoGrid[TCoord],
   pred_coord: TCoord
 ) extends DocumentEvaluationResult[TCoord](
   document, grid, pred_coord
@@ -266,8 +266,8 @@ class CoordDocumentEvaluationResult[TCoord](
  *        predicted cell
  */
 class RankedDocumentEvaluationResult[TCoord](
-  document: GDoc[TCoord],
-  val pred_cell: GCell[TCoord],
+  document: GeoDoc[TCoord],
+  val pred_cell: GeoCell[TCoord],
   val true_rank: Int
 ) extends DocumentEvaluationResult[TCoord](
   document, pred_cell.grid,
@@ -353,7 +353,7 @@ abstract class RankedDocumentEvalStats(
  */
 class GroupedDocumentEvalStats[TCoord](
   driver_stats: ExperimentDriverStats,
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   results_by_range: Boolean,
   create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
 ) {
@@ -624,7 +624,7 @@ abstract class CorpusEvaluator(
 
 trait GroupedEvalStatsCreator[TCoord] {
   def apply(driver: GridLocateDocumentDriver[TCoord],
-    grid: GGrid[TCoord], results_by_range: Boolean
+    grid: GeoGrid[TCoord], results_by_range: Boolean
   ): GroupedDocumentEvalStats[TCoord]
 }
 
@@ -659,7 +659,7 @@ abstract class GridEvaluator[TCoord](
   override val driver: GridLocateDocumentDriver[TCoord],
   evalstats: GroupedDocumentEvalStats[TCoord]
 ) extends CorpusEvaluator(stratname, driver) {
-  type TEvalDoc = GDoc[TCoord]
+  type TEvalDoc = GeoDoc[TCoord]
   override type TEvalRes <: DocumentEvaluationResult[TCoord]
 
   // val evalstats = grouped_eval_stats_creator(driver,
@@ -671,7 +671,7 @@ abstract class GridEvaluator[TCoord](
     evalstats.output_results(all_results = isfinal)
  }
 
-  override def would_skip_document(document: GDoc[TCoord], doctag: String) = {
+  override def would_skip_document(document: GeoDoc[TCoord], doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -694,12 +694,12 @@ abstract class GridEvaluator[TCoord](
    * @param document Document to evaluate.
    * @param true_cell Cell in the cell grid which contains the document.
    */
-  def return_ranked_cells(document: GDoc[TCoord], true_cell: GCell[TCoord]) = {
+  def return_ranked_cells(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]) = {
     if (driver.params.oracle_results)
       (Iterable((true_cell, 0.0)), 1)
     else {
       def get_computed_results() = {
-        val cells = ranker.evaluate(document, include = Iterable[GCell[TCoord]]())
+        val cells = ranker.evaluate(document, include = Iterable[GeoCell[TCoord]]())
         var rank = 1
         var broken = false
         breakable {
@@ -733,8 +733,8 @@ abstract class GridEvaluator[TCoord](
    * @param want_indiv_results Whether we should print out individual
    *   evaluation results for the document.
    */
-  def imp_evaluate_document(document: GDoc[TCoord], doctag: String,
-      true_cell: GCell[TCoord], want_indiv_results: Boolean): TEvalRes
+  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
+      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes
 
   /**
    * Evaluate a document, record statistics about it, etc.  Calls
@@ -749,7 +749,7 @@ abstract class GridEvaluator[TCoord](
    *   to be printed out at the beginning of diagnostic lines describing
    *   the document and its evaluation results.
    */
-  def evaluate_document(document: GDoc[TCoord], doctag: String): TEvalRes = {
+  def evaluate_document(document: GeoDoc[TCoord], doctag: String): TEvalRes = {
     val (skip, reason) = would_skip_document(document, doctag)
     assert(!skip)
     assert(document.dist.finished)
@@ -800,8 +800,8 @@ class RankedGridEvaluator[TCoord](
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
    */
-  def print_individual_result(doctag: String, document: GDoc[TCoord],
-    result: TEvalRes, pred_cells: Iterable[(GCell[TCoord], Double)]) {
+  def print_individual_result(doctag: String, document: GeoDoc[TCoord],
+    result: TEvalRes, pred_cells: Iterable[(GeoCell[TCoord], Double)]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
@@ -849,8 +849,8 @@ class RankedGridEvaluator[TCoord](
       driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
   }
 
-  def imp_evaluate_document(document: GDoc[TCoord], doctag: String,
-      true_cell: GCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
+  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
+      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
     val result = new TEvalRes(document, pred_cells.head._1, true_rank)
 
@@ -863,7 +863,7 @@ class RankedGridEvaluator[TCoord](
     if (want_indiv_results) {
       //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
       //for((cell, score) <- pred_cells) {
-      //  val scell = cell.asInstanceOf[GCell[GeoCoord, GeoDoc]]
+      //  val scell = cell.asInstanceOf[GeoCell[GeoCoord, GeoDoc]]
       //}
       print_individual_result(doctag, document, result, pred_cells)
     }
@@ -897,7 +897,7 @@ abstract class CoordGridEvaluator[TCoord](
   /**
    * Print out the evaluation result.
    */
-  def print_individual_result(doctag: String, document: GDoc[TCoord],
+  def print_individual_result(doctag: String, document: GeoDoc[TCoord],
       result: TEvalRes) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
@@ -911,10 +911,10 @@ abstract class CoordGridEvaluator[TCoord](
       doctag, document.output_distance(result.pred_truedist), result.pred_coord)
   }
 
-  def find_best_point(document: GDoc[TCoord], true_cell: GCell[TCoord]): TCoord
+  def find_best_point(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]): TCoord
 
-  def imp_evaluate_document(document: GDoc[TCoord], doctag: String,
-      true_cell: GCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
+  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
+      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
     val pred_coord = find_best_point(document, true_cell)
     val result = new TEvalRes(document, strategy.grid, pred_coord)
 
@@ -951,7 +951,7 @@ class MeanShiftGridEvaluator[TCoord](
 ) extends CoordGridEvaluator[TCoord](
   strategy, stratname, driver, evalstats
 ) {
-  def find_best_point(document: GDoc[TCoord], true_cell: GCell[TCoord]) = {
+  def find_best_point(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
     val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)

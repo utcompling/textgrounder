@@ -83,10 +83,10 @@ The Geolocate code works as follows:
 In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
 
--- Classes exist in `gridlocate` for an individual document (GDoc),
-   the table of all documents (GDocTable), the grid containing cells
+-- Classes exist in `gridlocate` for an individual document (GeoDoc),
+   the table of all documents (GeoDocTable), the grid containing cells
    into which the documents are placed (Grid), and the individual cells
-   in the grid (GCell).  There also needs to be a class specifying a
+   in the grid (GeoCell).  There also needs to be a class specifying a
    coordinate identifying a document (e.g. time or latitude/longitude pair).
    Specific versions of all of these are created for Geolocate, identified
    by the word "Sphere" (SphereDocument, SphereCell, SphereCoord, etc.),
@@ -317,7 +317,7 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new SphereDocumentTable(this, word_dist_factory)
 
-  protected def initialize_grid(table: GDocTable[SphereCoord]) = {
+  protected def initialize_grid(table: GeoDocTable[SphereCoord]) = {
     val spheretab = table.asInstanceOf[SphereDocumentTable]
     if (params.combined_kd_grid) {
       val kdcg =

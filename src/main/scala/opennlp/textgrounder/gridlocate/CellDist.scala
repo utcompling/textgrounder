@@ -33,17 +33,17 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
  */
 
 class CellDist[TCoord](
-  val grid: GGrid[TCoord]
+  val grid: GeoGrid[TCoord]
 ) {
-  val cellprobs = mutable.Map[GCell[TCoord], Double]()
+  val cellprobs = mutable.Map[GeoCell[TCoord], Double]()
 
   def set_cell_probabilities(
-      probs: collection.Map[GCell[TCoord], Double]) {
+      probs: collection.Map[GeoCell[TCoord], Double]) {
     cellprobs.clear()
     cellprobs ++= probs
   }
 
-  def get_ranked_cells(include: Iterable[GCell[TCoord]]) = {
+  def get_ranked_cells(include: Iterable[GeoCell[TCoord]]) = {
     val probs =
       if (include.size == 0)
         cellprobs
@@ -73,7 +73,7 @@ class CellDist[TCoord](
  */
 
 class WordCellDist[TCoord](
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   val word: Word
 ) extends CellDist[TCoord](grid) {
   var normalized = false
@@ -135,7 +135,7 @@ class CellDistFactory[TCoord](
   val lru_cache_size: Int
 ) {
   def create_word_cell_dist(
-    grid: GGrid[TCoord], word: Word
+    grid: GeoGrid[TCoord], word: Word
   ) = new WordCellDist[TCoord](grid, word)
 
   var cached_dists: LRUCache[Word, WordCellDist[TCoord]] = null
@@ -144,7 +144,7 @@ class CellDistFactory[TCoord](
    * Return a cell distribution over a single word, using a least-recently-used
    * cache to optimize access.
    */
-  def get_cell_dist(grid: GGrid[TCoord], word: Word) = {
+  def get_cell_dist(grid: GeoGrid[TCoord], word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
@@ -162,12 +162,12 @@ class CellDistFactory[TCoord](
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(grid: GGrid[TCoord], xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(grid: GeoGrid[TCoord], xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[GCell[TCoord]]()
+    val cellprobs = doublemap[GeoCell[TCoord]]()
     for ((word, count) <- word_dist.model.iter_items) {
       val dist = get_cell_dist(grid, word)
       for ((cell, prob) <- dist.cellprobs)
