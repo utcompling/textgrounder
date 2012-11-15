@@ -198,7 +198,7 @@ class DocumentEvaluationResult[Co](
   /**
    * True cell in the cell grid in which the document belongs
    */
-  val true_cell = grid.find_best_cell_for_document(document, true)
+  val true_cell = grid.find_best_cell_for_document(document, true).get
   /**
    * Number of documents in the true cell
    */
@@ -753,8 +753,10 @@ abstract class GridEvaluator[Co](
     val (skip, reason) = would_skip_document(document, doctag)
     assert(!skip)
     assert(document.dist.finished)
-    val true_cell =
+    val maybe_true_cell =
       strategy.grid.find_best_cell_for_document(document, true)
+    assert(maybe_true_cell != None)
+    val true_cell = maybe_true_cell.get
     if (debug("lots") || debug("commontop")) {
       val naitr = true_cell.combined_dist.num_docs_for_word_dist
       errprint("Evaluating document %s with %s word-dist documents in true cell",

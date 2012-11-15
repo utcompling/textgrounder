@@ -354,7 +354,7 @@ abstract class GeoGrid[Co](
 
   /**
    * Find the correct cell for the given document, based on the document's
-   * coordinates and other properties.  If no such cell exists, return null
+   * coordinates and other properties.  If no such cell exists, return None
    * if `create` is false.  Else, create an empty cell to hold the
    * coordinates -- but do *NOT* record the cell or otherwise alter the
    * existing cell configuration.  This situation where such a cell is needed
@@ -363,7 +363,7 @@ abstract class GeoGrid[Co](
    * such cells is to make sure that future evaluation results aren't affected.
    */
   def find_best_cell_for_document(doc: GeoDoc[Co], create_non_recorded: Boolean):
-    GeoCell[Co]
+    Option[GeoCell[Co]]
 
   /**
    * Add the given document to the cell grid.

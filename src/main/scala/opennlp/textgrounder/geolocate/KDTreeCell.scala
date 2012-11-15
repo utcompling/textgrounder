@@ -120,7 +120,7 @@ class KdTreeGrid(override val table: SphereDocumentTable,
     // FIXME: implementation note: the KD tree should tile the entire earth's surface,
     // but there's a possibility of something going awry here if we've never
     // seen a evaluation point before.
-    leaves_to_cell(kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long)))
+    Option(leaves_to_cell(kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long))))
   }
 
   /**

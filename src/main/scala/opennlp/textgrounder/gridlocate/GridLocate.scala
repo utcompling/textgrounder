@@ -1253,8 +1253,8 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
               val cell = grid.find_best_cell_for_document(doc, false)
               // We should already have a cell for each training doc,
               // right?
-              assert (cell != null)
-              (doc, cell)
+              assert(cell != None)
+              (doc, cell.get)
             }).toIterable
         new LinearClassifierGridReranker[Co](
           basic_ranker,
