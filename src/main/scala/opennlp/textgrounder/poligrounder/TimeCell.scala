@@ -79,17 +79,17 @@ class TimeCellPair(
       if (debug("cell"))
         errprint("Putting document with coord %s in category %s, before-chunk %s",
           category,  coord, before_chunk)
-      before_cell
+      Some(before_cell)
     } else if (after_cell contains coord) {
       if (debug("cell"))
         errprint("Putting document with coord %s in category %s, after-chunk %s",
           category, coord, after_chunk)
-      after_cell
+      Some(after_cell)
     } else {
       if (debug("cell"))
         errprint("Skipping document with category %s, coord %s because not in either before-chunk %s or after-chunk %s",
           category, coord, before_chunk, after_chunk)
-      null
+      None
     }
   }
 }
@@ -119,14 +119,12 @@ class TimeGrid(
     else {
       if (debug("cell"))
         errprint("Skipping document %s because not in any category", doc)
-      null
+      None
     }
   }
 
   def add_document_to_cell(doc: GeoDoc[TimeCoord]) {
-    val cell = find_best_cell_for_document(doc, false)
-    if (cell != null)
-      cell.add_document(doc)
+    find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
   }
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {

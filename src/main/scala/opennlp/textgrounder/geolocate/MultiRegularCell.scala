@@ -435,15 +435,15 @@ class MultiRegularGrid(
       create: Boolean, record_created_cell: Boolean) = {
     val cell = corner_to_multi_cell.getOrElse(index, null)
     if (cell != null)
-      cell
-    else if (!create) null
+      Some(cell)
+    else if (!create) None
     else {
       val newcell = new MultiRegularCell(this, index)
       if (record_created_cell) {
         num_non_empty_cells += 1
         corner_to_multi_cell(index) = newcell
       }
-      newcell
+      Some(newcell)
     }
   }
 
@@ -454,7 +454,7 @@ class MultiRegularGrid(
   def add_document_to_cell(doc: SphereDocument) {
     for (index <- iterate_overlapping_multi_cells(doc.coord)) {
       val cell = find_cell_for_cell_index(index, create = true,
-        record_created_cell = true)
+        record_created_cell = true).get
       if (debug("cell"))
         errprint("Adding document %s to cell %s", doc, cell)
       cell.add_document(doc)
@@ -468,13 +468,12 @@ class MultiRegularGrid(
     for (i <- minimum_latind to maximum_latind view) {
       for (j <- minimum_longind to maximum_longind view) {
         total_num_cells += 1
-        val cell = find_cell_for_cell_index(RegularCellIndex(i, j),
-          create = false, record_created_cell = false)
-        if (cell != null) {
-          cell.finish()
-          if (debug("cell"))
-            errprint("--> (%d,%d): %s", i, j, cell)
-        }
+        find_cell_for_cell_index(RegularCellIndex(i, j),
+          create = false, record_created_cell = false).foreach(cell => {
+            cell.finish()
+            if (debug("cell"))
+              errprint("--> (%d,%d): %s", i, j, cell)
+          })
         task.item_processed()
       }
     }
