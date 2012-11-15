@@ -165,8 +165,8 @@ object DocumentCounterTracker {
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class GeoDocTable[TCoord : Serializer](
-  val driver: GridLocateDriver[TCoord],
+abstract class GeoDocTable[Co : Serializer](
+  val driver: GridLocateDriver[Co],
   val word_dist_factory: WordDistFactory
 ) {
   // Example of using TaskCounterWrapper directly for non-split values.
@@ -239,7 +239,7 @@ abstract class GeoDocTable[TCoord : Serializer](
   val word_tokens_of_recorded_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
-  def create_document(schema: Schema): GeoDoc[TCoord]
+  def create_document(schema: Schema): GeoDoc[Co]
 
   /**
    * Implementation of `create_and_init_document`.  Subclasses should
@@ -311,7 +311,7 @@ abstract class GeoDocTable[TCoord : Serializer](
         }
         // SCALABUG, same bug with null and a generic type inheriting from
         // a reference type
-        null.asInstanceOf[GeoDoc[TCoord]]
+        null.asInstanceOf[GeoDoc[Co]]
       }
       if (doc.has_coord) {
         num_documents_with_coordinates_by_split(split) += 1
@@ -341,7 +341,7 @@ abstract class GeoDocTable[TCoord : Serializer](
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
       schema: Schema, record_in_table: Boolean, note_globally: Boolean
-    ): DocumentStatus[GeoDoc[TCoord]] = {
+    ): DocumentStatus[GeoDoc[Co]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
@@ -380,7 +380,7 @@ abstract class GeoDocTable[TCoord : Serializer](
           }
         }
       }
-    DocumentStatus[GeoDoc[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
+    DocumentStatus[GeoDoc[Co]](filehand, file, maybedoc, status, reason, docdesc)
   }
 
   /**
@@ -394,7 +394,7 @@ abstract class GeoDocTable[TCoord : Serializer](
   def line_to_document(filehand: FileHandler, file: String, line: String,
       lineno: Long, schema: Schema, record_in_table: Boolean,
       note_globally: Boolean
-    ): DocumentStatus[GeoDoc[TCoord]] = {
+    ): DocumentStatus[GeoDoc[Co]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
       record_in_table, note_globally)
@@ -663,9 +663,9 @@ case class DocumentValidationException(
  * split: Evaluation split of document ("training", "dev", "test"), usually
  *   stored as a fixed field in the schema.
  */
-abstract class GeoDoc[TCoord : Serializer](
+abstract class GeoDoc[Co : Serializer](
   val schema: Schema,
-  val table: GeoDocTable[TCoord]
+  val table: GeoDocTable[Co]
 ) {
 
   import GeoDocConverters._
@@ -697,7 +697,7 @@ abstract class GeoDoc[TCoord : Serializer](
    * undefined if the document has no coordinate (e.g. it might throw an
    * error or return a default value such as `null`).
    */
-  def coord: TCoord
+  def coord: Co
   /**
    * Return the evaluation split ("training", "dev" or "test") of the document.
    * This was created before corpora were sub-divided by the value of this
@@ -799,7 +799,7 @@ abstract class GeoDoc[TCoord : Serializer](
 
   def struct: scala.xml.Elem
 
-  def distance_to_coord(coord2: TCoord): Double
+  def distance_to_coord(coord2: Co): Double
 
   /**
    * Output a distance with attached units
@@ -926,11 +926,11 @@ object GeoDocConverters {
  * @param suffix suffix used for identifying the particular corpus in a
  *  directory
  */
-class GeoDocWriter[TCoord : Serializer](
+class GeoDocWriter[Co : Serializer](
   schema: Schema,
   suffix: String
 ) extends TextDBWriter(schema, suffix) {
-  def output_document(outstream: PrintStream, doc: GeoDoc[TCoord]) {
+  def output_document(outstream: PrintStream, doc: GeoDoc[Co]) {
     schema.output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }

@@ -184,16 +184,16 @@ class EvalStatsWithRank(
  * FIXME: Perhaps we should redo the results in terms of pseudo-documents
  * instead of cells.
  *
- * @tparam TCoord type of a coordinate
+ * @tparam Co type of a coordinate
  *
  * @param document document whose coordinate is predicted
  * @param grid cell grid against which error comparison should be done
  * @param pred_coord predicted coordinate of the document
  */
-class DocumentEvaluationResult[TCoord](
-  val document: GeoDoc[TCoord],
-  val grid: GeoGrid[TCoord],
-  val pred_coord: TCoord
+class DocumentEvaluationResult[Co](
+  val document: GeoDoc[Co],
+  val grid: GeoGrid[Co],
+  val pred_coord: Co
 ) {
   /**
    * True cell in the cell grid in which the document belongs
@@ -227,17 +227,17 @@ class DocumentEvaluationResult[TCoord](
  * Subclass of `DocumentEvaluationResult` where the predicted coordinate
  * is a point, not necessarily the central point of one of the grid cells.
  *
- * @tparam TCoord type of a coordinate
+ * @tparam Co type of a coordinate
  *
  * @param document document whose coordinate is predicted
  * @param grid cell grid against which error comparison should be done
  * @param pred_coord predicted coordinate of the document
  */
-class CoordDocumentEvaluationResult[TCoord](
-  document: GeoDoc[TCoord],
-  grid: GeoGrid[TCoord],
-  pred_coord: TCoord
-) extends DocumentEvaluationResult[TCoord](
+class CoordDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  grid: GeoGrid[Co],
+  pred_coord: Co
+) extends DocumentEvaluationResult[Co](
   document, grid, pred_coord
 ) {
   override def record_result(stats: DocumentEvalStats) {
@@ -257,7 +257,7 @@ class CoordDocumentEvaluationResult[TCoord](
  * an algorithm that does cell-by-cell comparison and computes a ranking of
  * all the cells.
  *
- * @tparam TCoord type of a coordinate
+ * @tparam Co type of a coordinate
  *
  * @param document document whose coordinate is predicted
  * @param pred_cell top-ranked predicted cell in which the document should
@@ -265,11 +265,11 @@ class CoordDocumentEvaluationResult[TCoord](
  * @param true_rank rank of the document's true cell among all of the
  *        predicted cell
  */
-class RankedDocumentEvaluationResult[TCoord](
-  document: GeoDoc[TCoord],
-  val pred_cell: GeoCell[TCoord],
+class RankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  val pred_cell: GeoCell[Co],
   val true_rank: Int
-) extends DocumentEvaluationResult[TCoord](
+) extends DocumentEvaluationResult[Co](
   document, pred_cell.grid,
   pred_cell.get_center_coord()
 ) {
@@ -341,7 +341,7 @@ abstract class RankedDocumentEvalStats(
  * computing not only results for the documents as a whole but also for various
  * subgroups.)
  *
- * @tparam TCoord type of a coordinate
+ * @tparam Co type of a coordinate
  *
  * @param driver_stats Object (possibly a trait) through which global-level
  *   program statistics can be accumulated (in a Hadoop context, this maps
@@ -351,13 +351,13 @@ abstract class RankedDocumentEvalStats(
  *   subresults.  Not on by default because Hadoop may choke on the large
  *   number of counters created this way.
  */
-class GroupedDocumentEvalStats[TCoord](
+class GroupedDocumentEvalStats[Co](
   driver_stats: ExperimentDriverStats,
-  grid: GeoGrid[TCoord],
+  grid: GeoGrid[Co],
   results_by_range: Boolean,
   create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
 ) {
-  type TEvalRes = DocumentEvaluationResult[TCoord]
+  type TEvalRes = DocumentEvaluationResult[Co]
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(driver_stats, prefix + ".byrange." + range)
 
@@ -622,10 +622,10 @@ abstract class CorpusEvaluator(
   }
 }
 
-trait GroupedEvalStatsCreator[TCoord] {
-  def apply(driver: GridLocateDocumentDriver[TCoord],
-    grid: GeoGrid[TCoord], results_by_range: Boolean
-  ): GroupedDocumentEvalStats[TCoord]
+trait GroupedEvalStatsCreator[Co] {
+  def apply(driver: GridLocateDocumentDriver[Co],
+    grid: GeoGrid[Co], results_by_range: Boolean
+  ): GroupedDocumentEvalStats[Co]
 }
 
 /**
@@ -645,7 +645,7 @@ trait GroupedEvalStatsCreator[TCoord] {
  * coordinate that is associated with training and test documents, so that
  * computation of error distances possible.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam Co Type of the coordinate assigned to a document
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -653,14 +653,14 @@ trait GroupedEvalStatsCreator[TCoord] {
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class GridEvaluator[TCoord](
-  val strategy: GridLocateDocumentStrategy[TCoord],
+abstract class GridEvaluator[Co](
+  val strategy: GridLocateDocumentStrategy[Co],
   val stratname: String,
-  override val driver: GridLocateDocumentDriver[TCoord],
-  evalstats: GroupedDocumentEvalStats[TCoord]
+  override val driver: GridLocateDocumentDriver[Co],
+  evalstats: GroupedDocumentEvalStats[Co]
 ) extends CorpusEvaluator(stratname, driver) {
-  type TEvalDoc = GeoDoc[TCoord]
-  override type TEvalRes <: DocumentEvaluationResult[TCoord]
+  type TEvalDoc = GeoDoc[Co]
+  override type TEvalRes <: DocumentEvaluationResult[Co]
 
   // val evalstats = grouped_eval_stats_creator(driver,
   //  strategy.grid, results_by_range = driver.params.results_by_range)
@@ -671,7 +671,7 @@ abstract class GridEvaluator[TCoord](
     evalstats.output_results(all_results = isfinal)
  }
 
-  override def would_skip_document(document: GeoDoc[TCoord], doctag: String) = {
+  override def would_skip_document(document: GeoDoc[Co], doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -694,12 +694,12 @@ abstract class GridEvaluator[TCoord](
    * @param document Document to evaluate.
    * @param true_cell Cell in the cell grid which contains the document.
    */
-  def return_ranked_cells(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]) = {
+  def return_ranked_cells(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     if (driver.params.oracle_results)
       (Iterable((true_cell, 0.0)), 1)
     else {
       def get_computed_results() = {
-        val cells = ranker.evaluate(document, include = Iterable[GeoCell[TCoord]]())
+        val cells = ranker.evaluate(document, include = Iterable[GeoCell[Co]]())
         var rank = 1
         var broken = false
         breakable {
@@ -733,8 +733,8 @@ abstract class GridEvaluator[TCoord](
    * @param want_indiv_results Whether we should print out individual
    *   evaluation results for the document.
    */
-  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
-      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes
+  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
+      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes
 
   /**
    * Evaluate a document, record statistics about it, etc.  Calls
@@ -749,7 +749,7 @@ abstract class GridEvaluator[TCoord](
    *   to be printed out at the beginning of diagnostic lines describing
    *   the document and its evaluation results.
    */
-  def evaluate_document(document: GeoDoc[TCoord], doctag: String): TEvalRes = {
+  def evaluate_document(document: GeoDoc[Co], doctag: String): TEvalRes = {
     val (skip, reason) = would_skip_document(document, doctag)
     assert(!skip)
     assert(document.dist.finished)
@@ -778,7 +778,7 @@ abstract class GridEvaluator[TCoord](
  * score and computes the document's location by the central point of the
  * top-ranked cell.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam Co Type of the coordinate assigned to a document
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -786,22 +786,22 @@ abstract class GridEvaluator[TCoord](
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-class RankedGridEvaluator[TCoord](
-  strategy: GridLocateDocumentStrategy[TCoord],
+class RankedGridEvaluator[Co](
+  strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
-  driver: GridLocateDocumentDriver[TCoord],
-  evalstats: GroupedDocumentEvalStats[TCoord]
-) extends GridEvaluator[TCoord] (
+  driver: GridLocateDocumentDriver[Co],
+  evalstats: GroupedDocumentEvalStats[Co]
+) extends GridEvaluator[Co] (
   strategy, stratname, driver, evalstats
 ) {
-  type TEvalRes = RankedDocumentEvaluationResult[TCoord]
+  type TEvalRes = RankedDocumentEvaluationResult[Co]
 
   /**
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
    */
-  def print_individual_result(doctag: String, document: GeoDoc[TCoord],
-    result: TEvalRes, pred_cells: Iterable[(GeoCell[TCoord], Double)]) {
+  def print_individual_result(doctag: String, document: GeoDoc[Co],
+    result: TEvalRes, pred_cells: Iterable[(GeoCell[Co], Double)]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
@@ -849,8 +849,8 @@ class RankedGridEvaluator[TCoord](
       driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
   }
 
-  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
-      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
+  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
+      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
     val result = new TEvalRes(document, pred_cells.head._1, true_rank)
 
@@ -876,7 +876,7 @@ class RankedGridEvaluator[TCoord](
  * A general implementation of `GridEvaluator` that returns a single
  * best point for a given test document.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam Co Type of the coordinate assigned to a document
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -884,20 +884,20 @@ class RankedGridEvaluator[TCoord](
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class CoordGridEvaluator[TCoord](
-  strategy: GridLocateDocumentStrategy[TCoord],
+abstract class CoordGridEvaluator[Co](
+  strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
-  driver: GridLocateDocumentDriver[TCoord],
-  evalstats: GroupedDocumentEvalStats[TCoord]
-) extends GridEvaluator[TCoord](
+  driver: GridLocateDocumentDriver[Co],
+  evalstats: GroupedDocumentEvalStats[Co]
+) extends GridEvaluator[Co](
   strategy, stratname, driver, evalstats
 ) {
-  type TEvalRes = CoordDocumentEvaluationResult[TCoord]
+  type TEvalRes = CoordDocumentEvaluationResult[Co]
 
   /**
    * Print out the evaluation result.
    */
-  def print_individual_result(doctag: String, document: GeoDoc[TCoord],
+  def print_individual_result(doctag: String, document: GeoDoc[Co],
       result: TEvalRes) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
@@ -911,10 +911,10 @@ abstract class CoordGridEvaluator[TCoord](
       doctag, document.output_distance(result.pred_truedist), result.pred_coord)
   }
 
-  def find_best_point(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]): TCoord
+  def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
 
-  def imp_evaluate_document(document: GeoDoc[TCoord], doctag: String,
-      true_cell: GeoCell[TCoord], want_indiv_results: Boolean): TEvalRes = {
+  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
+      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes = {
     val pred_coord = find_best_point(document, true_cell)
     val result = new TEvalRes(document, strategy.grid, pred_coord)
 
@@ -933,7 +933,7 @@ abstract class CoordGridEvaluator[TCoord](
  * of the strongest cluster of points among the central points of the
  * pseudo-documents.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam Co Type of the coordinate assigned to a document
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -941,17 +941,17 @@ abstract class CoordGridEvaluator[TCoord](
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-class MeanShiftGridEvaluator[TCoord](
-  strategy: GridLocateDocumentStrategy[TCoord],
+class MeanShiftGridEvaluator[Co](
+  strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
-  driver: GridLocateDocumentDriver[TCoord],
-  evalstats: GroupedDocumentEvalStats[TCoord],
+  driver: GridLocateDocumentDriver[Co],
+  evalstats: GroupedDocumentEvalStats[Co],
   k_best: Int,
-  mean_shift_obj: MeanShift[TCoord]
-) extends CoordGridEvaluator[TCoord](
+  mean_shift_obj: MeanShift[Co]
+) extends CoordGridEvaluator[Co](
   strategy, stratname, driver, evalstats
 ) {
-  def find_best_point(document: GeoDoc[TCoord], true_cell: GeoCell[TCoord]) = {
+  def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
     val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)
