@@ -628,6 +628,22 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
+  var rerank_instance =
+    ap.option[String]("rerank-instance",
+      default = "kl-div",
+      aliasedChoices = Seq(
+        Seq("kl-div", "kldiv"),
+        Seq("trivial")),
+      help = """How to generate rerank instances for the reranker, based on
+a combination of a document, a given cell as possible location of the
+document and the original ranking score. Possibilities are
+'trivial' (just use the score as a feature, for testing purposes); 'kl-div'
+(use the score as well as the individual word components of the KL-divergence
+between document and cell).  Default %default.
+
+Note that this only is used when --rerank=pointwise and --rerank-classifier
+specifies something other than 'trivial'.""")
+
   var pa_variant =
     ap.option[Int]("pa-variant",
       metavar = "INT",
@@ -1214,12 +1230,21 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
+  protected def create_rerank_instance_factory() = {
+    params.rerank_instance match {
+      case "trivial" =>
+        new TrivialGeoDocRerankInstanceFactory[Co]
+      case "kl-div" =>
+        new KLDivGeoDocRerankInstanceFactory[Co]
+    }
+  }
+
   def create_ranker(strategy: GridLocateDocumentStrategy[Co]) = {
     val basic_ranker = new GridRanker[Co](strategy)
     if (params.rerank == "none") basic_ranker
     else params.rerank_classifier match {
       case "trivial" =>
-        new TrivialGeoDocReranker[Co](
+        new TrivialGridReranker[Co](
           basic_ranker, params.rerank_top_n)
       case _ => {
         val training_docs =
@@ -1231,10 +1256,11 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
               assert (cell != null)
               (doc, cell)
             }).toIterable
-        new LinearClassifierGeoDocReranker[Co](
+        new LinearClassifierGridReranker[Co](
           basic_ranker,
           create_pointwise_classifier_trainer(),
           training_docs,
+          create_rerank_instance_factory(),
           params.rerank_top_n
         )
       }

@@ -1,7 +1,12 @@
 package opennlp.textgrounder.gridlocate
 
+import math.log
+
+import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.UnigramWordDist
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.perceptron._
+
 /**
  * A basic ranker.  Given a test item, return a list of ranked answers from
  * best to worst, with a score for each.  The score must not increase from
@@ -19,16 +24,17 @@ trait Ranker[TestItem, Answer] {
 }
 
 /**
- * A scoring binary classifier.  Given a test item, return a score, with
- * higher numbers indicating greater likelihood of being "positive".
+ * A ranker for ranking cells in a grid as possible matches for a given
+ * document.
+ *
+ * @param strategy Object encapsulating the strategy used for performing
+ *   ranking.
  */
-trait ScoringBinaryClassifier[TestItem] {
-  /**
-   * The value of `minimum_positive` indicates the dividing line between values
-   * that should be considered positive and those that should be considered
-   * negative; typically this will be 0 or 0.5. */
-  def minimum_positive: Double
-  def score_item(item: TestItem): Double
+class GridRanker[Co](
+  strategy: GridLocateDocumentStrategy[Co]
+ ) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
+  def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
+    strategy.return_ranked_cells(item.dist, include)
 }
 
 /**
@@ -45,7 +51,9 @@ trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
 
 /**
  * A pointwise reranker that uses a scoring classifier to assign a score
- * to each possible answer to be reranked.  The idea is that 
+ * to each possible answer to be reranked.  The idea is that, for each
+ * possible answer, we create test instances based on a combination of the
+ * test item and answer and score the instances to determine the ranking.
  */
 trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
     extends Reranker[TestItem, Answer] {
@@ -60,8 +68,8 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
    * is correct.  These training instances will be used to train the
    * classifier.
    */
-  protected def create_rerank_instance(item: TestItem, possible_answer: Answer,
-    score: Double): RerankInstance
+  protected val create_rerank_instance:
+    (TestItem, Answer, Double) => RerankInstance
 
   /**
    * Number of top-ranked items to submit to reranking.
@@ -101,8 +109,14 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
 }
 
 /**
- * A pointwise reranker that uses a scoring classifier to assign a score
- * to each possible answer to be reranked.  The idea is that ... FIXME.
+ * A pointwise classifying reranker that uses training data to train the
+ * classifier.  The training data consists of test items and correct
+ * answers.  From each data item, a series of training instances are
+ * generated as follows: (1) rank the data item to produce a set of
+ * possible answers; (2) if necessary, augment the possible answers to
+ * include the correct one; (3) create a training instance for each
+ * combination of test item and answer, with "correct" or "incorrect"
+ * indicated.
  */
 trait PointwiseClassifyingRerankerWithTrainingData[
     TestItem, RerankInstance, Answer] extends
@@ -117,9 +131,8 @@ trait PointwiseClassifyingRerankerWithTrainingData[
    * (in the form of pairs of reranking instances and whether they represent
    * correct answers).
    */
-  protected def create_rerank_classifier(
-    data: Iterable[(RerankInstance, Boolean)]
-  ): ScoringBinaryClassifier[RerankInstance]
+  protected val create_rerank_classifier:
+    Iterable[(RerankInstance, Boolean)] => ScoringBinaryClassifier[RerankInstance]
 
   lazy protected val rerank_classifier = {
     if (training_data == null)
@@ -138,117 +151,155 @@ trait PointwiseClassifyingRerankerWithTrainingData[
 }
 
 /**
- * A pointwise reranker that uses a linear classifier to assign a score
- * to each possible answer to be reranked.
+ * A scoring binary classifier.  Given a test item, return a score, with
+ * higher numbers indicating greater likelihood of being "positive".
  */
-trait LinearClassifierReranker[
-  TestItem, RerankInstance <: FeatureVector, Answer
-] extends PointwiseClassifyingRerankerWithTrainingData[
-  TestItem, RerankInstance, Answer
-] {
+trait ScoringBinaryClassifier[TestItem] {
   /**
-   * Trainer for the classifier used for reranking, given a set of training data
-   * (in the form of pairs of reranking instances and whether they represent
-   * correct answers).
-   */
-  protected def linear_classifier_trainer: BinaryLinearClassifierTrainer
-
-  /**
-   * An adapter class converting `BinaryLinearClassifier` (from the perceptron
-   * package) into a `ScoringBinaryClassifier`.
-   * FIXME: Just use one of the two everywhere.
-   */
-  class LinearClassifierAdapter(
-    cfier: BinaryLinearClassifier
-  ) extends ScoringBinaryClassifier[RerankInstance] {
-    /**
-     * The value of `minimum_positive` indicates the dividing line between values
-     * that should be considered positive and those that should be considered
-     * negative; typically this will be 0 or 0.5. */
-    def minimum_positive = 0.0
-    def score_item(item: RerankInstance) = cfier.binary_score(item)
-  }
-
-  protected def create_rerank_classifier(
-    data: Iterable[(RerankInstance, Boolean)]
-  ) = {
-    val adapted_data = data.map {
-      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
-    }
-    new LinearClassifierAdapter(linear_classifier_trainer(adapted_data, 2))
-  }
+   * The value of `minimum_positive` indicates the dividing line between values
+   * that should be considered positive and those that should be considered
+   * negative; typically this will be 0 or 0.5. */
+  def minimum_positive: Double
+  def score_item(item: TestItem): Double
 }
 
 /**
- * @param strategy Object encapsulating the strategy used for performing
- *   evaluation.
+ * An adapter class converting `BinaryLinearClassifier` (from the perceptron
+ * package) into a `ScoringBinaryClassifier`.
+ * FIXME: Just use one of the two everywhere.
  */
-class GridRanker[Co](
-  strategy: GridLocateDocumentStrategy[Co]
- ) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
-  def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
-    strategy.return_ranked_cells(item.dist, include)
+class LinearClassifierAdapter (
+  cfier: BinaryLinearClassifier
+) extends ScoringBinaryClassifier[FeatureVector] {
+  /**
+   * The value of `minimum_positive` indicates the dividing line between values
+   * that should be considered positive and those that should be considered
+   * negative; typically this will be 0 or 0.5. */
+  def minimum_positive = 0.0
+  def score_item(item: FeatureVector) = cfier.binary_score(item)
 }
 
-class GeoDocRerankInstance[Co](
-  doc: GeoDoc[Co], cell: GeoCell[Co], score: Double
-) extends SparseFeatureVector(Map("score" -> score)) {
+/**
+ * Trainer for `LinearClassifierAdapter`. This is a simple factory class that
+ * can be used as a function.  The data passed in is in the form of pairs of
+ * reranking instances and whether they represent correct answers.
+ */
+class LinearClassifierAdapterTrainer (
+  trainer: BinaryLinearClassifierTrainer
+) extends (
+  Iterable[(FeatureVector, Boolean)] => ScoringBinaryClassifier[FeatureVector]
+) {
+  def apply(data: Iterable[(FeatureVector, Boolean)]) = {
+    val adapted_data = data.map {
+      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
+    }
+    new LinearClassifierAdapter(trainer(adapted_data, 2))
+  }
 }
 
-abstract class GeoDocReranker[Co](
-  _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
-  _top_n: Int
-) extends PointwiseClassifyingReranker[
-  GeoDoc[Co], GeoDocRerankInstance[Co], GeoCell[Co]
-  ] {
-  protected val top_n = _top_n
-  protected val initial_ranker = _initial_ranker
+trait GeoDocRerankInstanceFactory[Co] extends (
+  (GeoDoc[Co], GeoCell[Co], Double) => FeatureVector
+) {
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double):
+    FeatureVector
+}
 
-  protected def create_rerank_instance(item: GeoDoc[Co], possible_answer: GeoCell[Co],
-    score: Double) =
-      new GeoDocRerankInstance[Co](
-        item, possible_answer, score)
+/**
+ * A simple factory for generating rerank instances for a document, using
+ * nothing but the score passed in.
+ */
+class TrivialGeoDocRerankInstanceFactory[Co] extends
+    GeoDocRerankInstanceFactory[Co] {
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) =
+    new SparseFeatureVector(Map("-SCORE-" -> score))
+}
+
+/**
+ * A simple factory for generating rerank instances for a document, using
+ * individual KL-divergence components for each word in the document.
+ */
+class KLDivGeoDocRerankInstanceFactory[Co] extends
+    GeoDocRerankInstanceFactory[Co] {
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) = {
+    val indiv_kl_vals =
+      doc.dist match {
+        case udist: UnigramWordDist => {
+         val celldist =
+           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
+          (for (word <- udist.model.iter_keys;
+               p = udist.lookup_word(word);
+               q = celldist.lookup_word(word);
+               if q != 0.0)
+            yield (unmemoize_string(word), p*(log(p) - log(q)))
+          ).toMap
+        }
+        case _ =>
+          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
+      }
+    new SparseFeatureVector(Map("-SCORE-" -> score) ++ indiv_kl_vals)
+  }
 }
 
 /**
  * A trivial scoring binary classifier that simply returns the already
  * existing score from a ranker.
  */
-class TrivialScoringBinaryClassifier[TestItem <: SparseFeatureVector](
+class TrivialScoringBinaryClassifier(
   val minimum_positive: Double
-) extends ScoringBinaryClassifier[TestItem] {
-  def score_item(item: TestItem) = {
-    val retval = item("score")
-    errprint("Trivial scoring item %s = %s", item, retval)
-    retval
+) extends ScoringBinaryClassifier[Double] {
+  def score_item(item: Double) = {
+    errprint("Trivial scoring item %s", item)
+    item
   }
 }
 
-class TrivialGeoDocReranker[Co](
-  _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
-  _top_n: Int
-) extends GeoDocReranker[Co](
-  _initial_ranker, _top_n
-) {
+/**
+ * A trivial grid reranker.  A grid reranker is a reranker based on a grid
+ * ranker (for ranking cells in a grid as possible matches for a given
+ * document).  This simply returns the initial score as the new score,
+ * meaning that the ranking will be unchanged.
+ */
+class TrivialGridReranker[Co](
+  val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
+  val top_n: Int
+) extends PointwiseClassifyingReranker[
+  GeoDoc[Co], Double, GeoCell[Co]
+] {
   lazy protected val rerank_classifier =
-    new TrivialScoringBinaryClassifier[
-      GeoDocRerankInstance[Co]](
+    new TrivialScoringBinaryClassifier(
         0 // FIXME: This is incorrect but doesn't matter
-      )
+    )
+  protected val create_rerank_instance =
+    (item: GeoDoc[Co], answer: GeoCell[Co], score: Double) => score
 }
 
-class LinearClassifierGeoDocReranker[Co](
-  _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
-  _trainer: BinaryLinearClassifierTrainer,
-  _training_data: Iterable[(GeoDoc[Co], GeoCell[Co])],
-  _top_n: Int
-) extends GeoDocReranker[Co](
-  _initial_ranker, _top_n
-) with LinearClassifierReranker[GeoDoc[Co],
-  GeoDocRerankInstance[Co],
-  GeoCell[Co]] {
-  val linear_classifier_trainer = _trainer
-  val training_data = _training_data
-  if (training_data == null)
-    errprint("null training_data in constructor")
+/**
+ * A grid reranker using a linear classifier.  A grid reranker is a reranker
+ * based on a grid ranker (for ranking cells in a grid as possible matches
+ * for a given document).
+ *
+ * @param initial_ranker The ranker used to create the initial ranking over
+ *   the grid.
+ * @param trainer Factory object for training a linear classifier used for
+ *   pointwise reranking.
+ * @param training_data Training data used to generate training instances
+ *   for the reranking linear classifier.  Generally the same as what was
+ *   used to train the initial ranker.
+ * @param create_rerank_instance Factory object for creating appropriate
+ *   feature vectors describing the combination of document, possible
+ *   cell and initial score.
+ * @param top_n Number of top items to rerank.
+ */
+class LinearClassifierGridReranker[Co](
+  val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
+  val trainer: BinaryLinearClassifierTrainer,
+  val training_data: Iterable[(GeoDoc[Co], GeoCell[Co])],
+  val create_rerank_instance:
+    (GeoDoc[Co], GeoCell[Co], Double) => FeatureVector,
+  val top_n: Int
+) extends PointwiseClassifyingRerankerWithTrainingData[
+  GeoDoc[Co], FeatureVector, GeoCell[Co]
+  ] {
+  protected val create_rerank_classifier =
+    new LinearClassifierAdapterTrainer(trainer)
 }
