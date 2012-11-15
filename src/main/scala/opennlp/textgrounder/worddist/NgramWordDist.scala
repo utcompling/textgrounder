@@ -31,7 +31,7 @@ import tg.util.textdbutil
 import tg.util.ioutil.{FileHandler, FileFormatException}
 import tg.util.printutil.{errprint, warning}
 
-import tg.gridlocate.GDoc
+import tg.gridlocate.GeoDoc
 import tg.gridlocate.GridLocateDriver.Debug._
 
 import WordDist.memoizer._
@@ -431,7 +431,7 @@ class DefaultNgramWordDistConstructor(
   def maybe_lowercase(ngram: Ngram) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def initialize_distribution(doc: GDoc[_], countstr: String) {
+  def initialize_distribution(doc: GeoDoc[_], countstr: String) {
     parse_counts(countstr)
     // Now set the distribution on the document.
     val dist = factory.create_word_dist

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  GDoc.scala
+//  GeoDoc.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
@@ -156,16 +156,16 @@ object DocumentCounterTracker {
 
 
 /////////////////////////////////////////////////////////////////////////////
-//                          GDoc tables                            //
+//                          GeoDoc tables                            //
 /////////////////////////////////////////////////////////////////////////////
 
-//////////////////////  GDoc table
+//////////////////////  GeoDoc table
 
 /**
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class GDocTable[TCoord : Serializer](
+abstract class GeoDocTable[TCoord : Serializer](
   val driver: GridLocateDriver[TCoord],
   val word_dist_factory: WordDistFactory
 ) {
@@ -239,7 +239,7 @@ abstract class GDocTable[TCoord : Serializer](
   val word_tokens_of_recorded_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
-  def create_document(schema: Schema): GDoc[TCoord]
+  def create_document(schema: Schema): GeoDoc[TCoord]
 
   /**
    * Implementation of `create_and_init_document`.  Subclasses should
@@ -311,7 +311,7 @@ abstract class GDocTable[TCoord : Serializer](
         }
         // SCALABUG, same bug with null and a generic type inheriting from
         // a reference type
-        null.asInstanceOf[GDoc[TCoord]]
+        null.asInstanceOf[GeoDoc[TCoord]]
       }
       if (doc.has_coord) {
         num_documents_with_coordinates_by_split(split) += 1
@@ -341,7 +341,7 @@ abstract class GDocTable[TCoord : Serializer](
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
       schema: Schema, record_in_table: Boolean, note_globally: Boolean
-    ): DocumentStatus[GDoc[TCoord]] = {
+    ): DocumentStatus[GeoDoc[TCoord]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
@@ -380,7 +380,7 @@ abstract class GDocTable[TCoord : Serializer](
           }
         }
       }
-    DocumentStatus[GDoc[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
+    DocumentStatus[GeoDoc[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
   }
 
   /**
@@ -394,7 +394,7 @@ abstract class GDocTable[TCoord : Serializer](
   def line_to_document(filehand: FileHandler, file: String, line: String,
       lineno: Long, schema: Schema, record_in_table: Boolean,
       note_globally: Boolean
-    ): DocumentStatus[GDoc[TCoord]] = {
+    ): DocumentStatus[GeoDoc[TCoord]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
       record_in_table, note_globally)
@@ -610,7 +610,7 @@ abstract class GDocTable[TCoord : Serializer](
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                             GDocs                               //
+//                             GeoDocs                               //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -663,12 +663,12 @@ case class DocumentValidationException(
  * split: Evaluation split of document ("training", "dev", "test"), usually
  *   stored as a fixed field in the schema.
  */
-abstract class GDoc[TCoord : Serializer](
+abstract class GeoDoc[TCoord : Serializer](
   val schema: Schema,
-  val table: GDocTable[TCoord]
+  val table: GeoDocTable[TCoord]
 ) {
 
-  import GDocConverters._
+  import GeoDocConverters._
 
   /**
    * Title of the document -- something that uniquely identifies it,
@@ -786,7 +786,7 @@ abstract class GDoc[TCoord : Serializer](
     }
   }
 
-  // def __repr__ = "GDoc(%s)" format toString.encode("utf-8")
+  // def __repr__ = "GeoDoc(%s)" format toString.encode("utf-8")
 
   def shortstr = "%s" format title
 
@@ -812,7 +812,7 @@ abstract class GDoc[TCoord : Serializer](
 //                           Conversion functions                          //
 /////////////////////////////////////////////////////////////////////////////
 
-object GDocConverters {
+object GeoDocConverters {
   def yesno_to_boolean(foo: String)  = {
     foo match {
       case "yes" => true
@@ -916,21 +916,21 @@ object GDocConverters {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                       GDoc File Processors                      //
+//                       GeoDoc File Processors                      //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * A writer class for writing GDocs out to a corpus.
+ * A writer class for writing GeoDocs out to a corpus.
  *
  * @param schema schema describing the fields in the document files
  * @param suffix suffix used for identifying the particular corpus in a
  *  directory
  */
-class GDocWriter[TCoord : Serializer](
+class GeoDocWriter[TCoord : Serializer](
   schema: Schema,
   suffix: String
 ) extends TextDBWriter(schema, suffix) {
-  def output_document(outstream: PrintStream, doc: GDoc[TCoord]) {
+  def output_document(outstream: PrintStream, doc: GeoDoc[TCoord]) {
     schema.output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }

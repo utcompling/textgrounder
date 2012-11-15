@@ -116,7 +116,7 @@ object UnigramStrategy {
  * individual words).
  */
 abstract class GridLocateDocumentStrategy[TCoord](
-  val grid: GGrid[TCoord]
+  val grid: GeoGrid[TCoord]
 ) {
   /**
    * For a given word distribution (describing a test document), return
@@ -126,8 +126,8 @@ abstract class GridLocateDocumentStrategy[TCoord](
    * be in sorted order, with better cells earlier.
    */
   def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GCell[TCoord]]):
-    Iterable[(GCell[TCoord], Double)]
+      include: Iterable[GeoCell[TCoord]]):
+    Iterable[(GeoCell[TCoord], Double)]
 }
 
 /**
@@ -136,10 +136,10 @@ abstract class GridLocateDocumentStrategy[TCoord](
  */
 
 class RandomGridLocateDocumentStrategy[TCoord](
-  grid: GGrid[TCoord]
+  grid: GeoGrid[TCoord]
 ) extends GridLocateDocumentStrategy[TCoord](grid) {
   def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GCell[TCoord]]) = {
+      include: Iterable[GeoCell[TCoord]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
@@ -153,10 +153,10 @@ class RandomGridLocateDocumentStrategy[TCoord](
  */
 
 class MostPopularGridLocateDocumentStrategy[TCoord] (
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   internal_link: Boolean
 ) extends GridLocateDocumentStrategy[TCoord](grid) {
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GCell[TCoord]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[TCoord]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
       yield (cell,
@@ -174,13 +174,13 @@ class MostPopularGridLocateDocumentStrategy[TCoord] (
  * in turn and computing a score.
  */
 abstract class PointwiseScoreStrategy[TCoord](
-  grid: GGrid[TCoord]
+  grid: GeoGrid[TCoord]
 ) extends GridLocateDocumentStrategy[TCoord](grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
    */
-  def score_cell(word_dist: WordDist, cell: GCell[TCoord]): Double
+  def score_cell(word_dist: WordDist, cell: GeoCell[TCoord]): Double
 
   /**
    * Compare a word distribution (for a document, typically) against all
@@ -188,14 +188,14 @@ abstract class PointwiseScoreStrategy[TCoord](
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells_serially(word_dist: WordDist,
-    include: Iterable[GCell[TCoord]]) = {
+    include: Iterable[GeoCell[TCoord]]) = {
     /*
      The non-parallel way of doing things; Stephen resurrected it when
      merging the Dirichlet stuff.  Attempting to use the parallel method
      caused an assertion failure after about 1200 of 1895 documents using
      GeoText.
      */
-      val buffer = mutable.Buffer[(GCell[TCoord], Double)]()
+      val buffer = mutable.Buffer[(GeoCell[TCoord], Double)]()
 
       for (cell <- grid.iter_nonempty_cells_including(
           include, nonempty_word_dist = true)) {
@@ -217,13 +217,13 @@ abstract class PointwiseScoreStrategy[TCoord](
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells_parallel(word_dist: WordDist,
-    include: Iterable[GCell[TCoord]]) = {
+    include: Iterable[GeoCell[TCoord]]) = {
     val cells = grid.iter_nonempty_cells_including(
       include, nonempty_word_dist = true)
     cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
   }
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GCell[TCoord]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[TCoord]]) = {
     // FIXME, eliminate this global reference
     val parallel = !GridLocateDriver.Params.no_parallel
     val cell_buf = {
@@ -268,7 +268,7 @@ abstract class PointwiseScoreStrategy[TCoord](
  * any case since it's comparing documents against cells.)
  */
 class KLDivergenceStrategy[TCoord](
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   partial: Boolean = true,
   symmetric: Boolean = false
 ) extends PointwiseScoreStrategy[TCoord](grid) {
@@ -279,7 +279,7 @@ class KLDivergenceStrategy[TCoord](
   def call_kl_divergence(self: WordDist, other: WordDist) =
     self.kl_divergence(self_kl_cache, other, partial = partial)
 
-  def score_cell(word_dist: WordDist, cell: GCell[TCoord]) = {
+  def score_cell(word_dist: WordDist, cell: GeoCell[TCoord]) = {
     val cell_word_dist = cell.combined_dist.word_dist
     var kldiv = call_kl_divergence(word_dist, cell_word_dist)
     if (symmetric) {
@@ -292,7 +292,7 @@ class KLDivergenceStrategy[TCoord](
   }
 
   override def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GCell[TCoord]]) = {
+      include: Iterable[GeoCell[TCoord]]) = {
     // This will be used by `score_cell` above.
     self_kl_cache = word_dist.get_kl_divergence_cache()
 
@@ -340,12 +340,12 @@ class KLDivergenceStrategy[TCoord](
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy[TCoord](
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   smoothed: Boolean = false,
   partial: Boolean = false
 ) extends PointwiseScoreStrategy[TCoord](grid) {
 
-  def score_cell(word_dist: WordDist, cell: GCell[TCoord]) = {
+  def score_cell(word_dist: WordDist, cell: GeoCell[TCoord]) = {
     var cossim =
       word_dist.cosine_similarity(cell.combined_dist.word_dist,
         partial = partial, smoothed = smoothed)
@@ -360,11 +360,11 @@ class CosineSimilarityStrategy[TCoord](
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy[TCoord](
-  grid: GGrid[TCoord],
+  grid: GeoGrid[TCoord],
   use_baseline: Boolean = true
 ) extends PointwiseScoreStrategy[TCoord](grid) {
 
-  def score_cell(word_dist: WordDist, cell: GCell[TCoord]) = {
+  def score_cell(word_dist: WordDist, cell: GeoCell[TCoord]) = {
     val params = grid.table.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
@@ -388,7 +388,7 @@ class NaiveBayesDocumentStrategy[TCoord](
 }
 
 class AverageCellProbabilityStrategy[TCoord](
-  grid: GGrid[TCoord]
+  grid: GeoGrid[TCoord]
 ) extends GridLocateDocumentStrategy[TCoord](grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[TCoord](lru_cache_size)
@@ -396,7 +396,7 @@ class AverageCellProbabilityStrategy[TCoord](
   val cdist_factory =
     create_cell_dist_factory(grid.table.driver.params.lru_cache_size)
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GCell[TCoord]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[TCoord]]) = {
     val celldist =
       cdist_factory.get_cell_dist_for_word_dist(grid, word_dist)
     celldist.get_ranked_cells(include)
@@ -906,8 +906,8 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
 
   var stopwords: Set[String] = _
   var whitelist: Set[String] = _
-  var grid: GGrid[TCoord] = _
-  var document_table: GDocTable[TCoord] = _
+  var grid: GeoGrid[TCoord] = _
+  var document_table: GeoDocTable[TCoord] = _
   var word_dist_factory: WordDistFactory = _
   var word_dist_constructor: WordDistConstructor = _
   var document_file_suffix: String = _
@@ -941,9 +941,9 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory):
-    GDocTable[TCoord]
+    GeoDocTable[TCoord]
 
-  protected def initialize_grid(table: GDocTable[TCoord]): GGrid[TCoord]
+  protected def initialize_grid(table: GeoDocTable[TCoord]): GeoGrid[TCoord]
 
   protected def word_dist_type = {
     if (params.word_dist == "unsmoothed-ngram") "ngram"
@@ -1026,7 +1026,7 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
   def read_training_documents(operation: String = "reading",
       record_in_subtable: Boolean = false,
       note_globally: Boolean = false,
-      finish_globally: Boolean = true): Iterator[GDoc[TCoord]] = {
+      finish_globally: Boolean = true): Iterator[GeoDoc[TCoord]] = {
     val task =
       new ExperimentMeteredTask(this, "document", operation,
         maxtime = params.max_time_per_stage)
@@ -1087,7 +1087,7 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
       // recording of global statistics in the word dists. [[However, currently
       // that's handled in a totally hacked fashion in a combination of
       // DefaultUnigramWordDistConstructor.initialize_distribution()
-      // and GDoc.set_field().]] -- not true. In reality, all the glop handled
+      // and GeoDoc.set_field().]] -- not true. In reality, all the glop handled
       // by finish_before_global() and note_dist_globally() (as well as
       // record_in_subtable) and such should be handled by separate mapping
       // stages onto the documents.
@@ -1140,7 +1140,7 @@ trait GridLocateDocumentDriver[TCoord] extends GridLocateDriver[TCoord] {
     Iterable[(String, GridLocateDocumentStrategy[TCoord])] = _
   var rankers: Map[
     GridLocateDocumentStrategy[TCoord],
-    Ranker[GDoc[TCoord], GCell[TCoord]]
+    Ranker[GeoDoc[TCoord], GeoCell[TCoord]]
   ] = _
 
   override def handle_parameters() {
@@ -1219,7 +1219,7 @@ trait GridLocateDocumentDriver[TCoord] extends GridLocateDriver[TCoord] {
     if (params.rerank == "none") basic_ranker
     else params.rerank_classifier match {
       case "trivial" =>
-        new TrivialGDocReranker[TCoord](
+        new TrivialGeoDocReranker[TCoord](
           basic_ranker, params.rerank_top_n)
       case _ => {
         val training_docs =
@@ -1231,7 +1231,7 @@ trait GridLocateDocumentDriver[TCoord] extends GridLocateDriver[TCoord] {
               assert (cell != null)
               (doc, cell)
             }).toIterable
-        new LinearClassifierGDocReranker[TCoord](
+        new LinearClassifierGeoDocReranker[TCoord](
           basic_ranker,
           create_pointwise_classifier_trainer(),
           training_docs,
