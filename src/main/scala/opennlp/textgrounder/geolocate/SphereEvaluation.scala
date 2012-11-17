@@ -247,19 +247,32 @@ class RankedSphereGridEvaluator(
 ) extends RankedGridEvaluator[SphereCoord](
   strategy, stratname, driver, evalstats
 ) {
-  override def print_individual_result(doctag: String,
-      document: SphereDocument,
-      result: TEvalRes,
-      pred_cells: Iterable[(SphereCell, Double)]) {
-    super.print_individual_result(doctag, document, result, pred_cells)
+  override def imp_evaluate_document(document: GeoDoc[SphereCoord], doctag: String,
+      true_cell: GeoCell[SphereCoord]) = {
+    val result = super.imp_evaluate_document(document, doctag, true_cell)
+    new RankedSphereDocumentEvaluationResult(result.document,
+      result.pred_cells, result.true_rank)
+  }
+}
+
+class RankedSphereDocumentEvaluationResult(
+  document: GeoDoc[SphereCoord],
+  pred_cells: Iterable[(GeoCell[SphereCoord], Double)],
+  true_rank: Int
+) extends RankedDocumentEvaluationResult[SphereCoord](
+  document, pred_cells, true_rank
+) {
+  override def print_result(doctag: String, document: GeoDoc[SphereCoord],
+      driver: GridLocateDocumentDriver[SphereCoord]) {
+    super.print_result(doctag, document, driver)
 
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
       (debuglist("gridrank") contains doctag.drop(1))) {
       val grsize = debugval("gridranksize").toInt
-      result.true_cell match {
+      true_cell match {
         case multireg: MultiRegularCell =>
-          strategy.grid.asInstanceOf[MultiRegularGrid].
+          multireg.grid.
             output_ranking_grid(
               pred_cells.asInstanceOf[Iterable[(MultiRegularCell, Double)]],
               multireg, grsize)
