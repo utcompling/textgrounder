@@ -804,21 +804,31 @@ found   : (String, Iterator[evalobj.TEvalRes])
 [error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
 */
 ): GridEvaluator[SphereCoord] = {
+    val output_result_with_units =
+      (kmdist: Double) => km_and_miles(kmdist)
+
+    val create_stats: (ExperimentDriverStats, String) =>
+        DocumentEvalStats[SphereCoord] =
+      params.coord_strategy match {
+        case "top-ranked" =>
+          new RankedDocumentEvalStats(_, _, output_result_with_units)
+        case "mean-shift" =>
+          new CoordDocumentEvalStats(_, _, output_result_with_units)
+      }
+
+    val evalstats =
+      if (params.results_by_range)
+        new GroupedSphereDocumentEvalStats(this, strategy.grid,
+          create_stats = create_stats)
+      else
+        new SphereDocumentEvalStats(this, create_stats(this, ""))
+
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereGridEvaluator(strategy, stratname, this,
-          new GroupedSphereDocumentEvalStats(this,
-            strategy.grid, results_by_range = params.results_by_range,
-            create_stats = (driver_stats, prefix) =>
-              new RankedSphereDocumentEvalStats(driver_stats, prefix)
-          )
-        )
+        new RankedSphereGridEvaluator(strategy, stratname, this, evalstats)
       case "mean-shift" =>
         new MeanShiftGridEvaluator[SphereCoord](strategy, stratname, this,
-          new GroupedSphereDocumentEvalStats(this,
-            strategy.grid, results_by_range = params.results_by_range,
-            create_stats = (driver_stats, prefix) =>
-              new CoordSphereDocumentEvalStats(driver_stats, prefix)),
+          evalstats,
           params.k_best,
           new SphereMeanShift(params.mean_shift_window,
             params.mean_shift_max_stddev, params.mean_shift_max_iterations)
