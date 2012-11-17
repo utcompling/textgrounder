@@ -278,6 +278,7 @@ class CoordDocumentEvaluationResult[Co](
  */
 class RankedDocumentEvaluationResult[Co](
   document: GeoDoc[Co],
+  // FIXME: Possible memory hog from storing all the results?
   val pred_cells: Iterable[(GeoCell[Co], Double)],
   val true_rank: Int
 ) extends DocumentEvaluationResult[Co](
