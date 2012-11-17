@@ -141,7 +141,7 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
  */
 
 class MultiRegularCell(
-  grid: MultiRegularGrid,
+  override val grid: MultiRegularGrid,
   val index: RegularCellIndex
 ) extends RectangularCell(grid) {
 

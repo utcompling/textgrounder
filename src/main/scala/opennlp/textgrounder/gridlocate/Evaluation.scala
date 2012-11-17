@@ -221,6 +221,25 @@ class DocumentEvaluationResult[Co](
   def record_result(stats: DocumentEvalStats) {
     stats.record_predicted_distance(pred_truedist)
   }
+
+  /**
+   * Print out the evaluation result, possibly along with some of the
+   * top-ranked cells.
+   */
+  def print_result(doctag: String, document: GeoDoc[Co],
+    driver: GridLocateDocumentDriver[Co]) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    errprint("%s:  %d types, %f tokens",
+      doctag, document.dist.model.num_types, document.dist.model.num_tokens)
+
+    errprint("%s:  Distance %s to true cell center at %s",
+      doctag, document.output_distance(true_truedist), true_center)
+    errprint("%s:  Distance %s to predicted cell center at %s",
+      doctag, document.output_distance(pred_truedist), pred_coord)
+
+    errprint("%s:  true cell: %s", doctag, true_cell)
+  }
 }
 
 /**
@@ -248,6 +267,7 @@ class CoordDocumentEvaluationResult[Co](
     // "incorrect" always exists.
     stats.asInstanceOf[CoordDocumentEvalStats].record_result(false)
   }
+
 }
 
 /**
@@ -267,15 +287,55 @@ class CoordDocumentEvaluationResult[Co](
  */
 class RankedDocumentEvaluationResult[Co](
   document: GeoDoc[Co],
-  val pred_cell: GeoCell[Co],
+  val pred_cells: Iterable[(GeoCell[Co], Double)],
   val true_rank: Int
 ) extends DocumentEvaluationResult[Co](
-  document, pred_cell.grid,
-  pred_cell.get_center_coord()
+  document, pred_cells.head._1.grid,
+  pred_cells.head._1.get_center_coord()
 ) {
   override def record_result(stats: DocumentEvalStats) {
     super.record_result(stats)
     stats.asInstanceOf[RankedDocumentEvalStats].record_true_rank(true_rank)
+  }
+
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
+    errprint("%s:  true cell at rank: %s", doctag, true_rank)
+    val num_cells_to_output =
+      if (driver.params.num_top_cells_to_output >= 0)
+         math.min(driver.params.num_top_cells_to_output, pred_cells.size)
+      else pred_cells.size
+    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex) {
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        doctag, i + 1, -score, cell)
+    }
+
+    val num_nearest_neighbors = driver.params.num_nearest_neighbors
+    val kNN = pred_cells.take(num_nearest_neighbors).map {
+      case (cell, score) => cell }
+    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
+      case ((cell, score), i) => (cell, i + 1) }.toMap
+    val closest_half_with_dists =
+      kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
+        toSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+
+    closest_half_with_dists.foreach {
+      case (cell, dist) =>
+        errprint("%s:  #%s close neighbor: %s; error distance: %s",
+          doctag, kNNranks(cell), cell.get_center_coord,
+          document.output_distance(dist))
+    }
+
+    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
+    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
+      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
+      document.output_distance(avg_dist_of_neighbors))
+
+    if (avg_dist_of_neighbors < pred_truedist)
+      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
   }
 }
 
@@ -660,7 +720,7 @@ abstract class GridEvaluator[Co](
   evalstats: GroupedDocumentEvalStats[Co]
 ) extends CorpusEvaluator(stratname, driver) {
   type TEvalDoc = GeoDoc[Co]
-  override type TEvalRes <: DocumentEvaluationResult[Co]
+  override type TEvalRes = DocumentEvaluationResult[Co]
 
   // val evalstats = grouped_eval_stats_creator(driver,
   //  strategy.grid, results_by_range = driver.params.results_by_range)
@@ -737,11 +797,9 @@ abstract class GridEvaluator[Co](
    *   to be printed out at the beginning of diagnostic lines describing
    *   the document and its evaluation results.
    * @param true_cell Cell in the cell grid which contains the document.
-   * @param want_indiv_results Whether we should print out individual
-   *   evaluation results for the document.
    */
   def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes
+      true_cell: GeoCell[Co]): TEvalRes
 
   /**
    * Evaluate a document, record statistics about it, etc.  Calls
@@ -769,10 +827,17 @@ abstract class GridEvaluator[Co](
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
+    val result = imp_evaluate_document(document, doctag, true_cell)
     val want_indiv_results =
       !driver.params.oracle_results && !driver.params.no_individual_results
-    val result = imp_evaluate_document(document, doctag, true_cell,
-      want_indiv_results)
+    if (want_indiv_results) {
+      //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
+      //for((cell, score) <- pred_cells) {
+      //  val scell = cell.asInstanceOf[GeoCell[GeoCoord, GeoDoc]]
+      //}
+      result.print_result(doctag, document, driver)
+    }
+
     evalstats.record_result(result)
     if (result.num_docs_in_true_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
@@ -803,65 +868,9 @@ class RankedGridEvaluator[Co](
 ) extends GridEvaluator[Co] (
   strategy, stratname, driver, evalstats
 ) {
-  type TEvalRes = RankedDocumentEvaluationResult[Co]
-
-  /**
-   * Print out the evaluation result, possibly along with some of the
-   * top-ranked cells.
-   */
-  def print_individual_result(doctag: String, document: GeoDoc[Co],
-    result: TEvalRes, pred_cells: Iterable[(GeoCell[Co], Double)]) {
-    errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document distribution: %s", doctag, document.dist)
-    errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.model.num_types, document.dist.model.num_tokens)
-    errprint("%s:  true cell at rank: %s", doctag, result.true_rank)
-    errprint("%s:  true cell: %s", doctag, result.true_cell)
-    val num_cells_to_output =
-      if (driver.params.num_top_cells_to_output >= 0)
-         math.min(driver.params.num_top_cells_to_output, pred_cells.size)
-      else pred_cells.size
-    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex) {
-      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
-        doctag, i + 1, -score, cell)
-    }
-
-    val num_nearest_neighbors = driver.params.num_nearest_neighbors
-    val kNN = pred_cells.take(num_nearest_neighbors).map {
-      case (cell, score) => cell }
-    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
-      case ((cell, score), i) => (cell, i + 1) }.toMap
-    val closest_half_with_dists =
-      kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
-        toSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
-
-    closest_half_with_dists.foreach {
-      case (cell, dist) =>
-        errprint("%s:  #%s close neighbor: %s; error distance: %s",
-          doctag, kNNranks(cell), cell.get_center_coord,
-          document.output_distance(dist))
-    }
-
-    errprint("%s:  Distance %s to true cell center at %s",
-      doctag, document.output_distance(result.true_truedist), result.true_center)
-    errprint("%s:  Distance %s to predicted cell center at %s",
-      doctag, document.output_distance(result.pred_truedist), result.pred_coord)
-
-    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
-    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
-      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
-      document.output_distance(avg_dist_of_neighbors))
-
-    if (avg_dist_of_neighbors < result.pred_truedist)
-      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
-  }
-
   def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes = {
+      true_cell: GeoCell[Co]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
-    val result = new TEvalRes(document, pred_cells.head._1, true_rank)
 
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
@@ -869,15 +878,7 @@ class RankedGridEvaluator[Co](
           cell.describe_indices(), score)
       }
     }
-    if (want_indiv_results) {
-      //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
-      //for((cell, score) <- pred_cells) {
-      //  val scell = cell.asInstanceOf[GeoCell[GeoCoord, GeoDoc]]
-      //}
-      print_individual_result(doctag, document, result, pred_cells)
-    }
-
-    return result
+    new RankedDocumentEvaluationResult[Co](document, pred_cells, true_rank)
   }
 }
 
@@ -901,36 +902,12 @@ abstract class CoordGridEvaluator[Co](
 ) extends GridEvaluator[Co](
   strategy, stratname, driver, evalstats
 ) {
-  type TEvalRes = CoordDocumentEvaluationResult[Co]
-
-  /**
-   * Print out the evaluation result.
-   */
-  def print_individual_result(doctag: String, document: GeoDoc[Co],
-      result: TEvalRes) {
-    errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document distribution: %s", doctag, document.dist)
-    errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.model.num_types, document.dist.model.num_tokens)
-    errprint("%s:  true cell: %s", doctag, result.true_cell)
-
-    errprint("%s:  Distance %s to true cell center at %s",
-      doctag, document.output_distance(result.true_truedist), result.true_center)
-    errprint("%s:  Distance %s to predicted cell center at %s",
-      doctag, document.output_distance(result.pred_truedist), result.pred_coord)
-  }
-
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
 
   def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co], want_indiv_results: Boolean): TEvalRes = {
+      true_cell: GeoCell[Co]) = {
     val pred_coord = find_best_point(document, true_cell)
-    val result = new TEvalRes(document, strategy.grid, pred_coord)
-
-    if (want_indiv_results)
-      print_individual_result(doctag, document, result)
-
-    return result
+    new CoordDocumentEvaluationResult[Co](document, strategy.grid, pred_coord)
   }
 }
 
