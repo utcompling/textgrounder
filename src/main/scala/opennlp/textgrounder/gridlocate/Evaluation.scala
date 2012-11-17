@@ -681,6 +681,16 @@ abstract class GridEvaluator[Co](
     } else (false, "")
   }
 
+  def get_true_rank(answers: Iterable[(GeoCell[Co], Double)],
+      true_cell: GeoCell[Co]) = {
+    answers.zipWithIndex.find {
+      case ((cell, score), index) => cell == true_cell
+    } match {
+      case Some(((cell, score), index)) => index + 1
+      case None => 1000000000
+    }
+  }
+
   /**
    * Compare the document to the pseudo-documents associated with each cell,
    * using the strategy for this evaluator.  Return a tuple
@@ -698,25 +708,22 @@ abstract class GridEvaluator[Co](
     if (driver.params.oracle_results)
       (Iterable((true_cell, 0.0)), 1)
     else {
-      def get_computed_results() = {
-        val cells = ranker.evaluate(document, include = Iterable[GeoCell[Co]]())
-        var rank = 1
-        var broken = false
-        breakable {
-          for ((cell, value) <- cells) {
-            if (cell eq true_cell) {
-              broken = true
-              break
-            }
-            rank += 1
-          }
+      val include = Iterable[GeoCell[Co]]()
+      ranker match {
+        case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] if debug("reranker") => {
+          val (initial_ranking, reranking) =
+            reranker.evaluate_with_initial_ranking(document, include)
+          errprint("True cell initial rank: %s",
+            get_true_rank(initial_ranking, true_cell))
+          val true_rank = get_true_rank(reranking, true_cell)
+          errprint("True cell new rank: %s", true_rank)
+          (reranking, true_rank)
         }
-        if (!broken)
-          rank = 1000000000
-        (cells, rank)
+        case _ => {
+          val cells = ranker.evaluate(document, include)
+          (cells, get_true_rank(cells, true_cell))
+        }
       }
-
-      get_computed_results()
     }
   }
 

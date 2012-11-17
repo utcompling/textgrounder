@@ -7,6 +7,8 @@ import opennlp.textgrounder.worddist.UnigramWordDist
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.perceptron._
 
+import GridLocateDriver.Debug._
+
 /**
  * A basic ranker.  Given a test item, return a list of ranked answers from
  * best to worst, with a score for each.  The score must not increase from
@@ -47,6 +49,33 @@ class GridRanker[Co](
  * often than actually at the top.
  */
 trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
+  /** Ranker for generating initial ranking. */
+  protected def initial_ranker: Ranker[TestItem, Answer]
+
+  /**
+   * Number of top-ranked items to submit to reranking.
+   */
+  protected val top_n: Int
+
+  /**
+   * Rerank the given answers, based on an initial ranking.
+   */
+  def rerank_answers(item: TestItem,
+    initial_ranking: Iterable[(Answer, Double)]): Iterable[(Answer, Double)]
+
+  def evaluate_with_initial_ranking(item: TestItem,
+      include: Iterable[Answer]) = {
+    val initial_ranking = initial_ranker.evaluate(item, include)
+    val (to_rerank, others) = initial_ranking.splitAt(top_n)
+    val reranking = rerank_answers(item, to_rerank) ++ others
+    (initial_ranking, reranking)
+  }
+
+  def evaluate(item: TestItem, include: Iterable[Answer]) = {
+    val (initial_ranking, reranking) =
+      evaluate_with_initial_ranking(item, include)
+    reranking
+  }
 }
 
 /**
@@ -57,8 +86,6 @@ trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
  */
 trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
     extends Reranker[TestItem, Answer] {
-  /** Ranker for generating initial ranking. */
-  protected def initial_ranker: Ranker[TestItem, Answer]
   /** Scoring classifier for use in reranking. */
   protected def rerank_classifier: ScoringBinaryClassifier[RerankInstance]
 
@@ -70,11 +97,6 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
    */
   protected val create_rerank_instance:
     (TestItem, Answer, Double) => RerankInstance
-
-  /**
-   * Number of top-ranked items to submit to reranking.
-   */
-  protected val top_n: Int
 
   /**
    * Generate rerank training instances for a given ranker
@@ -90,7 +112,7 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
         create_rerank_instance(item, possible_answer, score), is_correct)
   }
 
-  protected def rerank_answers(item: TestItem,
+  def rerank_answers(item: TestItem,
       answers: Iterable[(Answer, Double)]) = {
     val new_scores =
       for {(answer, score) <- answers
@@ -99,12 +121,6 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
           }
         yield (answer, new_score)
     new_scores.toSeq sortWith (_._2 > _._2)
-  }
-
-  def evaluate(item: TestItem, include: Iterable[Answer]) = {
-    val initial_answers = initial_ranker.evaluate(item, include)
-    val (to_rerank, others) = initial_answers.splitAt(top_n)
-    rerank_answers(item, to_rerank) ++ others
   }
 }
 
