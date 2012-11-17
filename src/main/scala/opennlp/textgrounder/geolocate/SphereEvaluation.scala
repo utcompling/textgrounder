@@ -238,7 +238,7 @@ class RankedSphereDocumentEvaluationResult(
   document: GeoDoc[SphereCoord],
   pred_cells: Iterable[(GeoCell[SphereCoord], Double)],
   true_rank: Int
-) extends RankedDocumentEvaluationResult[SphereCoord](
+) extends FullRankedDocumentEvaluationResult[SphereCoord](
   document, pred_cells, true_rank
 ) {
   override def print_result(doctag: String, document: GeoDoc[SphereCoord],
