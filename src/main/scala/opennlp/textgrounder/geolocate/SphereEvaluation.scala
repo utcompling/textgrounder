@@ -49,52 +49,42 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
  * addition to "true distances", and making sure results are output in
  * miles and km.
  */
-trait SphereDocumentEvalStats extends DocumentEvalStats {
+class SphereDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  wrapped:DocumentEvalStats[SphereCoord]
+) extends EvalStats(driver_stats, null, null) with DocumentEvalStats[SphereCoord] {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val degree_dists = mutable.Buffer[Double]()
   val oracle_degree_dists = mutable.Buffer[Double]()
 
-  def record_predicted_degree_distance(pred_degree_dist: Double) {
-    degree_dists += pred_degree_dist
+  override def increment_counter(counter: String) {
+    wrapped.increment_counter(counter)
   }
 
-  def record_oracle_degree_distance(oracle_degree_dist: Double) {
-    oracle_degree_dists += oracle_degree_dist
+  override def record_result(res: DocumentEvaluationResult[SphereCoord]) {
+    wrapped.record_result(res)
+    degree_dists += res.pred_degdist
+    oracle_degree_dists += res.true_degdist
   }
 
-  protected def output_result_with_units(kmdist: Double) = km_and_miles(kmdist)
+  val output_result_with_units: Double => String =
+    (kmdist: Double) => throw new UnsupportedOperationException("should not be called")
 
   override def output_incorrect_results() {
-    super.output_incorrect_results()
+    wrapped.output_incorrect_results()
     errprint("  Mean degree error distance = %.2f degrees",
       mean(degree_dists))
     errprint("  Median degree error distance = %.2f degrees",
       median(degree_dists))
-    errprint("  Median oracle true error distance = %s",
-      km_and_miles(median(oracle_true_dists)))
   }
-}
 
-/**
- * SphereDocument version of `CoordDocumentEvalStats`.
- */
-class CoordSphereDocumentEvalStats(
-  driver_stats: ExperimentDriverStats,
-  prefix: String
-) extends CoordDocumentEvalStats(driver_stats, prefix)
-  with SphereDocumentEvalStats {
-}
-
-/**
- * SphereDocument version of `RankedDocumentEvalStats`.
- */
-class RankedSphereDocumentEvalStats(
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  max_rank_for_credit: Int = 10
-) extends RankedDocumentEvalStats(driver_stats, prefix, max_rank_for_credit)
-  with SphereDocumentEvalStats {
+  override def output_results() {
+    wrapped.output_result_header()
+    wrapped.output_correct_results()
+    output_incorrect_results()
+    wrapped.output_other_stats()
+  }
 }
 
 /**
@@ -105,10 +95,13 @@ class RankedSphereDocumentEvalStats(
 class GroupedSphereDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   grid: SphereGrid,
-  results_by_range: Boolean,
-  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
+  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats[SphereCoord]
 ) extends GroupedDocumentEvalStats[SphereCoord](
-  driver_stats, grid, results_by_range, create_stats
+  driver_stats, grid,
+  (driver: ExperimentDriverStats, prefix: String) => {
+    val wrapped = create_stats(driver, prefix)
+    new SphereDocumentEvalStats(driver, wrapped)
+  }
 ) {
   val docs_by_degree_dist_to_true_center =
     docmap("degree_dist_to_true_center")
@@ -116,20 +109,6 @@ class GroupedSphereDocumentEvalStats(
   val docs_by_degree_dist_to_pred_center =
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("degree_dist_to_pred_center", _))
-
-  override def record_one_result(stats: DocumentEvalStats,
-      res: DocumentEvaluationResult[SphereCoord]) {
-    super.record_one_result(stats, res)
-    stats.asInstanceOf[SphereDocumentEvalStats].
-      record_predicted_degree_distance(res.pred_degdist)
-  }
-
-  override def record_one_oracle_result(stats: DocumentEvalStats,
-      res: DocumentEvaluationResult[SphereCoord]) {
-    super.record_one_oracle_result(stats, res)
-    stats.asInstanceOf[SphereDocumentEvalStats].
-      record_oracle_degree_distance(res.true_degdist)
-  }
 
   override def record_result_by_range(
     res: DocumentEvaluationResult[SphereCoord]
@@ -159,10 +138,10 @@ class GroupedSphereDocumentEvalStats(
           fracinc * floor(frac_true_degdist / fracinc)
         val rounded_frac_true_degdist =
           fracinc * floor(frac_true_degdist / fracinc)
-        res.record_result(docs_by_true_dist_to_true_center(
-          rounded_frac_true_truedist))
-        res.record_result(docs_by_degree_dist_to_true_center(
-          rounded_frac_true_degdist))
+        docs_by_true_dist_to_true_center(rounded_frac_true_truedist).
+          record_result(res)
+        docs_by_degree_dist_to_true_center(rounded_frac_true_degdist).
+          record_result(res)
 
         /* For distance to center of predicted cell, which may be large, since
            predicted cell may be nowhere near the true cell.  Again we convert
@@ -172,19 +151,19 @@ class GroupedSphereDocumentEvalStats(
            cell size */
         val frac_pred_truedist = res.pred_truedist / multigrid.km_per_cell
         val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
-        res.record_result(docs_by_true_dist_to_pred_center.get_collector(
-          frac_pred_truedist))
-        res.record_result(docs_by_degree_dist_to_pred_center.get_collector(
-          frac_pred_degdist))
+        docs_by_true_dist_to_pred_center.get_collector(frac_pred_truedist).
+          record_result(res)
+        docs_by_degree_dist_to_pred_center.get_collector(frac_pred_degdist).
+          record_result(res)
        }
 
       case kdgrid: KdTreeGrid => {
         // for kd trees, we do something similar to above,
         // but round to the nearest km...
-        res.record_result(docs_by_true_dist_to_true_center(
-          round(res.true_truedist)))
-        res.record_result(docs_by_degree_dist_to_true_center(
-         round(res.true_degdist)))
+        docs_by_true_dist_to_true_center(round(res.true_truedist)).
+          record_result(res)
+        docs_by_degree_dist_to_true_center(round(res.true_degdist)).
+          record_result(res)
       }
     }
   }
@@ -243,7 +222,7 @@ class RankedSphereGridEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
   driver: GeolocateDocumentTypeDriver,
-  evalstats: GroupedDocumentEvalStats[SphereCoord]
+  evalstats: DocumentEvalStats[SphereCoord]
 ) extends RankedGridEvaluator[SphereCoord](
   strategy, stratname, driver, evalstats
 ) {

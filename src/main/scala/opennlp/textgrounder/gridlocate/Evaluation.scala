@@ -110,12 +110,16 @@ class EvalStats(
     }
   }
 
-  def output_results() {
+  def output_result_header() {
     if (total_instances == 0) {
       warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
       return
     }
     errprint("Number of instances = %s", total_instances)
+  }
+
+  def output_results() {
+    output_result_header()
     output_correct_results()
     output_incorrect_results()
     output_other_stats()
@@ -218,10 +222,6 @@ class DocumentEvaluationResult[Co](
    */
   val pred_truedist = document.distance_to_coord(pred_coord)
 
-  def record_result(stats: DocumentEvalStats) {
-    stats.record_predicted_distance(pred_truedist)
-  }
-
   /**
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
@@ -259,15 +259,6 @@ class CoordDocumentEvaluationResult[Co](
 ) extends DocumentEvaluationResult[Co](
   document, grid, pred_coord
 ) {
-  override def record_result(stats: DocumentEvalStats) {
-    super.record_result(stats)
-    // It doesn't really make sense to record a result as "correct" or
-    // "incorrect" but we need to record something; just do "false"
-    // FIXME: Fix the incorrect assumption here that "correct" or
-    // "incorrect" always exists.
-    stats.asInstanceOf[CoordDocumentEvalStats].record_result(false)
-  }
-
 }
 
 /**
@@ -293,11 +284,6 @@ class RankedDocumentEvaluationResult[Co](
   document, pred_cells.head._1.grid,
   pred_cells.head._1.get_center_coord()
 ) {
-  override def record_result(stats: DocumentEvalStats) {
-    super.record_result(stats)
-    stats.asInstanceOf[RankedDocumentEvalStats].record_true_rank(true_rank)
-  }
-
   override def print_result(doctag: String, document: GeoDoc[Co],
       driver: GridLocateDocumentDriver[Co]) {
     super.print_result(doctag, document, driver)
@@ -343,20 +329,17 @@ class RankedDocumentEvaluationResult[Co](
  * A basic class for accumulating statistics from multiple evaluation
  * results.
  */
-trait DocumentEvalStats extends EvalStats {
+trait DocumentEvalStats[Co] extends EvalStats {
   // "True dist" means actual distance in km's or whatever.
   val true_dists = mutable.Buffer[Double]()
   val oracle_true_dists = mutable.Buffer[Double]()
 
-  def record_predicted_distance(pred_true_dist: Double) {
-    true_dists += pred_true_dist
-  }
+  val output_result_with_units: Double => String
 
-  def record_oracle_distance(oracle_true_dist: Double) {
-    oracle_true_dists += oracle_true_dist
+  def record_result(res: DocumentEvaluationResult[Co]) {
+    true_dists += res.pred_truedist
+    oracle_true_dists += res.true_truedist
   }
-
-  protected def output_result_with_units(result: Double): String
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
@@ -366,6 +349,8 @@ trait DocumentEvalStats extends EvalStats {
       output_result_with_units(median(true_dists)))
     errprint("  Mean oracle true error distance = %s",
       output_result_with_units(mean(oracle_true_dists)))
+    errprint("  Median oracle true error distance = %s",
+      output_result_with_units(median(oracle_true_dists)))
   }
 }
 
@@ -373,24 +358,36 @@ trait DocumentEvalStats extends EvalStats {
  * A class for accumulating statistics from multiple evaluation results,
  * where the results directly specify a coordinate (rather than e.g. a cell).
  */
-abstract class CoordDocumentEvalStats(
+class CoordDocumentEvalStats[Co](
   driver_stats: ExperimentDriverStats,
-  prefix: String
+  prefix: String,
+  val output_result_with_units: Double => String
 ) extends EvalStats(driver_stats, prefix, Map[String, String]()
-) with DocumentEvalStats { }
+) with DocumentEvalStats[Co] {
+  override def record_result(res: DocumentEvaluationResult[Co]) {
+    super.record_result(res)
+    // It doesn't really make sense to record a result as "correct" or
+    // "incorrect" but we need to record something; just do "false"
+    // FIXME: Fix the incorrect assumption here that "correct" or
+    // "incorrect" always exists.
+    record_result(false)
+  }
+}
 
 /**
  * A class for accumulating statistics from multiple evaluation results,
  * including statistics on the rank of the true cell.
  */
-abstract class RankedDocumentEvalStats(
+class RankedDocumentEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   prefix: String,
+  val output_result_with_units: Double => String,
   max_rank_for_credit: Int = 10
 ) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit
-) with DocumentEvalStats {
-  def record_true_rank(rank: Int) {
-    record_result(rank)
+) with DocumentEvalStats[Co] {
+  override def record_result(res: DocumentEvaluationResult[Co]) {
+    super.record_result(res)
+    record_result(res.asInstanceOf[RankedDocumentEvaluationResult[Co]].true_rank)
   }
 }
 
@@ -407,17 +404,13 @@ abstract class RankedDocumentEvalStats(
  *   program statistics can be accumulated (in a Hadoop context, this maps
  *   to counters).
  * @param grid Cell grid against which results were derived.
- * @param results_by_range If true, record more detailed range-by-range
- *   subresults.  Not on by default because Hadoop may choke on the large
- *   number of counters created this way.
  */
 class GroupedDocumentEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   grid: GeoGrid[Co],
-  results_by_range: Boolean,
-  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
-) {
-  type TEvalRes = DocumentEvaluationResult[Co]
+  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats[Co]
+) extends EvalStats(driver_stats, null, null) with DocumentEvalStats[Co] {
+
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(driver_stats, prefix + ".byrange." + range)
 
@@ -437,7 +430,7 @@ class GroupedDocumentEvalStats[Co](
   // and longitudinally.
   val dist_fraction_increment = 0.25
   def docmap(prefix: String) =
-    new SettingDefaultHashMap[Double, DocumentEvalStats](
+    new SettingDefaultHashMap[Double, DocumentEvalStats[Co]](
       create_stats_for_range(prefix, _))
   val docs_by_true_dist_to_true_center =
     docmap("true_dist_to_true_center")
@@ -453,33 +446,24 @@ class GroupedDocumentEvalStats[Co](
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_one_result(stats: DocumentEvalStats, res: TEvalRes) {
-    res.record_result(stats)
-  }
-
-  def record_one_oracle_result(stats: DocumentEvalStats, res: TEvalRes) {
-    stats.record_oracle_distance(res.true_truedist)
-  }
-
-  def record_result(res: TEvalRes) {
-    record_one_result(all_document, res)
-    record_one_oracle_result(all_document, res)
+  override def record_result(res: DocumentEvaluationResult[Co]) {
+    all_document.record_result(res)
     // Stephen says recording so many counters leads to crashes (at the 51st
     // counter or something), so don't do it unless called for.
-    if (results_by_range)
+    if (true) // results_by_range
       record_result_by_range(res)
   }
 
-  def record_result_by_range(res: TEvalRes) {
+  def record_result_by_range(res: DocumentEvaluationResult[Co]) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
-    record_one_result(naitr, res)
+    naitr.record_result(res)
   }
 
-  def increment_counter(name: String) {
+  override def increment_counter(name: String) {
     all_document.increment_counter(name)
   }
 
-  def output_results(all_results: Boolean = false) {
+  override def output_results() {
     errprint("")
     errprint("Results for all documents:")
     all_document.output_results()
@@ -490,7 +474,7 @@ class GroupedDocumentEvalStats[Co](
        the 'if (false)'.  See above.
      */
     //if (all_results)
-    if (false)
+    if (true) // results_by_range
       output_results_by_range()
     // FIXME: Output median and mean of true and degree error dists; also
     // maybe move this info info EvalByRank so that we can output the values
@@ -509,6 +493,9 @@ class GroupedDocumentEvalStats[Co](
       obj.output_results()
     }
   }
+
+  val output_result_with_units: Double => String =
+    (kmdist: Double) => throw new UnsupportedOperationException("should not be called")
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -682,12 +669,6 @@ abstract class CorpusEvaluator(
   }
 }
 
-trait GroupedEvalStatsCreator[Co] {
-  def apply(driver: GridLocateDocumentDriver[Co],
-    grid: GeoGrid[Co], results_by_range: Boolean
-  ): GroupedDocumentEvalStats[Co]
-}
-
 /**
  * Abstract class for evaluating a test document by comparing it against each
  * of the cells in a cell grid, where each cell has an associated
@@ -717,7 +698,7 @@ abstract class GridEvaluator[Co](
   val strategy: GridLocateDocumentStrategy[Co],
   val stratname: String,
   override val driver: GridLocateDocumentDriver[Co],
-  evalstats: GroupedDocumentEvalStats[Co]
+  evalstats: DocumentEvalStats[Co]
 ) extends CorpusEvaluator(stratname, driver) {
   type TEvalDoc = GeoDoc[Co]
   override type TEvalRes = DocumentEvaluationResult[Co]
@@ -728,7 +709,7 @@ abstract class GridEvaluator[Co](
   val ranker = driver.create_ranker(strategy)
 
   def output_results(isfinal: Boolean = false) {
-    evalstats.output_results(all_results = isfinal)
+    evalstats.output_results() // all_results = isfinal)
  }
 
   override def would_skip_document(document: GeoDoc[Co], doctag: String) = {
@@ -864,7 +845,7 @@ class RankedGridEvaluator[Co](
   strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
   driver: GridLocateDocumentDriver[Co],
-  evalstats: GroupedDocumentEvalStats[Co]
+  evalstats: DocumentEvalStats[Co]
 ) extends GridEvaluator[Co] (
   strategy, stratname, driver, evalstats
 ) {
@@ -898,7 +879,7 @@ abstract class CoordGridEvaluator[Co](
   strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
   driver: GridLocateDocumentDriver[Co],
-  evalstats: GroupedDocumentEvalStats[Co]
+  evalstats: DocumentEvalStats[Co]
 ) extends GridEvaluator[Co](
   strategy, stratname, driver, evalstats
 ) {
@@ -931,7 +912,7 @@ class MeanShiftGridEvaluator[Co](
   strategy: GridLocateDocumentStrategy[Co],
   stratname: String,
   driver: GridLocateDocumentDriver[Co],
-  evalstats: GroupedDocumentEvalStats[Co],
+  evalstats: DocumentEvalStats[Co],
   k_best: Int,
   mean_shift_obj: MeanShift[Co]
 ) extends CoordGridEvaluator[Co](
