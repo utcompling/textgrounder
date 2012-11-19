@@ -229,31 +229,31 @@ class RankedSphereGridEvaluator(
   override def imp_evaluate_document(document: GeoDoc[SphereCoord], doctag: String,
       true_cell: GeoCell[SphereCoord]) = {
     val result = super.imp_evaluate_document(document, doctag, true_cell)
-    new RankedSphereDocumentEvaluationResult(result.document,
-      result.pred_cells, result.true_rank)
+    new RankedSphereDocumentEvaluationResult(
+      result.asInstanceOf[FullRankedDocumentEvaluationResult[SphereCoord]]
+    )
   }
 }
 
 class RankedSphereDocumentEvaluationResult(
-  document: GeoDoc[SphereCoord],
-  pred_cells: Iterable[(GeoCell[SphereCoord], Double)],
-  true_rank: Int
+  wrapped: FullRankedDocumentEvaluationResult[SphereCoord]
 ) extends FullRankedDocumentEvaluationResult[SphereCoord](
-  document, pred_cells, true_rank
+  wrapped.document, wrapped.pred_cells, wrapped.true_rank
 ) {
   override def print_result(doctag: String, document: GeoDoc[SphereCoord],
       driver: GridLocateDocumentDriver[SphereCoord]) {
-    super.print_result(doctag, document, driver)
+    wrapped.print_result(doctag, document, driver)
 
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
       (debuglist("gridrank") contains doctag.drop(1))) {
       val grsize = debugval("gridranksize").toInt
-      true_cell match {
+      wrapped.true_cell match {
         case multireg: MultiRegularCell =>
           multireg.grid.
             output_ranking_grid(
-              pred_cells.asInstanceOf[Iterable[(MultiRegularCell, Double)]],
+              wrapped.pred_cells.
+                asInstanceOf[Iterable[(MultiRegularCell, Double)]],
               multireg, grsize)
         case _ =>
           warning("Can't output ranking grid, cell not of right type")
