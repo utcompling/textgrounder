@@ -250,168 +250,6 @@ class DocumentEvaluationResult[Co](
 }
 
 /**
- * Subclass of `DocumentEvaluationResult` where the predicted coordinate
- * is a point, not necessarily the central point of one of the grid cells.
- *
- * @tparam Co type of a coordinate
- *
- * @param document document whose coordinate is predicted
- * @param grid cell grid against which error comparison should be done
- * @param pred_coord predicted coordinate of the document
- */
-class CoordDocumentEvaluationResult[Co](
-  document: GeoDoc[Co],
-  grid: GeoGrid[Co],
-  pred_coord: Co
-) extends DocumentEvaluationResult[Co](
-  document, grid, pred_coord
-) {
-}
-
-/**
- *
- * Subclass of `DocumentEvaluationResult` where the predicted coordinate
- * is specifically the central point of one of the grid cells.  Here we use
- * an algorithm that does cell-by-cell comparison and computes a ranking of
- * all the cells.
- *
- * @tparam Co type of a coordinate
- *
- * @param document document whose coordinate is predicted
- * @param pred_cell top-ranked predicted cell in which the document should
- *        belong
- * @param true_rank rank of the document's true cell among all of the
- *        predicted cell
- */
-class RankedDocumentEvaluationResult[Co](
-  document: GeoDoc[Co],
-  val pred_cell: GeoCell[Co],
-  val true_rank: Int
-) extends DocumentEvaluationResult[Co](
-  document, pred_cell.grid,
-  pred_cell.get_center_coord()
-) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
-      driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
-    errprint("%s:  true cell at rank: %s", doctag, true_rank)
-  }
-}
-
-/**
- *
- * Subclass of `RankedDocumentEvaluationResult` listing all of the predicted
- * cells in order, with their scores.  We don't use this more than temporarily
- * to avoid excess memory usage when a large number of cells are present.
- *
- * @tparam Co type of a coordinate
- *
- * @param document document whose coordinate is predicted
- * @param pred_cells list of predicted cells with scores
- * @param true_rank rank of the document's true cell among all of the
- *        predicted cell
- */
-class FullRankedDocumentEvaluationResult[Co](
-  document: GeoDoc[Co],
-  val pred_cells: Iterable[(GeoCell[Co], Double)],
-  true_rank: Int
-) extends RankedDocumentEvaluationResult[Co](
-  document, pred_cells.head._1, true_rank
-) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
-      driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
-    val num_cells_to_output =
-      if (driver.params.num_top_cells_to_output >= 0)
-         math.min(driver.params.num_top_cells_to_output, pred_cells.size)
-      else pred_cells.size
-    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex) {
-      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
-        doctag, i + 1, -score, cell)
-    }
-
-    val num_nearest_neighbors = driver.params.num_nearest_neighbors
-    val kNN = pred_cells.take(num_nearest_neighbors).map {
-      case (cell, score) => cell }
-    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
-      case ((cell, score), i) => (cell, i + 1) }.toMap
-    val closest_half_with_dists =
-      kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
-        toSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
-
-    closest_half_with_dists.foreach {
-      case (cell, dist) =>
-        errprint("%s:  #%s close neighbor: %s; error distance: %s",
-          doctag, kNNranks(cell), cell.get_center_coord,
-          document.output_distance(dist))
-    }
-
-    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
-    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
-      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
-      document.output_distance(avg_dist_of_neighbors))
-
-    if (avg_dist_of_neighbors < pred_truedist)
-      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
-  }
-
-  override def get_public_result =
-    new RankedDocumentEvaluationResult(document, pred_cells.head._1, true_rank)
-}
-
-/**
- *
- * Subclass of `FullRankedDocumentEvaluationResult` for debugging or
- * investigating performance issues with the reranker.
- *
- * @tparam Co type of a coordinate
- *
- * @param document document whose coordinate is predicted
- * @param pred_cells list of predicted cells with scores
- * @param true_rank rank of the document's true cell among all of the
- *        predicted cell
- */
-class RerankedDocumentEvaluationResult[Co](
-  document: GeoDoc[Co],
-  pred_cells: Iterable[(GeoCell[Co], Double)],
-  true_rank: Int,
-  initial_pred_cells: Iterable[(GeoCell[Co], Double)],
-  initial_true_rank: Int
-) extends FullRankedDocumentEvaluationResult[Co](
-  document, pred_cells, true_rank
-) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
-      driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
-    errprint("%s:  true cell at initial rank: %s (vs. new %s)", doctag,
-      initial_true_rank, true_rank)
-    val num_cells_to_output = 5
-    for (((cell, score), i) <-
-        initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
-      errprint("%s:  Initial predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
-        doctag, i + 1, -score, cell)
-    }
-
-    val initial_pred_cell = initial_pred_cells.head._1
-    val initial_pred_coord = initial_pred_cell.get_center_coord()
-    val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
-
-    errprint("%s:  Distance %s to initial predicted cell center at %s",
-      doctag, document.output_distance(initial_pred_truedist),
-      initial_pred_coord)
-    errprint("%s:  Error distance change by reranking = %s - %s = %s",
-      document.output_distance(pred_truedist),
-      document.output_distance(initial_pred_truedist),
-      document.output_distance(pred_truedist - initial_pred_truedist)
-    )
-  }
-}
-
-/**
  * A basic class for accumulating statistics from multiple evaluation
  * results.
  */
@@ -437,43 +275,6 @@ trait DocumentEvalStats[Co] extends EvalStats {
       output_result_with_units(mean(oracle_true_dists)))
     errprint("  Median oracle true error distance = %s",
       output_result_with_units(median(oracle_true_dists)))
-  }
-}
-
-/**
- * A class for accumulating statistics from multiple evaluation results,
- * where the results directly specify a coordinate (rather than e.g. a cell).
- */
-class CoordDocumentEvalStats[Co](
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  val output_result_with_units: Double => String
-) extends EvalStats(driver_stats, prefix, Map[String, String]()
-) with DocumentEvalStats[Co] {
-  override def record_result(res: DocumentEvaluationResult[Co]) {
-    super.record_result(res)
-    // It doesn't really make sense to record a result as "correct" or
-    // "incorrect" but we need to record something; just do "false"
-    // FIXME: Fix the incorrect assumption here that "correct" or
-    // "incorrect" always exists.
-    record_result(false)
-  }
-}
-
-/**
- * A class for accumulating statistics from multiple evaluation results,
- * including statistics on the rank of the true cell.
- */
-class RankedDocumentEvalStats[Co](
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  val output_result_with_units: Double => String,
-  max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit
-) with DocumentEvalStats[Co] {
-  override def record_result(res: DocumentEvaluationResult[Co]) {
-    super.record_result(res)
-    record_result(res.asInstanceOf[RankedDocumentEvaluationResult[Co]].true_rank)
   }
 }
 
@@ -964,6 +765,166 @@ class RankedGridEvaluator[Co](
 }
 
 /**
+ *
+ * Subclass of `DocumentEvaluationResult` where the predicted coordinate
+ * is specifically the central point of one of the grid cells.  Here we use
+ * an algorithm that does cell-by-cell comparison and computes a ranking of
+ * all the cells.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cell top-ranked predicted cell in which the document should
+ *        belong
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class RankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  val pred_cell: GeoCell[Co],
+  val true_rank: Int
+) extends DocumentEvaluationResult[Co](
+  document, pred_cell.grid,
+  pred_cell.get_center_coord()
+) {
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
+    errprint("%s:  true cell at rank: %s", doctag, true_rank)
+  }
+}
+
+/**
+ *
+ * Subclass of `RankedDocumentEvaluationResult` listing all of the predicted
+ * cells in order, with their scores.  We don't use this more than temporarily
+ * to avoid excess memory usage when a large number of cells are present.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cells list of predicted cells with scores
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class FullRankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  val pred_cells: Iterable[(GeoCell[Co], Double)],
+  true_rank: Int
+) extends RankedDocumentEvaluationResult[Co](
+  document, pred_cells.head._1, true_rank
+) {
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
+    val num_cells_to_output =
+      if (driver.params.num_top_cells_to_output >= 0)
+         math.min(driver.params.num_top_cells_to_output, pred_cells.size)
+      else pred_cells.size
+    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex) {
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        doctag, i + 1, -score, cell)
+    }
+
+    val num_nearest_neighbors = driver.params.num_nearest_neighbors
+    val kNN = pred_cells.take(num_nearest_neighbors).map {
+      case (cell, score) => cell }
+    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
+      case ((cell, score), i) => (cell, i + 1) }.toMap
+    val closest_half_with_dists =
+      kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
+        toSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+
+    closest_half_with_dists.foreach {
+      case (cell, dist) =>
+        errprint("%s:  #%s close neighbor: %s; error distance: %s",
+          doctag, kNNranks(cell), cell.get_center_coord,
+          document.output_distance(dist))
+    }
+
+    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
+    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
+      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
+      document.output_distance(avg_dist_of_neighbors))
+
+    if (avg_dist_of_neighbors < pred_truedist)
+      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
+  }
+
+  override def get_public_result =
+    new RankedDocumentEvaluationResult(document, pred_cells.head._1, true_rank)
+}
+
+/**
+ *
+ * Subclass of `FullRankedDocumentEvaluationResult` for debugging or
+ * investigating performance issues with the reranker.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cells list of predicted cells with scores
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class RerankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  pred_cells: Iterable[(GeoCell[Co], Double)],
+  true_rank: Int,
+  initial_pred_cells: Iterable[(GeoCell[Co], Double)],
+  initial_true_rank: Int
+) extends FullRankedDocumentEvaluationResult[Co](
+  document, pred_cells, true_rank
+) {
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
+    errprint("%s:  true cell at initial rank: %s (vs. new %s)", doctag,
+      initial_true_rank, true_rank)
+    val num_cells_to_output = 5
+    for (((cell, score), i) <-
+        initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
+      errprint("%s:  Initial predicted cell (at rank %s, kl-div %s): %s",
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        doctag, i + 1, -score, cell)
+    }
+
+    val initial_pred_cell = initial_pred_cells.head._1
+    val initial_pred_coord = initial_pred_cell.get_center_coord()
+    val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
+
+    errprint("%s:  Distance %s to initial predicted cell center at %s",
+      doctag, document.output_distance(initial_pred_truedist),
+      initial_pred_coord)
+    errprint("%s:  Error distance change by reranking = %s - %s = %s",
+      document.output_distance(pred_truedist),
+      document.output_distance(initial_pred_truedist),
+      document.output_distance(pred_truedist - initial_pred_truedist)
+    )
+  }
+}
+
+/**
+ * A class for accumulating statistics from multiple evaluation results,
+ * including statistics on the rank of the true cell.
+ */
+class RankedDocumentEvalStats[Co](
+  driver_stats: ExperimentDriverStats,
+  prefix: String,
+  val output_result_with_units: Double => String,
+  max_rank_for_credit: Int = 10
+) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit
+) with DocumentEvalStats[Co] {
+  override def record_result(res: DocumentEvaluationResult[Co]) {
+    super.record_result(res)
+    record_result(res.asInstanceOf[RankedDocumentEvaluationResult[Co]].true_rank)
+  }
+}
+
+/**
  * A general implementation of `GridEvaluator` that returns a single
  * best point for a given test document.
  *
@@ -989,6 +950,45 @@ abstract class CoordGridEvaluator[Co](
       true_cell: GeoCell[Co]) = {
     val pred_coord = find_best_point(document, true_cell)
     new CoordDocumentEvaluationResult[Co](document, strategy.grid, pred_coord)
+  }
+}
+
+/**
+ * Subclass of `DocumentEvaluationResult` where the predicted coordinate
+ * is a point, not necessarily the central point of one of the grid cells.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param grid cell grid against which error comparison should be done
+ * @param pred_coord predicted coordinate of the document
+ */
+class CoordDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  grid: GeoGrid[Co],
+  pred_coord: Co
+) extends DocumentEvaluationResult[Co](
+  document, grid, pred_coord
+) {
+}
+
+/**
+ * A class for accumulating statistics from multiple evaluation results,
+ * where the results directly specify a coordinate (rather than e.g. a cell).
+ */
+class CoordDocumentEvalStats[Co](
+  driver_stats: ExperimentDriverStats,
+  prefix: String,
+  val output_result_with_units: Double => String
+) extends EvalStats(driver_stats, prefix, Map[String, String]()
+) with DocumentEvalStats[Co] {
+  override def record_result(res: DocumentEvaluationResult[Co]) {
+    super.record_result(res)
+    // It doesn't really make sense to record a result as "correct" or
+    // "incorrect" but we need to record something; just do "false"
+    // FIXME: Fix the incorrect assumption here that "correct" or
+    // "incorrect" always exists.
+    record_result(false)
   }
 }
 
