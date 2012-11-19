@@ -362,6 +362,56 @@ class FullRankedDocumentEvaluationResult[Co](
 }
 
 /**
+ *
+ * Subclass of `FullRankedDocumentEvaluationResult` for debugging or
+ * investigating performance issues with the reranker.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cells list of predicted cells with scores
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class RerankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  pred_cells: Iterable[(GeoCell[Co], Double)],
+  true_rank: Int,
+  initial_pred_cells: Iterable[(GeoCell[Co], Double)],
+  initial_true_rank: Int
+) extends FullRankedDocumentEvaluationResult[Co](
+  document, pred_cells, true_rank
+) {
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
+    errprint("%s:  true cell at initial rank: %s (vs. new %s)", doctag,
+      initial_true_rank, true_rank)
+    val num_cells_to_output = 5
+    for (((cell, score), i) <-
+        initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
+      errprint("%s:  Initial predicted cell (at rank %s, kl-div %s): %s",
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        doctag, i + 1, -score, cell)
+    }
+
+    val initial_pred_cell = initial_pred_cells.head._1
+    val initial_pred_coord = initial_pred_cell.get_center_coord()
+    val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
+
+    errprint("%s:  Distance %s to initial predicted cell center at %s",
+      doctag, document.output_distance(initial_pred_truedist),
+      initial_pred_coord)
+    errprint("%s:  Error distance change by reranking = %s - %s = %s",
+      doctag, document.output_distance(pred_truedist),
+      document.output_distance(initial_pred_truedist),
+      document.output_distance(pred_truedist - initial_pred_truedist)
+    )
+  }
+}
+
+/**
  * A basic class for accumulating statistics from multiple evaluation
  * results.
  */
@@ -887,15 +937,29 @@ class RankedGridEvaluator[Co](
 ) {
   def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
       true_cell: GeoCell[Co]) = {
-    val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
+    ranker match {
+      case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] => {
+        val (initial_ranking, reranking) =
+          reranker.evaluate_with_initial_ranking(document,
+            Iterable[GeoCell[Co]]())
+        val true_rank = get_true_rank(reranking, true_cell)
+        val initial_true_rank = get_true_rank(initial_ranking, true_cell)
+        new RerankedDocumentEvaluationResult[Co](document, reranking, true_rank,
+          initial_ranking, initial_true_rank)
+      }
+      case _ => {
+        val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
 
-    if (debug("all-scores")) {
-      for (((cell, score), index) <- pred_cells.zipWithIndex) {
-        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
-          cell.describe_indices(), score)
+        if (debug("all-scores")) {
+          for (((cell, score), index) <- pred_cells.zipWithIndex) {
+            errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
+              cell.describe_indices(), score)
+          }
+        }
+        new FullRankedDocumentEvaluationResult[Co](document, pred_cells,
+          true_rank)
       }
     }
-    new FullRankedDocumentEvaluationResult[Co](document, pred_cells, true_rank)
   }
 }
 
