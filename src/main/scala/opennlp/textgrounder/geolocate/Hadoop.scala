@@ -317,7 +317,7 @@ class DocumentResultReducer extends
 
   override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
       context: TContext) {
-    val errordists = (for (v <- values) yield v.get).toSeq
+    val errordists = (for (v <- values) yield v.get).toIndexedSeq
     val mean_dist = mean(errordists)
     val median_dist = median(errordists)
     context.write(new Text(key.toString + " mean"), new DoubleWritable(mean_dist))

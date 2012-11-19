@@ -120,7 +120,7 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
            new_score = rerank_classifier.score_item(instance)
           }
         yield (answer, new_score)
-    new_scores.toSeq sortWith (_._2 > _._2)
+    new_scores.toIndexedSeq sortWith (_._2 > _._2)
   }
 }
 

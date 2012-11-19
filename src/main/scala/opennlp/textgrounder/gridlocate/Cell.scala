@@ -410,7 +410,7 @@ abstract class GeoGrid[Co](
     if (include.size == 0)
       cells
     else
-      include.toSeq union cells.toSeq
+      include.toIndexedSeq union cells.toIndexedSeq
   }
 
   /*********************** Not meant to be overridden *********************/
