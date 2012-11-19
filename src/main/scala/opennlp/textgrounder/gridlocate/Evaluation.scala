@@ -835,7 +835,7 @@ class FullRankedDocumentEvaluationResult[Co](
       case ((cell, score), i) => (cell, i + 1) }.toMap
     val closest_half_with_dists =
       kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
-        toSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+        toIndexedSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
 
     closest_half_with_dists.foreach {
       case (cell, dist) =>
@@ -1020,7 +1020,7 @@ class MeanShiftGridEvaluator[Co](
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
-    val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toSeq
+    val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toIndexedSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)
     mean_shift_obj.vec_mean(shifted_values)
   }

@@ -482,13 +482,13 @@ class MultiRegularGrid(
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
     assert(all_cells_computed)
-    for {
+    (for {
       v <- corner_to_multi_cell.values
       val empty = (
         if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist()
         else v.combined_dist.is_empty())
       if (!empty)
-    } yield v
+    } yield v).toIndexedSeq
   }
 
   /**
