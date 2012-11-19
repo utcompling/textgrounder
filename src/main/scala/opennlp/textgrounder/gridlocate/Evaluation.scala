@@ -240,6 +240,13 @@ class DocumentEvaluationResult[Co](
 
     errprint("%s:  true cell: %s", doctag, true_cell)
   }
+
+  /**
+   * Return a "public" version of this result to be returned to callers.
+   * May include less information than what is required temporarily for
+   * print_result().
+   */
+  def get_public_result = this
 }
 
 /**
@@ -278,17 +285,42 @@ class CoordDocumentEvaluationResult[Co](
  */
 class RankedDocumentEvaluationResult[Co](
   document: GeoDoc[Co],
-  // FIXME: Possible memory hog from storing all the results?
-  val pred_cells: Iterable[(GeoCell[Co], Double)],
+  val pred_cell: GeoCell[Co],
   val true_rank: Int
 ) extends DocumentEvaluationResult[Co](
-  document, pred_cells.head._1.grid,
-  pred_cells.head._1.get_center_coord()
+  document, pred_cell.grid,
+  pred_cell.get_center_coord()
 ) {
   override def print_result(doctag: String, document: GeoDoc[Co],
       driver: GridLocateDocumentDriver[Co]) {
     super.print_result(doctag, document, driver)
     errprint("%s:  true cell at rank: %s", doctag, true_rank)
+  }
+}
+
+/**
+ *
+ * Subclass of `RankedDocumentEvaluationResult` listing all of the predicted
+ * cells in order, with their scores.  We don't use this more than temporarily
+ * to avoid excess memory usage when a large number of cells are present.
+ *
+ * @tparam Co type of a coordinate
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cells list of predicted cells with scores
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class FullRankedDocumentEvaluationResult[Co](
+  document: GeoDoc[Co],
+  val pred_cells: Iterable[(GeoCell[Co], Double)],
+  true_rank: Int
+) extends RankedDocumentEvaluationResult[Co](
+  document, pred_cells.head._1, true_rank
+) {
+  override def print_result(doctag: String, document: GeoDoc[Co],
+      driver: GridLocateDocumentDriver[Co]) {
+    super.print_result(doctag, document, driver)
     val num_cells_to_output =
       if (driver.params.num_top_cells_to_output >= 0)
          math.min(driver.params.num_top_cells_to_output, pred_cells.size)
@@ -324,6 +356,9 @@ class RankedDocumentEvaluationResult[Co](
     if (avg_dist_of_neighbors < pred_truedist)
       driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
   }
+
+  override def get_public_result =
+    new RankedDocumentEvaluationResult(document, pred_cells.head._1, true_rank)
 }
 
 /**
@@ -781,7 +816,7 @@ abstract class GridEvaluator[Co](
    * @param true_cell Cell in the cell grid which contains the document.
    */
   def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co]): TEvalRes
+      true_cell: GeoCell[Co]): DocumentEvaluationResult[Co]
 
   /**
    * Evaluate a document, record statistics about it, etc.  Calls
@@ -796,7 +831,7 @@ abstract class GridEvaluator[Co](
    *   to be printed out at the beginning of diagnostic lines describing
    *   the document and its evaluation results.
    */
-  def evaluate_document(document: GeoDoc[Co], doctag: String): TEvalRes = {
+  def evaluate_document(document: GeoDoc[Co], doctag: String) = {
     val (skip, reason) = would_skip_document(document, doctag)
     assert(!skip)
     assert(document.dist.finished)
@@ -824,7 +859,7 @@ abstract class GridEvaluator[Co](
     if (result.num_docs_in_true_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
-    result
+    result.get_public_result
   }
 }
 
@@ -860,7 +895,7 @@ class RankedGridEvaluator[Co](
           cell.describe_indices(), score)
       }
     }
-    new RankedDocumentEvaluationResult[Co](document, pred_cells, true_rank)
+    new FullRankedDocumentEvaluationResult[Co](document, pred_cells, true_rank)
   }
 }
 
