@@ -19,7 +19,6 @@
 
 package opennlp.textgrounder.gridlocate
 
-import collection.mutable
 import util.matching.Regex
 import util.control.Breaks._
 

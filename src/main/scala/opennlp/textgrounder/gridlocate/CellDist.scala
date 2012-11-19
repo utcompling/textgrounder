@@ -51,7 +51,7 @@ class CellDist[Co](
         // Elements on right override those on left
         include.map((_, 0.0)).toMap ++ cellprobs.toMap
     // sort by second element of tuple, in reverse order
-    probs.toSeq sortWith (_._2 > _._2)
+    probs.toIndexedSeq sortWith (_._2 > _._2)
   }
 }
 

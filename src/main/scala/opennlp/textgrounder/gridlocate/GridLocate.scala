@@ -21,7 +21,6 @@ package opennlp.textgrounder.gridlocate
 import util.matching.Regex
 import util.Random
 import math._
-import collection.mutable
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.argparser._
@@ -164,7 +163,7 @@ class MostPopularGridLocateDocumentStrategy[Co] (
            cell.combined_dist.incoming_links
          else
            cell.combined_dist.num_docs_for_links).toDouble)).
-    toSeq sortWith (_._2 > _._2)
+    toIndexedSeq sortWith (_._2 > _._2)
   }
 }
 
@@ -189,26 +188,16 @@ abstract class PointwiseScoreStrategy[Co](
    */
   def return_ranked_cells_serially(word_dist: WordDist,
     include: Iterable[GeoCell[Co]]) = {
-    /*
-     The non-parallel way of doing things; Stephen resurrected it when
-     merging the Dirichlet stuff.  Attempting to use the parallel method
-     caused an assertion failure after about 1200 of 1895 documents using
-     GeoText.
-     */
-      val buffer = mutable.Buffer[(GeoCell[Co], Double)]()
-
       for (cell <- grid.iter_nonempty_cells_including(
-          include, nonempty_word_dist = true)) {
+            include, nonempty_word_dist = true)
+          ) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
             cell.describe_indices(), cell.describe_location(),
             cell.combined_dist.num_docs_for_word_dist)
         }
-
-        val score = score_cell(word_dist, cell)
-        buffer += ((cell, score))
+        (cell, score_cell(word_dist, cell))
       }
-      buffer
   }
 
   /**
@@ -220,7 +209,7 @@ abstract class PointwiseScoreStrategy[Co](
     include: Iterable[GeoCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(
       include, nonempty_word_dist = true)
-    cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
+    cells.par.map(c => (c, score_cell(word_dist, c)))
   }
 
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
@@ -233,13 +222,7 @@ abstract class PointwiseScoreStrategy[Co](
         return_ranked_cells_serially(word_dist, include)
     }
 
-    /* SCALABUG:
-       If written simply as 'cell_buf sortWith (_._2 < _._2)',
-       return type is mutable.Buffer.  However, if written as an
-       if/then as follows, return type is Iterable, even though both
-       forks have the same type of mutable.buffer!
-     */
-    val retval = cell_buf sortWith (_._2 > _._2)
+    val retval = cell_buf.toIndexedSeq sortWith (_._2 > _._2)
 
     /* If doing things parallel, this code applies for debugging
        (serial has the debugging code embedded into it). */
@@ -315,8 +298,9 @@ class KLDivergenceStrategy[Co](
         errprint("    %30s  %s", "Word", "KL-div contribution")
         errprint("    %s", "-" * 50)
         // sort by absolute value of second element of tuple, in reverse order
-        val items = (contribs.toSeq sortWith ((x, y) => abs(x._2) > abs(y._2))).
-          take(num_contrib_words)
+        val items =
+          (contribs.toIndexedSeq sortWith ((x, y) => abs(x._2) > abs(y._2))).
+            take(num_contrib_words)
         for ((word, contribval) <- items)
           errprint("    %30s  %s", word, contribval)
         errprint("")
