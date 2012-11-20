@@ -614,16 +614,24 @@ For the perceptron classifiers, see also `--pa-variant`,
 
   var rerank_instance =
     ap.option[String]("rerank-instance",
-      default = "kl-div",
+      default = "matching-word-binary",
       aliasedChoices = Seq(
         Seq("kl-div", "kldiv"),
+        Seq("matching-word-binary"),
+        Seq("matching-word-count"),
+        Seq("matching-word-probability"),
         Seq("trivial")),
       help = """How to generate rerank instances for the reranker, based on
 a combination of a document, a given cell as possible location of the
-document and the original ranking score. Possibilities are
-'trivial' (just use the score as a feature, for testing purposes); 'kl-div'
-(use the score as well as the individual word components of the KL-divergence
-between document and cell).  Default %default.
+document and the original ranking score. The original ranking score
+always serves as one of the features.  Possibilities are 'trivial' (just
+use the score as a feature, for testing purposes); 'matching-word-binary'
+(use the value 1 when a word exists in both document and cell, 0 otherwise);
+'matching-word-count' (use the document word count when a word exists in both
+document and cell); 'matching-word-probability' (use the document probability
+when a word exists in both document and cell); 'kl-div' (use the individual
+word components of the KL-divergence between document and cell).
+Default %default.
 
 Note that this only is used when --rerank=pointwise and --rerank-classifier
 specifies something other than 'trivial'.""")
@@ -1220,6 +1228,12 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
         new TrivialGeoDocRerankInstanceFactory[Co]
       case "kl-div" =>
         new KLDivGeoDocRerankInstanceFactory[Co]
+      case "matching-word-binary" =>
+        new WordGeoDocRerankInstanceFactory[Co]("binary")
+      case "matching-word-count" =>
+        new WordGeoDocRerankInstanceFactory[Co]("count")
+      case "matching-word-probability" =>
+        new WordGeoDocRerankInstanceFactory[Co]("probability")
     }
   }
 

@@ -257,6 +257,43 @@ class KLDivGeoDocRerankInstanceFactory[Co] extends
 }
 
 /**
+ * A simple factory for generating rerank instances for a document, using
+ * the presence of matching words between document and cell.
+ *
+ * @param value How to compute the value assigned to the words that are
+ *   shared.  If "binary", always assign 1.  If "count", assign the word
+ *   count.  If "probability", assign the probability (essentially, word
+ *   count normalized by the number of words in the document).
+ */
+class WordGeoDocRerankInstanceFactory[Co](value: String) extends
+    GeoDocRerankInstanceFactory[Co] {
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) = {
+    val indiv_features =
+      doc.dist match {
+        case udist: UnigramWordDist => {
+         val celldist =
+           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
+          (for ((word, count) <- udist.model.iter_items;
+                qcount = celldist.model.get_item(word);
+                if qcount != 0.0)
+            yield {
+              val wordval = value match {
+                case "binary" => 1
+                case "count" => count
+                case "probability" => udist.lookup_word(word)
+              }
+              (unmemoize_string(word), wordval)
+            }
+          ).toMap
+        }
+        case _ =>
+          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
+      }
+    new SparseFeatureVector(Map("-SCORE-" -> score) ++ indiv_features)
+  }
+}
+
+/**
  * A trivial scoring binary classifier that simply returns the already
  * existing score from a ranker.
  */
