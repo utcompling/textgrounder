@@ -1144,13 +1144,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 }
 
 trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
-  var strategies:
-    Iterable[(String, GridLocateDocumentStrategy[Co])] = _
-  var rankers: Map[
-    GridLocateDocumentStrategy[Co],
-    Ranker[GeoDoc[Co], GeoCell[Co]]
-  ] = _
-
   override def handle_parameters() {
     super.handle_parameters()
     if (params.perceptron_aggressiveness <= 0)
@@ -1204,9 +1197,9 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  def create_strategies(): Seq[(String, GridLocateDocumentStrategy[Co])]
+  def iter_strategies: Iterable[(String, GridLocateDocumentStrategy[Co])]
 
-  protected def create_pointwise_classifier_trainer() = {
+  protected def create_pointwise_classifier_trainer = {
     params.rerank_classifier match {
       case "pa-perceptron" =>
         new PassiveAggressiveBinaryPerceptronTrainer(
@@ -1222,7 +1215,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  protected def create_rerank_instance_factory() = {
+  protected def create_rerank_instance_factory = {
     params.rerank_instance match {
       case "trivial" =>
         new TrivialGeoDocRerankInstanceFactory[Co]
@@ -1256,22 +1249,13 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
             }).toIterable
         new LinearClassifierGridReranker[Co](
           basic_ranker,
-          create_pointwise_classifier_trainer(),
+          create_pointwise_classifier_trainer,
           training_docs,
-          create_rerank_instance_factory(),
+          create_rerank_instance_factory,
           params.rerank_top_n
         )
       }
     }
-  }
-
-  /**
-   * Set everything up for document grid-location.  Create and save a
-   * sequence of strategy objects.
-   */
-  override def setup_for_run() {
-    super.setup_for_run()
-    strategies = create_strategies()
   }
 }
 

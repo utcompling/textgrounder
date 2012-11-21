@@ -279,14 +279,14 @@ trait DocumentRememberingCell[Co] {
   /**
    * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_documents(): Iterable[GeoDoc[Co]]
+  def iter_documents: Iterable[GeoDoc[Co]]
 
   /**
    * Generate the distribution for the cell from the documents in it.
    */
   def generate_dist() {
     assert(!finished)
-    for (doc <- iterate_documents())
+    for (doc <- iter_documents)
       add_document(doc)
     finish()
   }

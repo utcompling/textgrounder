@@ -71,10 +71,7 @@ class CombinedModelGrid(override val table: SphereDocumentTable,
     num_non_empty_cells = models.map(_.num_non_empty_cells).sum
   }
 
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = {
-    models.map(_.iter_nonempty_cells(nonempty_word_dist))
-          .reduce(_ ++ _)
-  }
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = models.flatMap(_.iter_nonempty_cells(nonempty_word_dist))
 }
 
 

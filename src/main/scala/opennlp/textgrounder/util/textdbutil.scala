@@ -382,7 +382,7 @@ package object textdbutil {
      * subdirectories looking for data files.  The data files must have a suffix
      * in their names that matches the given suffix. (If you want more control
      * over the processing, call `read_schema_from_textdb`,
-     * `iterate_files_recursively`, and `filter_file_by_suffix`.)
+     * `iter_files_recursively`, and `filter_file_by_suffix`.)
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
@@ -397,11 +397,11 @@ package object textdbutil {
     def get_textdb_files(filehand: FileHandler, dir: String,
         suffix: String, with_messages: Boolean = true) = {
       val schema = read_schema_from_textdb(filehand, dir, suffix)
-      val files = iterate_files_recursively(filehand, Iterable(dir)).
+      val files = iter_files_recursively(filehand, Iterable(dir)).
           filter(filter_file_by_suffix(_, suffix))
       val files_with_message =
         if (with_messages)
-          iterate_files_with_message(filehand, files)
+          iter_files_with_message(filehand, files)
         else
           files
       (schema, files_with_message)

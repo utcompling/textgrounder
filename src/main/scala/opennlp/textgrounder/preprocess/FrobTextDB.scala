@@ -333,7 +333,7 @@ based on the value of a field, e.g. "split" (--split-by-field).
 """
 
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver
+  def create_driver = new TDriver
 }
 
 //class ScoobiConvertTextToUnigramCountsDriver extends
@@ -402,6 +402,6 @@ based on the value of a field, e.g. "split" (--split-by-field).
 //    ScoobiApp("Convert raw text to unigram counts") {
 //  type TDriver = ScoobiConvertTextToUnigramCountsDriver
 //  def create_param_object(ap: ArgParser) = new TParam(ap)
-//  def create_driver() = new TDriver
+//  def create_driver = new TDriver
 //}
 

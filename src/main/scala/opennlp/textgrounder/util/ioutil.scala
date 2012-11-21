@@ -472,13 +472,13 @@ package object ioutil {
    * Iterate over the given files, recursively processing the files in
    * each directory given.
    */
-  def iterate_files_recursively(filehand: FileHandler,
+  def iter_files_recursively(filehand: FileHandler,
       files: Iterable[String]): Iterator[String] = {
     files.toIterator.flatMap(file => {
       if (!filehand.is_directory(file))
         Iterator(file)
       else
-        iterate_files_recursively(filehand, filehand.list_files(file))
+        iter_files_recursively(filehand, filehand.list_files(file))
     })
   }
 
@@ -486,7 +486,7 @@ package object ioutil {
    * Add "Processing ..." messages when processing each file, and when
    * processing the first file of a directory.
    */
-  def iterate_files_with_message(filehand: FileHandler,
+  def iter_files_with_message(filehand: FileHandler,
     files: Iterator[String]) = {
     var lastdir: String = null
     for (file <- files) yield {
@@ -505,10 +505,10 @@ package object ioutil {
    * each directory given and displaying a message as each file is
    * processed.
    */
-  def iterate_files_recursively_with_message(filehand: FileHandler,
+  def iter_files_recursively_with_message(filehand: FileHandler,
       files: Iterable[String]) = {
-    iterate_files_with_message(filehand,
-      iterate_files_recursively(filehand, files))
+    iter_files_with_message(filehand,
+      iter_files_recursively(filehand, files))
   }
 
   ////////////////////////////////////////////////////////////////////////////

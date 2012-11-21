@@ -222,7 +222,7 @@ class DocumentEvaluationMapper extends
   type TDriver = HadoopGeolocateDocumentDriver
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver
+  def create_driver = new TDriver
   type StrategyType = GridLocateDocumentStrategy[SphereCoord]
   type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
@@ -290,7 +290,7 @@ class DocumentEvaluationMapper extends
       }
     val stratname_evaluators =
       for ((stratname, strategy, docstats) <-
-        get_stat_iters(driver.strategies, orig_docstats)) yield {
+        get_stat_iters(driver.iter_strategies, orig_docstats)) yield {
           val evalobj = driver.create_cell_evaluator(strategy, stratname)
           (stratname, evalobj.evaluate_documents(docstats))
         }
@@ -344,7 +344,7 @@ object HadoopGeolocateDocumentApp extends
   type TDriver = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver()
+  def create_driver = new TDriver
 
   def initialize_hadoop_classes(job: Job) {
     job.setJarByClass(classOf[DocumentEvaluationMapper])

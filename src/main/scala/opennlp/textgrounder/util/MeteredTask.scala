@@ -49,24 +49,24 @@ class MeteredTask(item_name: String, verb: String,
   // processed
   var printed_stats = false
   errprint("--------------------------------------------------------")
-  val first_time = curtimesecs()
+  val first_time = curtimesecs
   var last_time = first_time
   errprint("Beginning %s %s at %s.", verb, plural_item_name,
     humandate_full(first_time))
   errprint("")
 
-  def num_processed() = items_processed
+  def num_processed = items_processed
 
-  def elapsed_time() = curtimesecs() - first_time
+  def elapsed_time = curtimesecs - first_time
 
-  def item_unit() = {
+  def item_unit = {
     if (items_processed == 1)
       item_name
     else
       plural_item_name
   }
 
-  def print_elapsed_time_and_rate(curtime: Double = curtimesecs(),
+  def print_elapsed_time_and_rate(curtime: Double = curtimesecs,
       nohuman: Boolean = false) {
     /* Don't do anything if already printed for this item. */
     if (printed_stats)
@@ -78,7 +78,7 @@ class MeteredTask(item_name: String, verb: String,
     errprint("%sElapsed time: %s, %s %s processed",
              attime,
              format_minutes_seconds(total_elapsed_secs, hours=false),
-             items_processed, item_unit())
+             items_processed, item_unit)
     val items_per_second = items_processed.toDouble / total_elapsed_secs
     val seconds_per_item = total_elapsed_secs / items_processed
     errprint("Processing rate: %s items per second (%s seconds per item)",
@@ -87,7 +87,7 @@ class MeteredTask(item_name: String, verb: String,
   }
 
   def item_processed() = {
-    val curtime = curtimesecs()
+    val curtime = curtimesecs
     items_processed += 1
     val total_elapsed_secs = curtime - first_time
     val last_elapsed_secs = curtime - last_time
@@ -120,7 +120,7 @@ class MeteredTask(item_name: String, verb: String,
    * "items" comes from the `item_name` constructor parameter to this
    * class. */ 
   def finish() = {
-    val curtime = curtimesecs()
+    val curtime = curtimesecs
     errprint("")
     errprint("Finished %s %s at %s.", verb, plural_item_name,
       humandate_full(curtime))

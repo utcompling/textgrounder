@@ -188,6 +188,6 @@ object GenerateKMLApp extends GeolocateApp("generate-kml") {
   type TDriver = GenerateKMLDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver()
+  def create_driver = new TDriver
 }
 

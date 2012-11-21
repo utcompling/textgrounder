@@ -38,22 +38,22 @@ package object osutil {
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs() = System.currentTimeMillis/1000.0
+  def curtimesecs = System.currentTimeMillis/1000.0
 
-  def curtimehuman() = (new Date()) toString
+  def curtimehuman = (new Date) toString
 
   def humandate_full(sectime: Double) =
     (new Date((sectime*1000).toLong)) toString
   def humandate_time(sectime: Double) =
-    DateFormat.getTimeInstance().format((sectime*1000).toLong)
+    DateFormat.getTimeInstance.format((sectime*1000).toLong)
 
   import java.lang.management._
-  def getpid() = ManagementFactory.getRuntimeMXBean().getName().split("@")(0)
+  def getpid_str = ManagementFactory.getRuntimeMXBean.getName.split("@")(0)
   private var initialized = false
   private def check_initialized() {
     if (!initialized)
       throw new IllegalStateException("""You must call initialize_osutil() 
-at the beginning of your program, in order to use get_program_time_usage()""")
+at the beginning of your program, in order to use get_program_time_usage""")
   }
   /**
    * Call this if you use `get_program_time_usage` or `output_resource_usage`.
@@ -67,11 +67,11 @@ at the beginning of your program, in order to use get_program_time_usage()""")
     // that this is done.
     initialized = true
   }
-  val beginning_prog_time = curtimesecs()
+  val beginning_prog_time = curtimesecs
   
-  def get_program_time_usage() = {
+  def get_program_time_usage = {
     check_initialized()
-    curtimesecs() - beginning_prog_time
+    curtimesecs - beginning_prog_time
   }
 
   /**
@@ -128,9 +128,8 @@ at the beginning of your program, in order to use get_program_time_usage()""")
       return wrap_call(get_program_memory_usage_ps(
         virtual=virtual, wraperr=false), -1L)
     val header = if (virtual) "vsz" else "rss"
-    val pid = getpid()
     val input =
-      capture_subprocess_output("ps", "-p", pid.toString, "-o", header)
+      capture_subprocess_output("ps", "-p", getpid_str, "-o", header)
     val lines = input.split('\n')
     for (line <- lines if line.trim != header.toUpperCase)
       return 1024*line.trim.toLong
@@ -174,7 +173,7 @@ at the beginning of your program, in order to use get_program_time_usage()""")
 
   def output_resource_usage(dojava: Boolean = true) {
     errprint("Total elapsed time since program start: %s",
-             format_minutes_seconds(get_program_time_usage()))
+             format_minutes_seconds(get_program_time_usage))
     val (vszmeth, vsz) = get_program_memory_usage(virtual = true,
       method = "auto")
     errprint("Memory usage, virtual memory size (%s): %s bytes", vszmeth,
