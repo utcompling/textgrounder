@@ -216,6 +216,15 @@ class LinearClassifierAdapterTrainer (
 trait GeoDocRerankInstanceFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double) => FeatureVector
 ) {
+  val featvec_factory = new SparseFeatureVectorFactory[Word]
+  val scoreword = memoizer.memoize("-SCORE-")
+
+  def make_feature_vector(feats: Iterable[(Word, Double)], score: Double) = {
+    val feats_with_score =
+      Iterable(scoreword -> score) ++ feats
+    featvec_factory.make_feature_vector(feats_with_score)
+  }
+
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double):
     FeatureVector
 }
@@ -227,7 +236,7 @@ trait GeoDocRerankInstanceFactory[Co] extends (
 class TrivialGeoDocRerankInstanceFactory[Co] extends
     GeoDocRerankInstanceFactory[Co] {
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) =
-    new SparseFeatureVector(Map("-SCORE-" -> score))
+    make_feature_vector(Iterable(), score)
 }
 
 /**
@@ -237,22 +246,21 @@ class TrivialGeoDocRerankInstanceFactory[Co] extends
 class KLDivGeoDocRerankInstanceFactory[Co] extends
     GeoDocRerankInstanceFactory[Co] {
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) = {
-    val indiv_kl_vals =
+    val indiv_features =
       doc.dist match {
         case udist: UnigramWordDist => {
          val celldist =
            UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-          (for (word <- udist.model.iter_keys;
-               p = udist.lookup_word(word);
-               q = celldist.lookup_word(word);
-               if q != 0.0)
-            yield (memoizer.unmemoize(word), p*(log(p) - log(q)))
-          ).toMap
+          for (word <- udist.model.iter_keys;
+              p = udist.lookup_word(word);
+              q = celldist.lookup_word(word);
+              if q != 0.0)
+            yield (word, p*(log(p) - log(q)))
         }
         case _ =>
           throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
       }
-    new SparseFeatureVector(Map("-SCORE-" -> score) ++ indiv_kl_vals)
+    make_feature_vector(indiv_features, score)
   }
 }
 
@@ -271,25 +279,24 @@ class WordGeoDocRerankInstanceFactory[Co](value: String) extends
     val indiv_features =
       doc.dist match {
         case udist: UnigramWordDist => {
-         val celldist =
-           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-          (for ((word, count) <- udist.model.iter_items;
-                qcount = celldist.model.get_item(word);
-                if qcount != 0.0)
+          val celldist =
+            UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
+          for ((word, count) <- udist.model.iter_items;
+               qcount = celldist.model.get_item(word);
+               if qcount != 0.0)
             yield {
               val wordval = value match {
                 case "binary" => 1
                 case "count" => count
                 case "probability" => udist.lookup_word(word)
               }
-              (memoizer.unmemoize(word), wordval)
+              (word, wordval)
             }
-          ).toMap
         }
         case _ =>
           throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
       }
-    new SparseFeatureVector(Map("-SCORE-" -> score) ++ indiv_features)
+    make_feature_vector(indiv_features, score)
   }
 }
 
