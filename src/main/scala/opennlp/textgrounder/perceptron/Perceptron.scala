@@ -367,8 +367,8 @@ trait LinearClassifierTrainer {
   /** Create and initialize a vector of weights of length `len` to all 0's. */
   def new_zero_weights(len: Int) = new WeightVector(len)
 
-  /** Check that all instances have the same length. */
-  def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) {
+  /** Check that all instances have the same length, and return it. */
+  def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) = {
     // Written this way because the length might change as we iterate
     // the first time through the data (this will be the case if we are
     // using SparseFeatureVector). The call to `max` iterates through the
@@ -378,6 +378,7 @@ trait LinearClassifierTrainer {
     for ((inst, label) <- data) {
       assert(inst.length == len)
     }
+    len
   }
 
   /** Train a linear classifier given a set of labeled instances. */
@@ -449,10 +450,10 @@ abstract class BinaryPerceptronTrainer(
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
   def initialize(data: Iterable[(FeatureVector, Int)]) = {
-    check_sequence_lengths(data)
+    val len = check_sequence_lengths(data)
     for ((inst, label) <- data)
       assert(label == 0 || label == 1)
-    new_weights(data.head._1.length)
+    new_weights(len)
   }
 
   /** Return the scale factor used for updating the weight vector to a
@@ -694,10 +695,11 @@ abstract class SingleWeightMultiClassPerceptronTrainer(
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
   def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val len = check_sequence_lengths(data)
     assert(num_classes >= 2)
     for ((inst, label) <- data)
       assert(label >= 0 && label < num_classes)
-    new_weights(data.head._1.length)
+    new_weights(len)
   }
 
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
@@ -769,10 +771,10 @@ abstract class MultiClassPerceptronTrainer(
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
   def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val len = check_sequence_lengths(data)
     assert(num_classes >= 2)
     for ((inst, label) <- data)
       assert(label >= 0 && label < num_classes)
-    val len = data.head._1.length
     IndexedSeq[WeightVector](
       (for (i <- 0 until num_classes) yield new_weights(len)) :_*)
   }
