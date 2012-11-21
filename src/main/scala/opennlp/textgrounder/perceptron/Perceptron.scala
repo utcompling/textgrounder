@@ -173,62 +173,44 @@ class ArrayFeatureVector(
  * similar.
  */
 class SparseFeatureVector(
-  feature_values: Map[String, Double]
+  factory: SparseFeatureVectorFactory[_],
+  feature_values: collection.Map[Int, Double]
 ) extends SimpleFeatureVector {
-  protected val memoized_features = Map(0 -> 0.0) ++ // the intercept term
-    feature_values.map {
-      case (name, value) =>
-        (SparseFeatureVector.feature_mapper.memoize(name), value)
-    }
-
   def length = {
     // +1 because of the intercept term
-    SparseFeatureVector.feature_mapper.number_of_entries + 1
+    factory.feature_mapper.number_of_entries + 1
   }
 
-  def apply(index: Int) = memoized_features.getOrElse(index, 0.0)
-  def apply(feature: String): Double =
-    apply(SparseFeatureVector.feature_mapper.memoize(feature))
+  def apply(index: Int) = feature_values.getOrElse(index, 0.0)
 
   def squared_magnitude(label: Int) =
-    memoized_features.map {
+    feature_values.map {
       case (index, value) => value * value
     }.sum
 
   def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
 
   def dot_product(weights: WeightVector, label: Int) =
-    memoized_features.map {
+    feature_values.map {
       case (index, value) => value * weights(index)
     }.sum
 
   def update_weights(weights: WeightVector, scale: Double, label: Int) {
-    memoized_features.map {
+    feature_values.map {
       case (index, value) => weights(index) += scale * value
     }
   }
 
-  override def toString = {
+  override def toString =
     "SparseFeatureVector(%s)" format
-    memoized_features.filter { case (index, value) => value > 0}.
+    feature_values.filter { case (index, value) => index > 0 }.
       toSeq.sorted.map {
         case (index, value) =>
           "%s(%s)=%.2f" format (
-            SparseFeatureVector.feature_mapper.unmemoize(index),
+            factory.feature_mapper.unmemoize(index),
             index, value
           )
       }.mkString(",")
-  }
-}
-
-object SparseFeatureVector {
-  // Use Trove for fast, efficient hash tables.
-  val hashfact = new TroveHashTableFactory
-  // Alternatively, just use the normal Scala hash tables.
-  // val hashfact = new ScalaHashTableFactory
-
-  // Set the minimum index to 1 so we can use 0 for the intercept term
-  val feature_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 1)
 }
 
 /**
@@ -237,21 +219,22 @@ object SparseFeatureVector {
  * indices into a logical vector.
  */
 class SparseNominalFeatureVector(
-  nominal_features: Iterable[String]
+  factory: SparseFeatureVectorFactory[_],
+  feature_values: Iterable[Int]
 ) extends SparseFeatureVector(
-  nominal_features.map((_, 1.0)).toMap
+  factory,
+  feature_values.map((_, 1.0)).toMap
 ) {
-  override def toString = {
+  override def toString =
     "SparseNominalFeatureVector(%s)" format
-    memoized_features.filter { case (index, value) => value > 0}.
+    feature_values.filter { _ > 0 }.
       toSeq.sorted.map {
-        case (index, value) =>
+        index =>
           "%s(%s)" format (
-            SparseFeatureVector.feature_mapper.unmemoize(index),
+            factory.feature_mapper.unmemoize(index),
             index
           )
       }.mkString(",")
-  }
 }
 
 /**
@@ -270,25 +253,55 @@ abstract class Instance[LabelType] {
 }
 
 /**
- * A factory object for creating sparse nominal instances for classification,
- * consisting of a nominal label and a set of nominal features.  "Nominal"
- * in this case means data described using an arbitrary string.  Nominal
- * features are either present or absent, and nominal labels have no ordering
- * or other numerical significance.
+ * A factory object for creating sparse feature vectors for classification.
  */
-class SparseNominalInstanceFactory {
+class SparseFeatureVectorFactory[T] {
   // Use Trove for fast, efficient hash tables.
   val hashfact = new TroveHashTableFactory
   // Alternatively, just use the normal Scala hash tables.
   // val hashfact = new ScalaHashTableFactory
 
+  // Set the minimum index to 1 so we can use 0 for the intercept term
+  val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
+
+  def make_feature_vector(feature_values: Iterable[(T, Double)]) = {
+    val memoized_features = Iterable(0 -> 1.0) ++ // the intercept term
+      feature_values.map {
+        case (name, value) => (feature_mapper.memoize(name), value)
+      }
+    new SparseFeatureVector(this, memoized_features.toMap)
+  }
+}
+
+/**
+ * A factory object for creating sparse nominal feature vectors for
+ * classification. "Nominal" in this case means data described using an
+ * single arbitrary value, with no attached weight -- i.e., simply present
+ * or absent.
+ */
+class SparseNominalFeatureVectorFactory[T] extends
+  SparseFeatureVectorFactory[T] {
+  def make_nominal_feature_vector(features: Iterable[T]) = {
+    val memoized_features = Iterable(0) ++ // the intercept term
+      features.map { feature_mapper.memoize(_) }
+    new SparseNominalFeatureVector(this, memoized_features)
+  }
+}
+
+/**
+ * A factory object for creating sparse nominal instances for classification,
+ * consisting of a nominal label and a set of nominal features.  Nominal
+ * labels have no ordering or other numerical significance.
+ */
+class SparseNominalInstanceFactory extends
+  SparseNominalFeatureVectorFactory[String] {
   val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
   def number_of_labels = label_mapper.number_of_entries
 
   def make_labeled_instance(features: Iterable[String], label: String) = {
-    val featvec = new SparseNominalFeatureVector(features)
+    val featvec = make_nominal_feature_vector(features)
     val labelind = label_to_index(label)
     (featvec, labelind)
   }
