@@ -50,16 +50,16 @@ abstract class PolygonalCell(
    * out the boundary vertex by vertex.  The last coordinate should be the
    * same as the first, as befits a closed shape.
    */
-  def get_boundary(): Iterable[SphereCoord]
+  def get_boundary: Iterable[SphereCoord]
 
   /**
    * Return the "inner boundary" -- something echoing the actual boundary of the
    * cell but with smaller dimensions.  Used for outputting KML to make the
    * output easier to read.
    */
-  def get_inner_boundary() = {
-    val center = get_center_coord()
-    for (coord <- get_boundary())
+  def get_inner_boundary = {
+    val center = get_center_coord
+    for (coord <- get_boundary)
       yield SphereCoord((center.lat + coord.lat) / 2.0,
                   average_longitudes(center.long, coord.long))
   }
@@ -78,7 +78,7 @@ abstract class PolygonalCell(
     val offprob = xfprob - xf_minprob
     val fracprob = offprob / (xf_maxprob - xf_minprob)
     var coordtext = "\n"
-    for (coord <- get_inner_boundary()) {
+    for (coord <- get_inner_boundary) {
       coordtext += "%s,%s,%s\n" format (
         coord.long, coord.lat, fracprob * params.kml_max_height)
     }
@@ -141,31 +141,31 @@ abstract class RectangularCell(
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
-  def get_southwest_coord(): SphereCoord
+  def get_southwest_coord: SphereCoord
   /**
    * Return the coordinate of the northeast point of the rectangle.
    */
-  def get_northeast_coord(): SphereCoord
+  def get_northeast_coord: SphereCoord
 
   /**
    * Define the center based on the southwest and northeast points,
    * or based on the centroid of the cell.
    */
-  var centroid: Array[Double] = new Array[Double](2)
+  val centroid = new Array[Double](2)
   var num_docs: Int = 0
 
-  def get_center_coord() = {
+  def get_center_coord = {
     if (num_docs == 0 ||
       get_sphere_doctable(grid).driver.params.center_method == "center") {
       // use the actual cell center
       // also, if we have an empty cell, there is no such thing as
       // a centroid, so default to the center
-      val sw = get_southwest_coord()
-      val ne = get_northeast_coord()
+      val sw = get_southwest_coord
+      val ne = get_northeast_coord
       SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
     } else {
       // use the centroid
-      SphereCoord(centroid(0) / num_docs, centroid(1) / num_docs);
+      SphereCoord(centroid(0) / num_docs, centroid(1) / num_docs)
     }
   }
 
@@ -182,10 +182,10 @@ abstract class RectangularCell(
    * Define the boundary given the specified southwest and northeast
    * points.
    */
-  def get_boundary() = {
-    val sw = get_southwest_coord()
-    val ne = get_northeast_coord()
-    val center = get_center_coord()
+  def get_boundary = {
+    val sw = get_southwest_coord
+    val ne = get_northeast_coord
+    val center = get_center_coord
     val nw = SphereCoord(ne.lat, sw.long)
     val se = SphereCoord(sw.lat, ne.long)
     Seq(sw, nw, ne, se, sw)
@@ -199,9 +199,9 @@ abstract class RectangularCell(
    * polygonal-shaped-cell level.)
    */
   def generate_kml_name_placemark(name: String) = {
-    val sw = get_southwest_coord()
-    val ne = get_northeast_coord()
-    val center = get_center_coord()
+    val sw = get_southwest_coord
+    val ne = get_northeast_coord
+    val center = get_center_coord
     // !!PY2SCALA: BEGIN_PASSTHRU
     // Because it tries to frob the # sign
     <Placemark>

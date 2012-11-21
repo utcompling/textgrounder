@@ -37,21 +37,16 @@ class KdTreeCell(
   val kdleaf : KdTree
 ) extends RectangularCell(cellgrid) {
 
-  def get_northeast_coord () : SphereCoord = {
+  def get_northeast_coord =
     new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
-  }
 
-  def get_southwest_coord () : SphereCoord = {
+  def get_southwest_coord =
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
-  }
 
-  def describe_indices () : String = {
-    "Placeholder"
-  }
+  def describe_indices = "Placeholder"
 
-  def describe_location () : String = {
+  def describe_location =
     get_boundary.toString + " (Center: " + get_center_coord + ")"
-  }
 }
 
 object KdTreeGrid {
@@ -218,7 +213,7 @@ class KdTreeGrid(override val table: SphereDocumentTable,
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = {
     val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
     for (leaf <- nodes
-      if (leaf.size() > 0 || !nonempty_word_dist))
+      if (leaf.size > 0 || !nonempty_word_dist))
         yield leaves_to_cell(leaf)
   }
 }

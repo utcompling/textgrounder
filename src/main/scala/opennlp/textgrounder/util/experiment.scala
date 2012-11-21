@@ -478,7 +478,7 @@ package object experiment {
      below on the line creating ArgParser when trying to access progname,
      saying "no such field". */
   abstract class ExperimentApp(val progname: String) {
-    val beginning_time = curtimesecs()
+    val beginning_time = curtimesecs
 
     // Things that must be implemented
 
@@ -578,7 +578,7 @@ package object experiment {
       output_command_line_parameters()
       output_ancillary_parameters()
       val retval = run_program()
-      val ending_time = curtimesecs()
+      val ending_time = curtimesecs
       errprint("Ending operation at %s" format humandate_full(ending_time))
       errprint("Program running time: %s",
         format_minutes_seconds(ending_time - beginning_time))
@@ -674,10 +674,10 @@ package object experiment {
       ExperimentApp(appname) {
     type TDriver <: ArgParserExperimentDriver
     
-    val driver = create_driver()
+    val driver = create_driver
     type TParam = driver.TParam
 
-    def create_driver(): TDriver
+    def create_driver: TDriver
 
     override def output_ancillary_parameters() {
       driver.output_ancillary_parameters()

@@ -547,7 +547,7 @@ abstract class CorpusEvaluator(
         errprint("")
         errprint("Final results for strategy %s: All %d documents processed:",
           stratname, task.num_processed)
-        errprint("Ending operation at %s", curtimehuman())
+        errprint("Ending operation at %s", curtimehuman)
         output_results(isfinal = true)
         errprint("Ending final results for strategy %s", stratname)
         output_resource_usage()

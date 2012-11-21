@@ -141,10 +141,10 @@ trait TwitterInfochimpsFileProcessor {
     }).flatten
   }
 
-  def iterate_files(filehand: FileHandler, files: Iterable[String]) =
-    iterate_files_recursively_with_message(filehand, files)
+  def iter_files(filehand: FileHandler, files: Iterable[String]) =
+    iter_files_recursively_with_message(filehand, files)
 
-  def iterate_fields(lines: Iterator[String]) = {
+  def iter_fields(lines: Iterator[String]) = {
     MeteredTask.iterate("tweet", "parsing")(yield_fields(lines)) ++
     new SideEffectIterator {
       print_msg_heading("Memory/time usage:", blank_lines_before = 3)
@@ -160,7 +160,7 @@ class ConvertTwitterInfochimpsFileProcessor(
   var schema: Seq[String] = null
 
   def process_files(filehand: FileHandler, files: Iterable[String]) {
-    for (file <- iterate_files(filehand, files)) {
+    for (file <- iter_files(filehand, files)) {
       val (lines, compression_type, realname) =
         filehand.openr_with_compression_info(file)
       val (_, outname) = filehand.split_filename(realname)
@@ -169,7 +169,7 @@ class ConvertTwitterInfochimpsFileProcessor(
       errprint("Text document file is %s..." format out_text_name)
       val outstream =
         filehand.openw(out_text_name, compression = compression_type)
-      for ((metadata, text) <- iterate_fields(lines)) {
+      for ((metadata, text) <- iter_fields(lines)) {
         val rawtext = unescapeHtml4(unescapeXml(text))
         val splittext = Twokenize(rawtext)
         val outdata = metadata ++ Seq("text"->(splittext mkString " "))
@@ -483,11 +483,11 @@ class TwitterInfochimpsStatsFileProcessor(
   }
 
   def process_files(filehand: FileHandler, files: Iterable[String]) {
-    for (file <- iterate_files(filehand, files)) {
+    for (file <- iter_files(filehand, files)) {
       val lines = filehand.openr(file)
       val (_, outname) = filehand.split_filename(file)
       val curfile_stats = new TwitterStatistics(params)
-      for ((metadata, text) <- iterate_fields(lines)) {
+      for ((metadata, text) <- iter_fields(lines)) {
         curfile_stats.record_tweet(metadata, text)
         global_stats.record_tweet(metadata, text)
       }
@@ -546,5 +546,5 @@ is given, output statistics to stderr rather than converting text.
 """
 
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver
+  def create_driver = new TDriver
 }

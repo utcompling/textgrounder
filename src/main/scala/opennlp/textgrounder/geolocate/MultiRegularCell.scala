@@ -77,7 +77,7 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
  * above.
  */
 case class RegularCellIndex(latind: Int, longind: Int) {
-  def toFractional() = FractionalRegularCellIndex(latind, longind)
+  def toFractional = FractionalRegularCellIndex(latind, longind)
 }
 
 object RegularCellIndex {
@@ -145,24 +145,22 @@ class MultiRegularCell(
   val index: RegularCellIndex
 ) extends RectangularCell(grid) {
 
-  def get_southwest_coord() =
-    grid.multi_cell_index_to_near_corner_coord(index)
+  def get_southwest_coord = grid.multi_cell_index_to_near_corner_coord(index)
 
-  def get_northeast_coord() =
-    grid.multi_cell_index_to_far_corner_coord(index)
+  def get_northeast_coord = grid.multi_cell_index_to_far_corner_coord(index)
 
-  def describe_location() = {
-    "%s-%s" format (get_southwest_coord(), get_northeast_coord())
+  def describe_location = {
+    "%s-%s" format (get_southwest_coord, get_northeast_coord)
   }
 
-  def describe_indices() = "%s,%s" format (index.latind, index.longind)
+  def describe_indices = "%s,%s" format (index.latind, index.longind)
 
   /**
    * For a given multi cell, iterate over the tiling cells in the multi cell.
    * The return values are the indices of the southwest corner of each
    * tiling cell.
    */
-  def iterate_tiling_cells() = {
+  def iter_tiling_cells = {
     // Be careful around the edges -- we need to truncate the latitude and
     // wrap the longitude.  The call to `coerce()` will automatically
     // wrap the longitude, but we need to truncate the latitude ourselves,
@@ -401,13 +399,13 @@ class MultiRegularGrid(
    * The returned values are the indices of the (southwest corner of the)
    * multi cells.
    */
-  def iterate_overlapping_multi_cells(coord: SphereCoord) = {
-    // The logic is almost exactly the same as in iterate_tiling_cells()
+  def iter_overlapping_multi_cells(coord: SphereCoord) = {
+    // The logic is almost exactly the same as in iter_tiling_cells()
     // except that the offset is negative.
     val index = coord_to_tiling_cell_index(coord)
     // In order to handle coordinates near the edges of the grid, we need to
     // truncate the latitude ourselves, but coerce() handles the longitude
-    // wrapping.  See iterate_tiling_cells().
+    // wrapping.  See iter_tiling_cells().
     val max_offset = width_of_multi_cell - 1
     val minlatind = minimum_latind max (index.latind - max_offset)
 
@@ -452,7 +450,7 @@ class MultiRegularGrid(
    * multi cells, creating them as necessary, and adds the document to each.
    */
   def add_document_to_cell(doc: SphereDocument) {
-    for (index <- iterate_overlapping_multi_cells(doc.coord)) {
+    for (index <- iter_overlapping_multi_cells(doc.coord)) {
       val cell = find_cell_for_cell_index(index, create = true,
         record_created_cell = true).get
       if (debug("cell"))
@@ -485,8 +483,8 @@ class MultiRegularGrid(
     (for {
       v <- corner_to_multi_cell.values
       val empty = (
-        if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist()
-        else v.combined_dist.is_empty())
+        if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist
+        else v.combined_dist.is_empty)
       if (!empty)
     } yield v).toIndexedSeq
   }

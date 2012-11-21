@@ -405,7 +405,7 @@ abstract class GeoDocTable[Co : Serializer](
    * @param record_in_table Whether to record the document in the document
    *  table.
    */
-  def iterate_document_statuses(filehand: FileHandler, file: String,
+  def iter_document_statuses(filehand: FileHandler, file: String,
       schema: Schema, record_in_table: Boolean, note_globally: Boolean) = {
     val lines = filehand.openr(file).zipWithIndex.map {
       case (line, idx) => (filehand, file, line, idx + 1)
@@ -438,7 +438,7 @@ abstract class GeoDocTable[Co : Serializer](
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)
     val docstats =
       (for (file <- files) yield {
-        iterate_document_statuses(filehand, file, schema, record_in_subtable,
+        iter_document_statuses(filehand, file, schema, record_in_subtable,
           note_globally)
       }).flatten
     if (!finish_globally)

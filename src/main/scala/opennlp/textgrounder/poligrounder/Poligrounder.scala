@@ -228,6 +228,6 @@ object PoligrounderApp extends GridLocateApp("poligrounder") {
   type TDriver = PoligrounderDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver()
+  def create_driver = new TDriver
 }
 

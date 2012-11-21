@@ -562,7 +562,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
     }
   }
 
-  def create_strategies() = {
+  def iter_strategies = {
     val strats_unflat =
       for (stratname <- params.strategy) yield {
         if (stratname == "baseline") {
@@ -600,7 +600,7 @@ Hadoop.scala:DocumentResultMapper:
 
     val stratname_evaluators =
       for ((stratname, strategy, docstats) <-
-        get_stat_iters(driver.strategies, orig_docstats)) yield {
+        get_stat_iters(driver.iter_strategies, orig_docstats)) yield {
           val evalobj = driver.create_cell_evaluator(strategy, stratname)
           (stratname, evalobj.evaluate_documents(docstats))
         }
@@ -855,7 +855,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run_after_setup() = {
-    for ((stratname, strategy) <- strategies) yield {
+    for ((stratname, strategy) <- iter_strategies) yield {
       val results =
         params.eval_format match {
           case "pcl-travel" => {
@@ -898,6 +898,6 @@ object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
   type TDriver = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver()
+  def create_driver = new TDriver
 }
 

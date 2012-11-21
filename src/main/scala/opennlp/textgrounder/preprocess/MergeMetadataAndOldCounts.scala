@@ -224,5 +224,5 @@ object MergeMetadataAndOldCounts extends
     ExperimentDriverApp("Merge document metadata files and old counts file") {
   type TDriver = MMCDriver
   def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver
+  def create_driver = new TDriver
 }

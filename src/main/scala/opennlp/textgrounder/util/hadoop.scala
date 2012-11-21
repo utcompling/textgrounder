@@ -246,7 +246,7 @@ package object hadoop {
       /* A very simple file processor that does nothing but note the files
          seen, for Hadoop's benefit. */
       val files =
-        iterate_files_recursively(driver.get_file_handler, corpus_dirs).
+        iter_files_recursively(driver.get_file_handler, corpus_dirs).
           filter(TextDBProcessor.filter_file_by_suffix(_, corpus_suffix))
       for (file <- files) {
          errprint("Adding %s to input path", file)
@@ -375,13 +375,13 @@ package object hadoop {
   trait HadoopExperimentMapReducer {
     type TContext <: TaskInputOutputContext[_,_,_,_]
     type TDriver <: HadoopExperimentDriver
-    val driver = create_driver()
+    val driver = create_driver
     type TParam = driver.TParam
 
     def progname: String
 
     def create_param_object(ap: ArgParser): TParam
-    def create_driver(): TDriver
+    def create_driver: TDriver
 
     /** Originally this was simply called 'setup', but used only for a
      * trait that could be mixed into a mapper.  Expanding this to allow

@@ -144,10 +144,10 @@ class SphereDocumentTable(
   /**
    * Iterate over all the subtables that exist.
    */
-  def iterate_subtables() = corpus_type_to_subtable.values
+  def iter_subtables() = corpus_type_to_subtable.values
 
   override def finish_document_loading() {
-    for (subtable <- iterate_subtables())
+    for (subtable <- iter_subtables())
       subtable.finish_document_loading()
     super.finish_document_loading()
   }
