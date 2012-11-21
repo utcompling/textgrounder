@@ -20,7 +20,7 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.textdbutil.Schema
 
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 class TwitterTweetDocument(
   schema: Schema,
@@ -57,18 +57,18 @@ class TwitterUserDocument(
   subtable: TwitterUserDocumentSubtable
 ) extends RealSphereDocument(schema, subtable.table) {
   var userind = blank_memoized_string
-  def title = unmemoize_string(userind)
+  def title = memoizer.unmemoize(userind)
 
   override def set_field(field: String, value: String) {
     field match {
-      case "user" => userind = memoize_string(value)
+      case "user" => userind = memoizer.memoize(value)
       case _ => super.set_field(field, value)
     }
   }
 
   def struct =
     <TwitterUserDocument>
-      <user>{ unmemoize_string(userind) }</user>
+      <user>{ memoizer.unmemoize(userind) }</user>
       {
         if (has_coord)
           <location>{ coord }</location>

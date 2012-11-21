@@ -24,7 +24,6 @@ import collection.mutable
 
 import java.io.{InputStream, PrintStream}
 
-import opennlp.textgrounder.worddist.IdentityMemoizer._
 import opennlp.textgrounder.gridlocate.GeoDoc
 
 import opennlp.textgrounder.{util => tgutil}
@@ -70,11 +69,11 @@ class MMCParameters(ap: ArgParser) extends
 trait SimpleUnigramWordDistConstructor {
   val initial_dynarr_size = 1000
   val keys_dynarr =
-    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+    new DynamicArray[String](initial_alloc = initial_dynarr_size)
   val values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
-  def handle_document(title: String, keys: Array[Word], values: Array[Int],
+  def handle_document(title: String, keys: Array[String], values: Array[Int],
       num_words: Int): Boolean
 
   def read_word_counts(filehand: FileHandler, filename: String) {
@@ -108,7 +107,7 @@ trait SimpleUnigramWordDistConstructor {
           line match {
             case linere(word, count) => {
               // errprint("Saw1 %s,%s", word, count)
-              keys_dynarr += memoize_string(word)
+              keys_dynarr += word
               values_dynarr += count.toInt
             }
             case _ =>
@@ -142,7 +141,7 @@ class MMCUnigramWordDistHandler(
   val outstream = writer.open_document_file(filehand, output_dir,
     output_file_prefix, compression = "bzip2")
  
-  def handle_document(title: String, keys: Array[Word], values: Array[Int],
+  def handle_document(title: String, keys: Array[String], values: Array[Int],
       num_words: Int) = {
     errprint("Handling document: %s", title)
     val params = document_fieldvals.getOrElse(title, null)
@@ -152,11 +151,9 @@ class MMCUnigramWordDistHandler(
       val counts =
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
-          ("%s:%s" format
-            (encode_string_for_count_map_field(unmemoize_string(keys(i))),
-              values(i)))
-          }).
-          mkString(" ")
+          ("%s:%s" format (encode_string_for_count_map_field(keys(i)),
+            values(i)))
+        }). mkString(" ")
       val new_params = params ++ Seq(counts)
       writer.schema.output_row(outstream, new_params)
     }

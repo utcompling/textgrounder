@@ -34,7 +34,7 @@ import tg.util.printutil.{errprint, warning}
 import tg.gridlocate.GeoDoc
 import tg.gridlocate.GridLocateDriver.Debug._
 
-import WordDist.memoizer._
+import WordDist._
 
 object NgramStorage {
   type Ngram = Iterable[String]
@@ -174,7 +174,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   * and inefficient too with extra encodings/decodings.  We need a better
 //   * implementation with a trie and such.
 //   */
-//  var counts = Vector(null, create_word_double_map())
+//  var counts = Vector(null, create_word_double_map)
 //  var num_tokens = Vector(0.0, 0.0)
 //  def max_ngram_size = counts.length - 1
 //  // var num_types = Vector(0)
@@ -191,7 +191,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //  def ensure_ngram_fits(n: Int) {
 //    assert(counts.length == num_tokens.length)
 //    while (n > max_ngram_size) {
-//      counts :+= create_word_double_map()
+//      counts :+= create_word_double_map
 //      num_tokens :+= 0.0
 //    }
 //  }
@@ -201,7 +201,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   */
 //  def record_encoded_ngram(egram: String, count: Int) {
 //    val n = egram.count(_ == ':') + 1
-//    val mgram = memoize_string(egram)
+//    val mgram = memoizer.memoize(egram)
 //    ensure_ngram_fits(n)
 //    counts(n)(mgram) += count
 //    num_tokens(n) += count

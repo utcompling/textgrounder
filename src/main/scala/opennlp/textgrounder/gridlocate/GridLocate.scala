@@ -35,7 +35,7 @@ import tgutil.printutil.errprint
 import opennlp.textgrounder.perceptron._
 import opennlp.textgrounder.worddist._
 
-import WordDist.memoizer._
+import WordDist._
 import GridLocateDriver.Debug._
 
 /*

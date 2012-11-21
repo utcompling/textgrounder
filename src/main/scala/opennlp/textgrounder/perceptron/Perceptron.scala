@@ -28,6 +28,8 @@ import util.control.Breaks._
 import collection.mutable
 import io.Source
 
+import opennlp.textgrounder.util.memoizer._
+
 /**
  * A vector of real-valued features.  In general, features are indexed
  * both by a non-negative integer and by a class label (i.e. a label for
@@ -176,7 +178,7 @@ class SparseFeatureVector(
   protected val memoized_features = Map(0 -> 0.0) ++ // the intercept term
     feature_values.map {
       case (name, value) =>
-        (SparseFeatureVector.feature_mapper.memoize_string(name), value)
+        (SparseFeatureVector.feature_mapper.memoize(name), value)
     }
 
   def length = {
@@ -186,7 +188,7 @@ class SparseFeatureVector(
 
   def apply(index: Int) = memoized_features.getOrElse(index, 0.0)
   def apply(feature: String): Double =
-    apply(SparseFeatureVector.feature_mapper.memoize_string(feature))
+    apply(SparseFeatureVector.feature_mapper.memoize(feature))
 
   def squared_magnitude(label: Int) =
     memoized_features.map {
@@ -212,7 +214,7 @@ class SparseFeatureVector(
       toSeq.sorted.map {
         case (index, value) =>
           "%s(%s)=%.2f" format (
-            SparseFeatureVector.feature_mapper.unmemoize_string(index),
+            SparseFeatureVector.feature_mapper.unmemoize(index),
             index, value
           )
       }.mkString(",")
@@ -220,8 +222,13 @@ class SparseFeatureVector(
 }
 
 object SparseFeatureVector {
+  // Use Trove for fast, efficient hash tables.
+  val hashfact = new TroveHashTableFactory
+  // Alternatively, just use the normal Scala hash tables.
+  // val hashfact = new ScalaHashTableFactory
+
   // Set the minimum index to 1 so we can use 0 for the intercept term
-  val feature_mapper = new IntStringMemoizer(minimum_index = 1)
+  val feature_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 1)
 }
 
 /**
@@ -240,7 +247,7 @@ class SparseNominalFeatureVector(
       toSeq.sorted.map {
         case (index, value) =>
           "%s(%s)" format (
-            SparseFeatureVector.feature_mapper.unmemoize_string(index),
+            SparseFeatureVector.feature_mapper.unmemoize(index),
             index
           )
       }.mkString(",")
@@ -270,9 +277,14 @@ abstract class Instance[LabelType] {
  * or other numerical significance.
  */
 class SparseNominalInstanceFactory {
-  val label_mapper = new IntStringMemoizer(minimum_index = 0)
-  def label_to_index(label: String) = label_mapper.memoize_string(label)
-  def index_to_label(index: Int) = label_mapper.unmemoize_string(index)
+  // Use Trove for fast, efficient hash tables.
+  val hashfact = new TroveHashTableFactory
+  // Alternatively, just use the normal Scala hash tables.
+  // val hashfact = new ScalaHashTableFactory
+
+  val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
+  def label_to_index(label: String) = label_mapper.memoize(label)
+  def index_to_label(index: Int) = label_mapper.unmemoize(index)
   def number_of_labels = label_mapper.number_of_entries
 
   def make_labeled_instance(features: Iterable[String], label: String) = {

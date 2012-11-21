@@ -25,7 +25,7 @@ import tgutil.collectionutil.{LRUCache, doublemap}
 import tgutil.printutil.{errprint, warning}
 
 import opennlp.textgrounder.worddist.{WordDist,UnigramWordDist}
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /**
  * A general distribution over cells, associating a probability with each

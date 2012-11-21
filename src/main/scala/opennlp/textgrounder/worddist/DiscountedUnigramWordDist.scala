@@ -28,7 +28,7 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 // FIXME! For --tf-idf
 import opennlp.textgrounder.gridlocate.GridLocateDriver
 
-import WordDist.memoizer._
+import WordDist._
 
 abstract class DiscountedUnigramWordDistFactory(
     val interpolate: Boolean
@@ -44,9 +44,9 @@ abstract class DiscountedUnigramWordDistFactory(
    * the value in 'globally_unseen_word_prob'.  We start out by storing raw
    * counts, then adjusting them.
    */
-  var overall_word_probs = create_word_double_map()
+  var overall_word_probs = create_word_double_map
   var owp_adjusted = false
-  var document_freq = create_word_double_map()
+  var document_freq = create_word_double_map
   var num_documents = 0
   var global_normalization_factor = 0.0
 
@@ -310,7 +310,7 @@ abstract class DiscountedUnigramWordDist(
       val wordprob = mle_wordprob*(1.0 - unseen_mass) + owprob*unseen_mass
       if (debug("lots"))
         errprint("Word %s, seen in document, wordprob = %s",
-                 unmemoize_string(word), wordprob)
+                 memoizer.unmemoize(word), wordprob)
       wordprob
     } else {
       val retval =
@@ -327,7 +327,7 @@ abstract class DiscountedUnigramWordDist(
               val wordprob = 0.0
               if (debug("lots"))
                 errprint("Word %s, never seen at all, wordprob = %s",
-                         unmemoize_string(word), wordprob)
+                         memoizer.unmemoize(word), wordprob)
               wordprob
             }
             case Some(owprob) => {
@@ -338,7 +338,7 @@ abstract class DiscountedUnigramWordDist(
               //    factory.overall_unseen_mass)
               if (debug("lots"))
                 errprint("Word %s, seen but not in document, wordprob = %s",
-                         unmemoize_string(word), wordprob)
+                         memoizer.unmemoize(word), wordprob)
               wordprob
             }
           }
@@ -352,7 +352,7 @@ abstract class DiscountedUnigramWordDist(
           val wordprob = wordcount.toDouble/normalization_factor*(1.0 - unseen_mass)
           if (debug("lots"))
             errprint("Word %s, seen in document, wordprob = %s",
-                     unmemoize_string(word), wordprob)
+                     memoizer.unmemoize(word), wordprob)
           wordprob
         }
       retval

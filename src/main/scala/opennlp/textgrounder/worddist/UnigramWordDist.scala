@@ -34,7 +34,7 @@ import tg.util.printutil.{errprint, warning}
 import tg.gridlocate.GeoDoc
 import tg.gridlocate.GridLocateDriver.Debug._
 
-import WordDist.memoizer._
+import WordDist._
 
 /**
  * An interface for storing and retrieving vocabulary items (e.g. words,
@@ -52,7 +52,7 @@ class UnigramStorage extends ItemStorage[Word] {
    * code does interpolation on cells).  FIXME: This seems ugly, perhaps
    * there is a better way?
    */
-  val counts = create_word_double_map()
+  val counts = create_word_double_map
   var tokens_accurate = true
   var num_tokens_val = 0.0
 
@@ -119,7 +119,7 @@ abstract class UnigramWordDist(factory: WordDistFactory
       for ((word, count) <-
         model.iter_items.toSeq.sortWith(_._2 > _._2).
           view(0, num_words_to_print))
-      yield "%s=%s" format (unmemoize_string(word), count) 
+      yield "%s=%s" format (memoizer.unmemoize(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
         model.num_types, model.num_tokens, innerToString,
@@ -162,7 +162,7 @@ abstract class UnigramWordDist(factory: WordDistFactory
       else {
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(unmemoize_string(word)) = p*(log(p) - log(q))
+          contribs(memoizer.unmemoize(word)) = p*(log(p) - log(q))
       }
     }
 
@@ -175,7 +175,7 @@ abstract class UnigramWordDist(factory: WordDistFactory
         val q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(unmemoize_string(word)) = p*(log(p) - log(q))
+          contribs(memoizer.unmemoize(word)) = p*(log(p) - log(q))
       }
 
       val retval = kldiv + kl_divergence_34(other)
@@ -220,7 +220,7 @@ abstract class UnigramWordDist(factory: WordDistFactory
    */
   def find_most_common_word(pred: String => Boolean): Option[Word] = {
     val filtered =
-      (for ((word, count) <- model.iter_items if pred(unmemoize_string(word)))
+      (for ((word, count) <- model.iter_items if pred(memoizer.unmemoize(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {
@@ -280,7 +280,7 @@ class DefaultUnigramWordDistConstructor(
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
-      model.add_item(memoize_string(lword), count)
+      model.add_item(memoizer.memoize(lword), count)
       true
     }
     else
@@ -343,7 +343,7 @@ class DefaultUnigramWordDistConstructor(
   protected def imp_finish_before_global(gendist: WordDist) {
     val dist = gendist.asInstanceOf[UnigramWordDist]
     val model = dist.model
-    val oov = memoize_string("-OOV-")
+    val oov = memoizer.memoize("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.

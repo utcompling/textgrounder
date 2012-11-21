@@ -19,18 +19,21 @@
 package opennlp.textgrounder.worddist
 
 import math._
+import collection.mutable
 
 import opennlp.{textgrounder=>tg}
+import tg.util.collectionutil._
 import tg.util.ioutil.FileHandler
 import tg.util.printutil.{errprint, warning}
 import tg.util.Serializer
+import tg.util.memoizer._
 
 import tg.gridlocate.GridLocateDriver.Debug._
 import tg.gridlocate.GeoDoc
 // FIXME! For reference to GridLocateDriver.Params
 import tg.gridlocate.GridLocateDriver
 
-import WordDist.memoizer._
+import WordDist._
 
 // val use_sorted_list = false
 
@@ -253,18 +256,50 @@ trait WordDistFactory {
   def finish_global_distribution()
 }
 
-object WordDist {
-  /**
-   * Object describing how we memoize words (i.e. convert them to Int
-   * indices, for faster operations on them).
-   *
-   * FIXME: Should probably be stored globally or at least elsewhere, since
-   * memoization is more general than just for words in word distributions,
-   * and is used elsewhere in the code for other things.  We should probably
-   * move the memoization code into the `util` package.
-   */
-  val memoizer = new IntStringMemoizer
-  //val memoizer = IdentityMemoizer
+/**
+ * Normal version of memoizer which maps words to Ints.
+ */
+trait WordAsIntMemoizer {
+  type Word = Int
+  // Use Trove for fast, efficient hash tables.
+  val hashfact = new TroveHashTableFactory
+  // Alternatively, just use the normal Scala hash tables.
+  // val hashfact = new ScalaHashTableFactory
+  val memoizer = new ToIntMemoizer[String](hashfact)
+  val invalid_word: Word = -1
+
+  val blank_memoized_string = memoizer.memoize("")
+
+  def create_word_int_map: mutable.Map[Word, Int] =
+    hashfact.create_int_int_map
+
+  def create_word_double_map: mutable.Map[Word, Double] =
+    hashfact.create_int_double_map
+}
+
+/**
+ * Version of memoizer which maps words to themselves as strings. This tests
+ * that we don't make any assumptions about memoized words being Ints.
+ */
+trait WordAsStringMemoizer {
+  type Word = String
+  val memoizer = new IdentityMemoizer[String]
+  val invalid_word: Word = null
+
+  val blank_memoized_string = memoizer.memoize("")
+
+  def create_word_int_map = intmap[Word]()
+
+  def create_word_double_map = doublemap[Word]()
+}
+
+/**
+ * Object describing how "words" are memoized and storing the memoizer
+ * object used for memoization. Memoization means mapping words (which are
+ * strings) into integers, for faster and less space-intensive operations
+ * on them).
+ */
+object WordDist extends WordAsIntMemoizer {
 }
 
 /**
