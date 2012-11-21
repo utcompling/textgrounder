@@ -33,7 +33,7 @@ import tgutil.experiment._
 import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.worddist._
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
@@ -318,7 +318,7 @@ class UnigramComparer(min_prob: Double, max_items: Int) extends
   type Dist = UnigramWordDist
 
   def lookup_item(dist: Dist, item: Item) = dist.lookup_word(item)
-  def format_item(item: Item) = unmemoize_string(item)
+  def format_item(item: Item) = memoizer.unmemoize(item)
 }
 
 class NgramComparer(min_prob: Double, max_items: Int) extends

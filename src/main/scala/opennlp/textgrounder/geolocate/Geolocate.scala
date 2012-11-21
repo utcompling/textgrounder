@@ -38,7 +38,7 @@ import opennlp.textgrounder.gridlocate._
 import GridLocateDriver.Debug._
 
 import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /*
 
@@ -157,7 +157,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
     val cands =
       if (maxword != None)
         wikipedia_table.construct_candidates(
-          unmemoize_string(maxword.get))
+          memoizer.unmemoize(maxword.get))
       else Seq[SphereDocument]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)

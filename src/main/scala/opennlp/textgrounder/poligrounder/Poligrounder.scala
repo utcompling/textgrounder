@@ -78,7 +78,7 @@ import opennlp.textgrounder.gridlocate._
 import GridLocateDriver.Debug._
 
 import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /*
 

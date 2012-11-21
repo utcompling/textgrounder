@@ -31,7 +31,7 @@ import tgutil.printutil.{errprint, warning}
 import opennlp.textgrounder.gridlocate._
 
 import opennlp.textgrounder.worddist._
-import WordDist.memoizer._
+import WordDist._
 
 class KMLParameters {
   // Minimum and maximum colors
@@ -95,11 +95,11 @@ class FilterUnigramWordDistConstructor(
     super.finish_before_global(dist)
 
     val model = dist.asInstanceOf[UnigramWordDist].model
-    val oov = memoize_string("-OOV-")
+    val oov = memoizer.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
     for ((word, count) <- model.iter_items
-         if !(filter_words contains unmemoize_string(word))) {
+         if !(filter_words contains memoizer.unmemoize(word))) {
       model.remove_item(word)
       model.add_item(oov, count)
     }
@@ -168,7 +168,7 @@ class GenerateKMLDriver extends
   def run_after_setup() {
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
-      val celldist = cdist_factory.get_cell_dist(grid, memoize_string(word))
+      val celldist = cdist_factory.get_cell_dist(grid, memoizer.memoize(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)

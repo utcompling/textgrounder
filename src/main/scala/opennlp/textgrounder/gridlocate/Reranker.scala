@@ -2,7 +2,7 @@ package opennlp.textgrounder.gridlocate
 
 import math.log
 
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 import opennlp.textgrounder.worddist.UnigramWordDist
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.perceptron._
@@ -246,7 +246,7 @@ class KLDivGeoDocRerankInstanceFactory[Co] extends
                p = udist.lookup_word(word);
                q = celldist.lookup_word(word);
                if q != 0.0)
-            yield (unmemoize_string(word), p*(log(p) - log(q)))
+            yield (memoizer.unmemoize(word), p*(log(p) - log(q)))
           ).toMap
         }
         case _ =>
@@ -282,7 +282,7 @@ class WordGeoDocRerankInstanceFactory[Co](value: String) extends
                 case "count" => count
                 case "probability" => udist.lookup_word(word)
               }
-              (unmemoize_string(word), wordval)
+              (memoizer.unmemoize(word), wordval)
             }
           ).toMap
         }

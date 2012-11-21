@@ -23,7 +23,7 @@ import math._
 import opennlp.textgrounder.util.distances._
 
 import opennlp.textgrounder.gridlocate.{GeoGrid,WordCellDist,CellDistFactory}
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //
@@ -96,9 +96,9 @@ object SphereWordCellDist {
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ unmemoize_string(celldist.word) }</name>
+            <name>{ memoizer.unmemoize(celldist.word) }</name>
             <open>1</open>
-            <description>{ "Cell distribution for word '%s'" format unmemoize_string(celldist.word) }</description>
+            <description>{ "Cell distribution for word '%s'" format memoizer.unmemoize(celldist.word) }</description>
             <LookAt>
               <latitude>42</latitude>
               <longitude>-102</longitude>

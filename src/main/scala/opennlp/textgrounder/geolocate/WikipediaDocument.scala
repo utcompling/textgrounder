@@ -29,7 +29,7 @@ import tgutil.textutil.capfirst
 import opennlp.textgrounder.gridlocate.GeoDocConverters._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist.WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist._
 
 /**
  * A document corresponding to a Wikipedia article.
@@ -59,15 +59,15 @@ class WikipediaDocument(
   var incoming_links_value: Option[Int] = None
   override def incoming_links = incoming_links_value
   var redirind = blank_memoized_string
-  def redir = unmemoize_string(redirind)
+  def redir = memoizer.unmemoize(redirind)
   var titleind = blank_memoized_string
-  def title = unmemoize_string(titleind)
+  def title = memoizer.unmemoize(titleind)
 
   override def set_field(field: String, value: String) {
     field match {
       case "id" => id = value.toLong
-      case "title" => titleind = memoize_string(value)
-      case "redir" => redirind = memoize_string(value)
+      case "title" => titleind = memoizer.memoize(value)
+      case "redir" => redirind = memoizer.memoize(value)
       case "incoming_links" => incoming_links_value = get_int_or_none(value)
       case _ => super.set_field(field, value)
     }
@@ -278,7 +278,7 @@ class WikipediaDocumentSubtable(
   def lookup_document(name: String) = {
     assert(name != null)
     assert(name.length > 0)
-    name_to_document.getOrElse(memoize_string(capfirst(name)),
+    name_to_document.getOrElse(memoizer.memoize(capfirst(name)),
       null.asInstanceOf[WikipediaDocument])
   }
 
@@ -299,14 +299,14 @@ class WikipediaDocumentSubtable(
     assert(name != null)
     assert(name.length > 0)
     assert(name == capfirst(name))
-    name_to_document(memoize_string(name)) = doc
+    name_to_document(memoizer.memoize(name)) = doc
     val loname = name.toLowerCase
-    val loname_word = memoize_string(loname)
+    val loname_word = memoizer.memoize(loname)
     lower_name_to_documents(loname_word) += doc
     val (short, div) = WikipediaDocument.compute_short_form(loname)
-    val short_word = memoize_string(short)
+    val short_word = memoizer.memoize(short)
     if (div != null) {
-      val div_word = memoize_string(div)
+      val div_word = memoizer.memoize(div)
       lower_name_div_to_documents((short_word, div_word)) += doc
     }
     short_lower_name_to_documents(short_word) += doc
@@ -350,12 +350,12 @@ class WikipediaDocumentSubtable(
   }
 
   def construct_candidates(toponym: String) = {
-    val lw = memoize_string(toponym.toLowerCase)
+    val lw = memoizer.memoize(toponym.toLowerCase)
     lower_toponym_to_document(lw)
   }
 
   def word_is_toponym(word: String) = {
-    val lw = memoize_string(word.toLowerCase)
+    val lw = memoizer.memoize(word.toLowerCase)
     lower_toponym_to_document contains lw
   }
 }
