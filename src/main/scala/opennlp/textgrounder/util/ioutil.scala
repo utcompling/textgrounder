@@ -474,12 +474,12 @@ package object ioutil {
    */
   def iter_files_recursively(filehand: FileHandler,
       files: Iterable[String]): Iterator[String] = {
-    files.toIterator.flatMap(file => {
+    files.toIterator.flatMap { file =>
       if (!filehand.is_directory(file))
         Iterator(file)
       else
         iter_files_recursively(filehand, filehand.list_files(file))
-    })
+    }
   }
 
   /**

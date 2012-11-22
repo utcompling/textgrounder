@@ -279,10 +279,10 @@ class DocumentEvaluationMapper extends
           val docstat =
             driver.document_table.line_to_document(filehand, file, line,
               lineno, schema, false, false)
-          docstat.maybedoc.foreach(doc => {                        
+          docstat.maybedoc.foreach { doc =>
             if (doc.dist != null)
               doc.dist.finish_after_global()
-          })
+          }
           docstat
         }
       }

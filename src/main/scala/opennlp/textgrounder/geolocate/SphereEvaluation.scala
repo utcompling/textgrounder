@@ -279,7 +279,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   type TEvalDoc = TitledDocument
   type TEvalRes = TitledDocumentResult
   def iter_documents = {
-    filenames.toIterator.flatMap(filename => {
+    filenames.toIterator.flatMap { filename =>
       val dom = try {
         // On error, just return, so that we don't have problems when called
         // on the whole PCL corpus dir (which includes non-XML files).
@@ -301,7 +301,7 @@ class PCLTravelGeolocateDocumentEvaluator(
         //errprint("Head text: %s", headtext)
         //errprint("Non-head text: %s", text)
       } yield (filehand, filename, TitledDocument(headtext, text))).toIterator
-    })
+    }
   }
 
   def iter_document_stats = iter_documents.map {
