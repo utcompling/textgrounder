@@ -138,13 +138,13 @@ object DocumentCounterTracker {
     (for (((filehand, file), file_statuses) <- byfile) yield {
       val tracker = new DocumentCounterTracker(
         filename_to_counter_name(filehand, file), driver)
-      val results = file_statuses.flatMap(status => {
+      val results = file_statuses.flatMap { status =>
         tracker.handle_status(status)
         status.maybedoc
-      })
+      }
       if (debug("per-document")) {
         val output_stats =
-          new SideEffectIterator({ tracker.note_document_counters(file) })
+          new SideEffectIterator { tracker.note_document_counters(file) }
         results ++ output_stats
       } else
         results
@@ -443,13 +443,13 @@ abstract class GeoDocTable[Co : Serializer](
     if (!finish_globally)
       docstats
     else
-      docstats.map(stat => {
-        stat.maybedoc.foreach(doc => {
+      docstats.map { stat =>
+        stat.maybedoc.foreach { doc =>
           if (doc.dist != null)
             doc.dist.finish_after_global()
-        })
+        }
         stat
-      })
+      }
   }
 
   def read_documents_from_textdb(filehand: FileHandler, dir: String,

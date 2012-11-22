@@ -1238,13 +1238,13 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
       case _ => {
         val training_docs =
           read_training_documents(operation = "training reranker").
-            map(doc => {
+            map { doc =>
               val cell = grid.find_best_cell_for_document(doc, false)
               // We should already have a cell for each training doc,
               // right?
               assert(cell != None)
               (doc, cell.get)
-            }).toIterable
+            }.toIterable
         new LinearClassifierGridReranker[Co](
           basic_ranker,
           create_pointwise_classifier_trainer,

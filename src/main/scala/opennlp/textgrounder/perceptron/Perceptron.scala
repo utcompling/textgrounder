@@ -91,7 +91,7 @@ trait DenseFeatureVector extends FeatureVector {
        yield va*va).sum
 
   def update_weights(weights: WeightVector, scale: Double, label: Int) {
-    (0 until length).foreach(i => { weights(i) += scale*apply(i, label) })
+    (0 until length).foreach { i => weights(i) += scale*apply(i, label) }
   }
 }
 

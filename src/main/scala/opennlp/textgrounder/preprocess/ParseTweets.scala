@@ -1990,14 +1990,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
             often they occur).
        */
       tweets.flatMap(x => stats_for_tweet(x)).
-      groupBy({ stats => (stats.ty, stats.key2, stats.value)}).
+      groupBy(stats => (stats.ty, stats.key2, stats.value)).
       combine(FeatureValueStats.merge_stats).
       map(_._2)
     }
 
     def get_by_type(values: DList[FeatureValueStats]) = {
       values.map(FeatureStats.from_value_stats(_)).
-      groupBy({ stats => (stats.ty, stats.key2) }).
+      groupBy(stats => (stats.ty, stats.key2)).
       combine(FeatureStats.merge_stats).
       map(_._2)
     }

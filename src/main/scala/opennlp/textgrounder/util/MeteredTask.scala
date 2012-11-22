@@ -138,13 +138,12 @@ class MeteredTask(item_name: String, verb: String,
 
   def foreach[T](trav: Traversable[T])(f: T => Unit) {
     start()
-    trav.foreach(x => { f(x); item_processed() })
+    trav.foreach { x => f(x); item_processed() }
     finish()
   }
 
-  def iterate[T](iter: Iterator[T]) = {
-    new SideEffectIterator({ start() }) ++
-    iter.map(x => { item_processed(); x }) ++
-    new SideEffectIterator({ finish() })
-  }
+  def iterate[T](iter: Iterator[T]) =
+    new SideEffectIterator { start() } ++
+    iter.map { x => item_processed(); x } ++
+    new SideEffectIterator { finish() }
 }
