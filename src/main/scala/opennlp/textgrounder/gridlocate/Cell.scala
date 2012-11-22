@@ -440,17 +440,12 @@ abstract class GeoGrid[Co](
     total_num_docs_for_links = 0
     total_num_docs_for_word_dist = 0
 
-    { // Put in a block to control scope of 'task'
-      val task = new ExperimentMeteredTask(table.driver, "non-empty cell",
-        "computing statistics of")
-      for (cell <- iter_nonempty_cells()) {
-        total_num_docs_for_word_dist +=
-          cell.combined_dist.num_docs_for_word_dist
-        total_num_docs_for_links +=
-          cell.combined_dist.num_docs_for_links
-        task.item_processed()
-      }
-      task.finish()
+    table.driver.show_progress("non-empty cell", "computing statistics of").
+    foreach(iter_nonempty_cells()) { cell =>
+      total_num_docs_for_word_dist +=
+        cell.combined_dist.num_docs_for_word_dist
+      total_num_docs_for_links +=
+        cell.combined_dist.num_docs_for_links
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)

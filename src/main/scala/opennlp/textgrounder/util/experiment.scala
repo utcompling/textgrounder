@@ -108,6 +108,29 @@ package object experiment {
       run_after_setup()
     }
 
+    def show_progress(item_name: String, verb: String,
+      secs_between_output: Double = 15, maxtime: Double = 0.0
+    ): MeteredTask =
+      // Call `driver.heartbeat` every time an item is processed or we
+      // otherwise do something, to let Hadoop know that we're actually
+      // making progress.
+      new MeteredTask(item_name, verb, secs_between_output, maxtime) {
+        override def start() = {
+          // This is kind of overkill, but shouldn't hurt.
+          heartbeat()
+          super.start()
+        }
+        override def item_processed() = {
+          heartbeat()
+          super.item_processed()
+        }
+        override def finish() = {
+          // This is also overkill, but shouldn't hurt.
+          heartbeat()
+          super.finish()
+        }
+      }
+
     def heartbeat() {
     }
 
@@ -691,30 +714,6 @@ package object experiment {
       driver.setup_for_run()
       driver.run_after_setup()
       0
-    }
-  }
-
-  /**
-   * An extension of the MeteredTask class that calls `driver.heartbeat`
-   * every time an item is processed or we otherwise do something, to let
-   * Hadoop know that we're actually making progress.
-   */
-  class ExperimentMeteredTask(
-    driver: ExperimentDriver,
-    item_name: String,
-    verb: String,
-    secs_between_output: Double = 15,
-    maxtime: Double = 0.0
-  ) extends MeteredTask(item_name, verb, secs_between_output, maxtime) {
-    driver.heartbeat() // Also overkill, again won't hurt.
-    override def item_processed() = {
-      driver.heartbeat()
-      super.item_processed()
-    }
-    override def finish() = {
-      // This is kind of overkill, but shouldn't hurt.
-      driver.heartbeat()
-      super.finish()
     }
   }
 }

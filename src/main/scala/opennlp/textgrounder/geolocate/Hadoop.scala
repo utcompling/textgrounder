@@ -29,7 +29,6 @@ import opennlp.textgrounder.{util => tgutil}
 import tgutil.argparser._
 import tgutil.collectionutil.TransposeIterator
 import tgutil.distances._
-import tgutil.experiment.ExperimentMeteredTask
 import tgutil.hadoop._
 import tgutil.ioutil.FileHandler
 import tgutil.mathutil.{mean, median}
@@ -226,7 +225,6 @@ class DocumentEvaluationMapper extends
   type StrategyType = GridLocateDocumentStrategy[SphereCoord]
   type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
-  val task = new ExperimentMeteredTask(driver, "document", "evaluating")
   lazy val filehand = driver.get_file_handler
 
   def get_stat_iters(strats: Iterable[(String, StrategyType)],

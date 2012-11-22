@@ -28,7 +28,6 @@ import tgutil.collectionutil._
 import tgutil.textdbutil._
 import tgutil.experiment._
 import tgutil.ioutil._
-import tgutil.MeteredTask
 import tgutil.printutil.warning
 
 import opennlp.textgrounder.gridlocate.GeoDoc
