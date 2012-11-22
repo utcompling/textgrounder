@@ -1216,15 +1216,15 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
   protected def create_rerank_instance_factory = {
     params.rerank_instance match {
       case "trivial" =>
-        new TrivialGeoDocRerankInstanceFactory[Co]
+        new TrivialRerankInstanceFactory[Co]
       case "kl-div" =>
-        new KLDivGeoDocRerankInstanceFactory[Co]
+        new KLDivRerankInstanceFactory[Co]
       case "matching-word-binary" =>
-        new WordGeoDocRerankInstanceFactory[Co]("binary")
+        new WordMatchingRerankInstanceFactory[Co]("binary")
       case "matching-word-count" =>
-        new WordGeoDocRerankInstanceFactory[Co]("count")
+        new WordMatchingRerankInstanceFactory[Co]("count")
       case "matching-word-probability" =>
-        new WordGeoDocRerankInstanceFactory[Co]("probability")
+        new WordMatchingRerankInstanceFactory[Co]("probability")
     }
   }
 
