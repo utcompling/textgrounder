@@ -96,7 +96,7 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
    * classifier.
    */
   protected val create_rerank_instance:
-    (TestItem, Answer, Double) => RerankInstance
+    (TestItem, Answer, Double, Boolean) => RerankInstance
 
   /**
    * Generate rerank training instances for a given ranker
@@ -109,14 +109,14 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
          is_correct = possible_answer == true_answer
         }
       yield (
-        create_rerank_instance(item, possible_answer, score), is_correct)
+        create_rerank_instance(item, possible_answer, score, true), is_correct)
   }
 
   def rerank_answers(item: TestItem,
       answers: Iterable[(Answer, Double)]) = {
     val new_scores =
       for {(answer, score) <- answers
-           instance = create_rerank_instance(item, answer, score)
+           instance = create_rerank_instance(item, answer, score, false)
            new_score = rerank_classifier.score_item(instance)
           }
         yield (answer, new_score)
@@ -213,54 +213,76 @@ class LinearClassifierAdapterTrainer (
   }
 }
 
-trait GeoDocRerankInstanceFactory[Co] extends (
-  (GeoDoc[Co], GeoCell[Co], Double) => FeatureVector
+trait RerankInstanceFactory[Co] extends (
+  (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory = new SparseFeatureVectorFactory[Word]
   val scoreword = memoizer.memoize("-SCORE-")
 
-  def make_feature_vector(feats: Iterable[(Word, Double)], score: Double) = {
+  def make_feature_vector(feats: Iterable[(Word, Double)], score: Double,
+      is_training: Boolean) = {
     val feats_with_score =
       Iterable(scoreword -> score) ++ feats
-    featvec_factory.make_feature_vector(feats_with_score)
+    featvec_factory.make_feature_vector(feats_with_score, is_training)
   }
 
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double):
-    FeatureVector
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
+    is_training: Boolean): FeatureVector
 }
 
 /**
  * A simple factory for generating rerank instances for a document, using
  * nothing but the score passed in.
  */
-class TrivialGeoDocRerankInstanceFactory[Co] extends
-    GeoDocRerankInstanceFactory[Co] {
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) =
-    make_feature_vector(Iterable(), score)
+class TrivialRerankInstanceFactory[Co] extends
+    RerankInstanceFactory[Co] {
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
+    is_training: Boolean) = make_feature_vector(Iterable(), score, is_training)
+}
+
+/**
+ * A factory for generating rerank instances for a document, generating
+ * separate features for each word.  using
+ * individual KL-divergence components for each word in the document.
+ */
+abstract class WordByWordRerankInstanceFactory[Co] extends
+    RerankInstanceFactory[Co] {
+  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
+    celldist: UnigramWordDist): Option[Double]
+
+  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
+      is_training: Boolean) = {
+    val indiv_features =
+      doc.dist match {
+        case docdist: UnigramWordDist => {
+         val celldist =
+           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
+         for ((word, count) <- docdist.model.iter_items;
+              featval = get_word_feature(word, count, docdist, celldist);
+              if featval != None)
+           yield (word, featval.get)
+        }
+        case _ =>
+          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
+      }
+    make_feature_vector(indiv_features, score, is_training)
+  }
 }
 
 /**
  * A simple factory for generating rerank instances for a document, using
  * individual KL-divergence components for each word in the document.
  */
-class KLDivGeoDocRerankInstanceFactory[Co] extends
-    GeoDocRerankInstanceFactory[Co] {
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) = {
-    val indiv_features =
-      doc.dist match {
-        case udist: UnigramWordDist => {
-         val celldist =
-           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-          for (word <- udist.model.iter_keys;
-              p = udist.lookup_word(word);
-              q = celldist.lookup_word(word);
-              if q != 0.0)
-            yield (word, p*(log(p) - log(q)))
-        }
-        case _ =>
-          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
-      }
-    make_feature_vector(indiv_features, score)
+class KLDivRerankInstanceFactory[Co] extends
+    WordByWordRerankInstanceFactory[Co] {
+  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
+      celldist: UnigramWordDist) = {
+    val p = docdist.lookup_word(word)
+    val q = celldist.lookup_word(word)
+    if (q == 0.0)
+      None
+    else
+      Some(p*(log(p) - log(q)))
   }
 }
 
@@ -273,30 +295,21 @@ class KLDivGeoDocRerankInstanceFactory[Co] extends
  *   count.  If "probability", assign the probability (essentially, word
  *   count normalized by the number of words in the document).
  */
-class WordGeoDocRerankInstanceFactory[Co](value: String) extends
-    GeoDocRerankInstanceFactory[Co] {
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double) = {
-    val indiv_features =
-      doc.dist match {
-        case udist: UnigramWordDist => {
-          val celldist =
-            UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-          for ((word, count) <- udist.model.iter_items;
-               qcount = celldist.model.get_item(word);
-               if qcount != 0.0)
-            yield {
-              val wordval = value match {
-                case "binary" => 1
-                case "count" => count
-                case "probability" => udist.lookup_word(word)
-              }
-              (word, wordval)
-            }
-        }
-        case _ =>
-          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
+class WordMatchingRerankInstanceFactory[Co](value: String) extends
+    WordByWordRerankInstanceFactory[Co] {
+  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
+      celldist: UnigramWordDist) = {
+    val qcount = celldist.model.get_item(word)
+    if (qcount == 0.0)
+      None
+    else {
+      val wordval = value match {
+        case "binary" => 1
+        case "count" => count
+        case "probability" => docdist.lookup_word(word)
       }
-    make_feature_vector(indiv_features, score)
+      Some(wordval)
+    }
   }
 }
 
@@ -330,7 +343,8 @@ class TrivialGridReranker[Co](
         0 // FIXME: This is incorrect but doesn't matter
     )
   protected val create_rerank_instance =
-    (item: GeoDoc[Co], answer: GeoCell[Co], score: Double) => score
+    (item: GeoDoc[Co], answer: GeoCell[Co], score: Double,
+      is_training: Boolean) => score
 }
 
 /**
@@ -355,7 +369,7 @@ class LinearClassifierGridReranker[Co](
   val trainer: BinaryLinearClassifierTrainer,
   val training_data: Iterable[(GeoDoc[Co], GeoCell[Co])],
   val create_rerank_instance:
-    (GeoDoc[Co], GeoCell[Co], Double) => FeatureVector,
+    (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector,
   val top_n: Int
 ) extends PointwiseClassifyingRerankerWithTrainingData[
   GeoDoc[Co], FeatureVector, GeoCell[Co]

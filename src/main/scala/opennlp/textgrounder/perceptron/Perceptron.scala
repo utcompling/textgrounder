@@ -264,27 +264,27 @@ class SparseFeatureVectorFactory[T] {
   // Set the minimum index to 1 so we can use 0 for the intercept term
   val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
 
-  def make_feature_vector(feature_values: Iterable[(T, Double)]) = {
-    val memoized_features = Iterable(0 -> 1.0) ++ // the intercept term
-      feature_values.map {
-        case (name, value) => (feature_mapper.memoize(name), value)
-      }
+  /**
+   * Generate a feature vector.  If not at training time, we need to be
+   * careful to skip features not seen during training because there won't a
+   * corresponding entry in the weight vector, and the resulting feature would
+   * containing a non-existent index, causing a crash during lookup (e.g.
+   * during the dot-product operation).
+   */
+  def make_feature_vector(feature_values: Iterable[(T, Double)],
+      is_training: Boolean) = {
+    val memoized_features = Iterable(0 -> 1.0) ++ (// the intercept term
+      if (is_training)
+        feature_values.map {
+          case (name, value) => (feature_mapper.memoize(name), value)
+        }
+       else
+        for { (name, value) <- feature_values;
+               index = feature_mapper.memoize_if(name);
+               if index != None }
+          yield (index.get, value)
+      )
     new SparseFeatureVector(this, memoized_features.toMap)
-  }
-}
-
-/**
- * A factory object for creating sparse nominal feature vectors for
- * classification. "Nominal" in this case means data described using an
- * single arbitrary value, with no attached weight -- i.e., simply present
- * or absent.
- */
-class SparseNominalFeatureVectorFactory[T] extends
-  SparseFeatureVectorFactory[T] {
-  def make_nominal_feature_vector(features: Iterable[T]) = {
-    val memoized_features = Iterable(0) ++ // the intercept term
-      features.map { feature_mapper.memoize(_) }
-    new SparseNominalFeatureVector(this, memoized_features)
   }
 }
 
@@ -294,25 +294,28 @@ class SparseNominalFeatureVectorFactory[T] extends
  * labels have no ordering or other numerical significance.
  */
 class SparseNominalInstanceFactory extends
-  SparseNominalFeatureVectorFactory[String] {
+  SparseFeatureVectorFactory[String] {
   val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
   def number_of_labels = label_mapper.number_of_entries
 
-  def make_labeled_instance(features: Iterable[String], label: String) = {
-    val featvec = make_nominal_feature_vector(features)
+  def make_labeled_instance(features: Iterable[String], label: String,
+      is_training: Boolean) = {
+    val featvals = features.map((_, 1.0))
+    val featvec = make_feature_vector(featvals, is_training)
+    // FIXME: What about labels not seen during training?
     val labelind = label_to_index(label)
     (featvec, labelind)
   }
 
-  def get_csv_labeled_instances(source: Source) = {
+  def get_csv_labeled_instances(source: Source, is_training: Boolean) = {
     val lines = source.getLines
     for (line <- lines) yield {
       val atts = line.split(",")
       val label = atts.last
       val features = atts.dropRight(1)
-      make_labeled_instance(features, label)
+      make_labeled_instance(features, label, is_training)
     }
   }
 }

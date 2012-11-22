@@ -83,6 +83,10 @@ trait Memoizer[T,U] {
    */
   def memoize(value: T): U
   /**
+   * Map a value to its memoized form but only if it has already been seen.
+   */
+  def memoize_if(value: T): Option[U]
+  /**
    * Map a value out of its memoized form.
    */
   def unmemoize(value: U): T
@@ -112,8 +116,10 @@ class ToIntMemoizer[T](
   // Map in the opposite direction.
   protected val id_value_map = hashfact.create_int_object_map[T]
 
+  def memoize_if(value: T) = value_id_map.get(value)
+
   def memoize(value: T) = {
-    val lookup = value_id_map.get(value)
+    val lookup = memoize_if(value)
     // println("Saw value=%s, index=%s" format (value, lookup))
     lookup match {
       case Some(index) => index
@@ -153,19 +159,21 @@ class TestStringIntMemoizer(
   minimum_index: Int = 0
 ) extends ToIntMemoizer[String](hashfact, minimum_index) {
   override def memoize(value: String) = {
-    val cur_nwi = next_index
-    val index = super.memoize(value)
-
     // if (debug("memoize")) {
-    {
-      if (next_index != cur_nwi)
-        errprint("Memoizing new string %s to ID %s", value, index)
-      else
-        errprint("Memoizing existing string %s to ID %s", value, index)
-    }
-
-    assert(super.unmemoize(index) == value)
-    index
+    val retval =
+      memoize_if(value) match {
+        case Some(index) => {
+          errprint("Memoizing existing string %s to ID %s", value, index)
+          index
+        }
+        case None => {
+          val index = super.memoize(value)
+          errprint("Memoizing new string %s to ID %s", value, index)
+          index
+        }
+      }
+    assert(super.unmemoize(retval) == value)
+    retval
   }
 
   override def unmemoize(value: Int) = {
@@ -195,6 +203,7 @@ class TestStringIntMemoizer(
  */
 class IdentityMemoizer[T] extends Memoizer[T,T] {
   def memoize(value: T) = value
+  def memoize_if(value: T) = Some(value)
   def unmemoize(value: T) = value
 }
 
