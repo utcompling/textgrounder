@@ -25,10 +25,9 @@ import collection.mutable
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.collectionutil._
-import tgutil.experiment.ExperimentDriverStats
+import tgutil.experiment._
 import tgutil.mathutil._
 import tgutil.ioutil.FileHandler
-import tgutil.MeteredTask
 import tgutil.osutil.{curtimehuman, output_resource_usage}
 import tgutil.printutil.{errprint, warning}
 
@@ -457,7 +456,7 @@ abstract class CorpusEvaluator(
    */
   def output_results(isfinal: Boolean = false): Unit
 
-  val task = new MeteredTask("document", "evaluating",
+  val task = driver.show_progress("document", "evaluating",
     maxtime = driver.params.max_time_per_stage)
   var last_elapsed = 0.0
   var last_processed = 0
@@ -498,6 +497,7 @@ abstract class CorpusEvaluator(
     val docstatiter = new InterruptibleIterator(docstats)
     var stopped = false
     val results =
+      new SideEffectIterator { task.start() } ++
       (for (stat <- docstatiter) yield {
         // errprint("Processing document: %s", stat)
         val num_processed = task.num_processed

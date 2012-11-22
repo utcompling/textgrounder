@@ -1035,8 +1035,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       record_in_subtable: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
-    val task =
-      new ExperimentMeteredTask(this, "document", operation,
+    val task = show_progress("document", operation,
         maxtime = params.max_time_per_stage)
     val dociter = new InterruptibleIterator(
       params.input_corpus.toIterator.flatMap(dir =>
@@ -1066,10 +1065,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           dociter.stop()
         doc
       }
-    docs ++ new SideEffectIterator {
-      task.finish()
-      output_resource_usage()
-    }
+    new SideEffectIterator { task.start() } ++
+    docs ++
+    new SideEffectIterator { task.finish(); output_resource_usage() }
   }
 
   /**

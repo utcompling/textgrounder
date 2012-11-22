@@ -32,7 +32,6 @@ import tgutil.collectionutil.DynamicArray
 import tgutil.textdbutil._
 import tgutil.experiment._
 import tgutil.ioutil._
-import tgutil.MeteredTask
 import tgutil.printutil.{errprint, warning}
 
 /////////////////////////////////////////////////////////////////////////////

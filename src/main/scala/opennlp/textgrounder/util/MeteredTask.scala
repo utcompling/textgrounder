@@ -44,26 +44,33 @@ import timeutil.format_minutes_seconds
 class MeteredTask(item_name: String, verb: String,
   secs_between_output: Double = 15, maxtime: Double = 0.0) {
   val plural_item_name = pluralize(item_name)
-  var items_processed = 0
+  protected var items_processed = 0
   // Whether we've already printed stats after the most recent item
   // processed
-  var printed_stats = false
-  errprint("--------------------------------------------------------")
-  val first_time = curtimesecs
-  var last_time = first_time
-  errprint("Beginning %s %s at %s.", verb, plural_item_name,
-    humandate_full(first_time))
-  errprint("")
-
-  def num_processed = items_processed
+  protected var printed_stats = false
+  protected var started = false
+  protected var first_time: Double = _
+  protected var last_time: Double = _
 
   def elapsed_time = curtimesecs - first_time
+  def num_processed = items_processed
 
   def item_unit = {
     if (items_processed == 1)
       item_name
     else
       plural_item_name
+  }
+
+  def start() = {
+    errprint("--------------------------------------------------------")
+    first_time = curtimesecs
+    last_time = first_time
+    errprint("Beginning %s %s at %s.", verb, plural_item_name,
+      humandate_full(first_time))
+    errprint("")
+    started = true
+    this
   }
 
   def print_elapsed_time_and_rate(curtime: Double = curtimesecs,
@@ -87,6 +94,7 @@ class MeteredTask(item_name: String, verb: String,
   }
 
   def item_processed() = {
+    assert(started)
     val curtime = curtimesecs
     items_processed += 1
     val total_elapsed_secs = curtime - first_time
@@ -119,7 +127,7 @@ class MeteredTask(item_name: String, verb: String,
    * lower-case transitive verb in the -ing form.  The actual value of
    * "items" comes from the `item_name` constructor parameter to this
    * class. */ 
-  def finish() = {
+  def finish() {
     val curtime = curtimesecs
     errprint("")
     errprint("Finished %s %s at %s.", verb, plural_item_name,
@@ -127,20 +135,16 @@ class MeteredTask(item_name: String, verb: String,
     print_elapsed_time_and_rate(curtime, nohuman = true)
     errprint("--------------------------------------------------------")
   }
-}
 
-object MeteredTask {
-  def iterate[T](item_name: String, verb: String,
-    secs_between_output: Double = 15, maxtime: Double = 0.0
-  )(iter: Iterator[T]) = {
-    var task: MeteredTask = null
-    new SideEffectIterator({
-      task = new MeteredTask(item_name, verb, secs_between_output, maxtime)
-    }) ++
-    iter.map(x => {
-      task.item_processed()
-      x
-    }) ++
-    new SideEffectIterator({ task.finish() })
+  def foreach[T](trav: Traversable[T])(f: T => Unit) {
+    start()
+    trav.foreach(x => { f(x); item_processed() })
+    finish()
+  }
+
+  def iterate[T](iter: Iterator[T]) = {
+    new SideEffectIterator({ start() }) ++
+    iter.map(x => { item_processed(); x }) ++
+    new SideEffectIterator({ finish() })
   }
 }

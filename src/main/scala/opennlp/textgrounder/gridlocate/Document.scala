@@ -32,7 +32,6 @@ import tgutil.experiment._
 import tgutil.ioutil._
 import tgutil.osutil.output_resource_usage
 import tgutil.printutil.{errprint, warning}
-import tgutil.MeteredTask
 import tgutil.Serializer
 import tgutil.textutil.capfirst
 

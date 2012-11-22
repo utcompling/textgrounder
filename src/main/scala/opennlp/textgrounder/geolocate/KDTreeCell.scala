@@ -88,8 +88,8 @@ class KdTreeGrid(override val table: SphereDocumentTable,
       // the entire kd-tree structure now, the centroids, and
       // clean out the data.
 
-      val task = new ExperimentMeteredTask(table.driver, "K-d tree structure",
-        "generating")
+      val task =
+        table.driver.show_progress("K-d tree structure", "generating").start()
 
       // build the full kd-tree structure.
       kdtree.balance
@@ -165,9 +165,8 @@ class KdTreeGrid(override val table: SphereDocumentTable,
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
-      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
-        "interpolating")
-      for (node <- nodes if node.parent != null) {
+      table.driver.show_progress("K-d tree cell", "interpolating").
+      foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist
         val model = wd.asInstanceOf[UnigramWordDist].model
@@ -186,10 +185,7 @@ class KdTreeGrid(override val table: SphereDocumentTable,
           if (newv > interpolateWeight)
             model.set_item(k, newv)
         }
-
-        task.item_processed()
       }
-      task.finish()
     }
 
     // here we need to drop nonleaf nodes unless backoff is enabled.

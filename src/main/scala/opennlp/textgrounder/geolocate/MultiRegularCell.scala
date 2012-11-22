@@ -460,22 +460,21 @@ class MultiRegularGrid(
   }
 
   protected def initialize_cells() {
-    val task = new ExperimentMeteredTask(table.driver, "Earth-tiling cell",
-      "generating non-empty")
+    val indices =
+      for (i <- minimum_latind to maximum_latind;
+           j <- minimum_longind to maximum_longind)
+         yield RegularCellIndex(i, j)
 
-    for (i <- minimum_latind to maximum_latind view) {
-      for (j <- minimum_longind to maximum_longind view) {
+    table.driver.show_progress("Earth-tiling cell", "generating non-empty").
+      foreach(indices) { index =>
         total_num_cells += 1
-        find_cell_for_cell_index(RegularCellIndex(i, j),
-          create = false, record_created_cell = false).foreach(cell => {
+        find_cell_for_cell_index(index, create = false,
+          record_created_cell = false).foreach { cell =>
             cell.finish()
             if (debug("cell"))
-              errprint("--> (%d,%d): %s", i, j, cell)
-          })
-        task.item_processed()
+              errprint("--> (%d,%d): %s", index.latind, index.longind, cell)
+          }
       }
-    }
-    task.finish()
   }
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
