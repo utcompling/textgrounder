@@ -28,6 +28,7 @@ import util.control.Breaks._
 import collection.mutable
 import io.Source
 
+import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.util.memoizer._
 import opennlp.textgrounder.util.MeteredTask
 
@@ -45,6 +46,10 @@ trait FeatureVector {
     * stored in the vector (which will be different especially in the case
     * of sparse vectors). */
   def length: Int
+
+  /** Return the number of items stored in the vector.  This will be different
+    * from the length in the case of sparse vectors. */
+  def stored_entries: Int
 
   /** Return the value at index `i`, for class `label`. */
   def apply(i: Int, label: Int): Double
@@ -81,6 +86,8 @@ trait SimpleFeatureVector extends FeatureVector {
  * an array of values.
  */
 trait DenseFeatureVector extends FeatureVector {
+  def stored_entries = length
+
   def dot_product(weights: WeightVector, label: Int) =
     (for (i <- 0 until length) yield apply(i, label)*weights(i)).sum
 
@@ -169,91 +176,6 @@ class ArrayFeatureVector(
 }
 
 /**
- * A feature vector in which the features are stored sparsely, i.e. only
- * the features with non-zero values are stored, using a hash table or
- * similar.
- */
-class SparseFeatureVector(
-  factory: SparseFeatureVectorFactory[_],
-  feature_values: collection.Map[Int, Double]
-) extends SimpleFeatureVector {
-  def length = {
-    // +1 because of the intercept term
-    factory.feature_mapper.number_of_entries + 1
-  }
-
-  def apply(index: Int) = feature_values.getOrElse(index, 0.0)
-
-  def squared_magnitude(label: Int) =
-    feature_values.map {
-      case (index, value) => value * value
-    }.sum
-
-  def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
-
-  def dot_product(weights: WeightVector, label: Int) =
-    feature_values.map {
-      case (index, value) => value * weights(index)
-    }.sum
-
-  def update_weights(weights: WeightVector, scale: Double, label: Int) {
-    feature_values.map {
-      case (index, value) => weights(index) += scale * value
-    }
-  }
-
-  override def toString =
-    "SparseFeatureVector(%s)" format
-    feature_values.filter { case (index, value) => index > 0 }.
-      toSeq.sorted.map {
-        case (index, value) =>
-          "%s(%s)=%.2f" format (
-            factory.feature_mapper.unmemoize(index),
-            index, value
-          )
-      }.mkString(",")
-}
-
-/**
- * A sparse feature vector built up out of nominal strings.  A global
- * mapping table is maintained to convert between strings and array
- * indices into a logical vector.
- */
-class SparseNominalFeatureVector(
-  factory: SparseFeatureVectorFactory[_],
-  feature_values: Iterable[Int]
-) extends SparseFeatureVector(
-  factory,
-  feature_values.map((_, 1.0)).toMap
-) {
-  override def toString =
-    "SparseNominalFeatureVector(%s)" format
-    feature_values.filter { _ > 0 }.
-      toSeq.sorted.map {
-        index =>
-          "%s(%s)" format (
-            factory.feature_mapper.unmemoize(index),
-            index
-          )
-      }.mkString(",")
-}
-
-/**
- * A data instance (a statistical unit), consisting of a feature vector
- * specifying the characteristics of the instance and a label, to be
- * predicted.
- *
- * @tparam LabelType type of the label (e.g. Int for classification,
- *   Double for regression, etc.).
- */
-abstract class Instance[LabelType] {
-  /** Return the label. */
-  def getLabel: LabelType
-  /** Return the feature vector. */
-  def getFeatures: FeatureVector
-}
-
-/**
  * A factory object for creating sparse feature vectors for classification.
  */
 class SparseFeatureVectorFactory[T] {
@@ -264,6 +186,55 @@ class SparseFeatureVectorFactory[T] {
 
   // Set the minimum index to 1 so we can use 0 for the intercept term
   val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
+
+  /**
+   * A feature vector in which the features are stored sparsely, i.e. only
+   * the features with non-zero values are stored, using a hash table or
+   * similar.  The features are indexed by integers, using the mapping
+   * stored in `feature_mapper`. There will always be a feature with the
+   * index 0, value 1.0, to handle the intercept term.
+   */
+  protected class SparseFeatureVector(
+    feature_values: collection.Map[Int, Double]
+  ) extends SimpleFeatureVector {
+    def length = {
+      // +1 because of the intercept term
+      feature_mapper.number_of_entries + 1
+    }
+
+    def stored_entries = feature_values.size
+
+    def apply(index: Int) = feature_values.getOrElse(index, 0.0)
+
+    def squared_magnitude(label: Int) =
+      feature_values.map {
+        case (index, value) => value * value
+      }.sum
+
+    def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
+
+    def dot_product(weights: WeightVector, label: Int) =
+      feature_values.map {
+        case (index, value) => value * weights(index)
+      }.sum
+
+    def update_weights(weights: WeightVector, scale: Double, label: Int) {
+      feature_values.map {
+        case (index, value) => weights(index) += scale * value
+      }
+    }
+
+    override def toString =
+      "SparseFeatureVector(%s)" format
+      feature_values.filter { case (index, value) => index > 0 }.
+        toSeq.sorted.map {
+          case (index, value) =>
+            "%s(%s)=%.2f" format (
+              feature_mapper.unmemoize(index),
+              index, value
+            )
+        }.mkString(",")
+  }
 
   /**
    * Generate a feature vector.  If not at training time, we need to be
@@ -285,7 +256,7 @@ class SparseFeatureVectorFactory[T] {
                if index != None }
           yield (index.get, value)
       )
-    new SparseFeatureVector(this, memoized_features.toMap)
+    new SparseFeatureVector(memoized_features.toMap)
   }
 }
 
@@ -395,6 +366,7 @@ trait LinearClassifierTrainer {
     do {
       iter += 1
       total_error = fun(iter)
+      errprint("Iteration %s, total_error %s", iter, total_error)
       task.item_processed()
     } while (iter < max_iterations && total_error >= error_threshold)
     task.finish()
@@ -492,9 +464,9 @@ abstract class BinaryPerceptronTrainer(
     val weights = initialize(data)
     val avg_weights = new_zero_weights(weights.length)
     def print_weights() {
-      Console.err.println("Weights: length=%s,max=%s,min=%s" format
-        (weights.length, weights.max, weights.min))
-      // Console.err.println("Weights: [%s]" format weights.mkString(","))
+      errprint("Weights: length=%s,max=%s,min=%s",
+        weights.length, weights.max, weights.min)
+      // errprint("Weights: [%s]", weights.mkString(","))
     }
     if (debug)
       print_weights()
@@ -502,16 +474,16 @@ abstract class BinaryPerceptronTrainer(
       iterate(error_threshold, max_iterations) { iter =>
         var total_error = 0.0
         if (debug)
-          Console.err.println("Iteration %s" format iter)
+          errprint("Iteration %s", iter)
         for ((inst, label) <- data) {
           if (debug)
-            Console.err.println("Instance %s, label %s" format (inst, label))
+            errprint("Instance %s, label %s", inst, label)
           val score = inst.dot_product(weights, 1)
           if (debug)
-            Console.err.println("Score %s" format score)
+            errprint("Score %s", score)
           val scale = get_scale_factor(inst, label, score)
           if (debug)
-            Console.err.println("Scale %s" format scale)
+            errprint("Scale %s", scale)
           inst.update_weights(weights, scale, 1)
           if (debug)
             print_weights()
@@ -519,8 +491,6 @@ abstract class BinaryPerceptronTrainer(
         }
         if (averaged)
           (0 until weights.length).foreach(i => avg_weights(i) += weights(i))
-        Console.err.println("Iteration %s, total_error %s"
-          format (iter, total_error))
         total_error
       }
     if (averaged) {
