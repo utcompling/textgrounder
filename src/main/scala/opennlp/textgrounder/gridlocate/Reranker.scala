@@ -104,7 +104,8 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
    */
   protected def get_rerank_training_instances(item: TestItem,
       true_answer: Answer) = {
-    val answers = initial_ranker.evaluate(item, Iterable(true_answer)).take(top_n)
+    val answers =
+      initial_ranker.evaluate(item, Iterable(true_answer)).take(top_n)
     for {(possible_answer, score) <- answers
          is_correct = possible_answer == true_answer
         }
@@ -151,16 +152,9 @@ trait PointwiseClassifyingRerankerWithTrainingData[
     Iterable[(RerankInstance, Boolean)] => ScoringBinaryClassifier[RerankInstance]
 
   lazy protected val rerank_classifier = {
-    if (training_data == null)
-      errprint("null training_data")
     val rerank_training_data = training_data.flatMap {
-      case (item, true_answer) => {
-        if (item == null)
-          errprint("null item")
-        if (true_answer == null)
-          errprint("null true_answer")
+      case (item, true_answer) =>
         get_rerank_training_instances(item, true_answer)
-      }
     }
     create_rerank_classifier(rerank_training_data)
   }
@@ -209,6 +203,18 @@ class LinearClassifierAdapterTrainer (
     val adapted_data = data.map {
       case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
     }
+    errprint("Training linear classifier ...")
+    errprint("Number of training items: %s", data.size)
+    val num_total_feats = data.map(_._1.length).sum
+    val num_total_stored_feats = data.map(_._1.stored_entries).sum
+    errprint("Total number of features in all training items: %s",
+      num_total_feats)
+    errprint("Avg number of features per training item: %.2f",
+      num_total_feats.toDouble / data.size)
+    errprint("Total number of stored features in all training items: %s",
+      num_total_stored_feats)
+    errprint("Avg number of stored features per training item: %.2f",
+      num_total_stored_feats.toDouble / data.size)
     new LinearClassifierAdapter(trainer(adapted_data, 2))
   }
 }
