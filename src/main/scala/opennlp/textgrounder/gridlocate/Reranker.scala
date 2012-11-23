@@ -221,8 +221,7 @@ trait RerankInstanceFactory[Co] extends (
 
   def make_feature_vector(feats: Iterable[(Word, Double)], score: Double,
       is_training: Boolean) = {
-    val feats_with_score =
-      Iterable(scoreword -> score) ++ feats
+    val feats_with_score = feats ++ Iterable(scoreword -> score)
     featvec_factory.make_feature_vector(feats_with_score, is_training)
   }
 
