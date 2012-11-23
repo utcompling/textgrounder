@@ -1244,7 +1244,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
               // right?
               assert(cell != None)
               (doc, cell.get)
-            }.toIterable
+            }.toIndexedSeq
         new LinearClassifierGridReranker[Co](
           basic_ranker,
           create_pointwise_classifier_trainer,
