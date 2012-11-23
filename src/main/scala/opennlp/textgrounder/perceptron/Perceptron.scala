@@ -29,6 +29,7 @@ import collection.mutable
 import io.Source
 
 import opennlp.textgrounder.util.memoizer._
+import opennlp.textgrounder.util.MeteredTask
 
 /**
  * A vector of real-valued features.  In general, features are indexed
@@ -384,6 +385,22 @@ trait LinearClassifierTrainer {
     len
   }
 
+  /** Iterate Train a linear classifier given a set of labeled instances. */
+  def iterate(error_threshold: Double, max_iterations: Int)(
+      fun: Int => Double) = {
+    val task = new MeteredTask("perceptron training iteration", "running")
+    task.start()
+    var iter = 0
+    var total_error = 0.0
+    do {
+      iter += 1
+      total_error = fun(iter)
+      task.item_processed()
+    } while (iter < max_iterations && total_error >= error_threshold)
+    task.finish()
+    iter
+  }
+
   /** Train a linear classifier given a set of labeled instances. */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
     LinearClassifier
@@ -479,16 +496,13 @@ abstract class BinaryPerceptronTrainer(
         (weights.length, weights.max, weights.min))
       // Console.err.println("Weights: [%s]" format weights.mkString(","))
     }
-    val len = weights.length
-    var iter = 0
     if (debug)
       print_weights()
-    breakable {
-      while (true) {
-        iter += 1
+    val num_iterations =
+      iterate(error_threshold, max_iterations) { iter =>
+        var total_error = 0.0
         if (debug)
           Console.err.println("Iteration %s" format iter)
-        var total_error = 0.0
         for ((inst, label) <- data) {
           if (debug)
             Console.err.println("Instance %s, label %s" format (inst, label))
@@ -504,14 +518,13 @@ abstract class BinaryPerceptronTrainer(
           total_error += math.abs(scale)
         }
         if (averaged)
-          (0 until len).foreach(i => avg_weights(i) += weights(i))
-        Console.err.println("Iteration %s, total_error %s" format (iter, total_error))
-        if (total_error < error_threshold || iter >= max_iterations)
-          break
+          (0 until weights.length).foreach(i => avg_weights(i) += weights(i))
+        Console.err.println("Iteration %s, total_error %s"
+          format (iter, total_error))
+        total_error
       }
-    }
     if (averaged) {
-      (0 until len).foreach(i => avg_weights(i) /= iter)
+      (0 until weights.length).foreach(i => avg_weights(i) /= num_iterations)
       new BinaryLinearClassifier(avg_weights)
     } else new BinaryLinearClassifier(weights)
   }
@@ -732,29 +745,23 @@ class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
    */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     val weights = initialize(data, num_classes)
-    val len = weights.length
-    var iter = 0
-    breakable {
-      while (iter < max_iterations) {
-        var total_error = 0.0
-        for ((inst, label) <- data) {
-          def dotprod(x: Int) = inst.dot_product(weights, x)
-          val yeslabs = yes_labels(label, num_classes)
-          val nolabs = no_labels(label, num_classes)
-          val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
-          val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
-          val margin = rscore - sscore
-          val loss = 0.0 max (1.0 - margin)
-          val sqmagdiff = inst.diff_squared_magnitude(r, s)
-          val scale = compute_update_factor(loss, sqmagdiff)
-          inst.update_weights(weights, scale, r)
-          inst.update_weights(weights, -scale, s)
-          total_error += math.abs(scale)
-        }
-        if (total_error < error_threshold)
-          break
-        iter += 1
+    iterate(error_threshold, max_iterations) { iter =>
+      var total_error = 0.0
+      for ((inst, label) <- data) {
+        def dotprod(x: Int) = inst.dot_product(weights, x)
+        val yeslabs = yes_labels(label, num_classes)
+        val nolabs = no_labels(label, num_classes)
+        val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
+        val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
+        val margin = rscore - sscore
+        val loss = 0.0 max (1.0 - margin)
+        val sqmagdiff = inst.diff_squared_magnitude(r, s)
+        val scale = compute_update_factor(loss, sqmagdiff)
+        inst.update_weights(weights, scale, r)
+        inst.update_weights(weights, -scale, s)
+        total_error += math.abs(scale)
       }
+      total_error
     }
     new SingleWeightMultiClassLinearClassifier(weights, num_classes)
   }
@@ -809,31 +816,25 @@ class PassiveAggressiveMultiClassPerceptronTrainer(
    */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     val weights = initialize(data, num_classes)
-    val len = weights(0).length
-    var iter = 0
-    breakable {
-      while (iter < max_iterations) {
-        var total_error = 0.0
-        for ((inst, label) <- data) {
-          def dotprod(x: Int) = inst.dot_product(weights(x), x)
-          val yeslabs = yes_labels(label, num_classes)
-          val nolabs = no_labels(label, num_classes)
-          val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
-          val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
-          val margin = rscore - sscore
-          val loss = 0.0 max (1.0 - margin)
-          val rmag = inst.squared_magnitude(r)
-          val smag = inst.squared_magnitude(s)
-          val sqmagdiff = rmag + smag
-          val scale = compute_update_factor(loss, sqmagdiff)
-          inst.update_weights(weights(r), scale, r)
-          inst.update_weights(weights(s), -scale, s)
-          total_error += math.abs(scale)
-        }
-        if (total_error < error_threshold)
-          break
-        iter += 1
+    iterate(error_threshold, max_iterations) { iter =>
+      var total_error = 0.0
+      for ((inst, label) <- data) {
+        def dotprod(x: Int) = inst.dot_product(weights(x), x)
+        val yeslabs = yes_labels(label, num_classes)
+        val nolabs = no_labels(label, num_classes)
+        val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
+        val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
+        val margin = rscore - sscore
+        val loss = 0.0 max (1.0 - margin)
+        val rmag = inst.squared_magnitude(r)
+        val smag = inst.squared_magnitude(s)
+        val sqmagdiff = rmag + smag
+        val scale = compute_update_factor(loss, sqmagdiff)
+        inst.update_weights(weights(r), scale, r)
+        inst.update_weights(weights(s), -scale, s)
+        total_error += math.abs(scale)
       }
+      total_error
     }
     new MultiClassLinearClassifier(weights)
   }
@@ -877,33 +878,28 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiClassPerceptronTra
    */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     val weights = initialize(data, num_classes)
-    val len = weights.length
     var iter = 0
     val all_labs = 0 until num_classes
-    breakable {
-      while (iter < max_iterations) {
-        var total_error = 0.0
-        for ((inst, label) <- data) {
-          def dotprod(x: Int) = inst.dot_product(weights, x)
-          val goldscore = dotprod(label)
-          val predlab =
-            if (prediction_based)
-              Maxutil.argmax[Int](all_labs, dotprod(_))
-            else
-              Maxutil.argmax[Int](all_labs,
-                x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
-          val loss = dotprod(predlab) - goldscore +
-            math.sqrt(cost(label, predlab))
-          val sqmagdiff = inst.diff_squared_magnitude(label, predlab)
-          val scale = compute_update_factor(loss, sqmagdiff)
-          inst.update_weights(weights, scale, label)
-          inst.update_weights(weights, -scale, predlab)
-          total_error += math.abs(scale)
-        }
-        if (total_error < error_threshold)
-          break
-        iter += 1
+    iterate(error_threshold, max_iterations) { iter =>
+      var total_error = 0.0
+      for ((inst, label) <- data) {
+        def dotprod(x: Int) = inst.dot_product(weights, x)
+        val goldscore = dotprod(label)
+        val predlab =
+          if (prediction_based)
+            Maxutil.argmax[Int](all_labs, dotprod(_))
+          else
+            Maxutil.argmax[Int](all_labs,
+              x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
+        val loss = dotprod(predlab) - goldscore +
+          math.sqrt(cost(label, predlab))
+        val sqmagdiff = inst.diff_squared_magnitude(label, predlab)
+        val scale = compute_update_factor(loss, sqmagdiff)
+        inst.update_weights(weights, scale, label)
+        inst.update_weights(weights, -scale, predlab)
+        total_error += math.abs(scale)
       }
+      total_error
     }
     new SingleWeightMultiClassLinearClassifier(weights, num_classes)
   }
@@ -947,35 +943,29 @@ abstract class PassiveAggressiveCostSensitiveMultiClassPerceptronTrainer(
    */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     val weights = initialize(data, num_classes)
-    val len = weights(0).length
-    var iter = 0
     val all_labs = 0 until num_classes
-    breakable {
-      while (iter < max_iterations) {
-        var total_error = 0.0
-        for ((inst, label) <- data) {
-          def dotprod(x: Int) = inst.dot_product(weights(x), x)
-          val goldscore = dotprod(label)
-          val predlab =
-            if (prediction_based)
-              Maxutil.argmax[Int](all_labs, dotprod(_))
-            else
-              Maxutil.argmax[Int](all_labs,
-                x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
-          val loss = dotprod(predlab) - goldscore +
-            math.sqrt(cost(label, predlab))
-          val rmag = inst.squared_magnitude(label)
-          val smag = inst.squared_magnitude(predlab)
-          val sqmagdiff = rmag + smag
-          val scale = compute_update_factor(loss, sqmagdiff)
-          inst.update_weights(weights(label), scale, label)
-          inst.update_weights(weights(predlab), -scale, predlab)
-          total_error += math.abs(scale)
-        }
-        if (total_error < error_threshold)
-          break
-        iter += 1
+    iterate(error_threshold, max_iterations) { iter =>
+      var total_error = 0.0
+      for ((inst, label) <- data) {
+        def dotprod(x: Int) = inst.dot_product(weights(x), x)
+        val goldscore = dotprod(label)
+        val predlab =
+          if (prediction_based)
+            Maxutil.argmax[Int](all_labs, dotprod(_))
+          else
+            Maxutil.argmax[Int](all_labs,
+              x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
+        val loss = dotprod(predlab) - goldscore +
+          math.sqrt(cost(label, predlab))
+        val rmag = inst.squared_magnitude(label)
+        val smag = inst.squared_magnitude(predlab)
+        val sqmagdiff = rmag + smag
+        val scale = compute_update_factor(loss, sqmagdiff)
+        inst.update_weights(weights(label), scale, label)
+        inst.update_weights(weights(predlab), -scale, predlab)
+        total_error += math.abs(scale)
       }
+      total_error
     }
     new MultiClassLinearClassifier(weights)
   }
