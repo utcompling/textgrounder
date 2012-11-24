@@ -1036,38 +1036,22 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
     val task = show_progress("document", operation,
-        maxtime = params.max_time_per_stage)
-    val dociter = new InterruptibleIterator(
-      params.input_corpus.toIterator.flatMap(dir =>
+        maxtime = params.max_time_per_stage,
+        maxitems = params.num_training_docs)
+    val dociter = params.input_corpus.toIterator.flatMap(dir =>
         document_table.read_documents_from_textdb(get_file_handler,
           dir, "training-" + document_file_suffix, 
-          record_in_subtable, note_globally, finish_globally)))
-    val docs =
-      for (doc <- dociter) yield {
-        var should_stop = false
-        if (task.item_processed())
-          should_stop = true
-        if ((params.num_training_docs > 0 &&
-          task.num_processed >= params.num_training_docs)) {
-          errprint("")
-          errprint("Stopping because limit of %s documents reached",
-            params.num_training_docs)
-          should_stop = true
+          record_in_subtable, note_globally, finish_globally))
+    for (doc <- task.iterate(dociter)) yield {
+      val sleep_at = debugval("sleep-at-docs")
+      if (sleep_at != "") {
+        if (task.num_processed == sleep_at.toInt) {
+          errprint("Reached %d documents, sleeping ...")
+          Thread.sleep(5000)
         }
-        val sleep_at = debugval("sleep-at-docs")
-        if (sleep_at != "") {
-          if (task.num_processed == sleep_at.toInt) {
-            errprint("Reached %d documents, sleeping ...")
-            Thread.sleep(5000)
-          }
-        }
-        if (should_stop)
-          dociter.stop()
-        doc
       }
-    new SideEffectIterator { task.start() } ++
-    docs ++
-    new SideEffectIterator { task.finish(); output_resource_usage() }
+      doc
+    }
   }
 
   /**

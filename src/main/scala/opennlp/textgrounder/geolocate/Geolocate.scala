@@ -31,7 +31,6 @@ import tgutil.collectionutil._
 import tgutil.distances._
 import tgutil.experiment._
 import tgutil.ioutil.{FileHandler, LocalFileHandler}
-import tgutil.osutil.output_resource_usage
 import tgutil.printutil.errprint
 
 import opennlp.textgrounder.gridlocate._
