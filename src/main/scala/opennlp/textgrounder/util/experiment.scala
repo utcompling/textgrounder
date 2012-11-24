@@ -109,12 +109,14 @@ package object experiment {
     }
 
     def show_progress(item_name: String, verb: String,
-      secs_between_output: Double = 15, maxtime: Double = 0.0
+      secs_between_output: Double = 15, maxtime: Double = 0.0,
+      maxitems: Int = 0
     ): MeteredTask =
       // Call `driver.heartbeat` every time an item is processed or we
       // otherwise do something, to let Hadoop know that we're actually
       // making progress.
-      new MeteredTask(item_name, verb, secs_between_output, maxtime) {
+      new MeteredTask(item_name, verb, secs_between_output, maxtime,
+          maxitems) {
         override def start() = {
           // This is kind of overkill, but shouldn't hurt.
           heartbeat()

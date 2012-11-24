@@ -144,13 +144,8 @@ trait TwitterInfochimpsFileProcessor {
   def iter_files(filehand: FileHandler, files: Iterable[String]) =
     iter_files_recursively_with_message(filehand, files)
 
-  def iter_fields(lines: Iterator[String]) = {
-    new MeteredTask("tweet", "parsing").iterate(yield_fields(lines)) ++
-    new SideEffectIterator {
-      print_msg_heading("Memory/time usage:", blank_lines_before = 3)
-      output_resource_usage(dojava = false)
-    }
-  }
+  def iter_fields(lines: Iterator[String]) =
+    new MeteredTask("tweet", "parsing").iterate(yield_fields(lines))
 }
 
 class ConvertTwitterInfochimpsFileProcessor(

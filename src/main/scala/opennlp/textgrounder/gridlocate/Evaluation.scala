@@ -224,8 +224,12 @@ class DocumentEvaluationResult[Co](
   /**
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
+   *
+   * @param doctag A short string identifying the document (e.g. '#25'),
+   *   to be printed out at the beginning of diagnostic lines describing
+   *   the document and its evaluation results.
    */
-  def print_result(doctag: String, document: GeoDoc[Co],
+  def print_result(doctag: String,
     driver: GridLocateDocumentDriver[Co]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
@@ -436,19 +440,13 @@ abstract class CorpusEvaluator(
    * false if processed and evaluated; and `reason` is the reason for
    * skipping.
    */
-  def would_skip_document(doc: TEvalDoc, doctag: String) = (false, "")
+  def would_skip_document(doc: TEvalDoc) = (false, "")
 
   /**
    * Evaluate a document.  Return an object describing the results of the
    * evaluation.
-   *
-   * @param document Document to evaluate.
-   * @param doctag A short string identifying the document (e.g. '#25'),
-   *   to be printed out at the beginning of diagnostic lines describing
-   *   the document and its evaluation results.
    */
-  def evaluate_document(doc: TEvalDoc, doctag: String):
-    TEvalRes
+  def evaluate_document(doc: TEvalDoc): TEvalRes
 
   /**
    * Output results so far.  If 'isfinal', this is the last call, so
@@ -457,32 +455,14 @@ abstract class CorpusEvaluator(
   def output_results(isfinal: Boolean = false): Unit
 
   val task = driver.show_progress("document", "evaluating",
-    maxtime = driver.params.max_time_per_stage)
+    maxtime = driver.params.max_time_per_stage,
+    maxitems = driver.params.num_test_docs)
   var last_elapsed = 0.0
   var last_processed = 0
 
-
-  def handle_status(stat: DocumentStatus[TEvalRes]) = {
-    stat.status match {
-      case "processed" => {
-        val new_elapsed = task.elapsed_time
-        val new_processed = task.num_processed
-        // If five minutes and ten documents have gone by,
-        // print out results
-        if ((new_elapsed - last_elapsed >= 300 &&
-          new_processed - last_processed >= 10)) {
-          errprint("Results after %d documents (strategy %s):",
-            task.num_processed, stratname)
-          output_results(isfinal = false)
-          errprint("End of results after %d documents (strategy %s):",
-            task.num_processed, stratname)
-          last_elapsed = new_elapsed
-          last_processed = new_processed
-        }
-      }
-      case _ => {}
-    }
-    stat
+  def process_document_statuses(docstats: Iterator[DocumentStatus[TEvalRes]]
+  ) = {
+    new DocumentCounterTrackerFactory(driver).process_statuses(docstats)
   }
 
   /**
@@ -494,18 +474,16 @@ abstract class CorpusEvaluator(
    * @return Iterator over evaluation results.
    */
   def evaluate_documents(docstats: Iterator[DocumentStatus[TEvalDoc]]) = {
-    val docstatiter = new InterruptibleIterator(docstats)
-    var stopped = false
-    val results =
-      new SideEffectIterator { task.start() } ++
-      (for (stat <- docstatiter) yield {
+    var statnum = 0
+    val result_stats =
+      for (stat <- docstats) yield {
         // errprint("Processing document: %s", stat)
-        val num_processed = task.num_processed
-        val doctag = "#%d" format (1 + num_processed)
+        statnum += 1
+        val doctag = "#%d" format statnum
         val (mayberes, status, reason, docdesc) =
           (stat.maybedoc, stat.status) match {
             case (Some(doc), "processed") => {
-              val (skip, reason) = would_skip_document(doc, doctag)
+              val (skip, reason) = would_skip_document(doc)
               if (skip)
                 (None, "skipped", reason, doctag)
               else {
@@ -515,21 +493,12 @@ abstract class CorpusEvaluator(
                     (None, "skipped", reason, doctag)
                   else {
                     // Don't put side-effecting code inside of an assert!
-                    val res1 = evaluate_document(doc, doctag)
+                    val res1 = evaluate_document(doc)
                     assert(res1 != null)
-                    (Some(res1), "processed", "", "")
+                    (Some(res1), "processed", "", doctag)
                   }
                 }
 
-                    
-                if (task.item_processed // If max time reached, stop
-                    ||
-                    // If max # of docs reached, stop
-                    (driver.params.num_test_docs > 0 &&
-                     task.num_processed >= driver.params.num_test_docs)) {
-                  stopped = true
-                  docstatiter.stop()
-                }
                 result
               }
             }
@@ -537,22 +506,33 @@ abstract class CorpusEvaluator(
         }
         DocumentStatus(stat.filehand, stat.file, mayberes, status, reason,
           docdesc)
-      }).map(handle_status) ++ new SideEffectIterator( {
-        if (stopped) {
-          errprint("")
-          errprint("Stopping because limit of %s documents reached",
-            driver.params.num_test_docs)
-        }
-        task.finish()
-        errprint("")
-        errprint("Final results for strategy %s: All %d documents processed:",
-          stratname, task.num_processed)
-        errprint("Ending operation at %s", curtimehuman)
-        output_results(isfinal = true)
-        errprint("Ending final results for strategy %s", stratname)
-        output_resource_usage()
-      } )
-    DocumentCounterTracker.process_statuses(results, driver)
+      }
+
+    task.iterate(process_document_statuses(result_stats)).map { res =>
+      val new_elapsed = task.elapsed_time
+      val new_processed = task.num_processed
+      // If five minutes and ten documents have gone by,
+      // print out results
+      if ((new_elapsed - last_elapsed >= 300 &&
+        new_processed - last_processed >= 10)) {
+        errprint("Results after %d documents (strategy %s):",
+          task.num_processed, stratname)
+        output_results(isfinal = false)
+        errprint("End of results after %d documents (strategy %s):",
+          task.num_processed, stratname)
+        last_elapsed = new_elapsed
+        last_processed = new_processed
+      }
+      res
+    } ++ new SideEffectIterator( {
+      errprint("")
+      errprint("Final results for strategy %s: All %d documents processed:",
+        stratname, task.num_processed)
+      errprint("Ending operation at %s", curtimehuman)
+      output_results(isfinal = true)
+      errprint("Ending final results for strategy %s", stratname)
+      output_resource_usage()
+    } )
   }
 }
 
@@ -590,6 +570,32 @@ abstract class GridEvaluator[Co](
   type TEvalDoc = GeoDoc[Co]
   override type TEvalRes = DocumentEvaluationResult[Co]
 
+  class GridDocumentCounterTrackerFactory extends
+      DocumentCounterTrackerFactory[TEvalRes](driver) {
+    override def create_tracker(shortname: String) =
+      new DocumentCounterTracker[TEvalRes](shortname, driver) {
+        val want_indiv_results = !driver.params.oracle_results &&
+          !driver.params.no_individual_results
+        override def print_status(status: DocumentStatus[TEvalRes]) {
+          (status.status, status.maybedoc) match {
+            case ("processed", Some(res)) => {
+              if (want_indiv_results)
+                res.print_result(status.docdesc, driver)
+            }
+            case _ => super.print_status(status)
+          }
+        }
+
+        override def handle_status(status: DocumentStatus[TEvalRes]):
+            Option[TEvalRes] = {
+          super.handle_status(status) match {
+            case None => None
+            case Some(res) => Some(res.get_public_result)
+          }
+        }
+      }
+  }
+
   // val evalstats = grouped_eval_stats_creator(driver,
   //  strategy.grid, results_by_range = driver.params.results_by_range)
 
@@ -597,9 +603,9 @@ abstract class GridEvaluator[Co](
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results() // all_results = isfinal)
- }
+  }
 
-  override def would_skip_document(document: GeoDoc[Co], doctag: String) = {
+  override def would_skip_document(document: GeoDoc[Co]) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -661,29 +667,30 @@ abstract class GridEvaluator[Co](
    * optionally print out information on these results.
    *
    * @param document Document to evaluate.
-   * @param doctag A short string identifying the document (e.g. '#25'),
-   *   to be printed out at the beginning of diagnostic lines describing
-   *   the document and its evaluation results.
    * @param true_cell Cell in the cell grid which contains the document.
    */
-  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co]): DocumentEvaluationResult[Co]
+  def imp_evaluate_document(document: GeoDoc[Co], true_cell: GeoCell[Co]
+  ): DocumentEvaluationResult[Co]
+
+  override def process_document_statuses(
+    docstats: Iterator[DocumentStatus[TEvalRes]]
+  ) = {
+    (new GridDocumentCounterTrackerFactory).process_statuses(docstats)
+  }
 
   /**
    * Evaluate a document, record statistics about it, etc.  Calls
-   * `imp_evaluate_document` to do the document evaluation and optionally
-   * print out information on the results, and records the results in
-   * `evalstats`.
+   * `imp_evaluate_document` to do the document evaluation and records
+   * the results in `evalstats`.  Printing of information about the
+   * evaluation happens when the document status is processed, in
+   * GridDocumentCounterTrackerFactory.
    *
    * Return an object describing the results of the evaluation.
    *
    * @param document Document to evaluate.
-   * @param doctag A short string identifying the document (e.g. '#25'),
-   *   to be printed out at the beginning of diagnostic lines describing
-   *   the document and its evaluation results.
    */
-  def evaluate_document(document: GeoDoc[Co], doctag: String) = {
-    val (skip, reason) = would_skip_document(document, doctag)
+  def evaluate_document(document: GeoDoc[Co]) = {
+    val (skip, reason) = would_skip_document(document)
     assert(!skip)
     assert(document.dist.finished)
     val maybe_true_cell =
@@ -695,22 +702,12 @@ abstract class GridEvaluator[Co](
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
-    val result = imp_evaluate_document(document, doctag, true_cell)
-    val want_indiv_results =
-      !driver.params.oracle_results && !driver.params.no_individual_results
-    if (want_indiv_results) {
-      //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
-      //for((cell, score) <- pred_cells) {
-      //  val scell = cell.asInstanceOf[GeoCell[GeoCoord, GeoDoc]]
-      //}
-      result.print_result(doctag, document, driver)
-    }
-
+    val result = imp_evaluate_document(document, true_cell)
     evalstats.record_result(result)
     if (result.num_docs_in_true_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
-    result.get_public_result
+    result
   }
 }
 
@@ -736,7 +733,7 @@ class RankedGridEvaluator[Co](
 ) extends GridEvaluator[Co] (
   strategy, stratname, driver, evalstats
 ) {
-  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
+  def imp_evaluate_document(document: GeoDoc[Co],
       true_cell: GeoCell[Co]) = {
     ranker match {
       case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] => {
@@ -751,12 +748,6 @@ class RankedGridEvaluator[Co](
       case _ => {
         val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
 
-        if (debug("all-scores")) {
-          for (((cell, score), index) <- pred_cells.zipWithIndex) {
-            errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
-              cell.describe_indices(), score)
-          }
-        }
         new FullRankedDocumentEvaluationResult[Co](document, pred_cells,
           true_rank)
       }
@@ -787,9 +778,9 @@ class RankedDocumentEvaluationResult[Co](
   document, pred_cell.grid,
   pred_cell.get_center_coord()
 ) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
+  override def print_result(doctag: String,
       driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
+    super.print_result(doctag, driver)
     errprint("%s:  true cell at rank: %s", doctag, true_rank)
   }
 }
@@ -814,9 +805,15 @@ class FullRankedDocumentEvaluationResult[Co](
 ) extends RankedDocumentEvaluationResult[Co](
   document, pred_cells.head._1, true_rank
 ) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
+  override def print_result(doctag: String,
       driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
+    if (debug("all-scores")) {
+      for (((cell, score), index) <- pred_cells.zipWithIndex) {
+        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
+          cell.describe_indices(), score)
+      }
+    }
+    super.print_result(doctag, driver)
     val num_cells_to_output =
       if (driver.params.num_top_cells_to_output >= 0)
          math.min(driver.params.num_top_cells_to_output, pred_cells.size)
@@ -878,9 +875,9 @@ class RerankedDocumentEvaluationResult[Co](
 ) extends FullRankedDocumentEvaluationResult[Co](
   document, pred_cells, true_rank
 ) {
-  override def print_result(doctag: String, document: GeoDoc[Co],
+  override def print_result(doctag: String,
       driver: GridLocateDocumentDriver[Co]) {
-    super.print_result(doctag, document, driver)
+    super.print_result(doctag, driver)
     errprint("%s:  true cell at initial rank: %s (vs. new %s)", doctag,
       initial_true_rank, true_rank)
     val num_cells_to_output = 5
@@ -946,8 +943,7 @@ abstract class CoordGridEvaluator[Co](
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
 
-  def imp_evaluate_document(document: GeoDoc[Co], doctag: String,
-      true_cell: GeoCell[Co]) = {
+  def imp_evaluate_document(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val pred_coord = find_best_point(document, true_cell)
     new CoordDocumentEvaluationResult[Co](document, strategy.grid, pred_coord)
   }

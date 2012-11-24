@@ -30,7 +30,6 @@ import tgutil.textdbutil._
 import tgutil.distances._
 import tgutil.experiment._
 import tgutil.ioutil._
-import tgutil.osutil.output_resource_usage
 import tgutil.printutil.{errprint, warning}
 import tgutil.Serializer
 import tgutil.textutil.capfirst
@@ -65,7 +64,7 @@ case class DocumentStatus[TDoc](
 )
 
 /******** Counters to track what's going on ********/
-class DocumentCounterTracker(
+class DocumentCounterTracker[T](
   shortfile: String,
   driver: ExperimentDriverStats
 ) {
@@ -87,12 +86,15 @@ class DocumentCounterTracker(
     increment_counter("documents.total")
   }
 
-  def handle_status[T](status: DocumentStatus[T]) {
+  def record_status(status: DocumentStatus[T]) {
     status.status match {
       case "bad" => increment_document_counter("documents.bad")
       case "skipped" => increment_document_counter("documents.skipped")
       case "processed" => increment_document_counter("documents.processed")
     }
+  }
+
+  def print_status(status: DocumentStatus[T]) {
     status.status match {
       case "skipped" =>
         errprint("Skipped document %s because %s", status.docdesc, status.reason)
@@ -101,6 +103,12 @@ class DocumentCounterTracker(
           status.reason)
       case _ => {}
     }
+  }
+
+  def handle_status(status: DocumentStatus[T]): Option[T] = {
+    record_status(status)
+    print_status(status)
+    status.maybedoc
   }
 
   def note_document_counters(file: String) {
@@ -118,7 +126,7 @@ class DocumentCounterTracker(
   }
 }
 
-object DocumentCounterTracker {
+class DocumentCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   def filename_to_counter_name(filehand: FileHandler, file: String) = {
     var (_, base) = filehand.split_filename(file)
     breakable {
@@ -131,17 +139,15 @@ object DocumentCounterTracker {
     """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
   }
 
-  def process_statuses[T](statuses: Iterator[DocumentStatus[T]],
-      driver: ExperimentDriverStats) = {
+  def create_tracker(shortname: String) =
+    new DocumentCounterTracker[T](shortname, driver)
+
+  def process_statuses(statuses: Iterator[DocumentStatus[T]]) = {
     val byfile = new GroupByIterator(statuses,
       (stat: DocumentStatus[T]) => (stat.filehand, stat.file))
     (for (((filehand, file), file_statuses) <- byfile) yield {
-      val tracker = new DocumentCounterTracker(
-        filename_to_counter_name(filehand, file), driver)
-      val results = file_statuses.flatMap { status =>
-        tracker.handle_status(status)
-        status.maybedoc
-      }
+      val tracker = create_tracker(filename_to_counter_name(filehand, file))
+      val results = file_statuses.flatMap(tracker.handle_status(_))
       if (debug("per-document")) {
         val output_stats =
           new SideEffectIterator { tracker.note_document_counters(file) }
@@ -458,7 +464,8 @@ abstract class GeoDocTable[Co : Serializer](
       finish_globally: Boolean = true) = {
     val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
       record_in_subtable, note_globally, finish_globally)
-    DocumentCounterTracker.process_statuses(statuses, driver)
+    new DocumentCounterTrackerFactory[GeoDoc[Co]](driver).
+      process_statuses(statuses)
   }
 
   def finish_document_loading() {

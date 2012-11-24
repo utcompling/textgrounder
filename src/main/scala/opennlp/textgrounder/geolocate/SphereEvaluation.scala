@@ -30,7 +30,6 @@ import tgutil.distances._
 import tgutil.experiment.ExperimentDriverStats
 import tgutil.mathutil.{mean, median}
 import tgutil.ioutil.{FileHandler}
-import tgutil.osutil.output_resource_usage
 import tgutil.printutil.{errprint, warning}
 import tgutil.textutil.split_text_into_words
 
@@ -226,9 +225,9 @@ class RankedSphereGridEvaluator(
 ) extends RankedGridEvaluator[SphereCoord](
   strategy, stratname, driver, evalstats
 ) {
-  override def imp_evaluate_document(document: GeoDoc[SphereCoord], doctag: String,
+  override def imp_evaluate_document(document: GeoDoc[SphereCoord],
       true_cell: GeoCell[SphereCoord]) = {
-    val result = super.imp_evaluate_document(document, doctag, true_cell)
+    val result = super.imp_evaluate_document(document, true_cell)
     new RankedSphereDocumentEvaluationResult(
       result.asInstanceOf[FullRankedDocumentEvaluationResult[SphereCoord]]
     )
@@ -240,9 +239,9 @@ class RankedSphereDocumentEvaluationResult(
 ) extends FullRankedDocumentEvaluationResult[SphereCoord](
   wrapped.document, wrapped.pred_cells, wrapped.true_rank
 ) {
-  override def print_result(doctag: String, document: GeoDoc[SphereCoord],
+  override def print_result(doctag: String,
       driver: GridLocateDocumentDriver[SphereCoord]) {
-    wrapped.print_result(doctag, document, driver)
+    wrapped.print_result(doctag, driver)
 
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
@@ -309,7 +308,7 @@ class PCLTravelGeolocateDocumentEvaluator(
       new DocumentStatus(filehand, filename, Some(doc), "processed", "", "")
   }
 
-  def evaluate_document(doc: TitledDocument, doctag: String) = {
+  def evaluate_document(doc: TitledDocument) = {
     val dist = driver.word_dist_factory.create_word_dist
     for (text <- Seq(doc.title, doc.text))
       dist.add_document(split_text_into_words(text, ignore_punc = true))
@@ -317,6 +316,7 @@ class PCLTravelGeolocateDocumentEvaluator(
     dist.finish_after_global()
     val cells =
       strategy.return_ranked_cells(dist, include = Iterable[SphereCell]())
+    // FIXME: This should be output by a result object we return.
     errprint("")
     errprint("Document with title: %s", doc.title)
     val num_cells_to_show = 5
