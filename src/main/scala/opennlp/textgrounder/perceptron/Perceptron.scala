@@ -1,4 +1,4 @@
- ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 //  Perceptron.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.perceptron
+package opennlp.textgrounder
+package perceptron
 
 /**
  * A perceptron for binary classification.
@@ -24,13 +25,14 @@ package opennlp.textgrounder.perceptron
  * @author Ben Wing
  */
 
-import util.control.Breaks._
+import scala.util.control.Breaks._
 import collection.mutable
 import io.Source
 
-import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.util.memoizer._
-import opennlp.textgrounder.util.MeteredTask
+import util.printutil._
+import util.memoizer._
+import util.MeteredTask
+import gridlocate.GridLocateDriver.Debug._
 
 /**
  * A vector of real-valued features.  In general, features are indexed
@@ -187,6 +189,28 @@ class SparseFeatureVectorFactory[T] {
   // Set the minimum index to 1 so we can use 0 for the intercept term
   val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
 
+  trait SparseFeatureVectorLike {
+    def length = {
+      // +1 because of the intercept term
+      feature_mapper.number_of_entries + 1
+    }
+
+    def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
+
+    def compute_toString(prefix: String,
+        feature_values: Iterable[(Int, Double)]) =
+      "%s(%s)" format (prefix,
+        feature_values.filter { case (index, value) => index > 0 }.
+          toSeq.sorted.map {
+            case (index, value) =>
+              "%s(%s)=%.2f" format (
+                feature_mapper.unmemoize(index),
+                index, value
+              )
+          }.mkString(",")
+      )
+  }
+
   /**
    * A feature vector in which the features are stored sparsely, i.e. only
    * the features with non-zero values are stored, using a hash table or
@@ -194,24 +218,68 @@ class SparseFeatureVectorFactory[T] {
    * stored in `feature_mapper`. There will always be a feature with the
    * index 0, value 1.0, to handle the intercept term.
    */
-  protected class SparseFeatureVector(
-    feature_values: collection.Map[Int, Double]
-  ) extends SimpleFeatureVector {
-    def length = {
-      // +1 because of the intercept term
-      feature_mapper.number_of_entries + 1
+  protected class CompressedSparseFeatureVector(
+    keys: Array[Int], values: Array[Double]
+  ) extends SimpleFeatureVector with SparseFeatureVectorLike {
+    assert(keys.length == values.length)
+
+    def stored_entries = keys.length
+
+    def apply(index: Int) = {
+      val keyind = java.util.Arrays.binarySearch(keys, index)
+      if (keyind < 0) 0.0 else values(keyind)
     }
 
+    def squared_magnitude(label: Int) = {
+      var i = 0
+      var res = 0.0
+      while (i < keys.length) {
+        res += values(i) * values(i)
+        i += 1
+      }
+      res
+    }
+
+    def dot_product(weights: WeightVector, label: Int) = {
+      var i = 0
+      var res = 0.0
+      while (i < keys.length) {
+        res += values(i) * weights(keys(i))
+        i += 1
+      }
+      res
+    }
+
+    def update_weights(weights: WeightVector, scale: Double, label: Int) {
+      var i = 0
+      while (i < keys.length) {
+        weights(keys(i)) += scale * values(i)
+        i += 1
+      }
+    }
+
+    override def toString = compute_toString(
+      "CompressedSparseFeatureVector", keys zip values)
+  }
+
+  /**
+   * A feature vector in which the features are stored sparsely, i.e. only
+   * the features with non-zero values are stored, using a hash table or
+   * similar.  The features are indexed by integers, using the mapping
+   * stored in `feature_mapper`. There will always be a feature with the
+   * index 0, value 1.0, to handle the intercept term.
+   */
+  protected abstract class SparseFeatureVector(
+    feature_values: Iterable[(Int, Double)]
+  ) extends SimpleFeatureVector with SparseFeatureVectorLike {
     def stored_entries = feature_values.size
 
-    def apply(index: Int) = feature_values.getOrElse(index, 0.0)
+    // def apply(index: Int): Double --- needs to be defined
 
     def squared_magnitude(label: Int) =
       feature_values.map {
         case (index, value) => value * value
       }.sum
-
-    def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
 
     def dot_product(weights: WeightVector, label: Int) =
       feature_values.map {
@@ -224,17 +292,49 @@ class SparseFeatureVectorFactory[T] {
       }
     }
 
-    override def toString =
-      "SparseFeatureVector(%s)" format
-      feature_values.filter { case (index, value) => index > 0 }.
-        toSeq.sorted.map {
-          case (index, value) =>
-            "%s(%s)=%.2f" format (
-              feature_mapper.unmemoize(index),
-              index, value
-            )
-        }.mkString(",")
+    def string_prefix: String
+
+    override def toString = compute_toString(string_prefix, feature_values)
   }
+
+  /**
+   * An implementation of a sparse feature vector storing the non-zero
+   * features in a `Map`.
+   */
+  protected class MapSparseFeatureVector(
+    feature_values: collection.Map[Int, Double]
+  ) extends SparseFeatureVector(feature_values) {
+    def apply(index: Int) = feature_values.getOrElse(index, 0.0)
+
+    def string_prefix = "MapSparseFeatureVector"
+  }
+
+  protected class TupleArraySparseFeatureVector(
+    feature_values: mutable.Buffer[(Int, Double)]
+  ) extends SparseFeatureVector(feature_values) {
+    // Use an O(n) algorithm to look up a value at a given index.  Luckily,
+    // this operation isn't performed very often (if at all).  We could
+    // speed it up by storing the items sorted and use binary search.
+    def apply(index: Int) = feature_values.find(_._1 == index) match {
+      case Some((index, value)) => value
+      case None => 0.0
+    }
+
+    def string_prefix = "TupleArraySparseFeatureVector"
+  }
+
+  val vector_impl = debugval("featvec") match {
+    case "Compressed" | "compressed" => "Compressed"
+    case "TupleArray" | "tuplearray" | "tuple-array" => "TupleArray"
+    case "Map" | "map" => "Map"
+    case _ => "Compressed"
+  }
+
+  errprint(vector_impl match {
+    case "Compressed" => "Using compressed feature vectors"
+    case "TupleArray" => "Using tuple array (semi-compressed) feature vectors"
+    case "Map" => "Using map (uncompressed) feature vectors"
+  })
 
   /**
    * Generate a feature vector.  If not at training time, we need to be
@@ -245,7 +345,7 @@ class SparseFeatureVectorFactory[T] {
    */
   def make_feature_vector(feature_values: Iterable[(T, Double)],
       is_training: Boolean) = {
-    val memoized_features = Iterable(0 -> 1.0) ++ (// the intercept term
+    val memoized_features = Iterable(0 -> 1.0) ++: (// the intercept term
       if (is_training)
         feature_values.map {
           case (name, value) => (feature_mapper.memoize(name), value)
@@ -256,7 +356,17 @@ class SparseFeatureVectorFactory[T] {
                if index != None }
           yield (index.get, value)
       )
-    new SparseFeatureVector(memoized_features.toMap)
+    vector_impl match {
+      case "Compressed" => {
+        val (keys, values) =
+          memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
+        new CompressedSparseFeatureVector(keys.toArray, values.toArray)
+      }
+      case "TupleArray" =>
+        new TupleArraySparseFeatureVector(memoized_features.toBuffer)
+      case "Map" =>
+        new MapSparseFeatureVector(memoized_features.toMap)
+    }
   }
 }
 
