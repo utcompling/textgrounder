@@ -157,10 +157,30 @@ trait PointwiseClassifyingRerankerWithTrainingData[
     Iterable[(RerankInstance, Boolean)] => ScoringBinaryClassifier[RerankInstance]
 
   lazy protected val rerank_classifier = {
-    val rerank_training_data = training_data.flatMap {
-      case (item, true_answer) =>
-        get_rerank_training_instances(item, true_answer)
-    }
+    val rerank_training_data =
+      if (debug("rerank-training")) {
+        training_data.zipWithIndex.flatMap {
+          case ((item, true_answer), index) => {
+            val prefix = "#%d: " format (index + 1)
+            errprint("%sTraining item: %s", prefix, item)
+            errprint("%sTrue answer: %s", prefix, true_answer)
+            val training_insts =
+              get_rerank_training_instances(item, true_answer)
+            for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
+              val instpref = "%s#%d: " format (prefix, instind + 1)
+              val correctstr =
+                if (correct) "CORRECT" else "INCORRECT"
+              errprint("%s%s: %s", instpref, correctstr, featvec)
+            }
+            training_insts
+          }
+        }
+      } else {
+        training_data.flatMap {
+          case (item, true_answer) =>
+            get_rerank_training_instances(item, true_answer)
+        }
+      }
     create_rerank_classifier(rerank_training_data)
   }
 }
