@@ -104,8 +104,13 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
    */
   protected def get_rerank_training_instances(item: TestItem,
       true_answer: Answer) = {
+    val initial_answers = initial_ranker.evaluate(item, Iterable(true_answer))
+    val top_answers = initial_answers.take(top_n)
     val answers =
-      initial_ranker.evaluate(item, Iterable(true_answer)).take(top_n)
+      if (top_answers.find(_._1 == true_answer) != None)
+        top_answers
+      else
+        top_answers ++ Iterable(initial_answers.find(_._1 == true_answer).get)
     for {(possible_answer, score) <- answers
          is_correct = possible_answer == true_answer
         }
