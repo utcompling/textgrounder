@@ -57,6 +57,10 @@ trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
    */
   protected val top_n: Int
 
+  protected def display_test_item(item: TestItem) = item.toString
+
+  protected def display_answer(answer: Answer) = answer.toString
+
   /**
    * Rerank the given answers, based on an initial ranking.
    */
@@ -162,8 +166,8 @@ trait PointwiseClassifyingRerankerWithTrainingData[
         training_data.zipWithIndex.flatMap {
           case ((item, true_answer), index) => {
             val prefix = "#%d: " format (index + 1)
-            errprint("%sTraining item: %s", prefix, item)
-            errprint("%sTrue answer: %s", prefix, true_answer)
+            errprint("%sTraining item: %s", prefix, display_test_item(item))
+            errprint("%sTrue answer: %s", prefix, display_answer(true_answer))
             val training_insts =
               get_rerank_training_instances(item, true_answer)
             for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
@@ -247,7 +251,8 @@ class LinearClassifierAdapterTrainer (
 trait RerankInstanceFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
-  val featvec_factory = new SparseFeatureVectorFactory[Word]
+  val featvec_factory =
+    new SparseFeatureVectorFactory[Word](word => memoizer.unmemoize(word))
   val scoreword = memoizer.memoize("-SCORE-")
 
   def make_feature_vector(feats: Iterable[(Word, Double)], score: Double,
@@ -407,4 +412,8 @@ class LinearClassifierGridReranker[Co](
   ] {
   protected val create_rerank_classifier =
     new LinearClassifierAdapterTrainer(trainer)
+
+  override def display_test_item(item: GeoDoc[Co]) = {
+    "%s, dist=%s" format (item, item.dist.debug_string)
+  }
 }
