@@ -413,8 +413,6 @@ package object hadoop {
       context.progress
       driver.set_parameters(params)
       context.progress
-      driver.setup_for_run()
-      context.progress
     }
   }
 }

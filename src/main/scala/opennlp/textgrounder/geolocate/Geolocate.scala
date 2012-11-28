@@ -312,10 +312,10 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       param_error("Width of multi cell must be positive")
   }
 
-  protected def initialize_document_table(word_dist_factory: WordDistFactory) =
+  protected def create_document_table(word_dist_factory: WordDistFactory) =
     new SphereDocumentTable(this, word_dist_factory)
 
-  protected def initialize_grid(table: GeoDocTable[SphereCoord]) = {
+  protected def create_grid(table: GeoDocTable[SphereCoord]) = {
     val spheretab = table.asInstanceOf[SphereDocumentTable]
     if (params.combined_kd_grid) {
       val kdcg =
@@ -549,7 +549,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
       need_seq(params.eval_file, "eval-file", "evaluation file(s)")
   }
 
-  override def create_strategy(stratname: String) = {
+  override def create_strategy(stratname: String, grid: GeoGrid[SphereCoord]) = {
     stratname match {
       case "link-most-common-toponym" =>
         new LinkMostCommonToponymGeolocateDocumentStrategy(grid)
@@ -557,20 +557,20 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
         new CellDistMostCommonToponymGeolocateDocumentStrategy(grid)
       case "average-cell-probability" =>
         new AverageCellProbabilityStrategy[SphereCoord](grid)
-      case other => super.create_strategy(other)
+      case other => super.create_strategy(other, grid)
     }
   }
 
-  def iter_strategies = {
+  def iter_strategies(grid: GeoGrid[SphereCoord]) = {
     val strats_unflat =
       for (stratname <- params.strategy) yield {
         if (stratname == "baseline") {
           for (basestratname <- params.baseline_strategy) yield {
-            val strategy = create_strategy(basestratname)
+            val strategy = create_strategy(basestratname, grid)
             ("baseline " + basestratname, strategy)
           }
         } else {
-          val strategy = create_strategy(stratname)
+          val strategy = create_strategy(stratname, grid)
           Seq((stratname, strategy))
         }
       }
@@ -853,20 +853,21 @@ found   : (String, Iterator[evalobj.TEvalRes])
    * NOTE: We force evaluation in this function because currently we mostly
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
-  def run_after_setup() = {
-    for ((stratname, strategy) <- iter_strategies) yield {
+  def run() = {
+    val grid = setup_for_run()
+    for ((stratname, strategy) <- iter_strategies(grid)) yield {
       val results =
         params.eval_format match {
           case "pcl-travel" => {
             val evalobj =
-              new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this,
+              new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, grid,
                 get_file_handler, params.eval_file)
             evalobj.evaluate_documents(evalobj.iter_document_stats)
           }
           case "internal" => {
             val docstats =
               params.input_corpus.toIterator.flatMap(dir =>
-                document_table.read_document_statuses_from_textdb(
+                grid.table.read_document_statuses_from_textdb(
                   get_file_handler, dir,
                   params.eval_set + "-" + document_file_suffix))
             val evalobj = create_cell_evaluator(strategy, stratname)

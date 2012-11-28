@@ -913,14 +913,6 @@ class DebugSettings {
 trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   override type TParam <: GridLocateParameters
 
-  var stopwords: Set[String] = _
-  var whitelist: Set[String] = _
-  var grid: GeoGrid[Co] = _
-  var document_table: GeoDocTable[Co] = _
-  var word_dist_factory: WordDistFactory = _
-  var word_dist_constructor: WordDistConstructor = _
-  var document_file_suffix: String = _
-
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
    * fields in this structure will be changed (canonicalized).  See above.
@@ -940,71 +932,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     if (params.jelinek_factor < 0.0 || params.jelinek_factor > 1.0) {
       param_error("Value for --jelinek-factor must be between 0.0 and 1.0, but is %g" format params.jelinek_factor)
     }
-
-    // Need to have `document_file_suffix` set early on, but factory
-    // shouldn't be created till setup_for_run() because factory may
-    // depend on auxiliary parameters set during this stage (e.g. during
-    // GenerateKML).
-    document_file_suffix = initialize_word_dist_suffix()
   }
-
-  protected def initialize_document_table(word_dist_factory: WordDistFactory):
-    GeoDocTable[Co]
-
-  protected def initialize_grid(table: GeoDocTable[Co]): GeoGrid[Co]
 
   protected def word_dist_type = {
     if (params.word_dist == "unsmoothed-ngram") "ngram"
     else "unigram"
   }
 
-  protected def initialize_word_dist_suffix() = {
+  def document_file_suffix = {
     if (word_dist_type == "ngram")
       textdbutil.ngram_counts_suffix
     else
       textdbutil.unigram_counts_suffix
-  }
-
-  protected def get_stopwords() = {
-    if (params.include_stopwords_in_document_dists) Set[String]()
-    else stopwords
-  }
-
-  protected def get_whitelist() = {
-    whitelist
-  }
-
-  protected def initialize_word_dist_constructor(factory: WordDistFactory) = {
-    val the_stopwords = get_stopwords()
-    val the_whitelist = get_whitelist()
-    if (word_dist_type == "ngram")
-      new DefaultNgramWordDistConstructor(
-        factory,
-        ignore_case = !params.preserve_case_words,
-        stopwords = the_stopwords,
-        whitelist = the_whitelist,
-        minimum_word_count = params.minimum_word_count,
-        max_ngram_length = params.max_ngram_length)
-    else
-      new DefaultUnigramWordDistConstructor(
-        factory,
-        ignore_case = !params.preserve_case_words,
-        stopwords = the_stopwords,
-        whitelist = the_whitelist,
-        minimum_word_count = params.minimum_word_count)
-  }
-
-  protected def initialize_word_dist_factory() = {
-    if (params.word_dist == "unsmoothed-ngram")
-      new UnsmoothedNgramWordDistFactory
-    else if (params.word_dist == "dirichlet")
-      new DirichletUnigramWordDistFactory(params.interpolate,
-        params.dirichlet_factor)
-    else if (params.word_dist == "jelinek-mercer")
-      new JelinekMercerUnigramWordDistFactory(params.interpolate,
-        params.jelinek_factor)
-    else
-      new PseudoGoodTuringUnigramWordDistFactory(params.interpolate)
   }
 
   protected def read_stopwords() = {
@@ -1012,9 +951,55 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       params.language)
   }
 
+  lazy protected val the_stopwords = {
+    if (params.include_stopwords_in_document_dists) Set[String]()
+    else read_stopwords()
+  }
+
   protected def read_whitelist() = {
     Whitelist.read_whitelist(get_file_handler, params.whitelist_file)
   }
+
+  lazy protected val the_whitelist = read_whitelist()
+
+  protected def get_create_word_dist_constructor =
+    (factory: WordDistFactory) => {
+      if (word_dist_type == "ngram")
+        new DefaultNgramWordDistConstructor(
+          factory,
+          ignore_case = !params.preserve_case_words,
+          stopwords = the_stopwords,
+          whitelist = the_whitelist,
+          minimum_word_count = params.minimum_word_count,
+          max_ngram_length = params.max_ngram_length)
+      else
+        new DefaultUnigramWordDistConstructor(
+          factory,
+          ignore_case = !params.preserve_case_words,
+          stopwords = the_stopwords,
+          whitelist = the_whitelist,
+          minimum_word_count = params.minimum_word_count)
+    }
+
+  protected def create_word_dist_factory() = {
+    val create_constructor = get_create_word_dist_constructor
+    if (params.word_dist == "unsmoothed-ngram")
+      new UnsmoothedNgramWordDistFactory(create_constructor)
+    else if (params.word_dist == "dirichlet")
+      new DirichletUnigramWordDistFactory(create_constructor,
+        params.interpolate, params.dirichlet_factor)
+    else if (params.word_dist == "jelinek-mercer")
+      new JelinekMercerUnigramWordDistFactory(create_constructor,
+        params.interpolate, params.jelinek_factor)
+    else
+      new PseudoGoodTuringUnigramWordDistFactory(create_constructor,
+        params.interpolate)
+  }
+
+  protected def create_document_table(word_dist_factory: WordDistFactory):
+    GeoDocTable[Co]
+
+  protected def create_grid(table: GeoDocTable[Co]): GeoGrid[Co]
 
   /**
    * Read the training documents.  This uses the values of the parameters
@@ -1031,7 +1016,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   those statistics.
    * @return Iterator over documents.
    */
-  def read_training_documents(operation: String = "reading",
+  def read_training_documents(document_table: GeoDocTable[Co],
+      operation: String = "reading",
       record_in_subtable: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
@@ -1064,7 +1050,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   (e.g. "counts" or "document-metadata"
    * @param grid Cell grid into which the documents are added.
    */
-  protected def read_training_documents_into_grid() {
+  protected def read_training_documents_into_grid(grid: GeoGrid[Co]) {
     for (pass <- 1 to grid.num_training_passes) {
       grid.begin_training_pass(pass)
       // FIXME: I don't think we should be recording in subtables the first
@@ -1081,7 +1067,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // by finish_before_global() and note_dist_globally() (as well as
       // record_in_subtable) and such should be handled by separate mapping
       // stages onto the documents.
-      for (doc <- read_training_documents("reading pass " + pass,
+      for (doc <- read_training_documents(grid.table, "reading pass " + pass,
             record_in_subtable = true,
             note_globally = pass == 1,
             finish_globally = false)) {
@@ -1089,21 +1075,20 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         grid.add_document_to_cell(doc)
       }
     }
-    document_table.finish_document_loading()
+    // Compute overall distribution values (e.g. back-off statistics).
+    errprint("Finishing global dist...")
+    grid.table.word_dist_factory.finish_global_distribution()
+    grid.table.finish_document_loading()
   }
 
-  def setup_for_run() {
-    stopwords = read_stopwords()
-    whitelist = read_whitelist()
-    word_dist_factory = initialize_word_dist_factory()
-    word_dist_constructor = initialize_word_dist_constructor(word_dist_factory)
-    word_dist_factory.set_word_dist_constructor(word_dist_constructor)
-    document_table = initialize_document_table(word_dist_factory)
-    grid = initialize_grid(document_table)
+  def setup_for_run() = {
+    val word_dist_factory = create_word_dist_factory()
+    val document_table = create_document_table(word_dist_factory)
+    val grid = create_grid(document_table)
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
     // to this in document_table.
-    read_training_documents_into_grid()
+    read_training_documents_into_grid(grid)
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       output_resource_usage()
@@ -1122,6 +1107,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         println(word_dist.toString)        
       }
     }
+    grid
   }
 }
 
@@ -1132,7 +1118,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
       param_error("Perceptron aggressiveness value should be strictly greater than zero")
   }
 
-  def create_strategy(stratname: String) = {
+  def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
     stratname match {
       case "random" =>
         new RandomGridLocateDocumentStrategy[Co](grid)
@@ -1179,7 +1165,8 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  def iter_strategies: Iterable[(String, GridLocateDocumentStrategy[Co])]
+  def iter_strategies(grid: GeoGrid[Co]):
+    Iterable[(String, GridLocateDocumentStrategy[Co])]
 
   protected def create_pointwise_classifier_trainer = {
     params.rerank_classifier match {
@@ -1222,11 +1209,13 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
         new TrivialGridReranker[Co](
           basic_ranker, params.rerank_top_n)
       case _ => {
+        val doctable =
+          create_document_table(strategy.grid.table.word_dist_factory)
         val training_docs =
-          read_training_documents(
+          read_training_documents(doctable,
               operation = "generating training data for reranker").
             map { doc =>
-              val cell = grid.find_best_cell_for_document(doc, false)
+              val cell = strategy.grid.find_best_cell_for_document(doc, false)
               // We should already have a cell for each training doc,
               // right?
               assert(cell != None)

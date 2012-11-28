@@ -23,9 +23,12 @@ package opennlp.textgrounder.worddist
  * discounting where we just use a constant discount factor.
  */ 
 class JelinekMercerUnigramWordDistFactory(
-    interpolate_string: String,
-    val jelinek_factor: Double
-) extends DiscountedUnigramWordDistFactory(interpolate_string != "no") {
+  create_constructor: WordDistFactory => WordDistConstructor,
+  interpolate_string: String,
+  val jelinek_factor: Double
+) extends DiscountedUnigramWordDistFactory(
+  create_constructor, interpolate_string != "no"
+) {
   def create_word_dist = new JelinekMercerUnigramWordDist(this)
 }
 

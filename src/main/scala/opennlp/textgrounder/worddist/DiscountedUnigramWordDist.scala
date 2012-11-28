@@ -31,8 +31,11 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver
 import WordDist._
 
 abstract class DiscountedUnigramWordDistFactory(
-    val interpolate: Boolean
-  ) extends UnigramWordDistFactory {
+  create_constructor: WordDistFactory => WordDistConstructor,
+  val interpolate: Boolean
+) extends UnigramWordDistFactory {
+  val constructor = create_constructor(this)
+
   // Estimate of number of unseen word types for all documents
   var total_num_unseen_word_types = 0
 

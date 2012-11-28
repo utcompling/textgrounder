@@ -23,9 +23,12 @@ package opennlp.textgrounder.worddist
  * depends on the size of the document.
  */ 
 class DirichletUnigramWordDistFactory(
+    create_constructor: WordDistFactory => WordDistConstructor,
     interpolate_string: String,
     val dirichlet_factor: Double
-) extends DiscountedUnigramWordDistFactory(interpolate_string != "no") {
+) extends DiscountedUnigramWordDistFactory(
+  create_constructor, interpolate_string != "no"
+) {
   def create_word_dist = new DirichletUnigramWordDist(this)
 }
 
