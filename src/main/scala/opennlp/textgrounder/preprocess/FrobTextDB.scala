@@ -309,8 +309,8 @@ class FrobTextDBDriver extends
     super.handle_parameters()
   }
 
-  override def run_after_setup() {
-    super.run_after_setup()
+  override def run() {
+    super.run()
 
     val filehand = get_file_handler
     val fileproc = new FrobTextDBProcessor(filehand, params)

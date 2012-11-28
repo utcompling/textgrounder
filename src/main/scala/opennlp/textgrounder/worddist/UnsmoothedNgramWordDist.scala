@@ -18,7 +18,10 @@
 
 package opennlp.textgrounder.worddist
 
-class UnsmoothedNgramWordDistFactory extends NgramWordDistFactory {
+class UnsmoothedNgramWordDistFactory(
+  create_constructor: WordDistFactory => WordDistConstructor
+) extends NgramWordDistFactory {
+  val constructor = create_constructor(this)
   def create_word_dist = new UnsmoothedNgramWordDist(this)
 
   def finish_global_distribution() {

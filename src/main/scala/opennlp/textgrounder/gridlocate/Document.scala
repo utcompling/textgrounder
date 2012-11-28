@@ -468,10 +468,6 @@ abstract class GeoDocTable[Co : Serializer](
   }
 
   def finish_document_loading() {
-    // Compute overall distribution values (e.g. back-off statistics).
-    errprint("Finishing global dist...")
-    word_dist_factory.finish_global_distribution()
-
     // Now output statistics on number of documents seen, etc.
     errprint("")
     errprint("-------------------------------------------------------------------------")

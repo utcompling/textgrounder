@@ -229,11 +229,7 @@ trait WordDistFactory {
   /**
    * Corresponding constructor object for building up the word distribution
    */
-  var constructor: WordDistConstructor = _
-
-  def set_word_dist_constructor(constructor: WordDistConstructor) {
-    this.constructor = constructor
-  }
+  val constructor: WordDistConstructor
 
   /**
    * Create an empty word distribution.

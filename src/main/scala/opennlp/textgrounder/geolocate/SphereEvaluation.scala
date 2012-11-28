@@ -271,10 +271,10 @@ class TitledDocumentResult { }
 class PCLTravelGeolocateDocumentEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
-  driver: GeolocateDocumentTypeDriver,
+  grid: GeoGrid[SphereCoord],
   filehand: FileHandler,
   filenames: Iterable[String]
-) extends CorpusEvaluator(stratname, driver) {
+) extends CorpusEvaluator(stratname, grid.table.driver) {
   type TEvalDoc = TitledDocument
   type TEvalRes = TitledDocumentResult
   def iter_documents = {
@@ -309,7 +309,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   }
 
   def evaluate_document(doc: TitledDocument) = {
-    val dist = driver.word_dist_factory.create_word_dist
+    val dist = grid.table.word_dist_factory.create_word_dist
     for (text <- Seq(doc.title, doc.text))
       dist.add_document(split_text_into_words(text, ignore_punc = true))
     dist.finish_before_global()

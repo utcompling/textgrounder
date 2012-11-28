@@ -188,14 +188,14 @@ class PoligrounderDriver extends
     super.handle_parameters()
   }
 
-  override protected def initialize_word_dist_suffix() = {
-    super.initialize_word_dist_suffix() + "-tweets"
+  override def document_file_suffix = {
+    super.document_file_suffix + "-tweets"
   }
 
-  protected def initialize_document_table(word_dist_factory: WordDistFactory) =
+  protected def create_document_table(word_dist_factory: WordDistFactory) =
     new TimeDocumentTable(this, word_dist_factory)
 
-  protected def initialize_grid(table: GeoDocTable[TimeCoord]) = {
+  protected def create_grid(table: GeoDocTable[TimeCoord]) = {
     val timetab = table.asInstanceOf[TimeDocumentTable]
     if (params.ideological_user_corpus == null)
       new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
@@ -211,7 +211,8 @@ class PoligrounderDriver extends
         }, timetab)
   }
 
-  def run_after_setup() {
+  def run() {
+    val grid = setup_for_run()
     if (params.ideological_user_corpus == null)
       DistributionComparer.compare_cells_2way(
         grid.asInstanceOf[TimeGrid], "all",

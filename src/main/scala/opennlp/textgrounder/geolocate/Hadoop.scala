@@ -256,6 +256,8 @@ class DocumentEvaluationMapper extends
           "FIXME: For Hadoop, currently need exactly one corpus")
       }
     }
+    val grid = driver.setup_for_run()
+    context.progress
     val schema = TextDBProcessor.read_schema_from_textdb(filehand,
       driver.params.input_corpus(0),
       driver.params.eval_set + "-" + driver.document_file_suffix)
@@ -276,9 +278,8 @@ class DocumentEvaluationMapper extends
     val orig_docstats =
       lines.map {
         case (filehand, file, line, lineno) => {
-          val docstat =
-            driver.document_table.line_to_document(filehand, file, line,
-              lineno, schema, false, false)
+          val docstat = grid.table.line_to_document(filehand, file, line,
+                          lineno, schema, false, false)
           docstat.maybedoc.foreach { doc =>
             if (doc.dist != null)
               doc.dist.finish_after_global()
@@ -288,7 +289,7 @@ class DocumentEvaluationMapper extends
       }
     val stratname_evaluators =
       for ((stratname, strategy, docstats) <-
-        get_stat_iters(driver.iter_strategies, orig_docstats)) yield {
+        get_stat_iters(driver.iter_strategies(grid), orig_docstats)) yield {
           val evalobj = driver.create_cell_evaluator(strategy, stratname)
           (stratname, evalobj.evaluate_documents(docstats))
         }

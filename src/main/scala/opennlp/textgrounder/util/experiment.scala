@@ -38,29 +38,20 @@ package object experiment {
    * 1. Create an instance of a class of type TParam (which is determined
    *    by the particular driver implementation) and populate it with the
    *    appropriate parameters.
-   * 2. Call `run()`, passing in the parameter object created in the previous
-   *    step.  The return value (of type TRunRes, again determined by
+   * 2. Call `run_program()`, passing in the parameter object created in the
+   *    previous step.  The return value (of type TRunRes, again determined by
    *    the particular implementation) contains the results.
    *
    * NOTE: Some driver implementations may change the values of some of the
    * parameters recorded in the parameter object (particularly to
    * canonicalize them).
    *
-   * Note that `run()` is actually a convenience method that does three steps:
+   * Note that `run_program()` is actually a convenience method that does
+   * the following steps:
    *
    * 1. `set_parameters`, which notes the parameters passed in and verifies
    *    that their values are good.
-   * 2. `setup_for_run`, which does any internal setup necessary for
-   *    running the experiment (e.g. reading files, creating internal
-   *    structures).
-   * 3. `run_after_setup`, which executes the experiment.
-   *
-   * These three steps have been split out because some applications may need
-   * to access each step separately, or override some but not others.  For
-   * example, to add Hadoop support to an application, `run_after_setup`
-   * might need to be replaced with a different implementation based on the
-   * MapReduce framework, while the other steps might stay more or less the
-   * same.
+   * 2. `run`, which executes the experiment.
    */
 
   trait ExperimentDriver {
@@ -102,10 +93,9 @@ package object experiment {
       handle_parameters()
     }
 
-    def run(params: TParam) = {
+    def run_program(params: TParam) = {
       set_parameters(params)
-      setup_for_run()
-      run_after_setup()
+      run()
     }
 
     def show_progress(item_name: String, verb: String,
@@ -150,22 +140,10 @@ package object experiment {
     protected def handle_parameters()
 
     /**
-     * Do any setup before actually implementing the experiment.  This
-     * may mean, for example, loading files and creating any needed
-     * structures.
+     * Actually run the experiment.
      */
 
-    def setup_for_run()
-
-    /**
-     * Actually run the experiment.  We have separated out the run process
-     * into three steps because we might want to replace one of the
-     * components in a sub-implementation of an experiment. (For example,
-     * if we implement a Hadoop version of an experiment, typically we need
-     * to replace the run_after_setup component but leave the others.)
-     */
-
-    def run_after_setup(): TRunRes
+    def run(): TRunRes
   }
 
   /**
@@ -713,8 +691,7 @@ package object experiment {
     }
 
     def run_program() = {
-      driver.setup_for_run()
-      driver.run_after_setup()
+      driver.run()
       0
     }
   }

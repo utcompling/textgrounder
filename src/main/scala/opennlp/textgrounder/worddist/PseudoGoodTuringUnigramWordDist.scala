@@ -39,8 +39,11 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
  * especially for bigrams or trigrams).
  */ 
 class PseudoGoodTuringUnigramWordDistFactory(
+    create_constructor: WordDistFactory => WordDistConstructor,
     interpolate_string: String
-) extends DiscountedUnigramWordDistFactory(interpolate_string == "yes") {
+) extends DiscountedUnigramWordDistFactory(
+  create_constructor, interpolate_string == "yes"
+) {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 

@@ -145,19 +145,17 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override protected def initialize_word_dist_constructor(
-      factory: WordDistFactory) = {
+  override protected def get_create_word_dist_constructor = {
     if (word_dist_type != "unigram")
       param_error("Only unigram word distributions supported with GenerateKML")
-    val the_stopwords = get_stopwords()
-    val the_whitelist = get_whitelist()
-    new FilterUnigramWordDistConstructor(
-      factory,
-      params.split_kml_words,
-      ignore_case = !params.preserve_case_words,
-      stopwords = the_stopwords,
-      whitelist = the_whitelist,
-      minimum_word_count = params.minimum_word_count)
+    (factory: WordDistFactory) =>
+      new FilterUnigramWordDistConstructor(
+        factory,
+        params.split_kml_words,
+        ignore_case = !params.preserve_case_words,
+        stopwords = the_stopwords,
+        whitelist = the_whitelist,
+        minimum_word_count = params.minimum_word_count)
   }
 
   /**
@@ -165,7 +163,8 @@ class GenerateKMLDriver extends
    * KML files created and written on disk.
    */
 
-  def run_after_setup() {
+  def run() {
+    val grid = setup_for_run()
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(grid, memoizer.memoize(word))

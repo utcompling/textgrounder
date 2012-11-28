@@ -184,9 +184,7 @@ counts file also containing the metadata.
     need(params.counts_file, "counts-file")
   }
 
-  def setup_for_run() { }
-
-  def run_after_setup() {
+  def run() {
     if (!filehand.make_directories(params.output_dir))
       param_error("Output dir %s must not already exist" format
         params.output_dir)
