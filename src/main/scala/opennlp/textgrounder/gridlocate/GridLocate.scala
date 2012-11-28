@@ -920,7 +920,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   var word_dist_factory: WordDistFactory = _
   var word_dist_constructor: WordDistConstructor = _
   var document_file_suffix: String = _
-  var output_training_cell_dists: Boolean = _
 
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
