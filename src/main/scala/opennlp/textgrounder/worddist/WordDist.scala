@@ -270,11 +270,14 @@ trait WordAsIntMemoizer {
 
   val blank_memoized_string = memoizer.memoize("")
 
-  def create_word_int_map: mutable.Map[Word, Int] =
-    hashfact.create_int_int_map
+  // These should NOT be declared to have a type of mutable.Map[Word, Int]
+  // or whatever.  Doing so ensures that we go through the Map[] interface,
+  // which requires lots of boxing and unboxing.
+  def create_word_int_map = hashfact.create_int_int_map
 
-  def create_word_double_map: mutable.Map[Word, Double] =
-    hashfact.create_int_double_map
+  // Same here as for `create_word_int_map`
+
+  def create_word_double_map = hashfact.create_int_double_map
 }
 
 /**
@@ -309,6 +312,10 @@ object WordDist extends WordAsIntMemoizer {
  * @tparam Item Type of the items stored.
  */
 trait ItemStorage[Item] {
+  // NOTE: Do not need to specialize the type on Int, given the current
+  // definition of UnigramStorage; in fact, doing so interferes with the
+  // ability of the compiler to inline what we ask it to inline in
+  // UnigramStorage.
 
   /**
    * Add an item with the given count.  If the item exists already,

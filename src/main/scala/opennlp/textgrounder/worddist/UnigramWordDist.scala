@@ -71,9 +71,14 @@ class UnigramStorage extends ItemStorage[Word] {
     tokens_accurate = false
   }
 
-  def contains(item: Word) = counts contains item
+  // Declare these inline final to try to ensure that the code gets inlined.
+  // Note that the code does get inlined in normal circumstances, but won't
+  // currently if trait `ItemStorage` is specialized on Int (which doesn't
+  // help fast_kl_divergence() in any case, based on disassembly of the byte
+  // code).
+  @inline final def contains(item: Word) = counts contains item
 
-  def get_item(item: Word) = counts(item)
+  @inline final def get_item(item: Word) = counts(item)
 
   def iter_items = counts.toIterable
 
@@ -87,7 +92,7 @@ class UnigramStorage extends ItemStorage[Word] {
     num_tokens_val
   }
 
-  def num_types = counts.size
+  @inline final def num_types = counts.size
 }
 
 /**

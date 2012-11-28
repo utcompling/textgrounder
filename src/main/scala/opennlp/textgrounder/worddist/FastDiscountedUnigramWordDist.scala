@@ -130,8 +130,8 @@ object FastDiscountedUnigramWordDist {
         val pcount = pvalues(i)
         val qcount = qmodel.get_item(word)
         val owprob = owprobs(word)
-        val p = pcount * pfact + owprob * pfact_unseen
-        val q = qcount * qfact + owprob * qfact_unseen
+        val p: Double = pcount * pfact + owprob * pfact_unseen
+        val q: Double = qcount * qfact + owprob * qfact_unseen
         /* In the "new way" we have to notice when a word was never seen
            at all, and ignore it. */
         if (q > 0.0) {
@@ -139,7 +139,8 @@ object FastDiscountedUnigramWordDist {
           //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
           //      p, q, word, pcount, qcount, qfact, qfact_unseen,
           //      owprobs(word))
-          kldiv += p * (log(p) - log(q))
+          // Use log(p/q) not log(p)-log(q) -- division faster than extra log
+          kldiv += p * log(p/q)
         }
         i += 1
       }
