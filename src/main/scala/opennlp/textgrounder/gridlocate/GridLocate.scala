@@ -619,6 +619,7 @@ For the perceptron classifiers, see also `--pa-variant`,
         Seq("kl-div", "kldiv"),
         Seq("matching-word-binary"),
         Seq("matching-word-count"),
+        Seq("matching-word-count-product"),
         Seq("matching-word-probability"),
         Seq("trivial")),
       help = """How to generate rerank instances for the reranker, based on
@@ -1207,6 +1208,8 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
         new WordMatchingRerankInstanceFactory[Co]("binary")
       case "matching-word-count" =>
         new WordMatchingRerankInstanceFactory[Co]("count")
+      case "matching-word-count-product" =>
+        new WordMatchingRerankInstanceFactory[Co]("count-product")
       case "matching-word-probability" =>
         new WordMatchingRerankInstanceFactory[Co]("probability")
     }
