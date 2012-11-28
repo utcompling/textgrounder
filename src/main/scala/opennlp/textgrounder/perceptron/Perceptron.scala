@@ -180,7 +180,9 @@ class ArrayFeatureVector(
 /**
  * A factory object for creating sparse feature vectors for classification.
  */
-class SparseFeatureVectorFactory[T] {
+class SparseFeatureVectorFactory[T](
+  display_feature: T => String
+) {
   // Use Trove for fast, efficient hash tables.
   val hashfact = new TroveHashTableFactory
   // Alternatively, just use the normal Scala hash tables.
@@ -204,7 +206,7 @@ class SparseFeatureVectorFactory[T] {
           toSeq.sorted.map {
             case (index, value) =>
               "%s(%s)=%.2f" format (
-                feature_mapper.unmemoize(index),
+                display_feature(feature_mapper.unmemoize(index)),
                 index, value
               )
           }.mkString(",")
@@ -376,7 +378,7 @@ class SparseFeatureVectorFactory[T] {
  * labels have no ordering or other numerical significance.
  */
 class SparseNominalInstanceFactory extends
-  SparseFeatureVectorFactory[String] {
+  SparseFeatureVectorFactory[String](identity) {
   val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
