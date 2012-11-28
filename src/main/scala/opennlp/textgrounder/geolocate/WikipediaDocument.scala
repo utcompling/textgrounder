@@ -29,6 +29,7 @@ import tgutil.textutil.capfirst
 import opennlp.textgrounder.gridlocate.GeoDocConverters._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
+import opennlp.textgrounder.worddist.WordDistFactory
 import opennlp.textgrounder.worddist.WordDist._
 
 /**
@@ -53,8 +54,8 @@ import opennlp.textgrounder.worddist.WordDist._
  */
 class WikipediaDocument(
   schema: Schema,
-  subtable: WikipediaDocumentSubtable
-) extends RealSphereDocument(schema, subtable.table) {
+  word_dist_factory: WordDistFactory
+) extends RealSphereDocument(schema, word_dist_factory) {
   var id = 0L
   var incoming_links_value: Option[Int] = None
   override def incoming_links = incoming_links_value
@@ -192,7 +193,8 @@ object WikipediaDocument {
 class WikipediaDocumentSubtable(
   override val table: SphereDocumentTable
 ) extends SphereDocumentSubtable[WikipediaDocument](table) {
-  def create_document(schema: Schema) = new WikipediaDocument(schema, this)
+  def create_document(schema: Schema) =
+    new WikipediaDocument(schema, table.word_dist_factory)
 
   override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean) = {

@@ -32,8 +32,8 @@ import opennlp.textgrounder.worddist.WordDistFactory
 
 abstract class RealSphereDocument(
   schema: Schema,
-  table: SphereDocumentTable
-) extends GeoDoc[SphereCoord](schema, table) {
+  word_dist_factory: WordDistFactory
+) extends GeoDoc[SphereCoord](schema, word_dist_factory) {
   var coord: SphereCoord = _
   def has_coord = coord != null
 
@@ -160,8 +160,8 @@ class SphereDocumentTable(
  */
 class GenericSphereDocument(
   schema: Schema,
-  subtable: GenericSphereDocumentSubtable
-) extends RealSphereDocument(schema, subtable.table) {
+  word_dist_factory: WordDistFactory
+) extends RealSphereDocument(schema, word_dist_factory) {
   var title: String = _
 
   override def set_field(name: String, value: String) {
@@ -185,5 +185,5 @@ class GenericSphereDocumentSubtable(
   table: SphereDocumentTable
 ) extends SphereDocumentSubtable[GenericSphereDocument](table) {
   def create_document(schema: Schema) =
-    new GenericSphereDocument(schema, this)
+    new GenericSphereDocument(schema, table.word_dist_factory)
 }

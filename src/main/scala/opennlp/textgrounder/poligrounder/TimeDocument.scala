@@ -32,8 +32,8 @@ import opennlp.textgrounder.worddist.WordDistFactory
 
 class TimeDocument(
   schema: Schema,
-  table: TimeDocumentTable
-) extends GeoDoc[TimeCoord](schema, table) {
+  word_dist_factory: WordDistFactory
+) extends GeoDoc[TimeCoord](schema, word_dist_factory) {
   var coord: TimeCoord = _
   var user: String = _
   def has_coord = coord != null
@@ -78,6 +78,7 @@ class TimeDocumentTable(
 ) extends GeoDocTable[TimeCoord](
   driver, word_dist_factory
 ) {
-  def create_document(schema: Schema) = new TimeDocument(schema, this)
+  def create_document(schema: Schema) =
+    new TimeDocument(schema, word_dist_factory)
 }
 

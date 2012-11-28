@@ -356,7 +356,6 @@ abstract class GeoDocTable[Co : Serializer](
               case Some(doc) => {
                 if (doc.dist != null) {
                   if (note_globally) {
-                    val factory = doc.table.word_dist_factory
                     // Don't use the eval set's distributions in computing
                     // global smoothing values and such, to avoid contaminating
                     // the results (training on your eval set). In addition, if
@@ -366,7 +365,7 @@ abstract class GeoDocTable[Co : Serializer](
                     // Add the distribution to the global stats before
                     // eliminating infrequent words through
                     // `finish_before_global`.
-                    factory.note_dist_globally(doc.dist)
+                    doc.word_dist_factory.note_dist_globally(doc.dist)
                   }
                   doc.dist.finish_before_global()
                 }
@@ -667,7 +666,7 @@ case class DocumentValidationException(
  */
 abstract class GeoDoc[Co : Serializer](
   val schema: Schema,
-  val table: GeoDocTable[Co]
+  val word_dist_factory: WordDistFactory
 ) {
 
   import GeoDocConverters._
@@ -770,9 +769,7 @@ abstract class GeoDoc[Co : Serializer](
   def set_field(field: String, value: String) {
     field match {
       case "counts" => {
-        val factory = table.word_dist_factory
-        val constructor = factory.constructor
-        constructor.initialize_distribution(this, value)
+        word_dist_factory.constructor.initialize_distribution(this, value)
         // Handled by callers.
         // dist.finish_before_global()
       }
