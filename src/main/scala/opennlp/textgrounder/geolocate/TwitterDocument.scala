@@ -20,12 +20,13 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.textdbutil.Schema
 
+import opennlp.textgrounder.worddist.WordDistFactory
 import opennlp.textgrounder.worddist.WordDist._
 
 class TwitterTweetDocument(
   schema: Schema,
-  subtable: TwitterTweetDocumentSubtable
-) extends RealSphereDocument(schema, subtable.table) {
+  word_dist_factory: WordDistFactory
+) extends RealSphereDocument(schema, word_dist_factory) {
   var id = 0L
   def title = id.toString
 
@@ -49,13 +50,14 @@ class TwitterTweetDocument(
 class TwitterTweetDocumentSubtable(
   table: SphereDocumentTable
 ) extends SphereDocumentSubtable[TwitterTweetDocument](table) {
-  def create_document(schema: Schema) = new TwitterTweetDocument(schema, this)
+  def create_document(schema: Schema) =
+    new TwitterTweetDocument(schema, table.word_dist_factory)
 }
 
 class TwitterUserDocument(
   schema: Schema,
-  subtable: TwitterUserDocumentSubtable
-) extends RealSphereDocument(schema, subtable.table) {
+  word_dist_factory: WordDistFactory
+) extends RealSphereDocument(schema, word_dist_factory) {
   var userind = blank_memoized_string
   def title = memoizer.unmemoize(userind)
 
@@ -79,5 +81,6 @@ class TwitterUserDocument(
 class TwitterUserDocumentSubtable(
   table: SphereDocumentTable
 ) extends SphereDocumentSubtable[TwitterUserDocument](table) {
-  def create_document(schema: Schema) = new TwitterUserDocument(schema, this)
+  def create_document(schema: Schema) =
+    new TwitterUserDocument(schema, table.word_dist_factory)
 }
