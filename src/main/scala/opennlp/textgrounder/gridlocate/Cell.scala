@@ -19,6 +19,8 @@
 
 package opennlp.textgrounder.gridlocate
 
+import collection.mutable
+
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.printutil.{errprint, warning}
 import tgutil.experiment._
@@ -409,8 +411,10 @@ abstract class GeoGrid[Co](
     val cells = iter_nonempty_cells(nonempty_word_dist)
     if (include.size == 0)
       cells
-    else
-      include.toIndexedSeq union cells.toIndexedSeq
+    else {
+      val not_included = include.filter(cell => cells.find(_ == cell) == None)
+      cells ++ not_included
+    }
   }
 
   /*********************** Not meant to be overridden *********************/
