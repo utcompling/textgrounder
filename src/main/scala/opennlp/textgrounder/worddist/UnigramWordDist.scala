@@ -110,21 +110,27 @@ abstract class UnigramWordDist(factory: WordDistFactory
 
   def innerToString: String
 
-  override def toString = {
+  def toString(num_words_to_print: Int) = {
     val finished_str =
       if (!finished) ", unfinished" else ""
-    val num_words_to_print = 15
-    val need_dots = model.num_types > num_words_to_print
+    val num_actual_words_to_print =
+      if (num_words_to_print < 0) model.num_types
+      else num_words_to_print
+    val need_dots = model.num_types > num_actual_words_to_print
     val items =
       for ((word, count) <-
         model.iter_items.toSeq.sortWith(_._2 > _._2).
-          view(0, num_words_to_print))
+          view(0, num_actual_words_to_print))
       yield "%s=%s" format (memoizer.unmemoize(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
         model.num_types, model.num_tokens, innerToString,
         finished_str, words)
   }
+
+  override def debug_string = toString(-1)
+
+  override def toString = toString(15)
 
   /**
    * This is a basic unigram implementation of the computation of the
