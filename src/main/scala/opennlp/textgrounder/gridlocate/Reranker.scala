@@ -150,7 +150,7 @@ trait PointwiseClassifyingRerankerWithTrainingData[
   /**
    * Training data used to create the reranker.
    */
-  protected val training_data: Iterable[(TestItem, Answer)]
+  protected val training_data: Iterator[(TestItem, Answer)]
 
   /**
    * Create the classifier used for reranking, given a set of training data
@@ -185,7 +185,12 @@ trait PointwiseClassifyingRerankerWithTrainingData[
             get_rerank_training_instances(item, true_answer)
         }
       }
-    create_rerank_classifier(rerank_training_data)
+    create_rerank_classifier(rerank_training_data.toIndexedSeq)
+  }
+
+  def train() = {
+    rerank_classifier
+    this
   }
 }
 
@@ -403,7 +408,7 @@ class TrivialGridReranker[Co](
 class LinearClassifierGridReranker[Co](
   val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
   val trainer: BinaryLinearClassifierTrainer,
-  val training_data: Iterable[(GeoDoc[Co], GeoCell[Co])],
+  val training_data: Iterator[(GeoDoc[Co], GeoCell[Co])],
   val create_rerank_instance:
     (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector,
   val top_n: Int
