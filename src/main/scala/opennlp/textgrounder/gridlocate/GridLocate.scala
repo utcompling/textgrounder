@@ -330,15 +330,13 @@ class CosineSimilarityStrategy[Co](
 ) extends PointwiseScoreStrategy[Co](grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
-    var cossim =
+    val cossim =
       word_dist.cosine_similarity(cell.combined_dist.word_dist,
         partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
     assert(cossim <= 1.002)
-    cossim = 1.002 - cossim
-    // Negate so that higher scores are better
-    -cossim
+    cossim
   }
 }
 
