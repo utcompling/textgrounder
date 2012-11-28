@@ -546,4 +546,6 @@ abstract class WordDist(factory: WordDistFactory) {
    * @param worddist Distribution of document.
    */
   def get_nbayes_logprob(worddist: WordDist): Double
+
+  def debug_string: String = toString
 }
