@@ -196,6 +196,7 @@ General commands:
                         to allow some number (by default, 20%) of all map and
                         reduce tasks to fail without killing the whole job.
   javap OPTIONS ...     Run 'javap' (with the classpath set appropriately).
+  scalap OPTIONS ...    Run 'scalap' (with the classpath set appropriately).
   scala OPTIONS ...     Run 'scala' (with the classpath set appropriately);
                         useful for getting a console to experiment with the
                         TextGrounder code.  Note that you can also use the
@@ -280,6 +281,10 @@ if [ -z "$CMD" ]; then
 elif [ "$CMD" = 'javap' ]; then
 
   execute javap -classpath "$CP" ${1+"$@"}
+
+elif [ "$CMD" = 'scalap' ]; then
+
+  execute scalap -classpath "$CP" ${1+"$@"}
 
 elif [ "$CMD" = 'scala' ]; then
 
