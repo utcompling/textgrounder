@@ -336,6 +336,7 @@ class WordMatchingRerankInstanceFactory[Co](value: String) extends
       val wordval = value match {
         case "binary" => 1
         case "count" => count
+        case "count-product" => count * qcount
         case "probability" => docdist.lookup_word(word)
       }
       Some(wordval)
