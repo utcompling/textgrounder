@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  WikipediaDocument.scala
+//  WikipediaDoc.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -52,10 +52,10 @@ import opennlp.textgrounder.worddist.WordDist._
  * is_list: Whether document is a list of any type ("List of *", disambig,
  *          or in Category or Book namespaces)
  */
-class WikipediaDocument(
+class WikipediaDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
-) extends RealSphereDocument(schema, word_dist_factory) {
+) extends RealSphereDoc(schema, word_dist_factory) {
   var id = 0L
   var incoming_links_value: Option[Int] = None
   override def incoming_links = incoming_links_value
@@ -84,7 +84,7 @@ class WikipediaDocument(
   }
 
   def struct =
-    <WikipediaDocument>
+    <WikipediaDoc>
       <title>{ title }</title>
       <id>{ id }</id>
       {
@@ -95,7 +95,7 @@ class WikipediaDocument(
         if (redir.length > 0)
           <redirectTo>{ redir }</redirectTo>
       }
-    </WikipediaDocument>
+    </WikipediaDoc>
 
   override def toString = {
     val redirstr =
@@ -104,10 +104,10 @@ class WikipediaDocument(
   }
 
   def adjusted_incoming_links =
-    WikipediaDocument.adjust_incoming_links(incoming_links)
+    WikipediaDoc.adjust_incoming_links(incoming_links)
 }
 
-object WikipediaDocument {
+object WikipediaDoc {
   /**
    * Compute the short form of a document name.  If short form includes a
    * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
@@ -158,7 +158,7 @@ object WikipediaDocument {
  *     articles to such articles. (But in the future we will want to make
  *     use of non-geotagged articles, e.g. in label propagation.)
  * (2) Documents that redirect to articles with coordinates have associated
- *     WikipediaDocument objects created for them.  These objects have their
+ *     WikipediaDoc objects created for them.  These objects have their
  *     `redir` field set to the name of the article redirected to. (Objects
  *     for non-redirect articles have this field blank.)
  * (3) However, these objects should not appear in the lists of documents by
@@ -178,7 +178,7 @@ object WikipediaDocument {
  *     article gets recorded as an additional name of the redirected-to
  *     article.
  * (7) Note that currently we don't actually keep a mapping of all the names
- *     of a given WikipediaDocument; instead, we have tables that
+ *     of a given WikipediaDoc; instead, we have tables that
  *     map names of various sorts to associated articles.  The articles
  *     pointed to in these maps are only content articles, except when there
  *     happen to be double redirects, i.e. redirects to other redirects.
@@ -187,14 +187,14 @@ object WikipediaDocument {
  *     ourselves; hence we may have some redirect articles listed in the
  *     maps. (FIXME, we should probably ignore these articles rather than
  *     record them.) Note that this means that we don't need the
- *     WikipediaDocument objects for redirect articles once we've finished
+ *     WikipediaDoc objects for redirect articles once we've finished
  *     loading the table; they should end up garbage collected.
  */
-class WikipediaDocumentSubtable(
-  override val table: SphereDocumentTable
-) extends SphereDocumentSubtable[WikipediaDocument](table) {
+class WikipediaDocSubtable(
+  override val table: SphereDocTable
+) extends SphereDocSubtable[WikipediaDoc](table) {
   def create_document(schema: Schema) =
-    new WikipediaDocument(schema, table.word_dist_factory)
+    new WikipediaDoc(schema, table.word_dist_factory)
 
   override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean) = {
@@ -227,10 +227,10 @@ class WikipediaDocumentSubtable(
   // val wikipedia_fields = Seq("incoming_links", "redir")
 
   /**
-   * Mapping from document names to WikipediaDocument objects, using the actual
+   * Mapping from document names to WikipediaDoc objects, using the actual
    * case of the document.
    */
-  val name_to_document = mutable.Map[Word, WikipediaDocument]()
+  val name_to_document = mutable.Map[Word, WikipediaDoc]()
 
   /**
    * Map from short name (lowercased) to list of documents.
@@ -241,24 +241,24 @@ class WikipediaDocumentSubtable(
    * name.  The idea is that the short name should be the same as one of
    * the toponyms used to refer to the document.
    */
-  val short_lower_name_to_documents = bufmap[Word, WikipediaDocument]()
+  val short_lower_name_to_documents = bufmap[Word, WikipediaDoc]()
 
   /**
    * Map from tuple (NAME, DIV) for documents of the form "Springfield, Ohio",
    * lowercased.
    */
   val lower_name_div_to_documents =
-    bufmap[(Word, Word), WikipediaDocument]()
+    bufmap[(Word, Word), WikipediaDoc]()
 
   /**
    * For each toponym, list of documents matching the name.
    */
-  val lower_toponym_to_document = bufmap[Word, WikipediaDocument]()
+  val lower_toponym_to_document = bufmap[Word, WikipediaDoc]()
 
   /**
-   * Mapping from lowercased document names to WikipediaDocument objects
+   * Mapping from lowercased document names to WikipediaDoc objects
    */
-  val lower_name_to_documents = bufmap[Word, WikipediaDocument]()
+  val lower_name_to_documents = bufmap[Word, WikipediaDoc]()
 
   /**
    * Total # of incoming links for all documents in each split.
@@ -270,7 +270,7 @@ class WikipediaDocumentSubtable(
    * List of documents that are Wikipedia redirect articles, accumulated
    * during loading and processed at the end.
    */
-  val redirects = mutable.Buffer[WikipediaDocument]()
+  val redirects = mutable.Buffer[WikipediaDoc]()
 
   /**
    * Look up a document named NAME and return the associated document.
@@ -281,7 +281,7 @@ class WikipediaDocumentSubtable(
     assert(name != null)
     assert(name.length > 0)
     name_to_document.getOrElse(memoizer.memoize(capfirst(name)),
-      null.asInstanceOf[WikipediaDocument])
+      null.asInstanceOf[WikipediaDoc])
   }
 
   /**
@@ -289,7 +289,7 @@ class WikipediaDocumentSubtable(
    * multiple names, due to redirects).  Also add to related lists mapping
    * lowercased form, short form, etc.
    */ 
-  def record_document_name(name: String, doc: WikipediaDocument) {
+  def record_document_name(name: String, doc: WikipediaDoc) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
     // println("length=%s" format name.length)
@@ -305,7 +305,7 @@ class WikipediaDocumentSubtable(
     val loname = name.toLowerCase
     val loname_word = memoizer.memoize(loname)
     lower_name_to_documents(loname_word) += doc
-    val (short, div) = WikipediaDocument.compute_short_form(loname)
+    val (short, div) = WikipediaDoc.compute_short_form(loname)
     val short_word = memoizer.memoize(short)
     if (div != null) {
       val div_word = memoizer.memoize(div)
@@ -323,7 +323,7 @@ class WikipediaDocumentSubtable(
    * Record either a normal document ('docfrom' same as 'docto') or a
    * redirect ('docfrom' redirects to 'docto').
    */
-  def record_document(docfrom: WikipediaDocument, docto: WikipediaDocument) {
+  def record_document(docfrom: WikipediaDoc, docto: WikipediaDoc) {
     record_document_name(docfrom.title, docto)
 
     // Handle incoming links.

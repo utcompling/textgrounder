@@ -54,7 +54,7 @@ import GridLocateDriver.Debug._
  * documents, where it generally describes what the document looked like
  * at the point it was skipped or discovered bad.
  */
-case class DocumentStatus[TDoc](
+case class DocStatus[TDoc](
   filehand: FileHandler,
   file: String,
   maybedoc: Option[TDoc],
@@ -64,7 +64,7 @@ case class DocumentStatus[TDoc](
 )
 
 /******** Counters to track what's going on ********/
-class DocumentCounterTracker[T](
+class DocCounterTracker[T](
   shortfile: String,
   driver: ExperimentDriverStats
 ) {
@@ -86,7 +86,7 @@ class DocumentCounterTracker[T](
     increment_counter("documents.total")
   }
 
-  def record_status(status: DocumentStatus[T]) {
+  def record_status(status: DocStatus[T]) {
     status.status match {
       case "bad" => increment_document_counter("documents.bad")
       case "skipped" => increment_document_counter("documents.skipped")
@@ -94,7 +94,7 @@ class DocumentCounterTracker[T](
     }
   }
 
-  def print_status(status: DocumentStatus[T]) {
+  def print_status(status: DocStatus[T]) {
     status.status match {
       case "skipped" =>
         errprint("Skipped document %s because %s", status.docdesc, status.reason)
@@ -105,7 +105,7 @@ class DocumentCounterTracker[T](
     }
   }
 
-  def handle_status(status: DocumentStatus[T]): Option[T] = {
+  def handle_status(status: DocStatus[T]): Option[T] = {
     record_status(status)
     print_status(status)
     status.maybedoc
@@ -126,7 +126,7 @@ class DocumentCounterTracker[T](
   }
 }
 
-class DocumentCounterTrackerFactory[T](driver: ExperimentDriverStats) {
+class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   def filename_to_counter_name(filehand: FileHandler, file: String) = {
     var (_, base) = filehand.split_filename(file)
     breakable {
@@ -140,11 +140,11 @@ class DocumentCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   }
 
   def create_tracker(shortname: String) =
-    new DocumentCounterTracker[T](shortname, driver)
+    new DocCounterTracker[T](shortname, driver)
 
-  def process_statuses(statuses: Iterator[DocumentStatus[T]]) = {
+  def process_statuses(statuses: Iterator[DocStatus[T]]) = {
     val byfile = new GroupByIterator(statuses,
-      (stat: DocumentStatus[T]) => (stat.filehand, stat.file))
+      (stat: DocStatus[T]) => (stat.filehand, stat.file))
     (for (((filehand, file), file_statuses) <- byfile) yield {
       val tracker = create_tracker(filename_to_counter_name(filehand, file))
       val results = file_statuses.flatMap(tracker.handle_status(_))
@@ -332,7 +332,7 @@ abstract class GeoDocTable[Co : Serializer](
 
   /**
    * Convert a set of fields from a textdb database into a document,
-   * returning a DocumentStatus describing the document.
+   * returning a DocStatus describing the document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
    * @param record_in_table Whether to record the document in the document
@@ -341,7 +341,7 @@ abstract class GeoDocTable[Co : Serializer](
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
       schema: Schema, record_in_table: Boolean, note_globally: Boolean
-    ): DocumentStatus[GeoDoc[Co]] = {
+    ): DocStatus[GeoDoc[Co]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
@@ -373,19 +373,19 @@ abstract class GeoDocTable[Co : Serializer](
               }
             }
           } catch {
-            case e:DocumentValidationException => {
+            case e:DocValidationException => {
               warning("Line %s: %s", lineno, e.message)
               (None, "bad", "error validating document field", "")
             }
           }
         }
       }
-    DocumentStatus[GeoDoc[Co]](filehand, file, maybedoc, status, reason, docdesc)
+    DocStatus[GeoDoc[Co]](filehand, file, maybedoc, status, reason, docdesc)
   }
 
   /**
    * Convert a line from a textdb database into a document, returning a
-   * DocumentStatus describing the document.
+   * DocStatus describing the document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
    * @param record_in_table Whether to record the document in the document
@@ -394,7 +394,7 @@ abstract class GeoDocTable[Co : Serializer](
   def line_to_document(filehand: FileHandler, file: String, line: String,
       lineno: Long, schema: Schema, record_in_table: Boolean,
       note_globally: Boolean
-    ): DocumentStatus[GeoDoc[Co]] = {
+    ): DocStatus[GeoDoc[Co]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
       record_in_table, note_globally)
@@ -402,7 +402,7 @@ abstract class GeoDocTable[Co : Serializer](
 
   /**
    * Iterate over the lines in a file in a textdb database, returning an
-   * iterator over DocumentStatus objects describing the attempt to
+   * iterator over DocStatus objects describing the attempt to
    * convert each line to a document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
@@ -463,7 +463,7 @@ abstract class GeoDocTable[Co : Serializer](
       finish_globally: Boolean = true) = {
     val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
       record_in_subtable, note_globally, finish_globally)
-    new DocumentCounterTrackerFactory[GeoDoc[Co]](driver).
+    new DocCounterTrackerFactory[GeoDoc[Co]](driver).
       process_statuses(statuses)
   }
 
@@ -614,7 +614,7 @@ abstract class GeoDocTable[Co : Serializer](
  * An exception thrown to indicate an error during document creation
  * (typically due to a bad field value).
  */
-case class DocumentValidationException(
+case class DocValidationException(
   message: String,
   cause: Option[Throwable] = None
 ) extends Exception(message) {
@@ -748,7 +748,7 @@ abstract class GeoDoc[Co : Serializer](
                        (value, field, e.toString))
             if (debug("stack-trace") || debug("stacktrace"))
               e.printStackTrace
-            throw new DocumentValidationException(msg, e)
+            throw new DocValidationException(msg, e)
           }
         }
       }

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  TwitterDocument.scala
+//  TwitterDoc.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -23,10 +23,10 @@ import opennlp.textgrounder.util.textdbutil.Schema
 import opennlp.textgrounder.worddist.WordDistFactory
 import opennlp.textgrounder.worddist.WordDist._
 
-class TwitterTweetDocument(
+class TwitterTweetDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
-) extends RealSphereDocument(schema, word_dist_factory) {
+) extends RealSphereDoc(schema, word_dist_factory) {
   var id = 0L
   def title = id.toString
 
@@ -38,26 +38,26 @@ class TwitterTweetDocument(
   }
 
   def struct =
-    <TwitterTweetDocument>
+    <TwitterTweetDoc>
       <id>{ id }</id>
       {
         if (has_coord)
           <location>{ coord }</location>
       }
-    </TwitterTweetDocument>
+    </TwitterTweetDoc>
 }
 
-class TwitterTweetDocumentSubtable(
-  table: SphereDocumentTable
-) extends SphereDocumentSubtable[TwitterTweetDocument](table) {
+class TwitterTweetDocSubtable(
+  table: SphereDocTable
+) extends SphereDocSubtable[TwitterTweetDoc](table) {
   def create_document(schema: Schema) =
-    new TwitterTweetDocument(schema, table.word_dist_factory)
+    new TwitterTweetDoc(schema, table.word_dist_factory)
 }
 
-class TwitterUserDocument(
+class TwitterUserDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
-) extends RealSphereDocument(schema, word_dist_factory) {
+) extends RealSphereDoc(schema, word_dist_factory) {
   var userind = blank_memoized_string
   def title = memoizer.unmemoize(userind)
 
@@ -69,18 +69,18 @@ class TwitterUserDocument(
   }
 
   def struct =
-    <TwitterUserDocument>
+    <TwitterUserDoc>
       <user>{ memoizer.unmemoize(userind) }</user>
       {
         if (has_coord)
           <location>{ coord }</location>
       }
-    </TwitterUserDocument>
+    </TwitterUserDoc>
 }
 
-class TwitterUserDocumentSubtable(
-  table: SphereDocumentTable
-) extends SphereDocumentSubtable[TwitterUserDocument](table) {
+class TwitterUserDocSubtable(
+  table: SphereDocTable
+) extends SphereDocSubtable[TwitterUserDoc](table) {
   def create_document(schema: Schema) =
-    new TwitterUserDocument(schema, table.word_dist_factory)
+    new TwitterUserDoc(schema, table.word_dist_factory)
 }

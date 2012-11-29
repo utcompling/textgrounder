@@ -33,7 +33,7 @@ trait Ranker[Query, Answer] {
  *   ranking.
  */
 class GridRanker[Co](
-  strategy: GridLocateDocumentStrategy[Co]
+  strategy: GridLocateDocStrategy[Co]
  ) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
   def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
     strategy.return_ranked_cells(item.dist, include)

@@ -5,13 +5,13 @@ import util.distances._
 
 package object geolocate {
   /**
-   * A general trait holding SphereDocument-specific code for storing the
+   * A general trait holding SphereDoc-specific code for storing the
    * result of evaluation on a document.  Here we simply compute the
    * true and predicted "degree distances" -- i.e. measured in degrees,
    * rather than in actual distance along a great circle.
    */
-  class SphereDocumentEvaluationResult(
-    stats: DocumentEvaluationResult[SphereCoord]
+  class SphereDocEvalResult(
+    stats: DocEvalResult[SphereCoord]
   ) {
     /**
      * Distance in degrees between document's coordinate and central
@@ -25,13 +25,13 @@ package object geolocate {
     val pred_degdist = degree_dist(stats.document.coord, stats.pred_coord)
   }
 
-  implicit def to_SphereDocumentEvaluationResult(
-    stats: DocumentEvaluationResult[SphereCoord]
-  ) = new SphereDocumentEvaluationResult(stats)
+  implicit def to_SphereDocEvalResult(
+    stats: DocEvalResult[SphereCoord]
+  ) = new SphereDocEvalResult(stats)
 
-  type SphereDocument = GeoDoc[SphereCoord]
+  type SphereDoc = GeoDoc[SphereCoord]
   type SphereCell = GeoCell[SphereCoord]
   type SphereGrid = GeoGrid[SphereCoord]
   def get_sphere_doctable(grid: SphereGrid) =
-    grid.table.asInstanceOf[SphereDocumentTable]
+    grid.table.asInstanceOf[SphereDocTable]
 }

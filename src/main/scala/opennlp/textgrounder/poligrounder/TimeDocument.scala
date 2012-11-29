@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  TimeDocument.scala
+//  TimeDoc.scala
 //
 //  Copyright (C) 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -30,7 +30,7 @@ import opennlp.textgrounder.gridlocate.GeoDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 
-class TimeDocument(
+class TimeDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
 ) extends GeoDoc[TimeCoord](schema, word_dist_factory) {
@@ -40,12 +40,12 @@ class TimeDocument(
   def title = if (coord != null) coord.toString else "unknown time"
 
   def struct =
-    <TimeDocument>
+    <TimeDoc>
       {
         if (has_coord)
           <timestamp>{ coord }</timestamp>
       }
-    </TimeDocument>
+    </TimeDoc>
 
   override def set_field(name: String, value: String) {
     name match {
@@ -72,13 +72,13 @@ class TimeDocument(
  * We delegate the actual document creation to a subtable specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
  */
-class TimeDocumentTable(
+class TimeDocTable(
   override val driver: PoligrounderDriver,
   word_dist_factory: WordDistFactory
 ) extends GeoDocTable[TimeCoord](
   driver, word_dist_factory
 ) {
   def create_document(schema: Schema) =
-    new TimeDocument(schema, word_dist_factory)
+    new TimeDoc(schema, word_dist_factory)
 }
 

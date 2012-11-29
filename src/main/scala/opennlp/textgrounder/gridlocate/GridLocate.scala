@@ -114,7 +114,7 @@ object UnigramStrategy {
  * document grid-location on them (as opposed, e.g., to trying to locate
  * individual words).
  */
-abstract class GridLocateDocumentStrategy[Co](
+abstract class GridLocateDocStrategy[Co](
   val grid: GeoGrid[Co]
 ) {
   /**
@@ -134,9 +134,9 @@ abstract class GridLocateDocumentStrategy[Co](
  * cell.
  */
 
-class RandomGridLocateDocumentStrategy[Co](
+class RandomGridLocateDocStrategy[Co](
   grid: GeoGrid[Co]
-) extends GridLocateDocumentStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](grid) {
   def return_ranked_cells(word_dist: WordDist,
       include: Iterable[GeoCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
@@ -151,10 +151,10 @@ class RandomGridLocateDocumentStrategy[Co](
  * the most number of links pointing to it, if `internal_link` is true).
  */
 
-class MostPopularGridLocateDocumentStrategy[Co] (
+class MostPopularGridLocateDocStrategy[Co] (
   grid: GeoGrid[Co],
   internal_link: Boolean
-) extends GridLocateDocumentStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](grid) {
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
@@ -174,7 +174,7 @@ class MostPopularGridLocateDocumentStrategy[Co] (
  */
 abstract class PointwiseScoreStrategy[Co](
   grid: GeoGrid[Co]
-) extends GridLocateDocumentStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
@@ -341,7 +341,7 @@ class CosineSimilarityStrategy[Co](
 }
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
-class NaiveBayesDocumentStrategy[Co](
+class NaiveBayesDocStrategy[Co](
   grid: GeoGrid[Co],
   use_baseline: Boolean = true
 ) extends PointwiseScoreStrategy[Co](grid) {
@@ -371,7 +371,7 @@ class NaiveBayesDocumentStrategy[Co](
 
 class AverageCellProbabilityStrategy[Co](
   grid: GeoGrid[Co]
-) extends GridLocateDocumentStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[Co](lru_cache_size)
 
@@ -880,7 +880,7 @@ class DebugSettings {
 
 /**
  * Base class for programmatic access to document/etc. geolocation.
- * Subclasses are for particular apps, e.g. GeolocateDocumentDriver for
+ * Subclasses are for particular apps, e.g. GeolocateDocDriver for
  * document-level geolocation.
  *
  * NOTE: Currently the code has some values stored in singleton objects,
@@ -893,7 +893,7 @@ class DebugSettings {
  * Basic operation:
  *
  * 1. Create an instance of the appropriate subclass of GeolocateParameters
- * (e.g. GeolocateDocumentParameters for document geolocation) and populate
+ * (e.g. GeolocateDocParameters for document geolocation) and populate
  * it with the appropriate parameters.  Don't pass in any ArgParser instance,
  * as is the default; that way, the parameters will get initialized to their
  * default values, and you only have to change the ones you want to be
@@ -994,7 +994,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         params.interpolate)
   }
 
-  protected def create_document_table(word_dist_factory: WordDistFactory):
+  protected def create_document_factory(word_dist_factory: WordDistFactory):
     GeoDocTable[Co]
 
   protected def create_grid(table: GeoDocTable[Co]): GeoGrid[Co]
@@ -1014,7 +1014,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   those statistics.
    * @return Iterator over documents.
    */
-  def read_training_documents(document_table: GeoDocTable[Co],
+  def read_training_documents(docfact: GeoDocTable[Co],
       operation: String = "reading",
       record_in_subtable: Boolean = false,
       note_globally: Boolean = false,
@@ -1023,7 +1023,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
     val dociter = params.input_corpus.toIterator.flatMap(dir =>
-        document_table.read_documents_from_textdb(get_file_handler,
+        docfact.read_documents_from_textdb(get_file_handler,
           dir, "training-" + document_file_suffix, 
           record_in_subtable, note_globally, finish_globally))
     for (doc <- task.iterate(dociter)) yield {
@@ -1081,11 +1081,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   def setup_for_run() = {
     val word_dist_factory = create_word_dist_factory()
-    val document_table = create_document_table(word_dist_factory)
-    val grid = create_grid(document_table)
+    val docfact = create_document_factory(word_dist_factory)
+    val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
-    // to this in document_table.
+    // to this in docfact.
     read_training_documents_into_grid(grid)
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
@@ -1109,7 +1109,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 }
 
-trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
+trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   override def handle_parameters() {
     super.handle_parameters()
     if (params.perceptron_aggressiveness <= 0)
@@ -1119,17 +1119,17 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
   def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
     stratname match {
       case "random" =>
-        new RandomGridLocateDocumentStrategy[Co](grid)
+        new RandomGridLocateDocStrategy[Co](grid)
       case "internal-link" =>
-        new MostPopularGridLocateDocumentStrategy[Co](
+        new MostPopularGridLocateDocStrategy[Co](
           grid, true)
       case "num-documents" =>
-        new MostPopularGridLocateDocumentStrategy[Co](
+        new MostPopularGridLocateDocStrategy[Co](
           grid, false)
       case "naive-bayes-no-baseline" =>
-        new NaiveBayesDocumentStrategy[Co](grid, false)
+        new NaiveBayesDocStrategy[Co](grid, false)
       case "naive-bayes-with-baseline" =>
-        new NaiveBayesDocumentStrategy[Co](grid, true)
+        new NaiveBayesDocStrategy[Co](grid, true)
       case "cosine-similarity" =>
         new CosineSimilarityStrategy[Co](grid, smoothed = false,
           partial = false)
@@ -1164,7 +1164,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
   }
 
   def iter_strategies(grid: GeoGrid[Co]):
-    Iterable[(String, GridLocateDocumentStrategy[Co])]
+    Iterable[(String, GridLocateDocStrategy[Co])]
 
   protected def create_pointwise_classifier_trainer = {
     params.rerank_classifier match {
@@ -1199,7 +1199,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  def create_ranker(strategy: GridLocateDocumentStrategy[Co]) = {
+  def create_ranker(strategy: GridLocateDocStrategy[Co]) = {
     val basic_ranker = new GridRanker[Co](strategy)
     if (params.rerank == "none") basic_ranker
     else params.rerank_classifier match {
@@ -1208,7 +1208,7 @@ trait GridLocateDocumentDriver[Co] extends GridLocateDriver[Co] {
           basic_ranker, params.rerank_top_n)
       case _ => {
         val doctable =
-          create_document_table(strategy.grid.table.word_dist_factory)
+          create_document_factory(strategy.grid.table.word_dist_factory)
         val training_docs =
           read_training_documents(doctable,
               operation = "generating training data for reranker").

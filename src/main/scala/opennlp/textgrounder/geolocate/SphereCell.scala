@@ -169,7 +169,7 @@ abstract class RectangularCell(
     }
   }
 
-  override def add_document(document: SphereDocument) {
+  override def add_document(document: SphereDoc) {
     num_docs += 1
     centroid(0) += document.coord.lat
     centroid(1) += document.coord.long
