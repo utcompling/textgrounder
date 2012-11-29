@@ -188,7 +188,15 @@ trait PointwiseClassifyingRerankerWithTrainingData[
     create_rerank_classifier(rerank_training_data.toIndexedSeq)
   }
 
+  /**
+   * Train the reranker and return a trained version.  Note that this isn't
+   * strictly necessary, because the first attempt to use the classifier
+   * will automatically train it.  However, calling this function allows
+   * the time at which training occurs to be controlled.
+   */
   def train() = {
+    // Simply accessing the classifier will train it, since it's a lazy
+    // variable.
     rerank_classifier
     this
   }
