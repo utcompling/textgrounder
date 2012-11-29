@@ -196,7 +196,7 @@ class MultiRegularCell(
 class MultiRegularGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
-  override val table: SphereDocumentTable
+  override val table: SphereDocTable
 ) extends SphereGrid(table) {
 
   /**
@@ -415,7 +415,7 @@ class MultiRegularGrid(
     ) yield RegularCellIndex.coerce(this, i, j)
   }
 
-  def find_best_cell_for_document(doc: SphereDocument,
+  def find_best_cell_for_document(doc: SphereDoc,
       create_non_recorded: Boolean) = {
     assert(all_cells_computed)
     val index = coord_to_multi_cell_index(doc.coord)
@@ -449,7 +449,7 @@ class MultiRegularGrid(
    * Add the document to the cell(s) it belongs to.  This finds all the
    * multi cells, creating them as necessary, and adds the document to each.
    */
-  def add_document_to_cell(doc: SphereDocument) {
+  def add_document_to_cell(doc: SphereDoc) {
     for (index <- iter_overlapping_multi_cells(doc.coord)) {
       val cell = find_cell_for_cell_index(index, create = true,
         record_created_cell = true).get

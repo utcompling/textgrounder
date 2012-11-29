@@ -101,8 +101,8 @@ class TimeGrid(
   before_chunk: (Long, Long),
   after_chunk: (Long, Long),
   categories: Seq[String],
-  category_of_doc: TimeDocument => String,
-  override val table: TimeDocumentTable
+  category_of_doc: TimeDoc => String,
+  override val table: TimeDocTable
 ) extends GeoGrid[TimeCoord](table) {
   
   val pairs = categories.map {
@@ -113,7 +113,7 @@ class TimeGrid(
   def find_best_cell_for_document(doc: GeoDoc[TimeCoord],
       create_non_recorded: Boolean) = {
     assert(!create_non_recorded)
-    val category = category_of_doc(doc.asInstanceOf[TimeDocument])
+    val category = category_of_doc(doc.asInstanceOf[TimeDoc])
     if (category != null)
       pairs(category).find_best_cell_for_coord(doc.coord)
     else {

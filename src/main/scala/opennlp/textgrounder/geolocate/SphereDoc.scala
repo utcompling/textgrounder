@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  SphereDocument.scala
+//  SphereDoc.scala
 //
 //  Copyright (C) 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -30,7 +30,7 @@ import opennlp.textgrounder.gridlocate.GeoDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 
-abstract class RealSphereDocument(
+abstract class RealSphereDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
 ) extends GeoDoc[SphereCoord](schema, word_dist_factory) {
@@ -49,11 +49,11 @@ abstract class RealSphereDocument(
 }
 
 /**
- * A subtable holding SphereDocuments corresponding to a specific corpus
+ * A subtable holding SphereDocs corresponding to a specific corpus
  * type (e.g. Wikipedia or Twitter).
  */
-abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
-  val table: SphereDocumentTable
+abstract class SphereDocSubtable[TDoc <: SphereDoc](
+  val table: SphereDocTable
 ) {
   /**
    * Create and return a document of the current type.
@@ -85,29 +85,29 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
  * We delegate the actual document creation to a subtable specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
  */
-class SphereDocumentTable(
+class SphereDocTable(
   override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
 ) extends GeoDocTable[SphereCoord](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subtable =
-    mutable.Map[String, SphereDocumentSubtable[_ <: SphereDocument]]()
+    mutable.Map[String, SphereDocSubtable[_ <: SphereDoc]]()
 
   def register_subtable(corpus_type: String, subtable:
-      SphereDocumentSubtable[_ <: SphereDocument]) {
+      SphereDocSubtable[_ <: SphereDoc]) {
     corpus_type_to_subtable(corpus_type) = subtable
   }
 
-  register_subtable("wikipedia", new WikipediaDocumentSubtable(this))
-  register_subtable("twitter-tweet", new TwitterTweetDocumentSubtable(this))
-  register_subtable("twitter-user", new TwitterUserDocumentSubtable(this))
-  register_subtable("generic", new GenericSphereDocumentSubtable(this))
+  register_subtable("wikipedia", new WikipediaDocSubtable(this))
+  register_subtable("twitter-tweet", new TwitterTweetDocSubtable(this))
+  register_subtable("twitter-user", new TwitterUserDocSubtable(this))
+  register_subtable("generic", new GenericSphereDocSubtable(this))
 
   def wikipedia_subtable =
-    corpus_type_to_subtable("wikipedia").asInstanceOf[WikipediaDocumentSubtable]
+    corpus_type_to_subtable("wikipedia").asInstanceOf[WikipediaDocSubtable]
 
-  def create_document(schema: Schema): SphereDocument = {
+  def create_document(schema: Schema): SphereDoc = {
     throw new UnsupportedOperationException("This shouldn't be called directly; instead, use create_and_init_document()")
   }
 
@@ -124,7 +124,7 @@ class SphereDocumentTable(
    * the appropriate table.
    */
   def find_subtable(schema: Schema, fieldvals: Seq[String]):
-      SphereDocumentSubtable[_ <: SphereDocument]  = {
+      SphereDocSubtable[_ <: SphereDoc]  = {
     val cortype = schema.get_field_or_else(fieldvals, "corpus-type", "generic")
     find_subtable(cortype)
   }
@@ -154,14 +154,14 @@ class SphereDocumentTable(
 }
 
 /**
- * A generic SphereDocument for when the corpus type is missing or
+ * A generic SphereDoc for when the corpus type is missing or
  * unrecognized. (FIXME: Do we really need this?  Should we just throw an
  * error or ignore it?)
  */
-class GenericSphereDocument(
+class GenericSphereDoc(
   schema: Schema,
   word_dist_factory: WordDistFactory
-) extends RealSphereDocument(schema, word_dist_factory) {
+) extends RealSphereDoc(schema, word_dist_factory) {
   var title: String = _
 
   override def set_field(name: String, value: String) {
@@ -172,18 +172,18 @@ class GenericSphereDocument(
   }
 
   def struct =
-    <GenericSphereDocument>
+    <GenericSphereDoc>
       <title>{ title }</title>
       {
         if (has_coord)
           <location>{ coord }</location>
       }
-    </GenericSphereDocument>
+    </GenericSphereDoc>
 }
 
-class GenericSphereDocumentSubtable(
-  table: SphereDocumentTable
-) extends SphereDocumentSubtable[GenericSphereDocument](table) {
+class GenericSphereDocSubtable(
+  table: SphereDocTable
+) extends SphereDocSubtable[GenericSphereDoc](table) {
   def create_document(schema: Schema) =
-    new GenericSphereDocument(schema, table.word_dist_factory)
+    new GenericSphereDoc(schema, table.word_dist_factory)
 }

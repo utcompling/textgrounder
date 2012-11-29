@@ -273,7 +273,7 @@ abstract class GeoCell[Co](
  * One example is the SphereGrid -- a grid of cells covering the Earth.
  * ("Sphere" is used here in its mathematical meaning of the surface of a
  * round ball.) Coordinates, of type SphereCoord, are pairs of latitude and
- * longitude.  Documents are of type SphereDocument and have a SphereCoord
+ * longitude.  Documents are of type SphereDoc and have a SphereCoord
  * as their coordinate.  Cells are of type SphereCell.  Subclasses of
  * SphereGrid refer to particular grid cell shapes.  For example, the
  * MultiRegularGrid consists of a regular tiling of the surface of the

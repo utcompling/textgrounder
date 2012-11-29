@@ -43,15 +43,15 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 //////// Statistics for geolocating documents
 
 /**
- * A general trait for encapsulating SphereDocument-specific behavior.
+ * A general trait for encapsulating SphereDoc-specific behavior.
  * In this case, this is largely the computation of "degree distances" in
  * addition to "true distances", and making sure results are output in
  * miles and km.
  */
-class SphereDocumentEvalStats(
+class SphereDocEvalStats(
   driver_stats: ExperimentDriverStats,
-  wrapped:DocumentEvalStats[SphereCoord]
-) extends EvalStats(driver_stats, null, null) with DocumentEvalStats[SphereCoord] {
+  wrapped:DocEvalStats[SphereCoord]
+) extends EvalStats(driver_stats, null, null) with DocEvalStats[SphereCoord] {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val degree_dists = mutable.Buffer[Double]()
@@ -61,7 +61,7 @@ class SphereDocumentEvalStats(
     wrapped.increment_counter(counter)
   }
 
-  override def record_result(res: DocumentEvaluationResult[SphereCoord]) {
+  override def record_result(res: DocEvalResult[SphereCoord]) {
     wrapped.record_result(res)
     degree_dists += res.pred_degdist
     oracle_degree_dists += res.true_degdist
@@ -87,19 +87,19 @@ class SphereDocumentEvalStats(
 }
 
 /**
- * SphereDocument version of `GroupedDocumentEvalStats`.  This keeps separate
+ * SphereDoc version of `GroupedDocEvalStats`.  This keeps separate
  * sets of statistics for different subgroups of the test documents, i.e.
  * those within particular ranges of one or more quantities of interest.
  */
-class GroupedSphereDocumentEvalStats(
+class GroupedSphereDocEvalStats(
   driver_stats: ExperimentDriverStats,
   grid: SphereGrid,
-  create_stats: (ExperimentDriverStats, String) => DocumentEvalStats[SphereCoord]
-) extends GroupedDocumentEvalStats[SphereCoord](
+  create_stats: (ExperimentDriverStats, String) => DocEvalStats[SphereCoord]
+) extends GroupedDocEvalStats[SphereCoord](
   driver_stats, grid,
   (driver: ExperimentDriverStats, prefix: String) => {
     val wrapped = create_stats(driver, prefix)
-    new SphereDocumentEvalStats(driver, wrapped)
+    new SphereDocEvalStats(driver, wrapped)
   }
 ) {
   val docs_by_degree_dist_to_true_center =
@@ -110,7 +110,7 @@ class GroupedSphereDocumentEvalStats(
       create_stats_for_range("degree_dist_to_pred_center", _))
 
   override def record_result_by_range(
-    res: DocumentEvaluationResult[SphereCoord]
+    res: DocEvalResult[SphereCoord]
   ) {
     super.record_result_by_range(res)
 
@@ -218,29 +218,29 @@ class GroupedSphereDocumentEvalStats(
  * Only needed to support debug("gridrank").
  */
 class RankedSphereGridEvaluator(
-  strategy: GridLocateDocumentStrategy[SphereCoord],
+  strategy: GridLocateDocStrategy[SphereCoord],
   stratname: String,
-  driver: GeolocateDocumentTypeDriver,
-  evalstats: DocumentEvalStats[SphereCoord]
+  driver: GeolocateDocTypeDriver,
+  evalstats: DocEvalStats[SphereCoord]
 ) extends RankedGridEvaluator[SphereCoord](
   strategy, stratname, driver, evalstats
 ) {
   override def imp_evaluate_document(document: GeoDoc[SphereCoord],
       true_cell: GeoCell[SphereCoord]) = {
     val result = super.imp_evaluate_document(document, true_cell)
-    new RankedSphereDocumentEvaluationResult(
-      result.asInstanceOf[FullRankedDocumentEvaluationResult[SphereCoord]]
+    new RankedSphereDocEvalResult(
+      result.asInstanceOf[FullRankedDocEvalResult[SphereCoord]]
     )
   }
 }
 
-class RankedSphereDocumentEvaluationResult(
-  wrapped: FullRankedDocumentEvaluationResult[SphereCoord]
-) extends FullRankedDocumentEvaluationResult[SphereCoord](
+class RankedSphereDocEvalResult(
+  wrapped: FullRankedDocEvalResult[SphereCoord]
+) extends FullRankedDocEvalResult[SphereCoord](
   wrapped.document, wrapped.pred_cells, wrapped.true_rank
 ) {
   override def print_result(doctag: String,
-      driver: GridLocateDocumentDriver[SphereCoord]) {
+      driver: GridLocateDocDriver[SphereCoord]) {
     wrapped.print_result(doctag, driver)
 
     assert(doctag(0) == '#')
@@ -261,22 +261,22 @@ class RankedSphereDocumentEvaluationResult(
   }
 }
 
-case class TitledDocument(title: String, text: String)
-class TitledDocumentResult { }
+case class TitledDoc(title: String, text: String)
+class TitledDocResult { }
 
 /**
  * A class for geolocation where each test document is a chapter in a book
  * in the PCL Travel corpus.
  */
-class PCLTravelGeolocateDocumentEvaluator(
-  strategy: GridLocateDocumentStrategy[SphereCoord],
+class PCLTravelGeolocateDocEvaluator(
+  strategy: GridLocateDocStrategy[SphereCoord],
   stratname: String,
   grid: GeoGrid[SphereCoord],
   filehand: FileHandler,
   filenames: Iterable[String]
 ) extends CorpusEvaluator(stratname, grid.table.driver) {
-  type TEvalDoc = TitledDocument
-  type TEvalRes = TitledDocumentResult
+  type TEvalDoc = TitledDoc
+  type TEvalRes = TitledDocResult
   def iter_documents = {
     filenames.toIterator.flatMap { filename =>
       val dom = try {
@@ -299,16 +299,16 @@ class PCLTravelGeolocateDocumentEvaluator(
         val text = (for (x <- nonheads) yield x.text) mkString ""
         //errprint("Head text: %s", headtext)
         //errprint("Non-head text: %s", text)
-      } yield (filehand, filename, TitledDocument(headtext, text))).toIterator
+      } yield (filehand, filename, TitledDoc(headtext, text))).toIterator
     }
   }
 
   def iter_document_stats = iter_documents.map {
     case (filehand, filename, doc) =>
-      new DocumentStatus(filehand, filename, Some(doc), "processed", "", "")
+      new DocStatus(filehand, filename, Some(doc), "processed", "", "")
   }
 
-  def evaluate_document(doc: TitledDocument) = {
+  def evaluate_document(doc: TitledDoc) = {
     val dist = grid.table.word_dist_factory.create_word_dist
     for (text <- Seq(doc.title, doc.text))
       dist.add_document(split_text_into_words(text, ignore_punc = true))
@@ -329,7 +329,7 @@ class PCLTravelGeolocateDocumentEvaluator(
         errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
     }
 
-    new TitledDocumentResult()
+    new TitledDocResult()
   }
 
   def output_results(isfinal: Boolean = false) {

@@ -24,7 +24,7 @@ import tgutil.distances.SphereCoord
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
 
-class CombinedModelGrid(override val table: SphereDocumentTable,
+class CombinedModelGrid(override val table: SphereDocTable,
                             models: Seq[SphereGrid])
     extends SphereGrid(table) {
 
@@ -42,7 +42,7 @@ class CombinedModelGrid(override val table: SphereDocumentTable,
     }
   }
 
-  def find_best_cell_for_document(doc: SphereDocument,
+  def find_best_cell_for_document(doc: SphereDoc,
                                   create_non_recorded: Boolean) = {
       val candidates =
         models.flatMap(_.find_best_cell_for_document(doc, create_non_recorded))
@@ -53,7 +53,7 @@ class CombinedModelGrid(override val table: SphereDocumentTable,
           cell => spheredist(cell.get_center_coord, doc.coord)))
   }
 
-  def add_document_to_cell(document: SphereDocument) {
+  def add_document_to_cell(document: SphereDoc) {
     for (model <- models) {
       if (current_training_pass <= model.num_training_passes) {
         model.add_document_to_cell(document)

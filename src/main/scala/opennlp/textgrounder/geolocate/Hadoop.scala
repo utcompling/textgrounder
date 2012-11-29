@@ -213,17 +213,17 @@ trait HadoopGeolocateDriver extends
 /*                Hadoop implementation of geolocate-document           */
 /************************************************************************/
 
-class DocumentEvaluationMapper extends
+class DocEvalMapper extends
     Mapper[Object, Text, Text, DoubleWritable] with
     HadoopExperimentMapReducer {
   def progname = HadoopGeolocateDocumentApp.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
-  type TDriver = HadoopGeolocateDocumentDriver
+  type TDriver = HadoopGeolocateDocDriver
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
-  type StrategyType = GridLocateDocumentStrategy[SphereCoord]
-  type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
+  type StrategyType = GridLocateDocStrategy[SphereCoord]
+  type DocStatsType = Iterator[DocStatus[SphereDoc]]
 
   lazy val filehand = driver.get_file_handler
 
@@ -302,15 +302,15 @@ class DocumentEvaluationMapper extends
   }
 }
 
-class DocumentResultReducer extends
+class DocResultReducer extends
     Reducer[Text, DoubleWritable, Text, DoubleWritable] {
 
   type TContext = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  var driver: HadoopGeolocateDocumentDriver = _
+  var driver: HadoopGeolocateDocDriver = _
 
   override def setup(context: TContext) {
-    driver = new HadoopGeolocateDocumentDriver
+    driver = new HadoopGeolocateDocDriver
     driver.set_task_context(context)
   }
 
@@ -324,31 +324,31 @@ class DocumentResultReducer extends
   }
 }
 
-class HadoopGeolocateDocumentParameters(
+class HadoopGeolocateDocParameters(
   parser: ArgParser = null
-) extends GeolocateDocumentParameters(parser) with HadoopGeolocateParameters {
+) extends GeolocateDocParameters(parser) with HadoopGeolocateParameters {
 }
 
 /**
  * Class for running the geolocate-document app using Hadoop.
  */
 
-class HadoopGeolocateDocumentDriver extends
-    GeolocateDocumentTypeDriver with HadoopGeolocateDriver {
-  override type TParam = HadoopGeolocateDocumentParameters
+class HadoopGeolocateDocDriver extends
+    GeolocateDocTypeDriver with HadoopGeolocateDriver {
+  override type TParam = HadoopGeolocateDocParameters
 }
 
 object HadoopGeolocateDocumentApp extends
     HadoopGeolocateApp("TextGrounder geolocate-document") {
-  type TDriver = HadoopGeolocateDocumentDriver
+  type TDriver = HadoopGeolocateDocDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
 
   def initialize_hadoop_classes(job: Job) {
-    job.setJarByClass(classOf[DocumentEvaluationMapper])
-    job.setMapperClass(classOf[DocumentEvaluationMapper])
-    job.setReducerClass(classOf[DocumentResultReducer])
+    job.setJarByClass(classOf[DocEvalMapper])
+    job.setMapperClass(classOf[DocEvalMapper])
+    job.setReducerClass(classOf[DocResultReducer])
     job.setOutputKeyClass(classOf[Text])
     job.setOutputValueClass(classOf[DoubleWritable])
   }

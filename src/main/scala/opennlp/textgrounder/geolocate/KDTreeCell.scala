@@ -50,7 +50,7 @@ class KdTreeCell(
 }
 
 object KdTreeGrid {
-  def apply(table: SphereDocumentTable, bucketSize: Int, splitMethod: String,
+  def apply(table: SphereDocTable, bucketSize: Int, splitMethod: String,
             useBackoff: Boolean, interpolateWeight: Double = 0.0) : KdTreeGrid = {
     new KdTreeGrid(table, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
@@ -60,7 +60,7 @@ object KdTreeGrid {
   }
 }
 
-class KdTreeGrid(override val table: SphereDocumentTable,
+class KdTreeGrid(override val table: SphereDocTable,
                      bucketSize: Int,
                      splitMethod: KdTree.SplitMethod,
                      useBackoff: Boolean,
@@ -110,7 +110,7 @@ class KdTreeGrid(override val table: SphereDocumentTable,
     }
   }
 
-  def find_best_cell_for_document(doc: SphereDocument,
+  def find_best_cell_for_document(doc: SphereDoc,
       create_non_recorded: Boolean) = {
     // FIXME: implementation note: the KD tree should tile the entire earth's surface,
     // but there's a possibility of something going awry here if we've never
@@ -121,7 +121,7 @@ class KdTreeGrid(override val table: SphereDocumentTable,
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: SphereDocument) {
+  def add_document_to_cell(document: SphereDoc) {
     if (current_training_pass == 1) {
       kdtree.addPoint(Array(document.coord.lat, document.coord.long))
     } else if (current_training_pass == 2) {

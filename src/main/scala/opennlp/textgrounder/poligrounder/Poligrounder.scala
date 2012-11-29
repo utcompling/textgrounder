@@ -192,11 +192,11 @@ class PoligrounderDriver extends
     super.document_file_suffix + "-tweets"
   }
 
-  protected def create_document_table(word_dist_factory: WordDistFactory) =
-    new TimeDocumentTable(this, word_dist_factory)
+  protected def create_document_factory(word_dist_factory: WordDistFactory) =
+    new TimeDocTable(this, word_dist_factory)
 
   protected def create_grid(table: GeoDocTable[TimeCoord]) = {
-    val timetab = table.asInstanceOf[TimeDocumentTable]
+    val timetab = table.asInstanceOf[TimeDocTable]
     if (params.ideological_user_corpus == null)
       new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
     else
