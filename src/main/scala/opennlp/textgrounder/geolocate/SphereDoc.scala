@@ -25,7 +25,7 @@ import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil.warning
 
-import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocTable}
+import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory}
 import opennlp.textgrounder.gridlocate.GeoDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
@@ -49,11 +49,11 @@ abstract class RealSphereDoc(
 }
 
 /**
- * A subtable holding SphereDocs corresponding to a specific corpus
+ * A subfactory holding SphereDocs corresponding to a specific corpus
  * type (e.g. Wikipedia or Twitter).
  */
-abstract class SphereDocSubtable[TDoc <: SphereDoc](
-  val table: SphereDocTable
+abstract class SphereDocSubfactory[TDoc <: SphereDoc](
+  val docfact: SphereDocFactory
 ) {
   /**
    * Create and return a document of the current type.
@@ -66,89 +66,89 @@ abstract class SphereDocSubtable[TDoc <: SphereDoc](
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean): Option[TDoc] = {
+      record_in_factory: Boolean): Option[TDoc] = {
     val doc = create_document(schema)
     doc.set_fields(fieldvals)
     Some(doc)
   }
 
   /**
-   * Do any subtable-specific operations needed after all documents have
+   * Do any subfactory-specific operations needed after all documents have
    * been loaded.
    */
   def finish_document_loading() { }
 }
 
 /**
- * A GeoDocTable specifically for documents with coordinates described
+ * A GeoDocFactory specifically for documents with coordinates described
  * by a SphereCoord (latitude/longitude coordinates on the Earth).
- * We delegate the actual document creation to a subtable specific to the
+ * We delegate the actual document creation to a subfactory specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
  */
-class SphereDocTable(
+class SphereDocFactory(
   override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends GeoDocTable[SphereCoord](
+) extends GeoDocFactory[SphereCoord](
   driver, word_dist_factory
 ) {
-  val corpus_type_to_subtable =
-    mutable.Map[String, SphereDocSubtable[_ <: SphereDoc]]()
+  val corpus_type_to_subfactory =
+    mutable.Map[String, SphereDocSubfactory[_ <: SphereDoc]]()
 
-  def register_subtable(corpus_type: String, subtable:
-      SphereDocSubtable[_ <: SphereDoc]) {
-    corpus_type_to_subtable(corpus_type) = subtable
+  def register_subfactory(corpus_type: String, subfactory:
+      SphereDocSubfactory[_ <: SphereDoc]) {
+    corpus_type_to_subfactory(corpus_type) = subfactory
   }
 
-  register_subtable("wikipedia", new WikipediaDocSubtable(this))
-  register_subtable("twitter-tweet", new TwitterTweetDocSubtable(this))
-  register_subtable("twitter-user", new TwitterUserDocSubtable(this))
-  register_subtable("generic", new GenericSphereDocSubtable(this))
+  register_subfactory("wikipedia", new WikipediaDocSubfactory(this))
+  register_subfactory("twitter-tweet", new TwitterTweetDocSubfactory(this))
+  register_subfactory("twitter-user", new TwitterUserDocSubfactory(this))
+  register_subfactory("generic", new GenericSphereDocSubfactory(this))
 
-  def wikipedia_subtable =
-    corpus_type_to_subtable("wikipedia").asInstanceOf[WikipediaDocSubtable]
+  def wikipedia_subfactory =
+    corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
   def create_document(schema: Schema): SphereDoc = {
     throw new UnsupportedOperationException("This shouldn't be called directly; instead, use create_and_init_document()")
   }
 
   override def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], record_in_table: Boolean) = {
-    find_subtable(schema, fieldvals).
-      create_and_init_document(schema, fieldvals, record_in_table)
+      fieldvals: Seq[String], record_in_factory: Boolean) = {
+    find_subfactory(schema, fieldvals).
+      create_and_init_document(schema, fieldvals, record_in_factory)
   }
 
   /**
-   * Find the subtable for the field values of a document as read from
+   * Find the subfactory for the field values of a document as read from
    * from a document file.  Currently this simply locates the 'corpus-type'
-   * parameter and calls `find_subtable(java.lang.String)` to find
-   * the appropriate table.
+   * parameter and calls `find_subfactory(java.lang.String)` to find
+   * the appropriate subfactory.
    */
-  def find_subtable(schema: Schema, fieldvals: Seq[String]):
-      SphereDocSubtable[_ <: SphereDoc]  = {
+  def find_subfactory(schema: Schema, fieldvals: Seq[String]):
+      SphereDocSubfactory[_ <: SphereDoc]  = {
     val cortype = schema.get_field_or_else(fieldvals, "corpus-type", "generic")
-    find_subtable(cortype)
+    find_subfactory(cortype)
   }
 
   /**
-   * Find the document table for a given corpus type.
+   * Find the document subfactory for a given corpus type.
    */
-  def find_subtable(cortype: String) = {
-    if (corpus_type_to_subtable contains cortype)
-      corpus_type_to_subtable(cortype)
+  def find_subfactory(cortype: String) = {
+    if (corpus_type_to_subfactory contains cortype)
+      corpus_type_to_subfactory(cortype)
     else {
       warning("Unrecognized corpus type: %s", cortype)
-      corpus_type_to_subtable("generic")
+      corpus_type_to_subfactory("generic")
     }
   }
 
   /**
-   * Iterate over all the subtables that exist.
+   * Iterate over all the subfactories that exist.
    */
-  def iter_subtables() = corpus_type_to_subtable.values
+  def iter_subfactories() = corpus_type_to_subfactory.values
 
   override def finish_document_loading() {
-    for (subtable <- iter_subtables())
-      subtable.finish_document_loading()
+    for (subfactory <- iter_subfactories())
+      subfactory.finish_document_loading()
     super.finish_document_loading()
   }
 }
@@ -181,9 +181,9 @@ class GenericSphereDoc(
     </GenericSphereDoc>
 }
 
-class GenericSphereDocSubtable(
-  table: SphereDocTable
-) extends SphereDocSubtable[GenericSphereDoc](table) {
+class GenericSphereDocSubfactory(
+  docfact: SphereDocFactory
+) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
   def create_document(schema: Schema) =
-    new GenericSphereDoc(schema, table.word_dist_factory)
+    new GenericSphereDoc(schema, docfact.word_dist_factory)
 }

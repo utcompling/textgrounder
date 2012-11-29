@@ -193,12 +193,12 @@ class PoligrounderDriver extends
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory) =
-    new TimeDocTable(this, word_dist_factory)
+    new TimeDocFactory(this, word_dist_factory)
 
-  protected def create_grid(table: GeoDocTable[TimeCoord]) = {
-    val timetab = table.asInstanceOf[TimeDocTable]
+  protected def create_grid(docfact: GeoDocFactory[TimeCoord]) = {
+    val time_docfact = docfact.asInstanceOf[TimeDocFactory]
     if (params.ideological_user_corpus == null)
-      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
+      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", time_docfact)
     else
       new TimeGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
         x => {
@@ -208,7 +208,7 @@ class PoligrounderDriver extends
             "conservative"
           else
             null
-        }, timetab)
+        }, time_docfact)
   }
 
   def run() {

@@ -153,7 +153,7 @@ abstract class GeoCell[Co](
     val grid: GeoGrid[Co]
 ) {
   val combined_dist =
-    new CombinedWordDist(grid.table.word_dist_factory)
+    new CombinedWordDist(grid.docfact.word_dist_factory)
   var most_popular_document: GeoDoc[Co] = _
   var mostpopdoc_links = 0
 
@@ -300,7 +300,7 @@ abstract class GeoCell[Co](
  *     `iter_nonempty_cells`.
  */
 abstract class GeoGrid[Co](
-    val table: GeoDocTable[Co]
+    val docfact: GeoDocFactory[Co]
 ) {
 
   /**
@@ -410,7 +410,7 @@ abstract class GeoGrid[Co](
     total_num_docs_for_links = 0
     total_num_docs_for_word_dist = 0
 
-    table.driver.show_progress("non-empty cell", "computing statistics of").
+    docfact.driver.show_progress("non-empty cell", "computing statistics of").
     foreach(iter_nonempty_cells()) { cell =>
       total_num_docs_for_word_dist +=
         cell.combined_dist.num_docs_for_word_dist
@@ -423,9 +423,9 @@ abstract class GeoGrid[Co](
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
     val recorded_training_docs_with_coordinates =
-      table.num_recorded_documents_with_coordinates_by_split("training").value
+      docfact.num_recorded_documents_with_coordinates_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
       recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
-    table.driver.heartbeat
+    docfact.driver.heartbeat
   }
 }

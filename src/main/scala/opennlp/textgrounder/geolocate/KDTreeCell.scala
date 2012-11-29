@@ -50,9 +50,10 @@ class KdTreeCell(
 }
 
 object KdTreeGrid {
-  def apply(table: SphereDocTable, bucketSize: Int, splitMethod: String,
-            useBackoff: Boolean, interpolateWeight: Double = 0.0) : KdTreeGrid = {
-    new KdTreeGrid(table, bucketSize, splitMethod match {
+  def apply(docfact: SphereDocFactory, bucketSize: Int,
+            splitMethod: String, useBackoff: Boolean,
+            interpolateWeight: Double = 0.0) : KdTreeGrid = {
+    new KdTreeGrid(docfact, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
       case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
@@ -60,12 +61,13 @@ object KdTreeGrid {
   }
 }
 
-class KdTreeGrid(override val table: SphereDocTable,
-                     bucketSize: Int,
-                     splitMethod: KdTree.SplitMethod,
-                     useBackoff: Boolean,
-                     interpolateWeight: Double)
-    extends SphereGrid(table) {
+class KdTreeGrid(
+  docfact: SphereDocFactory,
+  bucketSize: Int,
+  splitMethod: KdTree.SplitMethod,
+  useBackoff: Boolean,
+  interpolateWeight: Double
+) extends SphereGrid(docfact) {
   /**
    * Total number of cells in the grid.
    */
@@ -89,7 +91,7 @@ class KdTreeGrid(override val table: SphereDocTable,
       // clean out the data.
 
       val task =
-        table.driver.show_progress("K-d tree structure", "generating").start()
+        docfact.driver.show_progress("K-d tree structure", "generating").start()
 
       // build the full kd-tree structure.
       kdtree.balance
@@ -165,7 +167,7 @@ class KdTreeGrid(override val table: SphereDocTable,
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
-      table.driver.show_progress("K-d tree cell", "interpolating").
+      docfact.driver.show_progress("K-d tree cell", "interpolating").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist

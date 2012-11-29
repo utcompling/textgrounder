@@ -278,7 +278,7 @@ class DocEvalMapper extends
     val orig_docstats =
       lines.map {
         case (filehand, file, line, lineno) => {
-          val docstat = grid.table.line_to_document(filehand, file, line,
+          val docstat = grid.docfact.line_to_document(filehand, file, line,
                           lineno, schema, false, false)
           docstat.maybedoc.foreach { doc =>
             if (doc.dist != null)

@@ -102,8 +102,8 @@ class TimeGrid(
   after_chunk: (Long, Long),
   categories: Seq[String],
   category_of_doc: TimeDoc => String,
-  override val table: TimeDocTable
-) extends GeoGrid[TimeCoord](table) {
+  override val docfact: TimeDocFactory
+) extends GeoGrid[TimeCoord](docfact) {
   
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))

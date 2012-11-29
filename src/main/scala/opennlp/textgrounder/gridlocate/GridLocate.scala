@@ -347,7 +347,7 @@ class NaiveBayesDocStrategy[Co](
 ) extends PointwiseScoreStrategy[Co](grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
-    val params = grid.table.driver.params
+    val params = grid.docfact.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
@@ -376,7 +376,7 @@ class AverageCellProbabilityStrategy[Co](
     new CellDistFactory[Co](lru_cache_size)
 
   val cdist_factory =
-    create_cell_dist_factory(grid.table.driver.params.lru_cache_size)
+    create_cell_dist_factory(grid.docfact.driver.params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
     val celldist =
@@ -995,28 +995,32 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory):
-    GeoDocTable[Co]
+    GeoDocFactory[Co]
 
-  protected def create_grid(table: GeoDocTable[Co]): GeoGrid[Co]
+  protected def create_grid(docfact: GeoDocFactory[Co]): GeoGrid[Co]
 
   /**
    * Read the training documents.  This uses the values of the parameters
    * to determine where to read the documents from and how many documents to
    * read.
    *
+   * @param docfact Document factory used to create documents.
    * @param operation Name of logical operation, to be displayed in progress
    *   messages.
-   * @param record_in_table Whether to record documents in any subtables.
-   *   (FIXME: This should be an add-on to the iterator.)
+   * @param record_in_subfactory Whether to record documents in any
+   *   subfactories. (FIXME: This should be an add-on to the iterator.)
+   * @param note_globally Whether to add each document's words to the global
+   *   (e.g. back-off) distribution statistics.  Normally false, but may be
+   *   true during bootstrapping of those statistics.
    * @param finish_globally Whether to compute statistics of the documents'
    *   distributions that depend on global (e.g. back-off) distribution
    *   statistics.  Normally true, but may be false during bootstrapping of
    *   those statistics.
    * @return Iterator over documents.
    */
-  def read_training_documents(docfact: GeoDocTable[Co],
+  def read_training_documents(docfact: GeoDocFactory[Co],
       operation: String = "reading",
-      record_in_subtable: Boolean = false,
+      record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
     val task = show_progress("document", operation,
@@ -1025,7 +1029,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     val dociter = params.input_corpus.toIterator.flatMap(dir =>
         docfact.read_documents_from_textdb(get_file_handler,
           dir, "training-" + document_file_suffix, 
-          record_in_subtable, note_globally, finish_globally))
+          record_in_subfactory, note_globally, finish_globally))
     for (doc <- task.iterate(dociter)) yield {
       val sleep_at = debugval("sleep-at-docs")
       if (sleep_at != "") {
@@ -1040,22 +1044,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   /**
    * Read the training documents from the given corpora and add them to
-   * the cell grid corresponding to the table.
+   * the given cell grid.
    *
-   * @param filehand The FileHandler for working with the file.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
    * @param grid Cell grid into which the documents are added.
    */
   protected def read_training_documents_into_grid(grid: GeoGrid[Co]) {
     for (pass <- 1 to grid.num_training_passes) {
       grid.begin_training_pass(pass)
-      // FIXME: I don't think we should be recording in subtables the first
+      // FIXME: I don't think we should be recording in subfactories the first
       // time through if we have multiple passes.  More generally, now that
       // we've moved to an external iterator over documents, we should handle
       // everything that way and eliminate `begin_training_pass` and
-      // `record_in_subtable` and such.
+      // `record_in_subfactory` and such.
       //
       // FIXME #2: The "finish_globally" flag needs to be tied into the
       // recording of global statistics in the word dists. [[However, currently
@@ -1063,10 +1063,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // DefaultUnigramWordDistConstructor.initialize_distribution()
       // and GeoDoc.set_field().]] -- not true. In reality, all the glop handled
       // by finish_before_global() and note_dist_globally() (as well as
-      // record_in_subtable) and such should be handled by separate mapping
+      // record_in_subfactory) and such should be handled by separate mapping
       // stages onto the documents.
-      for (doc <- read_training_documents(grid.table, "reading pass " + pass,
-            record_in_subtable = true,
+      for (doc <- read_training_documents(grid.docfact, "reading pass " + pass,
+            record_in_subfactory = true,
             note_globally = pass == 1,
             finish_globally = false)) {
         assert(doc.dist != null)
@@ -1075,8 +1075,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
     // Compute overall distribution values (e.g. back-off statistics).
     errprint("Finishing global dist...")
-    grid.table.word_dist_factory.finish_global_distribution()
-    grid.table.finish_document_loading()
+    grid.docfact.word_dist_factory.finish_global_distribution()
+    grid.docfact.finish_document_loading()
   }
 
   def setup_for_run() = {
@@ -1207,10 +1207,10 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         new TrivialGridReranker[Co](
           basic_ranker, params.rerank_top_n)
       case _ => {
-        val doctable =
-          create_document_factory(strategy.grid.table.word_dist_factory)
+        val docfact =
+          create_document_factory(strategy.grid.docfact.word_dist_factory)
         val training_docs =
-          read_training_documents(doctable,
+          read_training_documents(docfact,
               operation = "generating training data for reranker").
             map { doc =>
               val cell = strategy.grid.find_best_cell_for_document(doc, false)

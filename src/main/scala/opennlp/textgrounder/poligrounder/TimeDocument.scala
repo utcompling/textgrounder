@@ -25,7 +25,7 @@ import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil._
 
-import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocTable,GeoGrid}
+import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
 import opennlp.textgrounder.gridlocate.GeoDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
@@ -67,15 +67,15 @@ class TimeDoc(
 }
 
 /**
- * A GeoDocTable specifically for documents with coordinates described
+ * A GeoDocFactory specifically for documents with coordinates described
  * by a TimeCoord.
- * We delegate the actual document creation to a subtable specific to the
+ * We delegate the actual document creation to a subfactory specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
  */
-class TimeDocTable(
+class TimeDocFactory(
   override val driver: PoligrounderDriver,
   word_dist_factory: WordDistFactory
-) extends GeoDocTable[TimeCoord](
+) extends GeoDocFactory[TimeCoord](
   driver, word_dist_factory
 ) {
   def create_document(schema: Schema) =
