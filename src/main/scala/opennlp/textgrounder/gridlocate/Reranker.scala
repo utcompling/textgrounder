@@ -10,18 +10,18 @@ import opennlp.textgrounder.perceptron._
 import GridLocateDriver.Debug._
 
 /**
- * A basic ranker.  Given a test item, return a list of ranked answers from
+ * A basic ranker.  Given a query item, return a list of ranked answers from
  * best to worst, with a score for each.  The score must not increase from
  * any answer to the next one.
  */
-trait Ranker[TestItem, Answer] {
+trait Ranker[Query, Answer] {
   /**
-   * Evaluate a test item, returning a list of ranked answers from best to
+   * Evaluate a query item, returning a list of ranked answers from best to
    * worst, with a score for each.  The score must not increase from any
    * answer to the next one.  Any answers mentioned in `include` must be
    * included in the returned list.
    */
-  def evaluate(item: TestItem, include: Iterable[Answer]):
+  def evaluate(item: Query, include: Iterable[Answer]):
     Iterable[(Answer, Double)]
 }
 
@@ -48,26 +48,26 @@ class GridRanker[Co](
  * is able to include the correct answer near the top significantly more
  * often than actually at the top.
  */
-trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
+trait Reranker[Query, Answer] extends Ranker[Query, Answer] {
   /** Ranker for generating initial ranking. */
-  protected def initial_ranker: Ranker[TestItem, Answer]
+  protected def initial_ranker: Ranker[Query, Answer]
 
   /**
    * Number of top-ranked items to submit to reranking.
    */
   protected val top_n: Int
 
-  protected def display_test_item(item: TestItem) = item.toString
+  protected def display_query_item(item: Query) = item.toString
 
   protected def display_answer(answer: Answer) = answer.toString
 
   /**
    * Rerank the given answers, based on an initial ranking.
    */
-  def rerank_answers(item: TestItem,
+  def rerank_answers(item: Query,
     initial_ranking: Iterable[(Answer, Double)]): Iterable[(Answer, Double)]
 
-  def evaluate_with_initial_ranking(item: TestItem,
+  def evaluate_with_initial_ranking(item: Query,
       include: Iterable[Answer]) = {
     val initial_ranking = initial_ranker.evaluate(item, include)
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
@@ -75,7 +75,7 @@ trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
     (initial_ranking, reranking)
   }
 
-  def evaluate(item: TestItem, include: Iterable[Answer]) = {
+  def evaluate(item: Query, include: Iterable[Answer]) = {
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, include)
     reranking
@@ -85,28 +85,28 @@ trait Reranker[TestItem, Answer] extends Ranker[TestItem, Answer] {
 /**
  * A pointwise reranker that uses a scoring classifier to assign a score
  * to each possible answer to be reranked.  The idea is that, for each
- * possible answer, we create test instances based on a combination of the
- * test item and answer and score the instances to determine the ranking.
+ * possible answer, we create query instances based on a combination of the
+ * query item and answer and score the instances to determine the ranking.
  */
-trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
-    extends Reranker[TestItem, Answer] {
+trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
+    extends Reranker[Query, Answer] {
   /** Scoring classifier for use in reranking. */
   protected def rerank_classifier: ScoringBinaryClassifier[RerankInstance]
 
   /**
    * Create a reranking training instance to feed to the classifier, given
-   * a test item, a potential answer from the ranker, and whether the answer
+   * a query item, a potential answer from the ranker, and whether the answer
    * is correct.  These training instances will be used to train the
    * classifier.
    */
   protected val create_rerank_instance:
-    (TestItem, Answer, Double, Boolean) => RerankInstance
+    (Query, Answer, Double, Boolean) => RerankInstance
 
   /**
    * Generate rerank training instances for a given ranker
    * training instance.
    */
-  protected def get_rerank_training_instances(item: TestItem,
+  protected def get_rerank_training_instances(item: Query,
       true_answer: Answer) = {
     val initial_answers = initial_ranker.evaluate(item, Iterable(true_answer))
     val top_answers = initial_answers.take(top_n)
@@ -122,7 +122,7 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
         create_rerank_instance(item, possible_answer, score, true), is_correct)
   }
 
-  def rerank_answers(item: TestItem,
+  def rerank_answers(item: Query,
       answers: Iterable[(Answer, Double)]) = {
     val new_scores =
       for {(answer, score) <- answers
@@ -136,21 +136,21 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
 
 /**
  * A pointwise classifying reranker that uses training data to train the
- * classifier.  The training data consists of test items and correct
+ * classifier.  The training data consists of query items and correct
  * answers.  From each data item, a series of training instances are
  * generated as follows: (1) rank the data item to produce a set of
  * possible answers; (2) if necessary, augment the possible answers to
  * include the correct one; (3) create a training instance for each
- * combination of test item and answer, with "correct" or "incorrect"
+ * combination of query item and answer, with "correct" or "incorrect"
  * indicated.
  */
 trait PointwiseClassifyingRerankerWithTrainingData[
-    TestItem, RerankInstance, Answer] extends
-  PointwiseClassifyingReranker[TestItem, RerankInstance, Answer] {
+    Query, RerankInstance, Answer] extends
+  PointwiseClassifyingReranker[Query, RerankInstance, Answer] {
   /**
    * Training data used to create the reranker.
    */
-  protected val training_data: Iterator[(TestItem, Answer)]
+  protected val training_data: Iterator[(Query, Answer)]
 
   /**
    * Create the classifier used for reranking, given a set of training data
@@ -166,7 +166,7 @@ trait PointwiseClassifyingRerankerWithTrainingData[
         training_data.zipWithIndex.flatMap {
           case ((item, true_answer), index) => {
             val prefix = "#%d: " format (index + 1)
-            errprint("%sTraining item: %s", prefix, display_test_item(item))
+            errprint("%sTraining item: %s", prefix, display_query_item(item))
             errprint("%sTrue answer: %s", prefix, display_answer(true_answer))
             val training_insts =
               get_rerank_training_instances(item, true_answer)
@@ -203,16 +203,16 @@ trait PointwiseClassifyingRerankerWithTrainingData[
 }
 
 /**
- * A scoring binary classifier.  Given a test item, return a score, with
+ * A scoring binary classifier.  Given a query item, return a score, with
  * higher numbers indicating greater likelihood of being "positive".
  */
-trait ScoringBinaryClassifier[TestItem] {
+trait ScoringBinaryClassifier[Query] {
   /**
    * The value of `minimum_positive` indicates the dividing line between values
    * that should be considered positive and those that should be considered
    * negative; typically this will be 0 or 0.5. */
   def minimum_positive: Double
-  def score_item(item: TestItem): Double
+  def score_item(item: Query): Double
 }
 
 /**
@@ -426,7 +426,7 @@ class LinearClassifierGridReranker[Co](
   protected val create_rerank_classifier =
     new LinearClassifierAdapterTrainer(trainer)
 
-  override def display_test_item(item: GeoDoc[Co]) = {
+  override def display_query_item(item: GeoDoc[Co]) = {
     "%s, dist=%s" format (item, item.dist.debug_string)
   }
 }
