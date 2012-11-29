@@ -261,40 +261,6 @@ abstract class GeoCell[Co](
 }
 
 /**
- * A mix-in trait for GeoCells that create their distribution by remembering
- * all the documents that go into the distribution, and then generating
- * the distribution from them at the end.
- *
- * NOTE: This is *not* the ideal way of doing things!  It can cause
- * out-of-memory errors for large corpora.  It is better to create the
- * distributions on the fly.  Note that for K-d cells this may require
- * two passes over the input corpus: One to note the documents that go into
- * the cells and create the cells appropriately, and another to add the
- * document distributions to those cells.  If so, we should add a function
- * to cell grids indicating whether they want the documents given to them
- * in two passes, and modify the code in GeoDocTable (GeoDoc.scala)
- * so that it does two passes over the documents if so requested.
- */
-trait DocumentRememberingCell[Co] {
-  this: GeoCell[Co] =>
-
-  /**
-   * Return an Iterable over documents, listing the documents in the cell.
-   */
-  def iter_documents: Iterable[GeoDoc[Co]]
-
-  /**
-   * Generate the distribution for the cell from the documents in it.
-   */
-  def generate_dist() {
-    assert(!finished)
-    for (doc <- iter_documents)
-      add_document(doc)
-    finish()
-  }
-}
-
-/**
  * Abstract class for a general grid of cells.  The grid is defined over
  * a continuous space (e.g. the surface of the Earth).  The space is indexed
  * by coordinates (of type Co).  Each cell (of type GeoCell[Co]) covers
