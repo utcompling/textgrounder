@@ -148,7 +148,7 @@ object WikipediaDoc {
 }
 
 /**
- * Document table for documents corresponding to Wikipedia articles.
+ * Document subfactory for documents corresponding to Wikipedia articles.
  *
  * Handling of redirect articles:
  *
@@ -188,16 +188,16 @@ object WikipediaDoc {
  *     maps. (FIXME, we should probably ignore these articles rather than
  *     record them.) Note that this means that we don't need the
  *     WikipediaDoc objects for redirect articles once we've finished
- *     loading the table; they should end up garbage collected.
+ *     loading the corpus; they should end up garbage collected.
  */
-class WikipediaDocSubtable(
-  override val table: SphereDocTable
-) extends SphereDocSubtable[WikipediaDoc](table) {
+class WikipediaDocSubfactory(
+  override val docfact: SphereDocFactory
+) extends SphereDocSubfactory[WikipediaDoc](docfact) {
   def create_document(schema: Schema) =
-    new WikipediaDoc(schema, table.word_dist_factory)
+    new WikipediaDoc(schema, docfact.word_dist_factory)
 
   override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean) = {
+      record_in_factory: Boolean) = {
    /**
     * FIXME: Perhaps we should filter the document file when we generate it,
     * to remove stuff not in the Main namespace.  We also need to remove
@@ -213,11 +213,11 @@ class WikipediaDocSubtable(
       val doc = create_document(schema)
       doc.set_fields(fieldvals)
       if (doc.redir.length > 0) {
-        if (record_in_table)
+        if (record_in_factory)
           redirects += doc
         None
       } else {
-        if (record_in_table)
+        if (record_in_factory)
           record_document(doc, doc)
         Some(doc)
       }
@@ -264,7 +264,7 @@ class WikipediaDocSubtable(
    * Total # of incoming links for all documents in each split.
    */
   val incoming_links_by_split =
-    table.driver.countermap("incoming_links_by_split")
+    docfact.driver.countermap("incoming_links_by_split")
 
   /**
    * List of documents that are Wikipedia redirect articles, accumulated

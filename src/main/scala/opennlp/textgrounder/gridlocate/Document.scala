@@ -160,16 +160,14 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
 
 
 /////////////////////////////////////////////////////////////////////////////
-//                          GeoDoc tables                            //
+//                              Document factories                         //
 /////////////////////////////////////////////////////////////////////////////
 
-//////////////////////  GeoDoc table
-
 /**
- * Class maintaining tables listing all documents and mapping between
- * names, ID's and documents.
+ * Factory for creating documents and maintaining statistics and certain
+ * other info about them.
  */
-abstract class GeoDocTable[Co : Serializer](
+abstract class GeoDocFactory[Co : Serializer](
   val driver: GridLocateDriver[Co],
   val word_dist_factory: WordDistFactory
 ) {
@@ -249,13 +247,13 @@ abstract class GeoDocTable[Co : Serializer](
    * Implementation of `create_and_init_document`.  Subclasses should
    * override this if needed.  External callers should call
    * `create_and_init_document`, not this.  Note also that the
-   * parameter `record_in_table` has a different meaning here -- it only
-   * refers to recording in subsidiary tables, subclasses, etc.  The
+   * parameter `record_in_subfactory` has a different meaning here -- it only
+   * refers to recording in subsidiary factories, subclasses, etc.  The
    * wrapping function `create_and_init_document` takes care of recording
-   * in the main table.
+   * in the main factory.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], record_in_table: Boolean
+      fieldvals: Seq[String], record_in_factory: Boolean
   ): Option[GeoDoc[Co]] = {
     val doc = create_document(schema)
     doc.set_fields(fieldvals)
@@ -271,18 +269,18 @@ abstract class GeoDocTable[Co : Serializer](
    *
    * @param schema Schema of the corpus from which the record was loaded
    * @param fieldvals Field values, taken from the record
-   * @param record_in_table If true, record the document in the table and
-   *   in any subsidiary tables, subclasses, etc.  This does not record
+   * @param record_in_factory If true, record the document in the factory and
+   *   in any subsidiary factores, subclasses, etc.  This does not record
    *   the document in the cell grid; the caller needs to do that if
    *   needed.
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean) = {
+      record_in_factory: Boolean) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
-    if (record_in_table)
+    if (record_in_factory)
       num_records_by_split(split) += 1
     val maybedoc = try {
-      imp_create_and_init_document(schema, fieldvals, record_in_table)
+      imp_create_and_init_document(schema, fieldvals, record_in_factory)
     } catch {
       case e:Exception => {
         num_error_skipped_records_by_split(split) += 1
@@ -301,7 +299,7 @@ abstract class GeoDocTable[Co : Serializer](
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
         assert(double_tokens == tokens)
-        if (record_in_table) {
+        if (record_in_factory) {
           num_documents_by_split(split) += 1
           word_tokens_of_documents_by_split(split) += tokens
         }
@@ -309,7 +307,7 @@ abstract class GeoDocTable[Co : Serializer](
           errprint("Document %s skipped because it has no coordinate", doc)
           num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
           word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          if (record_in_table) {
+          if (record_in_factory) {
             num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
             word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
           }
@@ -317,7 +315,7 @@ abstract class GeoDocTable[Co : Serializer](
         } else {
           num_documents_with_coordinates_by_split(split) += 1
           word_tokens_of_documents_with_coordinates_by_split(split) += tokens
-          if (record_in_table) {
+          if (record_in_factory) {
             num_recorded_documents_by_split(split) += 1
             word_tokens_of_recorded_documents_by_split(split) += tokens
             num_recorded_documents_with_coordinates_by_split(split) += 1
@@ -335,19 +333,19 @@ abstract class GeoDocTable[Co : Serializer](
    * returning a DocStatus describing the document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_table Whether to record the document in the document
-   *  table.
+   * @param record_in_factory Whether to record the document in the document
+   *  factory.
    */
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
-      schema: Schema, record_in_table: Boolean, note_globally: Boolean
+      schema: Schema, record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
         case Some(fieldvals) => {
           try {
-            create_and_init_document(schema, fieldvals, record_in_table) match {
+            create_and_init_document(schema, fieldvals, record_in_factory) match {
               case None => {
                 (None, "skipped", "unable to create document",
                   schema.get_field_or_else(fieldvals, "title",
@@ -388,16 +386,16 @@ abstract class GeoDocTable[Co : Serializer](
    * DocStatus describing the document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_table Whether to record the document in the document
-   *  table.
+   * @param record_in_factory Whether to record the document in the document
+   *  factory.
    */
   def line_to_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema, record_in_table: Boolean,
+      lineno: Long, schema: Schema, record_in_factory: Boolean,
       note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
-      record_in_table, note_globally)
+      record_in_factory, note_globally)
   }
 
   /**
@@ -406,17 +404,17 @@ abstract class GeoDocTable[Co : Serializer](
    * convert each line to a document.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_table Whether to record the document in the document
-   *  table.
+   * @param record_in_factory Whether to record the document in the document
+   *  factory.
    */
   def iter_document_statuses(filehand: FileHandler, file: String,
-      schema: Schema, record_in_table: Boolean, note_globally: Boolean) = {
+      schema: Schema, record_in_factory: Boolean, note_globally: Boolean) = {
     val lines = filehand.openr(file).zipWithIndex.map {
       case (line, idx) => (filehand, file, line, idx + 1)
     }
     lines.map { case (filehand, file, line, lineno) =>
       line_to_document(filehand, file, line, lineno, schema,
-        record_in_table, note_globally) }
+        record_in_factory, note_globally) }
   }
 
   /**
@@ -426,7 +424,7 @@ abstract class GeoDocTable[Co : Serializer](
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying the type of document file wanted
    *   (e.g. "counts" or "document-metadata")
-   * @param record_in_table Whether to record documents in any subtables.
+   * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param finish_globally Whether to compute statistics of the documents'
    *   distributions that depend on global (e.g. back-off) distribution
@@ -435,14 +433,14 @@ abstract class GeoDocTable[Co : Serializer](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subtable: Boolean = false,
+      suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val (schema, files) =
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)
     val docstats =
       (for (file <- files) yield {
-        iter_document_statuses(filehand, file, schema, record_in_subtable,
+        iter_document_statuses(filehand, file, schema, record_in_subfactory,
           note_globally)
       }).flatten
     if (!finish_globally)
@@ -458,11 +456,11 @@ abstract class GeoDocTable[Co : Serializer](
   }
 
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subtable: Boolean = false,
+      suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
-      record_in_subtable, note_globally, finish_globally)
+      record_in_subfactory, note_globally, finish_globally)
     new DocCounterTrackerFactory[GeoDoc[Co]](driver).
       process_statuses(statuses)
   }

@@ -156,7 +156,7 @@ abstract class RectangularCell(
 
   def get_center_coord = {
     if (num_docs == 0 ||
-      get_sphere_doctable(grid).driver.params.center_method == "center") {
+      get_sphere_docfact(grid).driver.params.center_method == "center") {
       // use the actual cell center
       // also, if we have an empty cell, there is no such thing as
       // a centroid, so default to the center

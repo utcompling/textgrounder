@@ -196,8 +196,8 @@ class MultiRegularCell(
 class MultiRegularGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
-  override val table: SphereDocTable
-) extends SphereGrid(table) {
+  docfact: SphereDocFactory
+) extends SphereGrid(docfact) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -465,7 +465,7 @@ class MultiRegularGrid(
            j <- minimum_longind to maximum_longind)
          yield RegularCellIndex(i, j)
 
-    table.driver.show_progress("Earth-tiling cell", "generating non-empty").
+    docfact.driver.show_progress("Earth-tiling cell", "generating non-empty").
       foreach(indices) { index =>
         total_num_cells += 1
         find_cell_for_cell_index(index, create = false,

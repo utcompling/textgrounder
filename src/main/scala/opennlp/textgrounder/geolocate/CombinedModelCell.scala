@@ -24,9 +24,11 @@ import tgutil.distances.SphereCoord
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
 
-class CombinedModelGrid(override val table: SphereDocTable,
-                            models: Seq[SphereGrid])
-    extends SphereGrid(table) {
+import opennlp.textgrounder.gridlocate.GeoDocFactory
+
+class CombinedModelGrid(
+  docfact: SphereDocFactory, models: Seq[SphereGrid]
+) extends SphereGrid(docfact) {
 
   override var total_num_cells: Int = models.map(_.total_num_cells).sum
   override val num_training_passes: Int = models.map(_.num_training_passes).max

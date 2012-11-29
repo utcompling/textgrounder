@@ -47,11 +47,11 @@ class TwitterTweetDoc(
     </TwitterTweetDoc>
 }
 
-class TwitterTweetDocSubtable(
-  table: SphereDocTable
-) extends SphereDocSubtable[TwitterTweetDoc](table) {
+class TwitterTweetDocSubfactory(
+  docfact: SphereDocFactory
+) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
   def create_document(schema: Schema) =
-    new TwitterTweetDoc(schema, table.word_dist_factory)
+    new TwitterTweetDoc(schema, docfact.word_dist_factory)
 }
 
 class TwitterUserDoc(
@@ -78,9 +78,9 @@ class TwitterUserDoc(
     </TwitterUserDoc>
 }
 
-class TwitterUserDocSubtable(
-  table: SphereDocTable
-) extends SphereDocSubtable[TwitterUserDoc](table) {
+class TwitterUserDocSubfactory(
+  docfact: SphereDocFactory
+) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
   def create_document(schema: Schema) =
-    new TwitterUserDoc(schema, table.word_dist_factory)
+    new TwitterUserDoc(schema, docfact.word_dist_factory)
 }

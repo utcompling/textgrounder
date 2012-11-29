@@ -83,8 +83,8 @@ In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
 
 -- Classes exist in `gridlocate` for an individual document (GeoDoc),
-   the table of all documents (GeoDocTable), the grid containing cells
-   into which the documents are placed (Grid), and the individual cells
+   the factory of all documents (GeoDocFactory), the grid containing cells
+   into which the documents are placed (GeoGrid), and the individual cells
    in the grid (GeoCell).  There also needs to be a class specifying a
    coordinate identifying a document (e.g. time or latitude/longitude pair).
    Specific versions of all of these are created for Geolocate, identified
@@ -114,11 +114,11 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
   sphere_grid: SphereGrid
 ) extends GeolocateDocStrategy(sphere_grid) {
   val cdist_factory =
-    new CellDistFactory[SphereCoord](sphere_grid.table.driver.params.lru_cache_size)
+    new CellDistFactory[SphereCoord](sphere_grid.docfact.driver.params.lru_cache_size)
 
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
-    val wikipedia_table = get_sphere_doctable(sphere_grid).wikipedia_subtable
+    val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
@@ -126,7 +126,7 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
         word => word(0).isUpper)
@@ -143,19 +143,19 @@ class LinkMostCommonToponymGeolocateDocStrategy(
 ) extends GeolocateDocStrategy(sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
-    val wikipedia_table = get_sphere_doctable(sphere_grid).wikipedia_subtable
+    val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
-        word => wikipedia_table.word_is_toponym(word))
+        word => wikipedia_fact.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        wikipedia_table.construct_candidates(
+        wikipedia_fact.construct_candidates(
           memoizer.unmemoize(maxword.get))
       else Seq[SphereDoc]()
     if (debug("commontop"))
@@ -313,24 +313,24 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory) =
-    new SphereDocTable(this, word_dist_factory)
+    new SphereDocFactory(this, word_dist_factory)
 
-  protected def create_grid(table: GeoDocTable[SphereCoord]) = {
-    val spheretab = table.asInstanceOf[SphereDocTable]
+  protected def create_grid(docfact: GeoDocFactory[SphereCoord]) = {
+    val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
     if (params.combined_kd_grid) {
       val kdcg =
-        KdTreeGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
+        KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
           params.kd_use_backoff, params.kd_interpolate_weight)
       val mrcg =
         new MultiRegularGrid(degrees_per_cell,
-          params.width_of_multi_cell, spheretab)
-      new CombinedModelGrid(spheretab, Seq(mrcg, kdcg))
+          params.width_of_multi_cell, sphere_docfact)
+      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
-      KdTreeGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
+      KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
     } else {
       new MultiRegularGrid(degrees_per_cell,
-        params.width_of_multi_cell, spheretab)
+        params.width_of_multi_cell, sphere_docfact)
     }
   }
 }
@@ -867,7 +867,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
           case "internal" => {
             val docstats =
               params.input_corpus.toIterator.flatMap(dir =>
-                grid.table.read_document_statuses_from_textdb(
+                grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir,
                   params.eval_set + "-" + document_file_suffix))
             val evalobj = create_cell_evaluator(strategy, stratname)
