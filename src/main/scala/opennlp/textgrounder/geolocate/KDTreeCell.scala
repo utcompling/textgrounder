@@ -77,38 +77,45 @@ class KdTreeGrid(
   val nodes_to_cell: Map[KdTree, KdTreeCell] = Map()
   val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
 
-  override val num_training_passes: Int = 2
-  var current_training_pass: Int = 0
+  override def read_training_documents_into_grid() {
+    for (doc <- docfact.driver.read_training_documents(docfact,
+           "preliminary pass to generate K-d tree: reading",
+           record_in_subfactory = false,
+           note_globally = false,
+           finish_globally = false)) {
+      assert(doc.dist != null)
+      kdtree.addPoint(Array(doc.coord.lat, doc.coord.long))
+    }
 
-  override def begin_training_pass(pass: Int) = {
-    current_training_pass = pass
+    // we've seen all the coordinates. we need to build up
+    // the entire kd-tree structure now, the centroids, and
+    // clean out the data.
 
-    if (pass == 1) {
-      // do nothing
-    } else if (pass == 2) {
-      // we've seen all the coordinates. we need to build up
-      // the entire kd-tree structure now, the centroids, and
-      // clean out the data.
+    val task =
+      docfact.driver.show_progress("K-d tree structure", "generating").start()
 
-      val task =
-        docfact.driver.show_progress("K-d tree structure", "generating").start()
+    // build the full kd-tree structure.
+    kdtree.balance
 
-      // build the full kd-tree structure.
-      kdtree.balance
+    for (node <- kdtree.getNodes) {
+      val c = new KdTreeCell(this, node)
+      nodes_to_cell.update(node, c)
+      task.item_processed()
+    }
+    task.finish()
 
-      for (node <- kdtree.getNodes) {
-        val c = new KdTreeCell(this, node)
-        nodes_to_cell.update(node, c)
-        task.item_processed()
+    // no longer need to keep all our locations in memory. destroy
+    // them. to free up memory.
+    kdtree.annihilateData
+
+    // Now read normally.
+    default_read_training_documents_into_grid { doc =>
+      val leaf = kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long))
+      var n = leaf
+      while (n != null) {
+        nodes_to_cell(n).add_document(doc)
+        n = n.parent
       }
-      task.finish()
-
-      // no longer need to keep all our locations in memory. destroy
-      // them. to free up memory.
-      kdtree.annihilateData
-    } else {
-      // definitely should not get here
-      assert(false);
     }
   }
 
@@ -118,24 +125,6 @@ class KdTreeGrid(
     // but there's a possibility of something going awry here if we've never
     // seen a evaluation point before.
     Option(leaves_to_cell(kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long))))
-  }
-
-  /**
-   * Add the given document to the cell grid.
-   */
-  def add_document_to_cell(document: SphereDoc) {
-    if (current_training_pass == 1) {
-      kdtree.addPoint(Array(document.coord.lat, document.coord.long))
-    } else if (current_training_pass == 2) {
-      val leaf = kdtree.getLeaf(Array(document.coord.lat, document.coord.long))
-      var n = leaf
-      while (n != null) {
-        nodes_to_cell(n).add_document(document)
-        n = n.parent;
-      }
-    } else {
-      assert(false)
-    }
   }
 
   /**

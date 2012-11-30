@@ -294,18 +294,6 @@ abstract class GeoGrid[Co](
    */
   var total_num_cells: Int
 
-  /*
-   * Number of times to pass over the training corpus
-   * and call add_document()
-   */
-  val num_training_passes: Int = 1
-
-  /*
-   * Called before each new pass of the training. Usually not
-   * needed, but needed for KDGrid and possibly future Grids.
-   */
-  def begin_training_pass(pass: Int) = {}
-
   /**
    * Find the correct cell for the given document, based on the document's
    * coordinates and other properties.  If no such cell exists, return None
@@ -320,9 +308,12 @@ abstract class GeoGrid[Co](
     Option[GeoCell[Co]]
 
   /**
-   * Add the given document to the cell grid.
+   * Read the training documents from the given corpora and add them to
+   * the given cell grid.
+   *
+   * @param grid Cell grid into which the documents are added.
    */
-  def add_document_to_cell(document: GeoDoc[Co]): Unit
+  def read_training_documents_into_grid()
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -331,12 +322,21 @@ abstract class GeoGrid[Co](
    * this, `iter_nonempty_cells` should work properly.  This is not meant
    * to be called externally.
    */
-  protected def initialize_cells(): Unit
+  protected def initialize_cells()
 
   /**
    * Iterate over all non-empty cells.
    */
   def iter_nonempty_cells: Iterable[GeoCell[Co]]
+  
+  /*********************** Not meant to be overridden *********************/
+
+  /* Sum of `num_docs` for each cell. */
+  var total_num_docs = 0
+  /* Set once finish() is called. */
+  var all_cells_computed = false
+  /* Number of non-empty cells. */
+  var num_non_empty_cells = 0
   
   /**
    * Iterate over all non-empty cells, making sure to include the given cells
@@ -352,14 +352,35 @@ abstract class GeoGrid[Co](
     }
   }
 
-  /*********************** Not meant to be overridden *********************/
-  
-  /* Sum of `num_docs` for each cell. */
-  var total_num_docs = 0
-  /* Set once finish() is called. */
-  var all_cells_computed = false
-  /* Number of non-empty cells. */
-  var num_non_empty_cells = 0
+  /**
+   * Standard implementation of `read_training_documents_into_grid`.
+   *
+   * @param add_document_to_grid Function to add a document to the grid.
+   */
+  protected def default_read_training_documents_into_grid(
+    add_document_to_grid: GeoDoc[Co] => Unit
+  ) {
+    // FIXME: The "finish_globally" flag needs to be tied into the
+    // recording of global statistics in the word dists. [[However, currently
+    // that's handled in a totally hacked fashion in a combination of
+    // DefaultUnigramWordDistConstructor.initialize_distribution()
+    // and GeoDoc.set_field().]] -- not true. In reality, all the glop handled
+    // by finish_before_global() and note_dist_globally() (as well as
+    // record_in_subfactory) and such should be handled by separate mapping
+    // stages onto the documents.
+    for (doc <- docfact.driver.read_training_documents(docfact,
+           "reading",
+           record_in_subfactory = true,
+           note_globally = true,
+           finish_globally = false)) {
+      assert(doc.dist != null)
+      add_document_to_grid(doc)
+    }
+    // Compute overall distribution values (e.g. back-off statistics).
+    errprint("Finishing global dist...")
+    docfact.word_dist_factory.finish_global_distribution()
+    docfact.finish_document_loading()
+  }
 
   /**
    * This function is called externally to initialize the cells.  It is a

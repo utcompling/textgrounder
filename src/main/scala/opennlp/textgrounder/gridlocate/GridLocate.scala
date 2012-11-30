@@ -1000,43 +1000,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
-  /**
-   * Read the training documents from the given corpora and add them to
-   * the given cell grid.
-   *
-   * @param grid Cell grid into which the documents are added.
-   */
-  protected def read_training_documents_into_grid(grid: GeoGrid[Co]) {
-    for (pass <- 1 to grid.num_training_passes) {
-      grid.begin_training_pass(pass)
-      // FIXME: I don't think we should be recording in subfactories the first
-      // time through if we have multiple passes.  More generally, now that
-      // we've moved to an external iterator over documents, we should handle
-      // everything that way and eliminate `begin_training_pass` and
-      // `record_in_subfactory` and such.
-      //
-      // FIXME #2: The "finish_globally" flag needs to be tied into the
-      // recording of global statistics in the word dists. [[However, currently
-      // that's handled in a totally hacked fashion in a combination of
-      // DefaultUnigramWordDistConstructor.initialize_distribution()
-      // and GeoDoc.set_field().]] -- not true. In reality, all the glop handled
-      // by finish_before_global() and note_dist_globally() (as well as
-      // record_in_subfactory) and such should be handled by separate mapping
-      // stages onto the documents.
-      for (doc <- read_training_documents(grid.docfact, "reading pass " + pass,
-            record_in_subfactory = true,
-            note_globally = pass == 1,
-            finish_globally = false)) {
-        assert(doc.dist != null)
-        grid.add_document_to_cell(doc)
-      }
-    }
-    // Compute overall distribution values (e.g. back-off statistics).
-    errprint("Finishing global dist...")
-    grid.docfact.word_dist_factory.finish_global_distribution()
-    grid.docfact.finish_document_loading()
-  }
-
   def setup_for_run() = {
     val word_dist_factory = create_word_dist_factory
     val docfact = create_document_factory(word_dist_factory)
@@ -1044,7 +1007,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
     // to this in docfact.
-    read_training_documents_into_grid(grid)
+    grid.read_training_documents_into_grid()
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       output_resource_usage()

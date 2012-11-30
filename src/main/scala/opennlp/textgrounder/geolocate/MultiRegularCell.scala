@@ -445,17 +445,15 @@ class MultiRegularGrid(
     }
   }
 
-  /**
-   * Add the document to the cell(s) it belongs to.  This finds all the
-   * multi cells, creating them as necessary, and adds the document to each.
-   */
-  def add_document_to_cell(doc: SphereDoc) {
-    for (index <- iter_overlapping_multi_cells(doc.coord)) {
-      val cell = find_cell_for_cell_index(index, create = true,
-        record_created_cell = true).get
-      if (debug("cell"))
-        errprint("Adding document %s to cell %s", doc, cell)
-      cell.add_document(doc)
+  def read_training_documents_into_grid() {
+    default_read_training_documents_into_grid { doc =>
+      for (index <- iter_overlapping_multi_cells(doc.coord)) {
+        val cell = find_cell_for_cell_index(index, create = true,
+          record_created_cell = true).get
+        if (debug("cell"))
+          errprint("Adding document %s to cell %s", doc, cell)
+        cell.add_document(doc)
+      }
     }
   }
 
