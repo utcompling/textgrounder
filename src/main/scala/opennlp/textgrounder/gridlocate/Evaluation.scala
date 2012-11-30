@@ -209,7 +209,7 @@ class DocEvalResult[Co](
   /**
    * Central point of the true cell
    */
-  val true_center = true_cell.get_center_coord()
+  val true_center = true_cell.get_center_coord
   /**
    * "True distance" (rather than e.g. degree distance) between document's
    * coordinate and central point of true cell
@@ -770,7 +770,7 @@ class RankedDocEvalResult[Co](
   val true_rank: Int
 ) extends DocEvalResult[Co](
   document, pred_cell.grid,
-  pred_cell.get_center_coord()
+  pred_cell.get_center_coord
 ) {
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[Co]) {
@@ -804,7 +804,7 @@ class FullRankedDocEvalResult[Co](
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
         errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
-          cell.describe_indices(), score)
+          cell.describe_indices, score)
       }
     }
     super.print_result(doctag, driver)
@@ -884,7 +884,7 @@ class RerankedDocEvalResult[Co](
     }
 
     val initial_pred_cell = initial_pred_cells.head._1
-    val initial_pred_coord = initial_pred_cell.get_center_coord()
+    val initial_pred_coord = initial_pred_cell.get_center_coord
     val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
 
     errprint("%s:  Distance %s to initial predicted cell center at %s",

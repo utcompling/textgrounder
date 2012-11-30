@@ -149,13 +149,13 @@ abstract class GeoCell[Co](
    * Return a string describing the location of the cell in its grid,
    * e.g. by its boundaries or similar.
    */
-  def describe_location(): String
+  def describe_location: String
 
   /**
    * Return a string describing the indices of the cell in its grid.
    * Only used for debugging.
    */
-  def describe_indices(): String
+  def describe_indices: String
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -164,7 +164,7 @@ abstract class GeoCell[Co](
    * center can be more or less arbitrarily placed as long as it's somewhere
    * central.
    */
-  def get_center_coord(): Co
+  def get_center_coord: Co
 
   /**
    * Return true if we have finished creating and populating the cell.
@@ -183,7 +183,7 @@ abstract class GeoCell[Co](
       else ""
 
     "GeoCell(%s%s%s, %d documents, %s types, %s tokens, %d links)" format (
-      describe_location(), unfinished, contains,
+      describe_location, unfinished, contains,
       combined_dist.num_docs,
       combined_dist.word_dist.model.num_types,
       combined_dist.word_dist.model.num_tokens,
@@ -199,7 +199,7 @@ abstract class GeoCell[Co](
    * logging purposes.
    */
   def shortstr = {
-    var str = "Cell %s" format describe_location()
+    var str = "Cell %s" format describe_location
     val mostpop = most_popular_document
     if (mostpop != null)
       str += ", most-popular %s" format mostpop.shortstr
@@ -210,13 +210,13 @@ abstract class GeoCell[Co](
    * Return an XML representation of the cell.  Currently used only for
    * debugging-output purposes, so the exact representation isn't too important.
    */
-  def struct() =
+  def struct =
     <GeoCell>
-      <bounds>{ describe_location() }</bounds>
+      <bounds>{ describe_location }</bounds>
       <finished>{ finished }</finished>
       {
         if (most_popular_document != null)
-          (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
+          (<mostPopularDocument>most_popular_document.struct</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
       <numDocuments>{ combined_dist.num_docs }</numDocuments>

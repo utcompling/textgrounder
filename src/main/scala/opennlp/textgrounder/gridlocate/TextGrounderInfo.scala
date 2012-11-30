@@ -31,7 +31,7 @@ object TextGrounderInfo {
     textgrounder_dir = dir
   }
 
-  def get_textgrounder_dir() = {
+  def get_textgrounder_dir = {
     if (textgrounder_dir == null)
       textgrounder_dir = System.getenv("TEXTGROUNDER_DIR")
     if (textgrounder_dir == null) {

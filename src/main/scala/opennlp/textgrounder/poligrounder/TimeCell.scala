@@ -48,7 +48,7 @@ class TimeCell(
    * Return the boundary of the cell as a pair of coordinates, specifying the
    * beginning and end.
    */
-  def get_boundary() = (from, to)
+  def get_boundary = (from, to)
 
   def contains(time: TimeCoord) = from <= time.millis && time.millis < to
 
