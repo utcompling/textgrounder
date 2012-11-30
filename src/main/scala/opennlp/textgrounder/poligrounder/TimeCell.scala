@@ -127,15 +127,12 @@ class TimeGrid(
     find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
   }
 
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
+  def iter_nonempty_cells = {
     for {
       category <- categories
       pair = pairs(category)
       v <- List(pair.before_cell, pair.after_cell)
-      val empty = (
-        if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist()
-        else v.combined_dist.is_empty())
-      if (!empty)
+      if (!v.combined_dist.is_empty)
     } yield v
   }
 
@@ -144,20 +141,17 @@ class TimeGrid(
       val pair = pairs(category)
       pair.before_cell.finish()
       pair.after_cell.finish()
-      /* FIXME!!!
-        1. Should this be is_empty or is_empty_for_word_dist?  Do we even need
-           this distinction?
-        2. Computation of num_non_empty_cells should happen automatically!
-      */
-      if (!pair.before_cell.combined_dist.is_empty_for_word_dist)
+      /* FIXME!!!  Computation of num_non_empty_cells should happen
+         automatically!  */
+      if (!pair.before_cell.combined_dist.is_empty)
         num_non_empty_cells += 1
-      if (!pair.after_cell.combined_dist.is_empty_for_word_dist)
+      if (!pair.after_cell.combined_dist.is_empty)
         num_non_empty_cells += 1
       for ((cell, name) <-
           Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
         val comdist = cell.combined_dist
         errprint("Number of documents in %s-chunk: %s", name,
-          comdist.num_docs_for_word_dist)
+          comdist.num_docs)
         errprint("Number of types in %s-chunk: %s", name,
           comdist.word_dist.model.num_types)
         errprint("Number of tokens in %s-chunk: %s", name,

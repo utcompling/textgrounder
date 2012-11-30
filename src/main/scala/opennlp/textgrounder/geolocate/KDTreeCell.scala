@@ -199,19 +199,10 @@ class KdTreeGrid(
 
   /**
    * Iterate over all non-empty cells.
-   *
-   * @param nonempty_word_dist If given, returned cells must also have a
-   *   non-empty word distribution; otherwise, they just need to have at least
-   *   one document in them. (Not all documents have word distributions, esp.
-   *   when --max-time-per-stage has been set to a non-zero value so that we
-   *   only load some subset of the word distributions for all documents.  But
-   *   even when not set, some documents may be listed in the document-data file
-   *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = {
+  def iter_nonempty_cells: Iterable[SphereCell] = {
     val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
-    for (leaf <- nodes
-      if (leaf.size > 0 || !nonempty_word_dist))
+    for (leaf <- nodes if leaf.size > 0)
         yield leaves_to_cell(leaf)
   }
 }

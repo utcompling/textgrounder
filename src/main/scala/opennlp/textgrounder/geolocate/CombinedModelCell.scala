@@ -73,7 +73,8 @@ class CombinedModelGrid(
     num_non_empty_cells = models.map(_.num_non_empty_cells).sum
   }
 
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = models.flatMap(_.iter_nonempty_cells(nonempty_word_dist))
+  def iter_nonempty_cells: Iterable[SphereCell] =
+    models.flatMap(_.iter_nonempty_cells)
 }
 
 

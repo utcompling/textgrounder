@@ -57,22 +57,15 @@ import GridLocateDriver.Params
 class CombinedWordDist(factory: WordDistFactory) {
   /** The combined word distribution itself. */
   val word_dist = factory.create_word_dist
-  /** Number of documents included in incoming-link computation. */
-  var num_docs_for_links = 0
+  /** Number of documents used to create distribution. */
+  var num_docs = 0
   /** Total number of incoming links. */
   var incoming_links = 0
-  /** Number of documents included in word distribution.  All such
-   * documents also contribute to the incoming link count. */
-  var num_docs_for_word_dist = 0
 
-  /** True if no documents have contributed to the word distribution.
-   * This should generally be the same as if the distribution is empty
-   * (unless documents with an empty distribution were added??). */
-  def is_empty_for_word_dist() = num_docs_for_word_dist == 0
-
-  /** True if the object is completely empty.  This means no documents
-   * at all have been added using `add_document`. */
-  def is_empty() = num_docs_for_links == 0
+  /** 
+   * True if the object is empty.  This means no documents have been
+   * added using `add_document`. */
+  def is_empty = num_docs == 0
 
   /**
    *  Add the given document to the total distribution seen so far.
@@ -126,15 +119,10 @@ class CombinedWordDist(factory: WordDistFactory) {
       case Some(x) => incoming_links += x
       case _ =>
     }
-    num_docs_for_links += 1
 
-    if (doc.dist == null) {
-      if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
-        warning("Saw document %s without distribution", doc)
-    } else {
-      word_dist.add_word_distribution(doc.dist, partial)
-      num_docs_for_word_dist += 1
-    }
+    assert (doc.dist != null)
+    word_dist.add_word_distribution(doc.dist, partial)
+    num_docs += 1
   }
 }
 
@@ -194,10 +182,9 @@ abstract class GeoCell[Co](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %s types, %s tokens, %d links)" format (
+    "GeoCell(%s%s%s, %d documents, %s types, %s tokens, %d links)" format (
       describe_location(), unfinished, contains,
-      combined_dist.num_docs_for_word_dist,
-      combined_dist.num_docs_for_links,
+      combined_dist.num_docs,
       combined_dist.word_dist.model.num_types,
       combined_dist.word_dist.model.num_tokens,
       combined_dist.incoming_links)
@@ -232,8 +219,7 @@ abstract class GeoCell[Co](
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocumentsDist>{ combined_dist.num_docs_for_word_dist }</numDocumentsDist>
-      <numDocumentsLink>{ combined_dist.num_docs_for_links }</numDocumentsLink>
+      <numDocuments>{ combined_dist.num_docs }</numDocuments>
       <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
     </GeoCell>
 
@@ -349,32 +335,15 @@ abstract class GeoGrid[Co](
 
   /**
    * Iterate over all non-empty cells.
-   * 
-   * @param nonempty_word_dist If given, returned cells must also have a
-   *   non-empty word distribution; otherwise, they just need to have at least
-   *   one document in them. (Not all documents have word distributions, esp.
-   *   when --max-time-per-stage has been set to a non-zero value so that we
-   *   only load some subset of the word distributions for all documents.  But
-   *   even when not set, some documents may be listed in the document-data file
-   *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
-    Iterable[GeoCell[Co]]
+  def iter_nonempty_cells: Iterable[GeoCell[Co]]
   
   /**
-   * Iterate over all non-empty cells.
-   * 
-   * @param nonempty_word_dist If given, returned cells must also have a
-   *   non-empty word distribution; otherwise, they just need to have at least
-   *   one document in them. (Not all documents have word distributions, esp.
-   *   when --max-time-per-stage has been set to a non-zero value so that we
-   *   only load some subset of the word distributions for all documents.  But
-   *   even when not set, some documents may be listed in the document-data file
-   *   but have no corresponding word counts given in the counts file.)
+   * Iterate over all non-empty cells, making sure to include the given cells
+   *  even if empty.
    */
-  def iter_nonempty_cells_including(include: Iterable[GeoCell[Co]],
-      nonempty_word_dist: Boolean = false) = {
-    val cells = iter_nonempty_cells(nonempty_word_dist)
+  def iter_nonempty_cells_including(include: Iterable[GeoCell[Co]]) = {
+    val cells = iter_nonempty_cells
     if (include.size == 0)
       cells
     else {
@@ -385,11 +354,8 @@ abstract class GeoGrid[Co](
 
   /*********************** Not meant to be overridden *********************/
   
-  /* These are simply the sum of the corresponding counts
-     `num_docs_for_word_dist` and `num_docs_for_links` of each individual
-     cell. */
-  var total_num_docs_for_word_dist = 0
-  var total_num_docs_for_links = 0
+  /* Sum of `num_docs` for each cell. */
+  var total_num_docs = 0
   /* Set once finish() is called. */
   var all_cells_computed = false
   /* Number of non-empty cells. */
@@ -407,15 +373,12 @@ abstract class GeoGrid[Co](
 
     all_cells_computed = true
 
-    total_num_docs_for_links = 0
-    total_num_docs_for_word_dist = 0
+    total_num_docs = 0
 
     docfact.driver.show_progress("non-empty cell", "computing statistics of").
-    foreach(iter_nonempty_cells()) { cell =>
-      total_num_docs_for_word_dist +=
-        cell.combined_dist.num_docs_for_word_dist
-      total_num_docs_for_links +=
-        cell.combined_dist.num_docs_for_links
+    foreach(iter_nonempty_cells) { cell =>
+      total_num_docs +=
+        cell.combined_dist.num_docs
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
