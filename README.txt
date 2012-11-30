@@ -59,7 +59,7 @@ Subprojects
 There are three subprojects:
 
 -- The Geolocate subproject primarily does document-level geolocation,
-   but also includes some code to do toponym geolocation.  This subproject
+   but also includes some code to generate KML files.  This subproject
    uses a statistical model derived from a large corpus of already geolocated
    documents, such as Wikipedia or Twitter -- i.e. it is supervised (at least
    in some sense).
@@ -214,13 +214,10 @@ The data necessary for running depends on the intended application.
       TG_GROUPS_DIR points to, and copy the relevant TextGrounder corpora out
       of the `.../corpora` directory; these will generally be the directories
       `wikipedia`, `twitter-geotext`, anything beginning with `gut...`, and
-      anything beginning with `ut...`.   You might also want to copy the
-      `.../projects/textgrounder` and `.../projects/pcl_travel` directories,
-      especially if you're doing work with toponym resolution.  All of these
-      directories should be placed under some directory with a structure
-      that mirrors the source structure, starting with the `.../corpora`
-      or `.../projects` directories.  Then set TG_GROUPS_DIR to the
-      top-level directory into which you placed these various directories.
+      anything beginning with `ut...`.  TG_GROUPS_DIR should be set to the
+      destination directory that you copied the data to, and it should have
+      a `.../corpora` directory under it, with a structure that mirrors the
+      source.
    3. Otherwise, you might be able to download the data and set up the
       appropriate environment variables, as described below.
    4. Otherwise, you can generate at least Wikipedia and Twitter data from

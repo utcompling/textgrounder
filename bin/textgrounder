@@ -356,9 +356,6 @@ else
         CLASS=$TGGEOLOCATE.GeolocateDocumentApp
       fi
     ;;
-    geolocate-toponym)
-       
-      CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
 
     # Misc
