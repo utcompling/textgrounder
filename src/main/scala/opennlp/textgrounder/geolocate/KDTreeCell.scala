@@ -78,7 +78,7 @@ class KdTreeGrid(
   val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
 
   override def read_training_documents_into_grid() {
-    for (doc <- docfact.driver.read_training_documents(docfact,
+    for (doc <- driver.read_training_documents(docfact,
            "preliminary pass to generate K-d tree: reading",
            record_in_subfactory = false,
            note_globally = false,
@@ -92,7 +92,7 @@ class KdTreeGrid(
     // clean out the data.
 
     val task =
-      docfact.driver.show_progress("K-d tree structure", "generating").start()
+      driver.show_progress("K-d tree structure", "generating").start()
 
     // build the full kd-tree structure.
     kdtree.balance
@@ -156,7 +156,7 @@ class KdTreeGrid(
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
-      docfact.driver.show_progress("K-d tree cell", "interpolating").
+      driver.show_progress("K-d tree cell", "interpolating").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist

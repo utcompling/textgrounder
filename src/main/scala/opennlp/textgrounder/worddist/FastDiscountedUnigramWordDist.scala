@@ -86,7 +86,7 @@ object FastDiscountedUnigramWordDist {
     val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
-    val factory = self.dufactory
+    val factory = self.factory
     /* Not needed in the new way
     val qfact_globally_unseen_prob = (other.unseen_mass*
         factory.globally_unseen_word_prob /
@@ -208,7 +208,7 @@ object FastDiscountedUnigramWordDist {
     val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
     val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
-    val factory = self.dufactory
+    val factory = self.factory
     /* Not needed in the new way
     val qfact_globally_unseen_prob = (other.unseen_mass*
         factory.globally_unseen_word_prob /

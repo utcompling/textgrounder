@@ -25,14 +25,13 @@ import tgutil.collectionutil._
 import tgutil.printutil.errprint
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
-// FIXME! For --tf-idf
-import opennlp.textgrounder.gridlocate.GridLocateDriver
 
 import WordDist._
 
 abstract class DiscountedUnigramWordDistFactory(
   create_constructor: WordDistFactory => WordDistConstructor,
-  val interpolate: Boolean
+  val interpolate: Boolean,
+  val tf_idf: Boolean
 ) extends UnigramWordDistFactory {
   val constructor = create_constructor(this)
 
@@ -92,7 +91,7 @@ abstract class DiscountedUnigramWordDistFactory(
     owp_adjusted = true
     // A holdout from the "old way".
     val globally_unseen_word_prob = 0.0
-    if (GridLocateDriver.Params.tf_idf) {
+    if (tf_idf) {
       for ((word, count) <- overall_word_probs)
         overall_word_probs(word) =
           count*math.log(num_documents/document_freq(word))
@@ -105,11 +104,10 @@ abstract class DiscountedUnigramWordDistFactory(
 }
 
 abstract class DiscountedUnigramWordDist(
-  gen_factory: WordDistFactory
-) extends UnigramWordDist(gen_factory) {
+  val factory: DiscountedUnigramWordDistFactory
+) extends UnigramWordDist(factory) {
   type TThis = DiscountedUnigramWordDist
   type TKLCache = DiscountedUnigramKLDivergenceCache
-  def dufactory = gen_factory.asInstanceOf[DiscountedUnigramWordDistFactory]
 
   /** Total probability mass to be assigned to all words not
       seen in the document.  This indicates how much mass to "discount" from
@@ -189,8 +187,6 @@ abstract class DiscountedUnigramWordDist(
    * distributions.
    */
   protected def imp_finish_after_global() {
-    val factory = dufactory
-
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
 
@@ -205,7 +201,7 @@ abstract class DiscountedUnigramWordDist(
         // 'counts.keys.toSeq'; who knows now.)
         (for (ind <- model.iter_keys.toSeq)
           yield factory.overall_word_probs(ind)) sum)
-    if (GridLocateDriver.Params.tf_idf) {
+    if (factory.tf_idf) {
       for ((word, count) <- model.iter_items)
         model.set_item(word,
           count*log(factory.num_documents/factory.document_freq(word)))
@@ -222,7 +218,7 @@ abstract class DiscountedUnigramWordDist(
       partial: Boolean = false) = {
     FastDiscountedUnigramWordDist.fast_kl_divergence(
       this.asInstanceOf[TThis], cache.asInstanceOf[TKLCache],
-      other.asInstanceOf[TThis], interpolate = dufactory.interpolate,
+      other.asInstanceOf[TThis], interpolate = factory.interpolate,
       partial = partial)
   }
 
@@ -239,7 +235,6 @@ abstract class DiscountedUnigramWordDist(
   }
 
   def kl_divergence_34(other: UnigramWordDist) = {
-    val factory = dufactory
     var overall_probs_diff_words = 0.0
     for (word <- other.model.iter_keys if !(model contains word)) {
       overall_probs_diff_words += factory.overall_word_probs(word)
@@ -298,7 +293,6 @@ abstract class DiscountedUnigramWordDist(
   }
 
   def lookup_word(word: Word) = {
-    val factory = dufactory
     assert(finished)
     if (factory.interpolate) {
       val wordcount = if (model contains word) model.get_item(word) else 0.0

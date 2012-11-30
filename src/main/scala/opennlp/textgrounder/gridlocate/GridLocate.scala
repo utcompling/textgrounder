@@ -171,8 +171,7 @@ abstract class PointwiseScoreStrategy[Co](
   }
 
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
-    // FIXME, eliminate this global reference
-    val parallel = !GridLocateDriver.Params.no_parallel
+    val parallel = !grid.driver.params.no_parallel
     val cell_buf = {
       if (parallel)
         return_ranked_cells_parallel(word_dist, include)
@@ -305,7 +304,7 @@ class NaiveBayesDocStrategy[Co](
 ) extends PointwiseScoreStrategy[Co](grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
-    val params = grid.docfact.driver.params
+    val params = grid.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
@@ -334,7 +333,7 @@ class AverageCellProbabilityStrategy[Co](
     new CellDistFactory[Co](lru_cache_size)
 
   val cdist_factory =
-    create_cell_dist_factory(grid.docfact.driver.params.lru_cache_size)
+    create_cell_dist_factory(grid.driver.params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
     val celldist =
@@ -736,10 +735,6 @@ Used only when --strategy=average-cell-probability.""")
   var no_parallel =
     ap.flag("no-parallel",
       help = """If true, don't do ranking computations in parallel.""")
-  var test_kl =
-    ap.flag("test-kl",
-      help = """If true, run both fast and slow KL-divergence variations and
-test to make sure results are the same.""")
 
   //// Debugging/output options
   var max_time_per_stage =
@@ -877,9 +872,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @param options Object holding options to set
    */
   def handle_parameters() {
-    /* FIXME: Eliminate this. */
-    GridLocateDriver.Params = params
-
     if (params.debug != null)
       parse_debug_spec(params.debug)
 
@@ -943,13 +935,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       new UnsmoothedNgramWordDistFactory(create_constructor)
     else if (params.word_dist == "dirichlet")
       new DirichletUnigramWordDistFactory(create_constructor,
-        params.interpolate, params.dirichlet_factor)
+        params.interpolate, params.tf_idf, params.dirichlet_factor)
     else if (params.word_dist == "jelinek-mercer")
       new JelinekMercerUnigramWordDistFactory(create_constructor,
-        params.interpolate, params.jelinek_factor)
+        params.interpolate, params.tf_idf, params.jelinek_factor)
     else
       new PseudoGoodTuringUnigramWordDistFactory(create_constructor,
-        params.interpolate)
+        params.interpolate, params.tf_idf)
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory):
@@ -1153,7 +1145,6 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
 }
 
 object GridLocateDriver {
-  var Params: GridLocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
   // Debug flags (from SphereGridEvaluator) -- need to set them

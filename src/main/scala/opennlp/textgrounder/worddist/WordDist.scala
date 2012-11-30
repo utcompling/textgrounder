@@ -29,9 +29,6 @@ import tg.util.Serializer
 import tg.util.memoizer._
 
 import tg.gridlocate.GridLocateDriver.Debug._
-import tg.gridlocate.GeoDoc
-// FIXME! For reference to GridLocateDriver.Params
-import tg.gridlocate.GridLocateDriver
 
 import WordDist._
 
@@ -108,16 +105,15 @@ trait FastSlowKLDivergence {
   }
 
   /**
-   * The actual kl_divergence implementation.  The value `test_kldiv`
-   * below can be set to true to compare fast and slow against either
-   * other, throwing an assertion failure if they are more than a very
-   * small amount different (the small amount rather than 0 to account for
-   * possible rounding error).
+   * The actual kl_divergence implementation.  The fast KL divergence
+   * implementation can be tested using '--debug test-kl'.  This compares
+   * fast and slow against each other, throwing an assertion failure if they
+   * are more than a very small amount different (the small amount rather
+   * than 0 to account for possible rounding error).
    */
   protected def imp_kl_divergence(cache: KLDivergenceCache, other: WordDist,
       partial: Boolean) = {
-    val test_kldiv = GridLocateDriver.Params.test_kl
-    if (test_kldiv)
+    if (debug("test-kl"))
       test_kl_divergence(cache, other, partial)
     else
       fast_kl_divergence(cache, other, partial)
@@ -206,7 +202,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
   def create_distribution(countstr: String): WordDist
 }
 
-class KLDivergenceCache {
+trait KLDivergenceCache {
 }
 
 /**

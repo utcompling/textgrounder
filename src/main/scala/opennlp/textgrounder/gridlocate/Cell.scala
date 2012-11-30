@@ -26,8 +26,6 @@ import tgutil.printutil.{errprint, warning}
 import tgutil.experiment._
 
 import opennlp.textgrounder.worddist.WordDistFactory
-/* FIXME: Eliminate this. */
-import GridLocateDriver.Params
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Word distributions                          //
@@ -288,6 +286,7 @@ abstract class GeoCell[Co](
 abstract class GeoGrid[Co](
     val docfact: GeoDocFactory[Co]
 ) {
+  def driver = docfact.driver
 
   /**
    * Total number of cells in the grid.
@@ -365,7 +364,7 @@ abstract class GeoGrid[Co](
     // In reality, all the glop handled by finish_before_global() and
     // note_dist_globally() (as well as record_in_subfactory) and such
     // should be handled by separate mapping stages onto the documents.
-    for (doc <- docfact.driver.read_training_documents(docfact,
+    for (doc <- driver.read_training_documents(docfact,
            "reading",
            record_in_subfactory = true,
            note_globally = true,
@@ -393,7 +392,7 @@ abstract class GeoGrid[Co](
 
     total_num_docs = 0
 
-    docfact.driver.show_progress("non-empty cell", "computing statistics of").
+    driver.show_progress("non-empty cell", "computing statistics of").
     foreach(iter_nonempty_cells) { cell =>
       total_num_docs +=
         cell.combined_dist.num_docs
@@ -407,6 +406,6 @@ abstract class GeoGrid[Co](
       docfact.num_recorded_documents_with_coordinates_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
       recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
-    docfact.driver.heartbeat
+    driver.heartbeat
   }
 }

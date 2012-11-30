@@ -107,8 +107,9 @@ class UnigramStorage extends ItemStorage[Word] {
  *   statistics.
  */
 
-abstract class UnigramWordDist(factory: WordDistFactory
-  ) extends WordDist(factory) with FastSlowKLDivergence {
+abstract class UnigramWordDist(
+  factory: UnigramWordDistFactory
+) extends WordDist(factory) with FastSlowKLDivergence {
   type Item = Word
   val pmodel = new UnigramStorage()
   val model = pmodel
@@ -382,4 +383,4 @@ class DefaultUnigramWordDistConstructor(
 /**
  * General factory for UnigramWordDist distributions.
  */ 
-abstract class UnigramWordDistFactory extends WordDistFactory { }
+trait UnigramWordDistFactory extends WordDistFactory { }
