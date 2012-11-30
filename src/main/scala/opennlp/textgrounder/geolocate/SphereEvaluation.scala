@@ -274,7 +274,7 @@ class PCLTravelGeolocateDocEvaluator(
   grid: GeoGrid[SphereCoord],
   filehand: FileHandler,
   filenames: Iterable[String]
-) extends CorpusEvaluator(stratname, grid.docfact.driver) {
+) extends CorpusEvaluator(stratname, grid.driver) {
   type TEvalDoc = TitledDoc
   type TEvalRes = TitledDocResult
 

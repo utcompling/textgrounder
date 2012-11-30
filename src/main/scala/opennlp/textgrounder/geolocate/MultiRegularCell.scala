@@ -463,7 +463,7 @@ class MultiRegularGrid(
            j <- minimum_longind to maximum_longind)
          yield RegularCellIndex(i, j)
 
-    docfact.driver.show_progress("Earth-tiling cell", "generating non-empty").
+    driver.show_progress("Earth-tiling cell", "generating non-empty").
       foreach(indices) { index =>
         total_num_cells += 1
         find_cell_for_cell_index(index, create = false,

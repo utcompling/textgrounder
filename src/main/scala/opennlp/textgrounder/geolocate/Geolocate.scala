@@ -114,7 +114,7 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
   sphere_grid: SphereGrid
 ) extends GeolocateDocStrategy(sphere_grid) {
   val cdist_factory =
-    new CellDistFactory[SphereCoord](sphere_grid.docfact.driver.params.lru_cache_size)
+    new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
