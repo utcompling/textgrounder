@@ -39,7 +39,7 @@ class TimeDoc(
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
-  def struct =
+  def xmldesc =
     <TimeDoc>
       {
         if (has_coord)

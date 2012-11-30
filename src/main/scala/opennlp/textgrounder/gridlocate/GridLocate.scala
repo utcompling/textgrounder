@@ -58,45 +58,6 @@ Earth's surface (two-dimensional).
 */
 
 /////////////////////////////////////////////////////////////////////////////
-//                               Structures                                //
-/////////////////////////////////////////////////////////////////////////////
-
-//  def print_structure(struct: Any, indent: Int = 0) {
-//    val indstr = " "*indent
-//    if (struct == null)
-//      errprint("%snull", indstr)
-//    else if (struct.isInstanceOf[Tuple2[Any,Any]]) {
-//      val (x,y) = struct.asInstanceOf[Tuple2[Any,Any]]
-//      print_structure(List(x,y), indent)
-//    } else if (!(struct.isInstanceOf[Seq[Any]]) ||
-//               struct.asInstanceOf[Seq[Any]].length == 0)
-//      errprint("%s%s", indstr, struct)
-//    else {
-//      if (struct(0).isInstanceOf[String]) {
-//        errprint("%s%s:", indstr, struct.asInstanceOf[String](0))
-//        indstr += "  "
-//        indent += 2
-//        struct = struct.slice(1)
-//      }
-//      for (s <- struct) {
-//        if (isinstance(s, Seq))
-//          print_structure(s, indent + 2)
-//        else if (isinstance(s, tuple)) {
-//          val (key, value) = s
-//          if (isinstance(value, Seq)) {
-//            errprint("%s%s:", indstr, key)
-//            print_structure(value, indent + 2)
-//          }
-//          else
-//            errprint("%s%s: %s", indstr, key, value)
-//        }
-//        else
-//          errprint("%s%s", indstr, s)
-//      }
-//    }
-//  }
-
-/////////////////////////////////////////////////////////////////////////////
 //                           Evaluation strategies                         //
 /////////////////////////////////////////////////////////////////////////////
 

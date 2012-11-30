@@ -210,13 +210,13 @@ abstract class GeoCell[Co](
    * Return an XML representation of the cell.  Currently used only for
    * debugging-output purposes, so the exact representation isn't too important.
    */
-  def struct =
+  def xmldesc =
     <GeoCell>
       <bounds>{ describe_location }</bounds>
       <finished>{ finished }</finished>
       {
         if (most_popular_document != null)
-          (<mostPopularDocument>most_popular_document.struct</mostPopularDocument>
+          (<mostPopularDocument>most_popular_document.xmldesc</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
       <numDocuments>{ combined_dist.num_docs }</numDocuments>
