@@ -195,36 +195,36 @@ class FrobTextDBProcessor(
    */
   def get_split_writer_and_outstream(schema: SchemaFromFile,
       fieldnames: Seq[String], fieldvals: Seq[String]) = {
-    val split =
-      Schema.get_field_or_else(fieldnames, fieldvals, params.split_by_field)
-    if (split == null)
-      (null, null)
-    else {
-      if (!(split_value_to_writer contains split)) {
-        /* Construct a new schema where the split has been moved into a
-           fixed field.  Create a new writer for this schema; write the
-           schema out; and record the writer in `split_value_to_writer`.
-         */
-        val field_map = Schema.to_map(fieldnames, fieldvals)
-        field_map -= params.split_by_field
-        val (new_fieldnames, new_fieldvals) = Schema.from_map(field_map)
-        val new_fixed_values =
-          schema.fixed_values + (params.split_by_field -> split)
-        val new_schema =
-          new Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
-        val writer = new TextDBWriter(new_schema, params.output_suffix)
-        writer.output_schema_file(output_filehand, params.output_dir,
-          schema_prefix + "-" + split)
-        split_value_to_writer(split) = writer
+    new Schema(fieldnames).
+      get_field_if(fieldvals, params.split_by_field) match {
+        case None => (null, null)
+        case Some(split) => {
+          if (!(split_value_to_writer contains split)) {
+            /* Construct a new schema where the split has been moved into a
+               fixed field.  Create a new writer for this schema; write the
+               schema out; and record the writer in `split_value_to_writer`.
+             */
+            val field_map = Schema.to_map(fieldnames, fieldvals)
+            field_map -= params.split_by_field
+            val (new_fieldnames, new_fieldvals) = Schema.from_map(field_map)
+            val new_fixed_values =
+              schema.fixed_values + (params.split_by_field -> split)
+            val new_schema =
+              new Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
+            val writer = new TextDBWriter(new_schema, params.output_suffix)
+            writer.output_schema_file(output_filehand, params.output_dir,
+              schema_prefix + "-" + split)
+            split_value_to_writer(split) = writer
+          }
+          if (!(split_value_to_outstream contains split)) {
+            val writer = split_value_to_writer(split)
+            split_value_to_outstream(split) =
+              writer.open_document_file(output_filehand, params.output_dir,
+                current_document_prefix + "-" + split)
+          }
+          (split_value_to_writer(split), split_value_to_outstream(split))
+        }
       }
-      if (!(split_value_to_outstream contains split)) {
-        val writer = split_value_to_writer(split)
-        split_value_to_outstream(split) =
-          writer.open_document_file(output_filehand, params.output_dir,
-            current_document_prefix + "-" + split)
-      }
-      (split_value_to_writer(split), split_value_to_outstream(split))
-    }
   }
 
   def process_row(schema: SchemaFromFile, fieldvals: Seq[String]) = {

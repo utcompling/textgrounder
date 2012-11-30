@@ -96,25 +96,50 @@ package object textdbutil {
             fieldnames.length, fieldvals.length, fieldvals))
     }
 
-    def get_field(fieldvals: Seq[String], key: String,
-        error_if_missing: Boolean = true) =
-      get_field_or_else(fieldvals, key, error_if_missing = error_if_missing)
-
-    def get_field_or_else(fieldvals: Seq[String], key: String,
-        default: String = null, error_if_missing: Boolean = false): String = {
+    def get_field(fieldvals: Seq[String], key: String) = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         fieldvals(field_indices(key))
       else
-        get_fixed_field(key, default, error_if_missing)
+        get_fixed_field(key)
     }
 
-    def get_fixed_field(key: String, default: String = null,
-        error_if_missing: Boolean = false) = {
+    def get_field_if(fieldvals: Seq[String], key: String) = {
+      check_values_fit_schema(fieldvals)
+      if (field_indices contains key)
+        Some(fieldvals(field_indices(key)))
+      else
+        get_fixed_field_if(key)
+    }
+
+    def get_field_or_else(fieldvals: Seq[String], key: String,
+        default: String) = {
+      check_values_fit_schema(fieldvals)
+      if (field_indices contains key)
+        fieldvals(field_indices(key))
+      else
+        get_fixed_field_or_else(key, default)
+    }
+
+    def get_fixed_field(key: String) = {
       if (fixed_values contains key)
         fixed_values(key)
       else
-        Schema.error_or_default(key, default, error_if_missing)
+        throw new NoSuchElementException("key not found: %s" format key)
+    }
+
+    def get_fixed_field_if(key: String) = {
+      if (fixed_values contains key)
+        Some(fixed_values(key))
+      else
+        None
+    }
+
+    def get_fixed_field_or_else(key: String, default: String) = {
+      if (fixed_values contains key)
+        fixed_values(key)
+      else
+        default
     }
 
     /**
@@ -242,35 +267,11 @@ package object textdbutil {
         val Array(from, to) = fixed
         if (from.length == 0)
           throw new FileFormatException(
-            "Blank field name in fxed-value part of schema file %s: line is %s".
+            "Blank field name in fixed-value part of schema file %s: line is %s".
               format(schema_file, line))
         fixed_fields += (from -> to)
       }
       new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields)
-    }
-
-    def get_field(fieldnames: Seq[String], fieldvals: Seq[String], key: String,
-        error_if_missing: Boolean = true) =
-      get_field_or_else(fieldnames, fieldvals, key,
-        error_if_missing = error_if_missing)
-
-    def get_field_or_else(fieldnames: Seq[String], fieldvals: Seq[String],
-        key: String, default: String = null,
-        error_if_missing: Boolean = false): String = {
-      assert(fieldvals.length == fieldnames.length)
-      var i = 0
-      while (i < fieldnames.length) {
-        if (fieldnames(i) == key) return fieldvals(i)
-        i += 1
-      }
-      return error_or_default(key, default, error_if_missing)
-    }
-
-    protected def error_or_default(key: String, default: String,
-        error_if_missing: Boolean) = {
-      if (error_if_missing) {
-        throw new NoSuchElementException("key not found: %s" format key)
-      } else default
     }
 
     /**
