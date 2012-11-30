@@ -22,6 +22,7 @@ import collection.mutable
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.collectionutil._
+import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil.{errprint, warning}
 import tgutil.Serializer._
@@ -29,7 +30,7 @@ import tgutil.textutil.capfirst
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist.WordDistFactory
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 import opennlp.textgrounder.worddist.WordDist._
 
 /**
@@ -54,26 +55,16 @@ import opennlp.textgrounder.worddist.WordDist._
  */
 class WikipediaDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends RealSphereDoc(schema, word_dist_factory) {
-  var id = 0L
-  var incoming_links_value: Option[Int] = None
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  coord: SphereCoord,
+  val title: String,
+  val redir: String,
+  // FIXME! Make this a val.
+  var incoming_links_value: Option[Int] = None,
+  val id: Long = 0L
+) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
   override def incoming_links = incoming_links_value
-  var redirind = blank_memoized_string
-  def redir = memoizer.unmemoize(redirind)
-  var titleind = blank_memoized_string
-  def title = memoizer.unmemoize(titleind)
-
-  override def set_field(field: String, value: String) {
-    field match {
-      case "id" => id = value.toLong
-      case "title" => titleind = memoizer.memoize(value)
-      case "redir" => redirind = memoizer.memoize(value)
-      case "incoming_links" => incoming_links_value = get_int_or_none(value)
-      case _ => super.set_field(field, value)
-    }
-  }
-
   override def get_field(field: String) = {
     field match {
       case "id" => id.toString
@@ -193,11 +184,8 @@ object WikipediaDoc {
 class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
-  def create_document(schema: Schema) =
-    new WikipediaDoc(schema, docfact.word_dist_factory)
-
   override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_factory: Boolean) = {
+      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
     val namespace = schema.get_field_or_else(fieldvals, "namepace", "")
@@ -207,8 +195,12 @@ class WikipediaDocSubfactory(
         namespace)
       None
     } else {
-      val doc = create_document(schema)
-      doc.set_fields(fieldvals)
+      val doc = new WikipediaDoc(schema, docfact.word_dist_factory, dist, coord,
+        id = schema.get_value_or_else[Long](fieldvals, "id", 0L),
+        redir = schema.get_value_or_else[String](fieldvals, "redir", ""),
+        title = schema.get_value_or_else[String](fieldvals, "title", ""),
+        incoming_links_value =
+          schema.get_value_if[Int](fieldvals, "incoming_links"))
       if (doc.redir.length > 0) {
         if (record_in_factory)
           redirects += doc

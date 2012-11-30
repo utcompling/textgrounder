@@ -369,13 +369,13 @@ class DefaultUnigramWordDistConstructor(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def initialize_distribution(doc: GeoDoc[_], countstr: String) {
+  def create_distribution(countstr: String) = {
     parse_counts(countstr)
     // Now set the distribution on the document.
     val dist = factory.create_word_dist
     add_keys_values(dist, keys_dynarr.array, values_dynarr.array,
       keys_dynarr.length)
-    doc.dist = dist
+    dist
   }
 }
 

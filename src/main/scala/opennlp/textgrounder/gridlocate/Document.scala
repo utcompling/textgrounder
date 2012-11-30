@@ -254,8 +254,6 @@ abstract class GeoDocFactory[Co : Serializer](
   val word_tokens_of_recorded_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
-  def create_document(schema: Schema): GeoDoc[Co]
-
   /**
    * Implementation of `create_and_init_document`.  Subclasses should
    * override this if needed.  External callers should call
@@ -266,12 +264,8 @@ abstract class GeoDocFactory[Co : Serializer](
    * in the main factory.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], record_in_factory: Boolean
-  ): Option[GeoDoc[Co]] = {
-    val doc = create_document(schema)
-    doc.set_fields(fieldvals)
-    Some(doc)
-  }
+      fieldvals: Seq[String], dist: WordDist, record_in_factory: Boolean
+  ): Option[GeoDoc[Co]]
 
   /**
    * Create, initialize and return a document with the given fieldvals,
@@ -292,14 +286,24 @@ abstract class GeoDocFactory[Co : Serializer](
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     if (record_in_factory)
       num_records_by_split(split) += 1
-    val maybedoc = try {
-      imp_create_and_init_document(schema, fieldvals, record_in_factory)
-    } catch {
-      case e:Exception => {
-        num_error_skipped_records_by_split(split) += 1
-        throw e
+    val counts = schema.get_field(fieldvals, "counts")
+    val dist = word_dist_factory.constructor.create_distribution(counts)
+    val maybedoc =
+      if (debug("rethrow"))
+        imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
+      else {
+        try {
+          imp_create_and_init_document(schema, fieldvals, dist,
+            record_in_factory)
+        } catch {
+          case e:Exception => {
+            num_error_skipped_records_by_split(split) += 1
+            if (debug("stack-trace") || debug("stacktrace"))
+              e.printStackTrace
+            throw new DocValidationException("Bad value for field", e)
+          }
+        }
       }
-    }
     maybedoc match {
       case None => {
         num_non_error_skipped_records_by_split(split) += 1
@@ -690,10 +694,15 @@ case class DocValidationException(
  * coord: Coordinates of document.
  * split: Evaluation split of document ("training", "dev", "test"), usually
  *   stored as a fixed field in the schema.
+ *
+ * @param schema
+ * @param word_dist_factory
+ * @param dist Object containing word distribution of this document.
  */
 abstract class GeoDoc[Co : Serializer](
   val schema: Schema,
-  val word_dist_factory: WordDistFactory
+  val word_dist_factory: WordDistFactory,
+  val dist: WordDist
 ) {
 
   import tgutil.Serializer._
@@ -747,61 +756,11 @@ abstract class GeoDoc[Co : Serializer](
    */
   def incoming_links: Option[Int] = None
 
-  /**
-   * Object containing word distribution of this document.
-   */
-  var dist: WordDist = _
-
-  /**
-   * Set the fields of the document to the given values.
-   *
-   * @param fieldvals A list of items, of the same length and in the same
-   *   order as the corresponding schema.
-   *
-   * Note that we don't include the field values as a constructor parameter
-   * and set them during construction, because we run into bootstrapping
-   * problems.  In particular, if subclasses declare and initialize
-   * additional fields, then those fields get initialized *after* the
-   * constructor runs, in which case the values determined from the field
-   * values get *overwritten* with their default values.  Subtle and bad.
-   * So instead we make it so that the call to `set_fields` has to happen
-   * *after* construction.
-   */
-  def set_fields(fieldvals: Seq[String]) {
-    for ((field, value) <- (schema.fieldnames zip fieldvals)) {
-      if (debug("rethrow"))
-        set_field(field, value)
-      else {
-        try { set_field(field, value) }
-        catch {
-          case e@_ => {
-            val msg = ("Bad value %s for field '%s': %s" format
-                       (value, field, e.toString))
-            if (debug("stack-trace") || debug("stacktrace"))
-              e.printStackTrace
-            throw new DocValidationException(msg, e)
-          }
-        }
-      }
-    }
-  }
-
   def get_fields(fields: Seq[String]) = {
     for (field <- fields;
          value = get_field(field);
          if value != null)
       yield value
-  }
-
-  def set_field(field: String, value: String) {
-    field match {
-      case "counts" => {
-        word_dist_factory.constructor.initialize_distribution(this, value)
-        // Handled by callers.
-        // dist.finish_before_global()
-      }
-      case _ => () // Just eat the other parameters
-    }
   }
 
   def get_field(field: String) = {

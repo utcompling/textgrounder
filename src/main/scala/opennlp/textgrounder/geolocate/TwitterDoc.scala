@@ -18,24 +18,20 @@
 
 package opennlp.textgrounder.geolocate
 
+import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.textdbutil.Schema
 
-import opennlp.textgrounder.worddist.WordDistFactory
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 import opennlp.textgrounder.worddist.WordDist._
 
 class TwitterTweetDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends RealSphereDoc(schema, word_dist_factory) {
-  var id = 0L
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  coord: SphereCoord,
+  val id: Long
+) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
   def title = id.toString
-
-  override def set_field(field: String, value: String) {
-    field match {
-      case "title" => id = value.toLong
-      case _ => super.set_field(field, value)
-    }
-  }
 
   def xmldesc =
     <TwitterTweetDoc>
@@ -50,23 +46,21 @@ class TwitterTweetDoc(
 class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
-  def create_document(schema: Schema) =
-    new TwitterTweetDoc(schema, docfact.word_dist_factory)
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterTweetDoc(schema, docfact.word_dist_factory, dist, coord,
+      schema.get_value_or_else[Long](fieldvals, "title", 0L))
+    )
 }
 
 class TwitterUserDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends RealSphereDoc(schema, word_dist_factory) {
-  var userind = blank_memoized_string
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  coord: SphereCoord,
+  val userind: Word
+) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
   def title = memoizer.unmemoize(userind)
-
-  override def set_field(field: String, value: String) {
-    field match {
-      case "user" => userind = memoizer.memoize(value)
-      case _ => super.set_field(field, value)
-    }
-  }
 
   def xmldesc =
     <TwitterUserDoc>
@@ -81,6 +75,10 @@ class TwitterUserDoc(
 class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
-  def create_document(schema: Schema) =
-    new TwitterUserDoc(schema, docfact.word_dist_factory)
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterUserDoc(schema, docfact.word_dist_factory, dist, coord,
+      memoizer.memoize(
+        schema.get_value_or_else[String](fieldvals, "user", "")))
+    )
 }
