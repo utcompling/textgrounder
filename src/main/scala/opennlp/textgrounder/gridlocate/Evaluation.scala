@@ -205,7 +205,7 @@ class DocEvalResult[Co](
   /**
    * Number of documents in the true cell
    */
-  val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
+  val num_docs_in_true_cell = true_cell.combined_dist.num_docs
   /**
    * Central point of the true cell
    */
@@ -692,8 +692,8 @@ abstract class GridEvaluator[Co](
     assert(maybe_true_cell != None)
     val true_cell = maybe_true_cell.get
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.combined_dist.num_docs_for_word_dist
-      errprint("Evaluating document %s with %s word-dist documents in true cell",
+      val naitr = true_cell.combined_dist.num_docs
+      errprint("Evaluating document %s with %s documents in true cell",
         document, naitr)
     }
     val result = imp_evaluate_document(document, true_cell)

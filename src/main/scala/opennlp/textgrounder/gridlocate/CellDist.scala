@@ -83,7 +83,7 @@ class WordCellDist[Co](
     // distributions.
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
-    for (cell <- grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+    for (cell <- grid.iter_nonempty_cells) {
       val word_dist =
         UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
       val prob = word_dist.lookup_word(word)

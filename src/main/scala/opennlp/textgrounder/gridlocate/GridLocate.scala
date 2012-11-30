@@ -162,7 +162,7 @@ class MostPopularGridLocateDocStrategy[Co] (
         (if (internal_link)
            cell.combined_dist.incoming_links
          else
-           cell.combined_dist.num_docs_for_links).toDouble)).
+           cell.combined_dist.num_docs).toDouble)).
     toIndexedSeq sortWith (_._2 > _._2)
   }
 }
@@ -188,13 +188,11 @@ abstract class PointwiseScoreStrategy[Co](
    */
   def return_ranked_cells_serially(word_dist: WordDist,
     include: Iterable[GeoCell[Co]]) = {
-      for (cell <- grid.iter_nonempty_cells_including(
-            include, nonempty_word_dist = true)
-          ) yield {
+      for (cell <- grid.iter_nonempty_cells_including(include)) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
             cell.describe_indices(), cell.describe_location(),
-            cell.combined_dist.num_docs_for_word_dist)
+            cell.combined_dist.num_docs)
         }
         (cell, score_cell(word_dist, cell))
       }
@@ -207,8 +205,7 @@ abstract class PointwiseScoreStrategy[Co](
    */
   def return_ranked_cells_parallel(word_dist: WordDist,
     include: Iterable[GeoCell[Co]]) = {
-    val cells = grid.iter_nonempty_cells_including(
-      include, nonempty_word_dist = true)
+    val cells = grid.iter_nonempty_cells_including(include)
     cells.par.map(c => (c, score_cell(word_dist, c)))
   }
 
@@ -230,7 +227,7 @@ abstract class PointwiseScoreStrategy[Co](
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
           cell.describe_indices(), cell.describe_location(),
-          cell.combined_dist.num_docs_for_word_dist, score)
+          cell.combined_dist.num_docs, score)
     }
     retval
   }
@@ -361,8 +358,8 @@ class NaiveBayesDocStrategy[Co](
     val word_logprob =
       cell.combined_dist.word_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
-      log(cell.combined_dist.num_docs_for_links.toDouble /
-          grid.total_num_docs_for_links)
+      log(cell.combined_dist.num_docs.toDouble /
+          grid.total_num_docs)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
     logprob
@@ -1099,7 +1096,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
     grid.finish()
     if(params.output_training_cell_dists) {
-      for(cell <- grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+      for(cell <- grid.iter_nonempty_cells) {
         print(cell.shortstr+"\t")
         val word_dist = cell.combined_dist.word_dist
         println(word_dist.toString)        
