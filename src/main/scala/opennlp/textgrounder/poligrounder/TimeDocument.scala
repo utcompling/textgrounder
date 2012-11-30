@@ -24,9 +24,9 @@ import opennlp.textgrounder.{util => tgutil}
 import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil._
+import tgutil.Serializer._
 
 import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
-import opennlp.textgrounder.gridlocate.GeoDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 

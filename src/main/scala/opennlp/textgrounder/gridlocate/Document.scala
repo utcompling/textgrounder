@@ -696,7 +696,7 @@ abstract class GeoDoc[Co : Serializer](
   val word_dist_factory: WordDistFactory
 ) {
 
-  import GeoDocConverters._
+  import tgutil.Serializer._
 
   /**
    * Title of the document -- something that uniquely identifies it,
@@ -834,113 +834,6 @@ abstract class GeoDoc[Co : Serializer](
 }
 
 
-/////////////////////////////////////////////////////////////////////////////
-//                           Conversion functions                          //
-/////////////////////////////////////////////////////////////////////////////
-
-object GeoDocConverters {
-  def yesno_to_boolean(foo: String)  = {
-    foo match {
-      case "yes" => true
-      case "no" => false
-      case _ => {
-        warning("Expected yes or no, saw '%s'", foo)
-        false
-      }
-    }
-  }
-  def boolean_to_yesno(foo: Boolean) = if (foo) "yes" else "no"
-  
-  def get_int_or_none(foo: String) =
-    if (foo == "") None else Option[Int](foo.toInt)
-  def put_int_or_none(foo: Option[Int]) = {
-    foo match {
-      case None => ""
-      case Some(x) => x.toString
-    }
-  }
-
-  /**
-   * Convert an object of type `T` into a serialized (string) form, for
-   * storage purposes in a text file.  Note that the construction
-   * `T : Serializer` means essentially "T must have a Serializer".
-   * More technically, it adds an extra implicit parameter list with a
-   * single parameter of type Serializer[T].  When the compiler sees a
-   * call to put_x[X] for some type X, it looks in the lexical environment
-   * to see if there is an object in scope of type Serializer[X] that is
-   * marked `implicit`, and if so, it gives the implicit parameter
-   * the value of that object; otherwise, you get a compile error.  The
-   * function can then retrieve the implicit parameter's value using the
-   * construction `implicitly[Serializer[T]]`.  The `T : Serializer`
-   * construction is technically known as a *context bound*.
-   */
-  def put_x[T : Serializer](foo: T) =
-    implicitly[Serializer[T]].serialize(foo)
-  /**
-   * Convert the serialized form of the value of an object of type `T`
-   * back into that type.  Throw an error if an invalid string was seen.
-   * See `put_x` for a description of the `Serializer` type and the *context
-   * bound* (denoted by a colon) that ties it to `T`.
-   *
-   * @see put_x
-   */
-  def get_x[T : Serializer](foo: String) =
-    implicitly[Serializer[T]].deserialize(foo)
-
-  /**
-   * Convert an object of type `Option[T]` into a serialized (string) form.
-   * See `put_x` for more information.  The only difference between that
-   * function is that if the value is None, a blank string is written out;
-   * else, for a value Some(x), where `x` is a value of type `T`, `x` is
-   * written out using `put_x`.
-   *
-   * @see put_x
-   */
-  def put_x_or_none[T : Serializer](foo: Option[T]) = {
-    foo match {
-      case None => ""
-      case Some(x) => put_x[T](x)
-    }
-  }
-  /**
-   * Convert a blank string into None, or a valid string that converts into
-   * type T into Some(value), where value is of type T.  Throw an error if
-   * a non-blank, invalid string was seen.
-   *
-   * @see get_x
-   * @see put_x
-   */
-  def get_x_or_none[T : Serializer](foo: String) =
-    if (foo == "") None
-    else Option[T](get_x[T](foo))
-
-  /**
-   * Convert an object of type `T` into a serialized (string) form.
-   * If the object has the value `null`, write out a blank string.
-   * Note that T must be a reference type (i.e. not a primitive
-   * type such as Int or Double), so that `null` is a valid value.
-   * 
-   * @see put_x
-   * @see put_x
-   */
-  def put_x_or_null[T >: Null : Serializer](foo: T) = {
-    if (foo == null) ""
-    else put_x[T](foo)
-  }
-  /**
-   * Convert a blank string into null, or a valid string that converts into
-   * type T into that value.  Throw an error if a non-blank, invalid string
-   * was seen.  Note that T must be a reference type (i.e. not a primitive
-   * type such as Int or Double), so that `null` is a valid value.
-   *
-   * @see get_x
-   * @see put_x
-   */
-  def get_x_or_null[T >: Null : Serializer](foo: String) =
-    if (foo == "") null
-    else get_x[T](foo)
-}
-
 /////////////////////////////////////////////////////////////////////////////
 //                       GeoDoc File Processors                      //
 /////////////////////////////////////////////////////////////////////////////
