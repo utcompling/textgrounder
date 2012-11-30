@@ -321,7 +321,7 @@ class PCLTravelGeolocateDocEvaluator(
       val (cell, vall) = cellval
       if (debug("pcl-travel")) {
         errprint("  Rank %d, goodness %g:", rank, vall)
-        errprint(cell.struct.toString) // indent=4
+        errprint(cell.xmldesc.toString) // indent=4
       } else
         errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
     }

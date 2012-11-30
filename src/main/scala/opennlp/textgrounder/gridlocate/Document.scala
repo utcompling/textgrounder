@@ -823,7 +823,7 @@ abstract class GeoDoc[Co : Serializer](
     "%s%s%s".format(corpusstr, title, coordstr)
   }
 
-  def struct: scala.xml.Elem
+  def xmldesc: scala.xml.Elem
 
   def distance_to_coord(coord2: Co): Double
 

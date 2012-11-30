@@ -171,7 +171,7 @@ class GenericSphereDoc(
     }
   }
 
-  def struct =
+  def xmldesc =
     <GenericSphereDoc>
       <title>{ title }</title>
       {

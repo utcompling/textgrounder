@@ -37,7 +37,7 @@ class TwitterTweetDoc(
     }
   }
 
-  def struct =
+  def xmldesc =
     <TwitterTweetDoc>
       <id>{ id }</id>
       {
@@ -68,7 +68,7 @@ class TwitterUserDoc(
     }
   }
 
-  def struct =
+  def xmldesc =
     <TwitterUserDoc>
       <user>{ memoizer.unmemoize(userind) }</user>
       {

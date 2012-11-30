@@ -83,7 +83,7 @@ class WikipediaDoc(
     }
   }
 
-  def struct =
+  def xmldesc =
     <WikipediaDoc>
       <title>{ title }</title>
       <id>{ id }</id>
