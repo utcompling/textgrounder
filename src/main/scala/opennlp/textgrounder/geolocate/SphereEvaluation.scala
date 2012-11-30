@@ -277,7 +277,8 @@ class PCLTravelGeolocateDocEvaluator(
 ) extends CorpusEvaluator(stratname, grid.docfact.driver) {
   type TEvalDoc = TitledDoc
   type TEvalRes = TitledDocResult
-  def iter_documents = {
+
+  def iter_document_stats = {
     filenames.toIterator.flatMap { filename =>
       val dom = try {
         // On error, just return, so that we don't have problems when called
@@ -299,13 +300,9 @@ class PCLTravelGeolocateDocEvaluator(
         val text = (for (x <- nonheads) yield x.text) mkString ""
         //errprint("Head text: %s", headtext)
         //errprint("Non-head text: %s", text)
-      } yield (filehand, filename, TitledDoc(headtext, text))).toIterator
+      } yield DocStatus(filehand, filename, 0, Some(TitledDoc(headtext, text)),
+                "processed", "", "")).toIterator
     }
-  }
-
-  def iter_document_stats = iter_documents.map {
-    case (filehand, filename, doc) =>
-      new DocStatus(filehand, filename, Some(doc), "processed", "", "")
   }
 
   def evaluate_document(doc: TitledDoc) = {

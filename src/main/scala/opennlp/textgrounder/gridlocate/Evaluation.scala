@@ -479,33 +479,27 @@ abstract class CorpusEvaluator(
       for (stat <- docstats) yield {
         // errprint("Processing document: %s", stat)
         statnum += 1
-        val doctag = "#%d" format statnum
-        val (mayberes, status, reason, docdesc) =
-          (stat.maybedoc, stat.status) match {
-            case (Some(doc), "processed") => {
-              val (skip, reason) = would_skip_document(doc)
+        stat.map_result { doc =>
+          val doctag = "#%d" format statnum
+          val (skip, reason) = would_skip_document(doc)
+          if (skip)
+            (None, "skipped", reason, doctag)
+          else {
+            val result = {
+              val (skip, reason) = would_skip_by_parameters()
               if (skip)
                 (None, "skipped", reason, doctag)
               else {
-                val result = {
-                  val (skip, reason) = would_skip_by_parameters()
-                  if (skip)
-                    (None, "skipped", reason, doctag)
-                  else {
-                    // Don't put side-effecting code inside of an assert!
-                    val res1 = evaluate_document(doc)
-                    assert(res1 != null)
-                    (Some(res1), "processed", "", doctag)
-                  }
-                }
-
-                result
+                // Don't put side-effecting code inside of an assert!
+                val res1 = evaluate_document(doc)
+                assert(res1 != null)
+                (Some(res1), "processed", "", doctag)
               }
             }
-            case _ => (None, stat.status, stat.reason, stat.docdesc)
+
+            result
+          }
         }
-        DocStatus(stat.filehand, stat.file, mayberes, status, reason,
-          docdesc)
       }
 
     task.iterate(process_document_statuses(result_stats)).map { res =>

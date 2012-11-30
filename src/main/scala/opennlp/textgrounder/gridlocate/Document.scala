@@ -57,11 +57,24 @@ import GridLocateDriver.Debug._
 case class DocStatus[TDoc](
   filehand: FileHandler,
   file: String,
+  lineno: Long,
   maybedoc: Option[TDoc],
   status: String,
   reason: String,
   docdesc: String
-)
+) {
+  require((status == "processed") == (maybedoc != None))
+  def map_result[NewDoc](f: TDoc => (Option[NewDoc], String, String, String)) = {
+    maybedoc match {
+      case Some(doc) => {
+        val (doc2, status2, reason2, docdesc2) = f(doc)
+        DocStatus(filehand, file, lineno, doc2, status2, reason2, docdesc2)
+      }
+      case None =>
+        DocStatus[NewDoc](filehand, file, lineno, None, status, reason, docdesc)
+    }
+  }
+}
 
 /******** Counters to track what's going on ********/
 class DocCounterTracker[T](
@@ -329,56 +342,69 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   /**
-   * Convert a set of fields from a textdb database into a document,
-   * returning a DocStatus describing the document.
+   * Convert a line from a textdb database into a raw document status,
+   * listing the fields in the document.
+   *
+   * @param schema Schema for textdb, indicating names of fields, etc.
+   */
+  def line_to_raw_document(filehand: FileHandler, file: String, line: String,
+      lineno: Long, schema: Schema): DocStatus[Seq[String]] = {
+    line_to_fields(line, lineno, schema) match {
+      case Some(fields) =>
+        DocStatus(filehand, file, lineno, Some(fields), "processed",
+          "", "")
+      case None =>
+        DocStatus(filehand, file, lineno, None, "bad",
+          "badly formatted database row", "")
+    }
+  }
+
+  /**
+   * Convert a raw document (describing the fields of the document) to
+   * an actual document object.
    *
    * @param schema Schema for textdb, indicating names of fields, etc.
    * @param record_in_factory Whether to record the document in the document
    *  factory.
+   * @return a DocStatus describing the document.
    */
-  def fields_to_document(filehand: FileHandler, file: String,
-      maybe_fieldvals: Option[Seq[String]], lineno: Long,
+  def raw_document_to_document(rawdoc: DocStatus[Seq[String]],
       schema: Schema, record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
-    val (maybedoc, status, reason, docdesc) =
-      maybe_fieldvals match {
-        case None => (None, "bad", "badly formatted database row", "")
-        case Some(fieldvals) => {
-          try {
-            create_and_init_document(schema, fieldvals, record_in_factory) match {
-              case None => {
-                (None, "skipped", "unable to create document",
-                  schema.get_field_or_else(fieldvals, "title",
-                    "unknown title??"))
+    rawdoc map_result { fieldvals =>
+      try {
+        create_and_init_document(schema, fieldvals, record_in_factory) match {
+          case None => {
+            (None, "skipped", "unable to create document",
+              schema.get_field_or_else(fieldvals, "title",
+                "unknown title??"))
+          }
+          case Some(doc) => {
+            if (doc.dist != null) {
+              if (note_globally) {
+                // Don't use the eval set's distributions in computing
+                // global smoothing values and such, to avoid contaminating
+                // the results (training on your eval set). In addition, if
+                // this isn't the training or eval set, we shouldn't be
+                // loading at all.
+                //
+                // Add the distribution to the global stats before
+                // eliminating infrequent words through
+                // `finish_before_global`.
+                doc.word_dist_factory.note_dist_globally(doc.dist)
               }
-              case Some(doc) => {
-                if (doc.dist != null) {
-                  if (note_globally) {
-                    // Don't use the eval set's distributions in computing
-                    // global smoothing values and such, to avoid contaminating
-                    // the results (training on your eval set). In addition, if
-                    // this isn't the training or eval set, we shouldn't be
-                    // loading at all.
-                    //
-                    // Add the distribution to the global stats before
-                    // eliminating infrequent words through
-                    // `finish_before_global`.
-                    doc.word_dist_factory.note_dist_globally(doc.dist)
-                  }
-                  doc.dist.finish_before_global()
-                }
-                (Some(doc), "processed", "", "")
-              }
+              doc.dist.finish_before_global()
             }
-          } catch {
-            case e:DocValidationException => {
-              warning("Line %s: %s", lineno, e.message)
-              (None, "bad", "error validating document field", "")
-            }
+            (Some(doc), "processed", "", "")
           }
         }
+      } catch {
+        case e:DocValidationException => {
+          warning("Line %s: %s", rawdoc.lineno, e.message)
+          (None, "bad", "error validating document field", "")
+        }
       }
-    DocStatus[GeoDoc[Co]](filehand, file, maybedoc, status, reason, docdesc)
+    }
   }
 
   /**
@@ -393,28 +419,32 @@ abstract class GeoDocFactory[Co : Serializer](
       lineno: Long, schema: Schema, record_in_factory: Boolean,
       note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
-    val maybe_fieldvals = line_to_fields(line, lineno, schema)
-    fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
-      record_in_factory, note_globally)
+    raw_document_to_document(
+      line_to_raw_document(filehand, file, line, lineno, schema),
+      schema, record_in_factory, note_globally)
   }
 
   /**
-   * Iterate over the lines in a file in a textdb database, returning an
-   * iterator over DocStatus objects describing the attempt to
-   * convert each line to a document.
+   * Read the raw documents from a textdb corpus.
    *
-   * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_factory Whether to record the document in the document
-   *  factory.
+   * @param filehand The FileHandler for the directory of the corpus.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata")
+   * @return Iterator over document statuses.
    */
-  def iter_document_statuses(filehand: FileHandler, file: String,
-      schema: Schema, record_in_factory: Boolean, note_globally: Boolean) = {
-    val lines = filehand.openr(file).zipWithIndex.map {
-      case (line, idx) => (filehand, file, line, idx + 1)
-    }
-    lines.map { case (filehand, file, line, lineno) =>
-      line_to_document(filehand, file, line, lineno, schema,
-        record_in_factory, note_globally) }
+  def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
+      suffix: String) = {
+    val (schema, files) =
+      TextDBProcessor.get_textdb_files(filehand, dir, suffix)
+    val rawdocs =
+      files.flatMap { file =>
+        filehand.openr(file).zipWithIndex.map {
+          case (line, idx) =>
+            line_to_raw_document(filehand, file, line, idx + 1, schema)
+        }
+      }
+    (schema, rawdocs)
   }
 
   /**
@@ -426,6 +456,9 @@ abstract class GeoDocFactory[Co : Serializer](
    *   (e.g. "counts" or "document-metadata")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
+   * @param note_globally Whether to add each document's words to the global
+   *   (e.g. back-off) distribution statistics.  Normally false, but may be
+   *   true during bootstrapping of those statistics.
    * @param finish_globally Whether to compute statistics of the documents'
    *   distributions that depend on global (e.g. back-off) distribution
    *   statistics.  Normally true, but may be false during bootstrapping of
@@ -436,13 +469,13 @@ abstract class GeoDocFactory[Co : Serializer](
       suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
-    val (schema, files) =
-      TextDBProcessor.get_textdb_files(filehand, dir, suffix)
+    val (schema, rawdocs) =
+      read_raw_documents_from_textdb(filehand, dir, suffix)
     val docstats =
-      (for (file <- files) yield {
-        iter_document_statuses(filehand, file, schema, record_in_subfactory,
+      rawdocs map { rawdoc =>
+        raw_document_to_document(rawdoc, schema, record_in_subfactory,
           note_globally)
-      }).flatten
+      }
     if (!finish_globally)
       docstats
     else
