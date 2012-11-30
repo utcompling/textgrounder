@@ -191,7 +191,7 @@ abstract class PointwiseScoreStrategy[Co](
       for (cell <- grid.iter_nonempty_cells_including(include)) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
-            cell.describe_indices(), cell.describe_location(),
+            cell.describe_indices, cell.describe_location,
             cell.combined_dist.num_docs)
         }
         (cell, score_cell(word_dist, cell))
@@ -226,7 +226,7 @@ abstract class PointwiseScoreStrategy[Co](
     if (parallel && debug("lots")) {
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
-          cell.describe_indices(), cell.describe_location(),
+          cell.describe_indices, cell.describe_location,
           cell.combined_dist.num_docs, score)
     }
     retval
@@ -976,7 +976,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           minimum_word_count = params.minimum_word_count)
     }
 
-  protected def create_word_dist_factory() = {
+  protected def create_word_dist_factory = {
     val create_constructor = get_create_word_dist_constructor
     if (params.word_dist == "unsmoothed-ngram")
       new UnsmoothedNgramWordDistFactory(create_constructor)
@@ -1077,7 +1077,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   def setup_for_run() = {
-    val word_dist_factory = create_word_dist_factory()
+    val word_dist_factory = create_word_dist_factory
     val docfact = create_document_factory(word_dist_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables

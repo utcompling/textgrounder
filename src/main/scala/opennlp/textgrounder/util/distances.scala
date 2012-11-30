@@ -96,7 +96,7 @@ package object distances {
     // Not sure why this code was implemented with coerce_within_bounds,
     // but either always coerce, or check the bounds ...
     require(SphereCoord.valid(lat, long))
-    override def toString() = "(%.2f,%.2f)".format(lat, long)
+    override def toString = "(%.2f,%.2f)".format(lat, long)
   }
 
   implicit object SphereCoord extends Serializer[SphereCoord] {
@@ -272,7 +272,7 @@ package object distances {
   // add a second serializable type, and then lots of compile errors.
 
   case class TimeCoord(millis: Long) {
-    override def toString() = "%s (%s)" format (millis, format_time(millis))
+    override def toString = "%s (%s)" format (millis, format_time(millis))
   }
 
   implicit object TimeCoord extends Serializer[TimeCoord] {

@@ -66,7 +66,7 @@ object SphereWordCellDist {
     val xf_minprob = xform(celldist.cellprobs.values min)
     val xf_maxprob = xform(celldist.cellprobs.values max)
 
-    def yield_cell_kml() = {
+    def yield_cell_kml = {
       for {
         (cell, prob) <- celldist.cellprobs
         kml <- cell.asInstanceOf[KMLSphereCell].generate_kml(
@@ -75,7 +75,7 @@ object SphereWordCellDist {
       } yield expr
     }
 
-    val allcellkml = yield_cell_kml()
+    val allcellkml = yield_cell_kml
 
     val kml =
       <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">

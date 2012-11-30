@@ -144,10 +144,10 @@ class SphereDocFactory(
   /**
    * Iterate over all the subfactories that exist.
    */
-  def iter_subfactories() = corpus_type_to_subfactory.values
+  def iter_subfactories = corpus_type_to_subfactory.values
 
   override def finish_document_loading() {
-    for (subfactory <- iter_subfactories())
+    for (subfactory <- iter_subfactories)
       subfactory.finish_document_loading()
     super.finish_document_loading()
   }
