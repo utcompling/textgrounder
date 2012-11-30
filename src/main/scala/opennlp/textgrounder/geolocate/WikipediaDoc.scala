@@ -233,32 +233,9 @@ class WikipediaDocSubfactory(
   val name_to_document = mutable.Map[Word, WikipediaDoc]()
 
   /**
-   * Map from short name (lowercased) to list of documents.
-   * The short name for a document is computed from the document's name.  If
-   * the document name has a comma, the short name is the part before the
-   * comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
-   * If the name has no comma, the short name is the same as the document
-   * name.  The idea is that the short name should be the same as one of
-   * the toponyms used to refer to the document.
-   */
-  val short_lower_name_to_documents = bufmap[Word, WikipediaDoc]()
-
-  /**
-   * Map from tuple (NAME, DIV) for documents of the form "Springfield, Ohio",
-   * lowercased.
-   */
-  val lower_name_div_to_documents =
-    bufmap[(Word, Word), WikipediaDoc]()
-
-  /**
    * For each toponym, list of documents matching the name.
    */
   val lower_toponym_to_document = bufmap[Word, WikipediaDoc]()
-
-  /**
-   * Mapping from lowercased document names to WikipediaDoc objects
-   */
-  val lower_name_to_documents = bufmap[Word, WikipediaDoc]()
 
   /**
    * Total # of incoming links for all documents in each split.
@@ -304,14 +281,8 @@ class WikipediaDocSubfactory(
     name_to_document(memoizer.memoize(name)) = doc
     val loname = name.toLowerCase
     val loname_word = memoizer.memoize(loname)
-    lower_name_to_documents(loname_word) += doc
     val (short, div) = WikipediaDoc.compute_short_form(loname)
     val short_word = memoizer.memoize(short)
-    if (div != null) {
-      val div_word = memoizer.memoize(div)
-      lower_name_div_to_documents((short_word, div_word)) += doc
-    }
-    short_lower_name_to_documents(short_word) += doc
     if (!(lower_toponym_to_document(loname_word) contains doc))
       lower_toponym_to_document(loname_word) += doc
     if (short_word != loname_word &&
