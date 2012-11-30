@@ -31,18 +31,6 @@ class CombinedModelGrid(
 ) extends SphereGrid(docfact) {
 
   override var total_num_cells: Int = models.map(_.total_num_cells).sum
-  override val num_training_passes: Int = models.map(_.num_training_passes).max
-
-  var current_training_pass: Int = 0
-
-  override def begin_training_pass(pass: Int) = {
-    current_training_pass = pass
-    for (model <- models) {
-      if (pass <= model.num_training_passes) {
-        model.begin_training_pass(pass)
-      }
-    }
-  }
 
   def find_best_cell_for_document(doc: SphereDoc,
                                   create_non_recorded: Boolean) = {
@@ -55,15 +43,14 @@ class CombinedModelGrid(
           cell => spheredist(cell.get_center_coord, doc.coord)))
   }
 
-  def add_document_to_cell(document: SphereDoc) {
-    for (model <- models) {
-      if (current_training_pass <= model.num_training_passes) {
-        model.add_document_to_cell(document)
-      }
-    }
+  def read_training_documents_into_grid() {
+    for (model <- models)
+      model.read_training_documents_into_grid()
   }
 
-  def initialize_cells() {
+  protected def initialize_cells() {
+    // Should never be called because we override finish().
+    assert(false)
   }
 
   override def finish() {

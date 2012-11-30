@@ -123,8 +123,10 @@ class TimeGrid(
     }
   }
 
-  def add_document_to_cell(doc: GeoDoc[TimeCoord]) {
-    find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
+  def read_training_documents_into_grid() {
+    default_read_training_documents_into_grid { doc =>
+      find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
+    }
   }
 
   def iter_nonempty_cells = {
