@@ -431,12 +431,12 @@ class DefaultNgramWordDistConstructor(
   def maybe_lowercase(ngram: Ngram) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def initialize_distribution(doc: GeoDoc[_], countstr: String) {
+  def create_distribution(countstr: String) = {
     parse_counts(countstr)
     // Now set the distribution on the document.
     val dist = factory.create_word_dist
     add_parsed_ngrams(dist, parsed_ngrams)
-    doc.dist = dist
+    dist
   }
 }
 

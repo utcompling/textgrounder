@@ -28,21 +28,15 @@ import tgutil.Serializer._
 
 import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory}
 
-import opennlp.textgrounder.worddist.WordDistFactory
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 
 abstract class RealSphereDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends GeoDoc[SphereCoord](schema, word_dist_factory) {
-  var coord: SphereCoord = _
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  val coord: SphereCoord
+) extends GeoDoc[SphereCoord](schema, word_dist_factory, dist) {
   def has_coord = coord != null
-
-  override def set_field(name: String, value: String) {
-    name match {
-      case "coord" => coord = get_x_or_null[SphereCoord](value)
-      case _ => super.set_field(name, value)
-    }
-  }
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
   def output_distance(dist: Double) = km_and_miles(dist)
@@ -56,21 +50,13 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
   val docfact: SphereDocFactory
 ) {
   /**
-   * Create and return a document of the current type.
-   */
-  def create_document(schema: Schema): TDoc
-
-  /**
    * Given the schema and field values read from a document file, create
-   * and return a document.  Return value can be null if the document is
+   * and return a document.  Return value can be None if the document is
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_factory: Boolean): Option[TDoc] = {
-    val doc = create_document(schema)
-    doc.set_fields(fieldvals)
-    Some(doc)
-  }
+      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean
+    ): Option[TDoc]
 
   /**
    * Do any subfactory-specific operations needed after all documents have
@@ -107,14 +93,11 @@ class SphereDocFactory(
   def wikipedia_subfactory =
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
-  def create_document(schema: Schema): SphereDoc = {
-    throw new UnsupportedOperationException("This shouldn't be called directly; instead, use create_and_init_document()")
-  }
-
   override def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], record_in_factory: Boolean) = {
+      fieldvals: Seq[String], dist: WordDist, record_in_factory: Boolean) = {
+    val coord = schema.get_value_or_else[SphereCoord](fieldvals, "coord", null)
     find_subfactory(schema, fieldvals).
-      create_and_init_document(schema, fieldvals, record_in_factory)
+      create_and_init_document(schema, fieldvals, dist, coord, record_in_factory)
   }
 
   /**
@@ -160,16 +143,11 @@ class SphereDocFactory(
  */
 class GenericSphereDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends RealSphereDoc(schema, word_dist_factory) {
-  var title: String = _
-
-  override def set_field(name: String, value: String) {
-    name match {
-      case "title" => title = value
-      case _ => super.set_field(name, value)
-    }
-  }
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  coord: SphereCoord,
+  val title: String
+) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
 
   def xmldesc =
     <GenericSphereDoc>
@@ -184,6 +162,9 @@ class GenericSphereDoc(
 class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
-  def create_document(schema: Schema) =
-    new GenericSphereDoc(schema, docfact.word_dist_factory)
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new GenericSphereDoc(schema, docfact.word_dist_factory, dist, coord,
+      schema.get_value_or_else[String](fieldvals, "title", "unknown"))
+    )
 }

@@ -28,14 +28,15 @@ import tgutil.Serializer._
 
 import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
 
-import opennlp.textgrounder.worddist.WordDistFactory
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 
 class TimeDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory
-) extends GeoDoc[TimeCoord](schema, word_dist_factory) {
-  var coord: TimeCoord = _
-  var user: String = _
+  word_dist_factory: WordDistFactory,
+  dist: WordDist,
+  val coord: TimeCoord,
+  val user: String
+) extends GeoDoc[TimeCoord](schema, word_dist_factory, dist) {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
@@ -46,14 +47,6 @@ class TimeDoc(
           <timestamp>{ coord }</timestamp>
       }
     </TimeDoc>
-
-  override def set_field(name: String, value: String) {
-    name match {
-      case "min-timestamp" => coord = get_x_or_null[TimeCoord](value)
-      case "user" => user = value
-      case _ => super.set_field(name, value)
-    }
-  }
 
   def coord_as_double(coor: TimeCoord) = coor match {
     case null => Double.NaN
@@ -78,7 +71,11 @@ class TimeDocFactory(
 ) extends GeoDocFactory[TimeCoord](
   driver, word_dist_factory
 ) {
-  def create_document(schema: Schema) =
-    new TimeDoc(schema, word_dist_factory)
+  def imp_create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      dist: WordDist, record_in_factory: Boolean) = Some(
+    new TimeDoc(schema, word_dist_factory, dist,
+      schema.get_value[TimeCoord](fieldvals, "min-timestamp"),
+      schema.get_value[String](fieldvals, "user")
+    ))
 }
 

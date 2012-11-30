@@ -203,7 +203,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    * @param doc Document to set the distribution of.
    * @param diststr String from the document file, describing the distribution.
    */
-  def initialize_distribution(doc: GeoDoc[_], countstr: String)
+  def create_distribution(countstr: String): WordDist
 }
 
 class KLDivergenceCache {

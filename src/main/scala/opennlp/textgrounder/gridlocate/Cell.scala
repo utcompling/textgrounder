@@ -361,13 +361,10 @@ abstract class GeoGrid[Co](
     add_document_to_grid: GeoDoc[Co] => Unit
   ) {
     // FIXME: The "finish_globally" flag needs to be tied into the
-    // recording of global statistics in the word dists. [[However, currently
-    // that's handled in a totally hacked fashion in a combination of
-    // DefaultUnigramWordDistConstructor.initialize_distribution()
-    // and GeoDoc.set_field().]] -- not true. In reality, all the glop handled
-    // by finish_before_global() and note_dist_globally() (as well as
-    // record_in_subfactory) and such should be handled by separate mapping
-    // stages onto the documents.
+    // recording of global statistics in the word dists.
+    // In reality, all the glop handled by finish_before_global() and
+    // note_dist_globally() (as well as record_in_subfactory) and such
+    // should be handled by separate mapping stages onto the documents.
     for (doc <- docfact.driver.read_training_documents(docfact,
            "reading",
            record_in_subfactory = true,
