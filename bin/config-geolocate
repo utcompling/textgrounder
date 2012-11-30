@@ -19,10 +19,8 @@
 #
 #    b. If you have the data files in a directory structure like the one on
 #       the UTexas comp ling machines with the corpora stored under a
-#       directory `.../corpora` and other stuff stored in particular places
-#       (e.g. auxiliary data, used for the `geolocate-toponym` subproject,
-#       stored in `.../projects/textgrounder/data`), you can set
-#       TG_GROUPS_DIR to the root of that directory structure.
+#       directory `.../corpora`, you can set TG_GROUPS_DIR to the root of
+#       that directory structure.
 #
 #    c. If you're actually on the UTexas comp ling machines, which put the
 #       above directories under `/groups`, or you have exactly the same

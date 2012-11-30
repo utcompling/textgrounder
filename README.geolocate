@@ -58,26 +58,21 @@ Obtaining the Data
 ==================
 
 If you don't have the data already (you do if you have access to the Comp
-Ling machines), download and unzip the processed Wikipedia/Twitter data and
-aux files from http://wing.best.vwh.net/wikigrounder.
+Ling machines), download and unzip the processed Wikipedia/Twitter data
+from http://wing.best.vwh.net/wikigrounder.
 
-There are three sets of data to download:
+There are two sets of data to download:
   * The processed Wikipedia data, in `wikipedia/`.  The files are
     listed separately here and bzipped, in case you don't want them all.
     If you're not sure, get them all; or read down below to see which ones
     you need.
   * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
-  * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: These really
-    aren't needed any more.  The only remaining auxiliary file is the
-    World Gazetteer, and that is needed only when doing toponym resolution.
 
 Untar these files somewhere.  It is generally recommended that you create
 a directory and set `TG_GROUPS_DIR` to point to it; then put the Wikipedia
-and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory, and the
-auxiliary files (if needed) under `$TG_GROUPS_DIR/projects/textgrounder/data`.
+and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory.
 Alternatively, `TG_CORPUS_DIR` can be used to directly point to where the
-corpora are stored, and `TG_AUX_DIR` to directly point to where the auxiliary
-files (if needed) are stored.
+corpora are stored.
 
 (Alternatively, if you are running on a UTexas Comp Ling machine, or a
 machine with a copy of the relevant portions of /groups/corpora and
@@ -123,30 +118,21 @@ scripts available:
     and the language of the data, e.g. to select the correct stopwords list.
     The application to run is specified by the `--app` option; if omitted,
     it defaults to `geolocate-document` (other possibilities are
-    `generate-kml` and `geolocate-toponym`).  For the Twitter corpora,
-    an additional option `--doc-thresh NUM` can be used to specify the
-    threshold, i.e. minimum number of documents that a vocabulary item
-    must be seen in; uncommon vocabulary before that is ignored (or
-    rather, converted to an OOV token).  Additional arguments to both
-    the app and `textgrounder` itself can be given.  Configuration values
-    (e.g. indicating where to find Wikipedia and Twitter, given the above
-    environment variables) are read from `config-geolocate` in the
-    TextGrounder `bin` directory; additional site-specific configuration
-    will be read from `local-config-geolocate`, if you create that file
-    in the `bin` directory.  There's a `sample.local-config-geolocate`
-    file in the directory giving a sample local config file.
+    `generate-kml`).  For the Twitter corpora, an additional option
+    `--doc-thresh NUM` can be used to specify the threshold, i.e. minimum
+    number of documents that a vocabulary item must be seen in; uncommon
+    vocabulary before that is ignored (or rather, converted to an OOV token).
+    Additional arguments to both the app and `textgrounder` itself can be
+    given.  Configuration values (e.g. indicating where to find Wikipedia
+    and Twitter, given the above environment variables) are read from
+    `config-geolocate` in the TextGrounder `bin` directory; additional
+    site-specific configuration will be read from `local-config-geolocate`,
+    if you create that file in the `bin` directory.  There's a
+    `sample.local-config-geolocate` file in the directory giving a sample
+    local config file.
 
   * `tg-generate-kml` is exactly the same as `tg-geolocate --app generate-kml`
     but easier to type.
-
-  * `geolocate-toponym` is almost exactly the same as
-    `tg-geolocate --app geolocate-toponym`, but also specifies a gazetteer
-    file as an extra argument.  You still need to supply a value for
-    `--eval-file` and `--eval-type`.
-
-  * `geolocate-toponym-tr-conll` is almost exactly the same as
-    `geolocate-toponym`, but also specifies arguments to evaluate on the
-    PCL-CoNLL corpus.
 
   * `run-nohup` is a script for wrapping other scripts.  The other script
     is run using `nohup`, so that a long-running experiment will not get
@@ -276,15 +262,15 @@ that were retweeted from some other tweet, redirect info when a Wikipedia
 article is a redirect to another article, etc.).
 
 Additional data files (which are automatically handled by the
-`tg-geolocate` script) are specified using `--stopwords-file` and
-`--gazetteer-file`.  The stopwords file is a list of stopwords (one per
+`tg-geolocate` script) can be specified using `--stopwords-file` and
+`--whitelist-file`.  The stopwords file is a list of stopwords (one per
 line), i.e. words to be ignored when generating a distribution from the
-word counts in the counts file.  You don't normally have to specify this
-at all; if not, a default stopwords file is retrieved from inside the
-TextGrounder distribution.  The optional gazetteer file is used only
-when doing toponym resolution (--mode=geotag-toponyms), and doesn't
-apply at all when doing the normal document resolution, as was done in
-the paper.
+word counts in the counts file.  The whitelist file is the logical opposite
+of the stopwords file; if given, only words in the file will be used when
+generating a distribution from the word counts in the counts file.
+You don't normally have to specify these args at all, as the whitelist
+file is optional in any case and a default stopwords file will be retrieved
+from inside the TextGrounder distribution if necessary.
 
 The following is a list of the generally-applicable defined fields:
 
@@ -313,10 +299,8 @@ The following is a list of fields specific to Wikipedia:
 
   * `redir`: If this document is a Wikipedia redirect article, this
   specifies the title of the document redirected to; otherwise, blank.
-  This field is not much used by the document-geotagging code (it is
-  more important during toponym geotagging).  Its main use in document
-  geotagging is in computing the incoming link count of a document (see
-  below).
+  Its main use in document geotagging is in computing the incoming link
+  count of a document (see below).
 
   * `incoming_links`: Number of incoming links, or blank if unknown.
   This specifies the number of links pointing to the document from anywhere
