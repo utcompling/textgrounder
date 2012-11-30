@@ -200,8 +200,8 @@ class WikipediaDocSubfactory(
       record_in_factory: Boolean) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
-    val namespace = schema.get_field_or_else(fieldvals, "namepace")
-    if (namespace != null && namespace != "Main") {
+    val namespace = schema.get_field_or_else(fieldvals, "namepace", "")
+    if (namespace != "" && namespace != "Main") {
       errprint("Skipped document %s, namespace %s is not Main",
         schema.get_field_or_else(fieldvals, "title", "unknown title??"),
         namespace)

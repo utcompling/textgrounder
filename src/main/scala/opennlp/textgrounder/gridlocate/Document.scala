@@ -732,7 +732,7 @@ abstract class GeoDoc[Co : Serializer](
    * field, and hence it could be a property of the document.  It's now a
    * fixed value in the schema, but the field remains.
    */
-  def split = schema.get_fixed_field("split", error_if_missing = true)
+  def split = schema.get_fixed_field("split")
   /**
    * If this document has an incoming-link value associated with it (i.e.
    * number of links pointing to it in some sort of link structure), return
@@ -818,7 +818,7 @@ abstract class GeoDoc[Co : Serializer](
 
   override def toString = {
     val coordstr = if (has_coord) " at %s".format(coord) else ""
-    val corpus_name = schema.get_fixed_field("corpus-name")
+    val corpus_name = schema.get_fixed_field_or_else("corpus-name", "unknown")
     val corpusstr = if (corpus_name != null) "%s/".format(corpus_name) else ""
     "%s%s%s".format(corpusstr, title, coordstr)
   }
