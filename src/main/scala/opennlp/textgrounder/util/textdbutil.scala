@@ -87,6 +87,8 @@ package object textdbutil {
     val fixed_values: Map[String, String] = Map[String, String]()
   ) {
 
+    import Serializer._
+
     val field_indices = fieldnames.zipWithIndex.toMap
 
     def check_values_fit_schema(fieldvals: Seq[String]) {
@@ -94,6 +96,23 @@ package object textdbutil {
         throw FileFormatException(
           "Wrong-length line, expected %d fields, found %d: %s" format (
             fieldnames.length, fieldvals.length, fieldvals))
+    }
+
+    def get_value[T : Serializer](fieldvals: Seq[String], key: String): T = {
+      get_x[T](get_field(fieldvals, key))
+    }
+
+    def get_value_if[T : Serializer](fieldvals: Seq[String],
+        key: String): Option[T] = {
+      get_field_if(fieldvals, key) flatMap { x => get_x_or_none[T](x) }
+    }
+
+    def get_value_or_else[T : Serializer](fieldvals: Seq[String], key: String,
+        default: T): T = {
+      get_value_if[T](fieldvals, key) match {
+        case Some(x) => x
+        case None => default
+      }
     }
 
     def get_field(fieldvals: Seq[String], key: String) = {

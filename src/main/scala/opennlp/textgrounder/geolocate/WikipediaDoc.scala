@@ -24,9 +24,9 @@ import opennlp.textgrounder.{util => tgutil}
 import tgutil.collectionutil._
 import tgutil.textdbutil.Schema
 import tgutil.printutil.{errprint, warning}
+import tgutil.Serializer._
 import tgutil.textutil.capfirst
 
-import opennlp.textgrounder.gridlocate.GeoDocConverters._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
 import opennlp.textgrounder.worddist.WordDistFactory
