@@ -16,9 +16,10 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
-import opennlp.textgrounder.util.printutil.errprint
+import util.printutil.errprint
 
 /**
  TextGrounder-specific information (e.g. env vars).

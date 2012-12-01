@@ -16,12 +16,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.printutil.errprint
+import util.printutil.errprint
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GridLocateDriver.Debug._
 
 /**
  * This class implements a simple version of Good-Turing smoothing where we

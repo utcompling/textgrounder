@@ -16,21 +16,21 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
 import collection.mutable
 
 import java.io._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.textdbutil._
-import tgutil.experiment._
-import tgutil.ioutil._
-import tgutil.printutil.warning
+import util.argparser._
+import util.collectionutil._
+import util.textdbutil._
+import util.experiment._
+import util.ioutil._
+import util.printutil.warning
 
-import opennlp.textgrounder.gridlocate.GeoDoc
+import gridlocate.GeoDoc
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

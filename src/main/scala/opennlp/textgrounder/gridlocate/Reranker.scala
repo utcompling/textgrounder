@@ -1,11 +1,12 @@
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
 import math.log
 
-import opennlp.textgrounder.worddist.WordDist._
-import opennlp.textgrounder.worddist.UnigramWordDist
-import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.perceptron._
+import worddist.WordDist._
+import worddist.UnigramWordDist
+import util.printutil._
+import perceptron._
 
 import GridLocateDriver.Debug._
 

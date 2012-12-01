@@ -16,15 +16,15 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.distances.spheredist
-import tgutil.distances.SphereCoord
-import tgutil.experiment._
-import tgutil.printutil.{errprint, warning}
+import util.distances.spheredist
+import util.distances.SphereCoord
+import util.experiment._
+import util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate.GeoDocFactory
+import gridlocate.GeoDocFactory
 
 class CombinedModelGrid(
   docfact: SphereDocFactory, models: Seq[SphereGrid]

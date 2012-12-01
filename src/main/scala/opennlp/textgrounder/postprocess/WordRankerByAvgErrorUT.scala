@@ -16,10 +16,10 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.postprocess
+package opennlp.textgrounder
+package postprocess
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.Twokenize
+import util.Twokenize
 import org.clapper.argot._
 import java.io._
 

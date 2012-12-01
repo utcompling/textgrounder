@@ -1,4 +1,5 @@
-package opennlp.textgrounder.util
+package opennlp.textgrounder
+package util
 
 /* TextGrounder note:
 

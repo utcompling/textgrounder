@@ -16,21 +16,21 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import java.io.{FileSystem=>_,_}
 
 import org.apache.hadoop.io._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.distances.SphereCoord
-import tgutil.experiment._
-import tgutil.printutil.{errprint, warning}
+import util.argparser._
+import util.distances.SphereCoord
+import util.experiment._
+import util.printutil.{errprint, warning}
  
-import opennlp.textgrounder.gridlocate._
+import gridlocate._
 
-import opennlp.textgrounder.worddist._
+import worddist._
 import WordDist._
 
 class KMLParameters {

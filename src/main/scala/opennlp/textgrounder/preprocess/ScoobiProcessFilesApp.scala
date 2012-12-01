@@ -20,7 +20,8 @@
  * This file provides support for a Scoobi application that processes files.
  */
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
 import java.io._
 
@@ -32,11 +33,10 @@ import com.nicta.scoobi.Scoobi._
 // import com.nicta.scoobi.testing.HadoopLogFactory
 import com.nicta.scoobi.application.HadoopLogFactory
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.osutil._
-import tgutil.collectionutil._
-import tgutil.printutil._
+import util.argparser._
+import util.osutil._
+import util.collectionutil._
+import util.printutil._
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",

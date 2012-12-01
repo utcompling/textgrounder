@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.util
+package opennlp.textgrounder
+package util
 
 import scala.util.control.Breaks._
 import scala.collection.mutable
@@ -41,7 +42,7 @@ import osutil._
  * stuff here directly in package scope.  This makes it possible to have
  * functions in package scope instead of inside a class or object (i.e.
  * singleton class).  The functions here are accessed using
- * 'import opennlp.textgrounder.util.ioutil._' outside of package 'util',
+ * 'import util.ioutil._' outside of package 'util',
  * and simply 'import ioutil._' inside of it.  Note that this is named
  * 'ioutil' instead of just 'io' to avoid possible conflicts with 'scala.io',
  * which is visible by default as 'io'. (Merely declaring it doesn't cause

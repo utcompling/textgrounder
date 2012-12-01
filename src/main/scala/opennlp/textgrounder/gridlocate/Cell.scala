@@ -17,15 +17,15 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.printutil.{errprint, warning}
-import tgutil.experiment._
+import util.printutil.{errprint, warning}
+import util.experiment._
 
-import opennlp.textgrounder.worddist.WordDistFactory
+import worddist.WordDistFactory
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Word distributions                          //

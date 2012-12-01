@@ -16,13 +16,13 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
 import scala.collection.mutable
 import math.{log, sqrt}
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil.DynamicArray
+import util.collectionutil.DynamicArray
 
 import WordDist.Word
 

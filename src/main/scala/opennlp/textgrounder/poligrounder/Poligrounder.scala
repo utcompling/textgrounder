@@ -56,28 +56,28 @@ look at distributions over a period of time, we will have more cells, at
 (possibly more or less) regular intervals.
 
 */
-package opennlp.textgrounder.poligrounder
+package opennlp.textgrounder
+package poligrounder
 
-import util.matching.Regex
-import util.Random
+import scala.util.matching.Regex
+import scala.util.Random
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.{util=>tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.textdbutil._
-import tgutil.distances._
-import tgutil.experiment._
-import tgutil.ioutil.{FileHandler, LocalFileHandler}
-import tgutil.printutil.errprint
-import tgutil.timeutil._
+import util.argparser._
+import util.collectionutil._
+import util.textdbutil._
+import util.distances._
+import util.experiment._
+import util.ioutil.{FileHandler, LocalFileHandler}
+import util.printutil.errprint
+import util.timeutil._
 
-import opennlp.textgrounder.gridlocate._
+import gridlocate._
 import GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist._
+import worddist.{WordDist,WordDistFactory}
+import worddist.WordDist._
 
 /*
 

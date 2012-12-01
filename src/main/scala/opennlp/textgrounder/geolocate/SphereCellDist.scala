@@ -16,14 +16,15 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import math._
 
-import opennlp.textgrounder.util.distances._
+import util.distances._
 
-import opennlp.textgrounder.gridlocate.{GeoGrid,WordCellDist,CellDistFactory}
-import opennlp.textgrounder.worddist.WordDist._
+import gridlocate.{GeoGrid,WordCellDist,CellDistFactory}
+import worddist.WordDist._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //

@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
 /*
  * This program reads in tweets and processes them, optionally filtering
@@ -45,16 +46,15 @@ import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
 
 import com.nicta.scoobi.Scoobi._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.Twokenize
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.textdbutil._
-import tgutil.ioutil.FileHandler
-import tgutil.hadoop.HadoopFileHandler
-import tgutil.printutil._
-import tgutil.textutil.with_commas
-import tgutil.timeutil._
+import util.Twokenize
+import util.argparser._
+import util.collectionutil._
+import util.textdbutil._
+import util.ioutil.FileHandler
+import util.hadoop.HadoopFileHandler
+import util.printutil._
+import util.textutil.with_commas
+import util.timeutil._
 
 class ParseTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {

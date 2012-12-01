@@ -17,23 +17,23 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.poligrounder
+package opennlp.textgrounder
+package poligrounder
 
 import math._
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.textutil.format_float
-import tgutil.distances._
-import tgutil.printutil.{errout, errprint}
-import tgutil.experiment._
+import util.collectionutil._
+import util.textutil.format_float
+import util.distances._
+import util.printutil.{errout, errprint}
+import util.experiment._
 
-import opennlp.textgrounder.gridlocate._
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
-import opennlp.textgrounder.worddist._
-import opennlp.textgrounder.worddist.WordDist._
+import gridlocate._
+import gridlocate.GridLocateDriver.Debug._
+import worddist._
+import worddist.WordDist._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //

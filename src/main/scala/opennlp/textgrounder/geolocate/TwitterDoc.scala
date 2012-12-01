@@ -16,13 +16,14 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.textdbutil.Schema
+import util.distances._
+import util.textdbutil.Schema
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist._
+import worddist.{WordDist,WordDistFactory}
+import worddist.WordDist._
 
 class TwitterTweetDoc(
   schema: Schema,

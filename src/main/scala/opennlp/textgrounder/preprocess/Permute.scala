@@ -16,9 +16,10 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
-import util.Random
+import scala.util.Random
 import com.nicta.scoobi.Scoobi._
 import java.io._
 

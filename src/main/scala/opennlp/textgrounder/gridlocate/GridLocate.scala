@@ -16,24 +16,24 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
-import util.matching.Regex
-import util.Random
+import scala.util.matching.Regex
+import scala.util.Random
 import math._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.textdbutil
-import tgutil.distances._
-import tgutil.experiment._
-import tgutil.ioutil.{FileHandler, LocalFileHandler}
-import tgutil.osutil.output_resource_usage
-import tgutil.printutil.errprint
+import util.argparser._
+import util.collectionutil._
+import util.textdbutil
+import util.distances._
+import util.experiment._
+import util.ioutil.{FileHandler, LocalFileHandler}
+import util.osutil.output_resource_usage
+import util.printutil.errprint
 
-import opennlp.textgrounder.perceptron._
-import opennlp.textgrounder.worddist._
+import perceptron._
+import worddist._
 
 import WordDist._
 import GridLocateDriver.Debug._

@@ -16,19 +16,19 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
 import math._
 import collection.mutable
 
-import opennlp.{textgrounder=>tg}
-import tg.util.collectionutil._
-import tg.util.ioutil.FileHandler
-import tg.util.printutil.{errprint, warning}
-import tg.util.Serializer
-import tg.util.memoizer._
+import util.collectionutil._
+import util.ioutil.FileHandler
+import util.printutil.{errprint, warning}
+import util.Serializer
+import util.memoizer._
 
-import tg.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GridLocateDriver.Debug._
 
 import WordDist._
 

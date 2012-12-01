@@ -16,18 +16,18 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.distances._
-import tgutil.printutil.{errout, errprint}
-import tgutil.experiment._
+import util.collectionutil._
+import util.distances._
+import util.printutil.{errout, errprint}
+import util.experiment._
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                         A regularly spaced grid                         //

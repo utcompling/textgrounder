@@ -16,12 +16,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.experiment._
-import tgutil.ioutil._
+import util.argparser._
+import util.experiment._
+import util.ioutil._
 
 /*
    Common code for doing basic file-processing operations.

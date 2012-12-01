@@ -16,14 +16,15 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.postprocess
+package opennlp.textgrounder
+package postprocess
 
 import java.io._
 import javax.xml.datatype._
 import javax.xml.stream._
-import opennlp.textgrounder.tr.topo._
-import opennlp.textgrounder.tr.util.KMLUtil
-import opennlp.textgrounder.tr.util.LogUtil
+import tr.topo._
+import tr.util.KMLUtil
+import tr.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 

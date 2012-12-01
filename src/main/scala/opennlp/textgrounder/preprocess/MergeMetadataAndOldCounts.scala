@@ -16,23 +16,23 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
-import util.matching.Regex
-import util.control.Breaks._
+import scala.util.matching.Regex
+import scala.util.control.Breaks._
 import collection.mutable
 
 import java.io.{InputStream, PrintStream}
 
-import opennlp.textgrounder.gridlocate.GeoDoc
+import gridlocate.GeoDoc
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil.DynamicArray
-import tgutil.textdbutil._
-import tgutil.experiment._
-import tgutil.ioutil._
-import tgutil.printutil.{errprint, warning}
+import util.argparser._
+import util.collectionutil.DynamicArray
+import util.textdbutil._
+import util.experiment._
+import util.ioutil._
+import util.printutil.{errprint, warning}
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

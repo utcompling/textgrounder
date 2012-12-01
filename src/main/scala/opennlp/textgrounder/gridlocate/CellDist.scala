@@ -16,16 +16,16 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil.{LRUCache, doublemap}
-import tgutil.printutil.{errprint, warning}
+import util.collectionutil.{LRUCache, doublemap}
+import util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.worddist.{WordDist,UnigramWordDist}
-import opennlp.textgrounder.worddist.WordDist._
+import worddist.{WordDist,UnigramWordDist}
+import worddist.WordDist._
 
 /**
  * A general distribution over cells, associating a probability with each

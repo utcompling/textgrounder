@@ -17,22 +17,22 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
 import math._
 import collection.mutable
-import util.control.Breaks._
+import scala.util.control.Breaks._
 
 import java.io._
 
-import opennlp.{textgrounder=>tg}
-import tg.util.collectionutil.DynamicArray
-import tg.util.textdbutil
-import tg.util.ioutil.{FileHandler, FileFormatException}
-import tg.util.printutil.{errprint, warning}
+import util.collectionutil.DynamicArray
+import util.textdbutil
+import util.ioutil.{FileHandler, FileFormatException}
+import util.printutil.{errprint, warning}
 
-import tg.gridlocate.GeoDoc
-import tg.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GeoDoc
+import gridlocate.GridLocateDriver.Debug._
 
 import WordDist._
 

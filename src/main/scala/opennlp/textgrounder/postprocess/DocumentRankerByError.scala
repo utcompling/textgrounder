@@ -16,13 +16,14 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.postprocess
+package opennlp.textgrounder
+package postprocess
 
 // This program takes a log file and outputs the document names to standard out, ranked by prediction error.
 
 import org.clapper.argot._
-import opennlp.textgrounder.tr.topo._
-import opennlp.textgrounder.tr.util.LogUtil
+import tr.topo._
+import tr.util.LogUtil
 
 object DocumentRankerByError {
 
