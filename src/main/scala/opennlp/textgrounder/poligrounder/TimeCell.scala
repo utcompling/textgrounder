@@ -24,10 +24,10 @@ import math._
 
 import collection.mutable
 
-import util.collectionutil._
-import util.textutil.format_float
+import util.collection._
+import util.text.format_float
 import util.distances._
-import util.printutil.{errout, errprint}
+import util.print.{errout, errprint}
 import util.experiment._
 
 import gridlocate._

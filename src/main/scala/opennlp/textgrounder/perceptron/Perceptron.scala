@@ -29,7 +29,7 @@ import scala.util.control.Breaks._
 import collection.mutable
 import io.Source
 
-import util.printutil._
+import util.print._
 import util.memoizer._
 import util.MeteredTask
 import gridlocate.GridLocateDriver.Debug._

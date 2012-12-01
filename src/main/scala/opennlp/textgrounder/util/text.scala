@@ -21,11 +21,11 @@ package util
 
 import scala.util.control.Breaks._
 import scala.util.matching.Regex
-import math._
+import scala.math._
 
-import printutil.warning
+import print.warning
 
-package object textutil {
+package object text {
 
   ////////////////////////////////////////////////////////////////////////////
   //                    String functions involving numbers                  //

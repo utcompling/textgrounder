@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  mathutil.scala
+//  math.scala
 //
 //  Copyright (C) 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -19,9 +19,9 @@
 package opennlp.textgrounder
 package util
 
-import math._
+import scala.math._
 
-package object mathutil {
+package object math {
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
    */

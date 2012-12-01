@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  osutil.scala
+//  os.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -25,12 +25,12 @@ import java.util.Date
 import java.text.DateFormat
 import java.io._
 
-import ioutil._
-import printutil._
-import textutil._
-import timeutil.format_minutes_seconds
+import io._
+import print._
+import text._
+import time.format_minutes_seconds
 
-package object osutil {
+package object os {
 
   ////////////////////////////////////////////////////////////////////////////
   //                             Resource Usage                             //
@@ -63,7 +63,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
    */
   def initialize_osutil() {
     // Simply calling this function is enough, because it will trigger the
-    // loading of the class associated with package object osutil, which
+    // loading of the class associated with package object os, which
     // will cause `beginning_prog_time` to get set.  We set a flag to verify
     // that this is done.
     initialized = true

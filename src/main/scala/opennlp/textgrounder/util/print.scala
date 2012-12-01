@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  printutil.scala
+//  print.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -29,11 +29,11 @@ import scala.collection.mutable
 // various meanings.)
 import java.io.{Console=>_,_}
 
-import textutil._
-import ioutil._
-import osutil._
+import text._
+import io._
+import os._
 
-package object printutil {
+package object print {
 
   ////////////////////////////////////////////////////////////////////////////
   //                            Text output functions                       //
@@ -226,7 +226,7 @@ package object printutil {
    * @param maxrows If specified, output at most this many rows.
    */
   def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-      table: collection.Map[T,U], keep_secondary_order: Boolean = false,
+      table: scala.collection.Map[T,U], keep_secondary_order: Boolean = false,
       outfile: PrintStream = System.out, indent: String = "",
       maxrows: Int = -1) {
     output_reverse_sorted_list(table toList, keep_secondary_order,
@@ -243,7 +243,7 @@ package object printutil {
    * @param maxrows If specified, output at most this many rows.
    */
   def output_key_sorted_table[T <% Ordered[T],U](
-      table: collection.Map[T,U],
+      table: scala.collection.Map[T,U],
       outfile: PrintStream = System.out, indent: String = "",
       maxrows: Int = -1) {
     output_tuple_list(table.toSeq.sortBy (_._1), outfile, indent,

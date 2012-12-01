@@ -24,13 +24,13 @@ import scala.util.Random
 import math._
 
 import util.argparser._
-import util.collectionutil._
-import util.textdbutil
+import util.collection._
+import util.textdb
 import util.distances._
 import util.experiment._
-import util.ioutil.{FileHandler, LocalFileHandler}
-import util.osutil.output_resource_usage
-import util.printutil.errprint
+import util.io.{FileHandler, LocalFileHandler}
+import util.os.output_resource_usage
+import util.print.errprint
 
 import perceptron._
 import worddist._
@@ -889,9 +889,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   def document_file_suffix = {
     if (word_dist_type == "ngram")
-      textdbutil.ngram_counts_suffix
+      textdb.ngram_counts_suffix
     else
-      textdbutil.unigram_counts_suffix
+      textdb.unigram_counts_suffix
   }
 
   protected def read_stopwords() = {

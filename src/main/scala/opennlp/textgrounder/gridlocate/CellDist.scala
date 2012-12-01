@@ -21,8 +21,8 @@ package gridlocate
 
 import collection.mutable
 
-import util.collectionutil.{LRUCache, doublemap}
-import util.printutil.{errprint, warning}
+import util.collection.{LRUCache, doublemap}
+import util.print.{errprint, warning}
 
 import worddist.{WordDist,UnigramWordDist}
 import worddist.WordDist._

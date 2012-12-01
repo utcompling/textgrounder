@@ -26,13 +26,13 @@ import java.io.PrintStream
 import org.apache.commons.lang3.StringEscapeUtils._
 
 import util.argparser._
-import util.collectionutil._
+import util.collection._
 import util.experiment._
-import util.ioutil._
+import util.io._
 import util.MeteredTask
-import util.osutil.output_resource_usage
-import util.printutil._
-import util.textutil.with_commas
+import util.os.output_resource_usage
+import util.print._
+import util.text.with_commas
 import util.Twokenize
 
 /*

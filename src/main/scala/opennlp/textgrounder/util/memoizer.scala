@@ -20,12 +20,12 @@ package opennlp.textgrounder
 package util
 package memoizer
 
-import collection.mutable
+import scala.collection.mutable
 
 import com.codahale.trove.{mutable => trovescala}
 
-import collectionutil._
-import printutil.errprint
+import collection._
+import print.errprint
 
 trait HashTableFactory {
   /**

@@ -22,8 +22,8 @@ package geolocate
 import collection.mutable
 
 import util.distances._
-import util.textdbutil.Schema
-import util.printutil.warning
+import util.textdb.Schema
+import util.print.warning
 import util.Serializer._
 
 import gridlocate.{GeoDoc,GeoDocFactory}

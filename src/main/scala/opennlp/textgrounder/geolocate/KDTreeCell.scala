@@ -28,7 +28,7 @@ import ags.utils.KdTree
 
 import util.distances.SphereCoord
 import util.experiment._
-import util.printutil.{errprint, warning}
+import util.print.{errprint, warning}
 
 import worddist.UnigramWordDist
 

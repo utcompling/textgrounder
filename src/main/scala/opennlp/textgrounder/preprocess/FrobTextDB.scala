@@ -24,11 +24,11 @@ import collection.mutable
 import java.io._
 
 import util.argparser._
-import util.collectionutil._
-import util.textdbutil._
+import util.collection._
+import util.textdb._
 import util.experiment._
-import util.ioutil._
-import util.printutil.warning
+import util.io._
+import util.print.warning
 
 import gridlocate.GeoDoc
 

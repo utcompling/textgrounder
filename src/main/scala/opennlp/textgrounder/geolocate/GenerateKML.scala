@@ -26,7 +26,7 @@ import org.apache.hadoop.io._
 import util.argparser._
 import util.distances.SphereCoord
 import util.experiment._
-import util.printutil.{errprint, warning}
+import util.print.{errprint, warning}
  
 import gridlocate._
 

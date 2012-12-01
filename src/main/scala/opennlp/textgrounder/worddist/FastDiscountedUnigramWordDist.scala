@@ -22,7 +22,7 @@ package worddist
 import scala.collection.mutable
 import math.{log, sqrt}
 
-import util.collectionutil.DynamicArray
+import util.collection.DynamicArray
 
 import WordDist.Word
 

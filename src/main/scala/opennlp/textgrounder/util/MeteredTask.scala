@@ -21,11 +21,11 @@ package util
 
 import scala.util.control.Breaks._
 
-import collectionutil.{InterruptibleIterator, SideEffectIterator}
-import osutil._
-import printutil.errprint
-import textutil._
-import timeutil.format_minutes_seconds
+import collection.{InterruptibleIterator, SideEffectIterator}
+import os._
+import print.errprint
+import text._
+import time.format_minutes_seconds
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Metered Tasks                               //

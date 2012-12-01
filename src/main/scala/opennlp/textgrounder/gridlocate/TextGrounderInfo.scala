@@ -19,7 +19,7 @@
 package opennlp.textgrounder
 package gridlocate
 
-import util.printutil.errprint
+import util.print.errprint
 
 /**
  TextGrounder-specific information (e.g. env vars).

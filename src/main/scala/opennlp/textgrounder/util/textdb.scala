@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  textdbutil.scala
+//  textdb.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
 //
@@ -19,13 +19,13 @@
 package opennlp.textgrounder
 package util
 
-import collection.mutable
+import scala.collection.mutable
 import scala.util.control.Breaks._
 
 import java.io.PrintStream
 
-import printutil.{errprint, warning}
-import ioutil._
+import print.{errprint, warning}
+import io._
 
 /**
  * Package for databases stored in "textdb" format.
@@ -71,7 +71,7 @@ import ioutil._
  * However, there are a number of convenience functions for handling
  * common situations (e.g. all files in a single directory).
  */
-package object textdbutil {
+package object textdb {
   /**
    * An object describing a textdb schema, i.e. a description of each of the
    * fields in a textdb, along with "fixed fields" containing the same
@@ -524,7 +524,7 @@ package object textdbutil {
    *
    * @param schema the schema describing the fields in the document file
    * @param suffix the suffix of the data files, as described in the
-   *   `textdbutil` package
+   *   `textdb` package
    */
   class TextDBWriter(
     val schema: Schema,
@@ -690,7 +690,7 @@ package object textdbutil {
    * in a corpus.  The word or ngram must already have been encoded using
    * `encode_string_for_count_map_field` or `encode_ngram_for_count_map_field`.
    */
-  def shallow_encode_count_map(seq: collection.Seq[(String, Int)]) = {
+  def shallow_encode_count_map(seq: scala.collection.Seq[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
     // as putting the most significant items first, for visual confirmation.
     (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
@@ -701,7 +701,7 @@ package object textdbutil {
    * Serialize a sequence of (word, count) pairs into the format used
    * in a corpus.
    */
-  def encode_count_map(seq: collection.Seq[(String, Int)]) = {
+  def encode_count_map(seq: scala.collection.Seq[(String, Int)]) = {
     shallow_encode_count_map(seq map {
       case (word, count) => (encode_string_for_count_map_field(word), count)
     })
@@ -736,11 +736,13 @@ package object textdbutil {
   }
 
   object Encoder {
-    def count_map(x: collection.Map[String, Int]) = encode_count_map(x.toSeq)
-    def count_map_seq(x: collection.Seq[(String, Int)]) = encode_count_map(x)
+    def count_map(x: scala.collection.Map[String, Int]) =
+      encode_count_map(x.toSeq)
+    def count_map_seq(x: scala.collection.Seq[(String, Int)]) =
+      encode_count_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
-    def seq_string(x: collection.Seq[String]) =
+    def seq_string(x: scala.collection.Seq[String]) =
       x.map(encode_string_for_sequence_field) mkString ">>"
     def timestamp(x: Long) = x.toString
     def long(x: Long) = x.toString

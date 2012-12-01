@@ -27,11 +27,11 @@ import math._
 import collection.mutable
 
 import util.argparser._
-import util.collectionutil._
+import util.collection._
 import util.distances._
 import util.experiment._
-import util.ioutil.{FileHandler, LocalFileHandler}
-import util.printutil.errprint
+import util.io.{FileHandler, LocalFileHandler}
+import util.print.errprint
 
 import gridlocate._
 import GridLocateDriver.Debug._

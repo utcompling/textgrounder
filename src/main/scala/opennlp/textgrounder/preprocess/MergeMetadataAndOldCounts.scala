@@ -28,11 +28,11 @@ import java.io.{InputStream, PrintStream}
 import gridlocate.GeoDoc
 
 import util.argparser._
-import util.collectionutil.DynamicArray
-import util.textdbutil._
+import util.collection.DynamicArray
+import util.textdb._
 import util.experiment._
-import util.ioutil._
-import util.printutil.{errprint, warning}
+import util.io._
+import util.print.{errprint, warning}
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

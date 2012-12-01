@@ -27,13 +27,13 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.fs.Path
 
 import util.argparser._
-import util.collectionutil.TransposeIterator
+import util.collection.TransposeIterator
 import util.distances._
 import util.hadoop._
-import util.ioutil.FileHandler
-import util.mathutil.{mean, median}
-import util.printutil.{errprint, warning}
-import util.textdbutil.TextDBProcessor
+import util.io.FileHandler
+import util.math.{mean, median}
+import util.print.{errprint, warning}
+import util.textdb.TextDBProcessor
 
 import gridlocate._
 

@@ -37,7 +37,7 @@ package util
 
 import scala.util.control.Breaks._
 import scala.collection.mutable
-import scala.collection.mutable.{Builder, MapBuilder}
+import mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
 
 /**
@@ -59,7 +59,7 @@ import scala.collection.generic.CanBuildFrom
  *    -- 'merge_numbered_sequences_uniquely'
  */
 
-package object collectionutil {
+package object collection {
 
   ////////////////////////////////////////////////////////////////////////////
   //                               Default maps                             //

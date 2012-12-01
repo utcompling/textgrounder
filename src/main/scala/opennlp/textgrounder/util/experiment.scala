@@ -22,12 +22,12 @@ package util
 import scala.collection.mutable
 
 import argparser._
-import collectionutil._
-import ioutil.{FileHandler, LocalFileHandler}
-import osutil._
-import printutil.{errprint, set_stdout_stderr_utf_8}
-import textutil._
-import timeutil.format_minutes_seconds
+import collection._
+import io.{FileHandler, LocalFileHandler}
+import os._
+import print.{errprint, set_stdout_stderr_utf_8}
+import text._
+import time.format_minutes_seconds
 
 package object experiment {
   /**

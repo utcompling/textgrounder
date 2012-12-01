@@ -22,9 +22,9 @@ package geolocate
 import math._
 import collection.mutable
 
-import util.collectionutil._
+import util.collection._
 import util.distances._
-import util.printutil.{errout, errprint}
+import util.print.{errout, errprint}
 import util.experiment._
 
 import gridlocate.GridLocateDriver.Debug._

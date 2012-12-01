@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  timeutil.scala
+//  time.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -20,9 +20,9 @@ package opennlp.textgrounder
 package util
 
 import math._
-import textutil.split_with_delim
+import text.split_with_delim
 
-package object timeutil {
+package object time {
 
   def format_minutes_seconds(seconds: Double, hours: Boolean = true) = {
     var secs = seconds

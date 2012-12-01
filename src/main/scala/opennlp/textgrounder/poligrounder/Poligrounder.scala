@@ -65,13 +65,13 @@ import math._
 import collection.mutable
 
 import util.argparser._
-import util.collectionutil._
-import util.textdbutil._
+import util.collection._
+import util.textdb._
 import util.distances._
 import util.experiment._
-import util.ioutil.{FileHandler, LocalFileHandler}
-import util.printutil.errprint
-import util.timeutil._
+import util.io.{FileHandler, LocalFileHandler}
+import util.print.errprint
+import util.time._
 
 import gridlocate._
 import GridLocateDriver.Debug._

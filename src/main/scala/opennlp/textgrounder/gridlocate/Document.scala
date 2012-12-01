@@ -25,14 +25,14 @@ import scala.util.control.Breaks._
 
 import java.io._
 
-import util.collectionutil._
-import util.textdbutil._
+import util.collection._
+import util.textdb._
 import util.distances._
 import util.experiment._
-import util.ioutil._
-import util.printutil.{errprint, warning}
+import util.io._
+import util.print.{errprint, warning}
 import util.Serializer
-import util.textutil.capfirst
+import util.text.capfirst
 
 import worddist.{WordDist,WordDistFactory}
 
