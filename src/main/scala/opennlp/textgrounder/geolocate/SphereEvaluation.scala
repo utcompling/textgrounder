@@ -25,13 +25,13 @@ import math.{round, floor}
 import collection.mutable
 import scala.util.control.Breaks._
 
-import util.collectionutil.{DoubleTableByRange}
+import util.collection.{DoubleTableByRange}
 import util.distances._
 import util.experiment.ExperimentDriverStats
-import util.mathutil.{mean, median}
-import util.ioutil.{FileHandler}
-import util.printutil.{errprint, warning}
-import util.textutil.split_text_into_words
+import util.math.{mean, median}
+import util.io.{FileHandler}
+import util.print.{errprint, warning}
+import util.text.split_text_into_words
 
 import gridlocate._
 import gridlocate.GridLocateDriver.Debug._

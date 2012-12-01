@@ -27,12 +27,12 @@ import org.apache.commons.logging
 import com.nicta.scoobi.Scoobi._
 
 import util.argparser._
-import util.textdbutil._
+import util.textdb._
 import util.hadoop._
-import util.ioutil._
-import util.collectionutil._
-import util.osutil._
-import util.printutil._
+import util.io._
+import util.collection._
+import util.os._
+import util.print._
 
 class FindPoliticalParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {

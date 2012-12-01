@@ -26,10 +26,10 @@ import scala.util.control.Breaks._
 
 import java.io._
 
-import util.collectionutil.DynamicArray
-import util.textdbutil
-import util.ioutil.{FileHandler, FileFormatException}
-import util.printutil.{errprint, warning}
+import util.collection.DynamicArray
+import util.textdb
+import util.io.{FileHandler, FileFormatException}
+import util.print.{errprint, warning}
 
 import gridlocate.GeoDoc
 import gridlocate.GridLocateDriver.Debug._
@@ -274,7 +274,7 @@ class DefaultUnigramWordDistConstructor(
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
-    for ((word, count) <- textdbutil.decode_count_map(countstr)) {
+    for ((word, count) <- textdb.decode_count_map(countstr)) {
       /* FIXME: Is this necessary? */
       if (raw_keys_set contains word)
         throw FileFormatException(

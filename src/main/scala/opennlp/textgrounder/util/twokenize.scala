@@ -54,6 +54,7 @@ package util
 */
 
 import scala.util.matching.Regex
+import scala.io.Source
 
 object Twokenize {
 
@@ -205,7 +206,7 @@ object Twokenize {
 
   // Main method
   def main (args: Array[String]) = {
-    io.Source.stdin.getLines foreach { 
+    Source.stdin.getLines foreach {
       line => println(apply(line) reduceLeft(_ + " " + _)) 
     }
   }

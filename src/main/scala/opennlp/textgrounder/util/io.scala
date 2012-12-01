@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  ioutil.scala
+//  io.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -33,26 +33,19 @@ import java.util.NoSuchElementException
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
-import printutil.{errprint, warning}
-import textutil._
-import osutil._
+import print.{errprint, warning}
+import text._
+import os._
 
 /**
  * A 'package object' declaration creates a new subpackage and puts the
  * stuff here directly in package scope.  This makes it possible to have
  * functions in package scope instead of inside a class or object (i.e.
- * singleton class).  The functions here are accessed using
- * 'import util.ioutil._' outside of package 'util',
- * and simply 'import ioutil._' inside of it.  Note that this is named
- * 'ioutil' instead of just 'io' to avoid possible conflicts with 'scala.io',
- * which is visible by default as 'io'. (Merely declaring it doesn't cause
- * a problem, as it overrides 'scala.io'; but people using 'io.*' either
- * elsewhere in this package or anywhere that does an import of
- * 'opennlp.textgrounder.util._', expecting it to refer to 'scala.io', will
- * be surprised.
+ * singleton class).  The functions here are accessed using 'import util.io._'
+ * outside of package 'util', and simply 'import io._' inside of it.
  */
 
-package object ioutil {
+package object io {
 
   //////////////////////////////////////////////////////////////////////////////
   //                            File reading functions                        //

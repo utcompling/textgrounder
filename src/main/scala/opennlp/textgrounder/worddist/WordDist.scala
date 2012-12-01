@@ -22,9 +22,9 @@ package worddist
 import math._
 import collection.mutable
 
-import util.collectionutil._
-import util.ioutil.FileHandler
-import util.printutil.{errprint, warning}
+import util.collection._
+import util.io.FileHandler
+import util.print.{errprint, warning}
 import util.Serializer
 import util.memoizer._
 

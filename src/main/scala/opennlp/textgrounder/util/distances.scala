@@ -19,10 +19,10 @@
 package opennlp.textgrounder
 package util
 
-import math._
+import scala.math._
 
-import printutil.warning
-import mathutil.MeanShift
+import print.warning
+import math.MeanShift
 
 /*
   The coordinates of a point are spherical coordinates, indicating a

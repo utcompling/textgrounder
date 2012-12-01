@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package geolocate
 
 import util.distances._
-import util.textdbutil.Schema
+import util.textdb.Schema
 
 import worddist.{WordDist,WordDistFactory}
 import worddist.WordDist._

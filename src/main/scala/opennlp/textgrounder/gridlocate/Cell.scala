@@ -22,7 +22,7 @@ package gridlocate
 
 import collection.mutable
 
-import util.printutil.{errprint, warning}
+import util.print.{errprint, warning}
 import util.experiment._
 
 import worddist.WordDistFactory

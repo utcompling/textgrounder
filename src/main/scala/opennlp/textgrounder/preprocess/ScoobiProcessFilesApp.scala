@@ -34,9 +34,9 @@ import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.application.HadoopLogFactory
 
 import util.argparser._
-import util.osutil._
-import util.collectionutil._
-import util.printutil._
+import util.os._
+import util.collection._
+import util.print._
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",

@@ -24,12 +24,12 @@ package gridlocate
 import scala.util.control.Breaks._
 import collection.mutable
 
-import util.collectionutil._
+import util.collection._
 import util.experiment._
-import util.mathutil._
-import util.ioutil.FileHandler
-import util.osutil.{curtimehuman, output_resource_usage}
-import util.printutil.{errprint, warning}
+import util.math._
+import util.io.FileHandler
+import util.os.{curtimehuman, output_resource_usage}
+import util.print.{errprint, warning}
 
 import GridLocateDriver.Debug._
 

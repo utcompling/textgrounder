@@ -5,7 +5,7 @@ import math.log
 
 import worddist.WordDist._
 import worddist.UnigramWordDist
-import util.printutil._
+import util.print._
 import perceptron._
 
 import GridLocateDriver.Debug._

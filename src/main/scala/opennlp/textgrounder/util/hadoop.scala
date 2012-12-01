@@ -35,11 +35,11 @@ import java.io.{FileSystem=>_,_}
 import java.net.URI
 
 import argparser._
-import collectionutil._
-import textdbutil._
+import collection._
+import textdb._
 import experiment._
-import ioutil._
-import printutil.{errprint, set_errout_prefix}
+import io._
+import print.{errprint, set_errout_prefix}
 
 package object hadoop {
   class HadoopFileHandler(conf: Configuration) extends FileHandler {

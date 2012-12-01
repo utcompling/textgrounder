@@ -21,8 +21,8 @@ package worddist
 
 import math._
 
-import util.collectionutil._
-import util.printutil.errprint
+import util.collection._
+import util.print.errprint
 
 import gridlocate.GridLocateDriver.Debug._
 

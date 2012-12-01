@@ -22,8 +22,8 @@ package poligrounder
 import collection.mutable
 
 import util.distances._
-import util.textdbutil.Schema
-import util.printutil._
+import util.textdb.Schema
+import util.print._
 import util.Serializer._
 
 import gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}

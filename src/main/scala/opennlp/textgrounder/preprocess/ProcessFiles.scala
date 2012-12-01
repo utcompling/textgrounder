@@ -21,7 +21,7 @@ package preprocess
 
 import util.argparser._
 import util.experiment._
-import util.ioutil._
+import util.io._
 
 /*
    Common code for doing basic file-processing operations.

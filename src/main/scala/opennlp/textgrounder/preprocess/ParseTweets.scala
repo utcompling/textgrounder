@@ -48,13 +48,13 @@ import com.nicta.scoobi.Scoobi._
 
 import util.Twokenize
 import util.argparser._
-import util.collectionutil._
-import util.textdbutil._
-import util.ioutil.FileHandler
+import util.collection._
+import util.textdb._
+import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
-import util.printutil._
-import util.textutil.with_commas
-import util.timeutil._
+import util.print._
+import util.text.with_commas
+import util.time._
 
 class ParseTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {

@@ -19,7 +19,7 @@
 package opennlp.textgrounder
 package worddist
 
-import util.printutil.errprint
+import util.print.errprint
 
 import gridlocate.GridLocateDriver.Debug._
 

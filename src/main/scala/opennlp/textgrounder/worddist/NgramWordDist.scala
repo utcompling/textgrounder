@@ -26,10 +26,10 @@ import scala.util.control.Breaks._
 
 import java.io._
 
-import util.collectionutil.DynamicArray
-import util.textdbutil
-import util.ioutil.{FileHandler, FileFormatException}
-import util.printutil.{errprint, warning}
+import util.collection.DynamicArray
+import util.textdb
+import util.io.{FileHandler, FileFormatException}
+import util.print.{errprint, warning}
 
 import gridlocate.GeoDoc
 import gridlocate.GridLocateDriver.Debug._
@@ -337,7 +337,7 @@ class DefaultNgramWordDistConstructor(
     parsed_ngrams.clear()
     val ngramcounts = countstr.split(" ")
     for (ngramcount <- ngramcounts) yield {
-      val (egram, count) = textdbutil.shallow_split_count_map_field(ngramcount)
+      val (egram, count) = textdb.shallow_split_count_map_field(ngramcount)
       if (parsed_ngrams contains egram)
         throw FileFormatException(
           "Ngram %s seen twice in same counts list" format egram)
@@ -400,7 +400,7 @@ class DefaultNgramWordDistConstructor(
     var addedTokens = 0
     var totalTokens = 0
     for ((egram, count) <- grams) {
-      val ngram = textdbutil.decode_ngram_for_count_map_field(egram)
+      val ngram = textdb.decode_ngram_for_count_map_field(egram)
       if (add_ngram_with_count(dist, ngram, count)) {
         addedTypes += 1
         addedTokens += count

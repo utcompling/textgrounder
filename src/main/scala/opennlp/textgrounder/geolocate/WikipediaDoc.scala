@@ -21,12 +21,12 @@ package geolocate
 
 import collection.mutable
 
-import util.collectionutil._
+import util.collection._
 import util.distances._
-import util.textdbutil.Schema
-import util.printutil.{errprint, warning}
+import util.textdb.Schema
+import util.print.{errprint, warning}
 import util.Serializer._
-import util.textutil.capfirst
+import util.text.capfirst
 
 import gridlocate.GridLocateDriver.Debug._
 
