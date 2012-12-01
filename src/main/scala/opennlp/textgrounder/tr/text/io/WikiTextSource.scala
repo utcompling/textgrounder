@@ -1,11 +1,12 @@
-package opennlp.textgrounder.tr.text.io
+package opennlp.textgrounder.tr
+package text.io
 
 import java.io._
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.Buffer
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.prep._
+import text._
+import text.prep._
 
 class WikiTextSource(
   reader: BufferedReader

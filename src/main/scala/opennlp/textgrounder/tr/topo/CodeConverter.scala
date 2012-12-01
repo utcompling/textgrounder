@@ -13,7 +13,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.topo.util
+package opennlp.textgrounder.tr
+package topo
 
 import java.io._
 import java.io.InputStream

@@ -13,14 +13,15 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.topo.gaz
+package opennlp.textgrounder.tr
+package topo.gaz
 
 import java.util.Iterator
 import scala.collection.JavaConversions._
 
-import opennlp.textgrounder.tr.text.Corpus
-import opennlp.textgrounder.tr.text.Token
-import opennlp.textgrounder.tr.topo.Location
+import text.Corpus
+import text.Token
+import topo.Location
 
 class CorpusGazetteerReader(private val corpus: Corpus[_ <: Token])
   extends GazetteerReader {

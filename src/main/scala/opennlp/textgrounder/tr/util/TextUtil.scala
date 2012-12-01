@@ -1,8 +1,9 @@
-package opennlp.textgrounder.tr.util
+package opennlp.textgrounder.tr
+package util
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.prep._
-import opennlp.textgrounder.tr.text.io._
+import text._
+import text.prep._
+import text.io._
 
 import scala.collection.JavaConversions._
 

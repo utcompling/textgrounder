@@ -1,13 +1,15 @@
-package opennlp.textgrounder.tr.text.io
+package opennlp.textgrounder.tr
+package text.io
 
 import java.io._
 import java.util._
 import javax.xml.datatype._
-import javax.xml.stream._
+// Avoid name clash with util directory here and below
+import javax.xml.stream.{util=>_,_}
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.topo._
-import opennlp.textgrounder.tr.util._
+import text._
+import topo._
+import util._
 
 import scala.collection.JavaConversions._
 

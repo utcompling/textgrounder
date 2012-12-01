@@ -13,10 +13,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.resolver
+package opennlp.textgrounder.tr
+package resolver
 
 import scala.collection.JavaConversions._
-import opennlp.textgrounder.tr.text._
+import text._
 
 
 class AltBasicMinDistResolver extends Resolver {

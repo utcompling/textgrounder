@@ -13,15 +13,16 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.topo.gaz.geonames
+package opennlp.textgrounder.tr
+package topo.gaz.geonames
 
 import java.io._
 import scala.collection.JavaConversions._
 import scala.io._
 
-import opennlp.textgrounder.tr.text.Corpus
-import opennlp.textgrounder.tr.text.Token
-import opennlp.textgrounder.tr.topo.Location
+import text.Corpus
+import text.Token
+import topo.Location
 
 class GeoNamesParser(private val file: File) {
   val locs = scala.collection.mutable.Map[String, List[(Double, Double)]]()
