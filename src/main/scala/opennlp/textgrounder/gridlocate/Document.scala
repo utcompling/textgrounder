@@ -17,24 +17,24 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
-import util.matching.Regex
-import util.control.Breaks._
+import scala.util.matching.Regex
+import scala.util.control.Breaks._
 
 import java.io._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.textdbutil._
-import tgutil.distances._
-import tgutil.experiment._
-import tgutil.ioutil._
-import tgutil.printutil.{errprint, warning}
-import tgutil.Serializer
-import tgutil.textutil.capfirst
+import util.collectionutil._
+import util.textdbutil._
+import util.distances._
+import util.experiment._
+import util.ioutil._
+import util.printutil.{errprint, warning}
+import util.Serializer
+import util.textutil.capfirst
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
+import worddist.{WordDist,WordDistFactory}
 
 import GridLocateDriver.Debug._
 
@@ -705,7 +705,7 @@ abstract class GeoDoc[Co : Serializer](
   val dist: WordDist
 ) {
 
-  import tgutil.Serializer._
+  import util.Serializer._
 
   /**
    * Title of the document -- something that uniquely identifies it,

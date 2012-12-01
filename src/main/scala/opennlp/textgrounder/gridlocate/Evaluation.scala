@@ -18,18 +18,18 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.gridlocate
+package opennlp.textgrounder
+package gridlocate
 
-import util.control.Breaks._
+import scala.util.control.Breaks._
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.experiment._
-import tgutil.mathutil._
-import tgutil.ioutil.FileHandler
-import tgutil.osutil.{curtimehuman, output_resource_usage}
-import tgutil.printutil.{errprint, warning}
+import util.collectionutil._
+import util.experiment._
+import util.mathutil._
+import util.ioutil.FileHandler
+import util.osutil.{curtimehuman, output_resource_usage}
+import util.printutil.{errprint, warning}
 
 import GridLocateDriver.Debug._
 

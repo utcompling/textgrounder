@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.util
+package opennlp.textgrounder
+package util
 
 object WikiRelFreqs extends App {
 

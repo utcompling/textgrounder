@@ -16,10 +16,11 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.util
+package opennlp.textgrounder
+package util
 
 import collection.mutable
-import util.control.Breaks._
+import scala.util.control.Breaks._
 
 import java.io.PrintStream
 

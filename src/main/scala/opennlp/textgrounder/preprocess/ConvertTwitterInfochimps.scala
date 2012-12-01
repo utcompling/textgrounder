@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
 import collection.mutable
 
@@ -24,16 +25,15 @@ import java.io.PrintStream
 
 import org.apache.commons.lang3.StringEscapeUtils._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.experiment._
-import tgutil.ioutil._
-import tgutil.MeteredTask
-import tgutil.osutil.output_resource_usage
-import tgutil.printutil._
-import tgutil.textutil.with_commas
-import tgutil.Twokenize
+import util.argparser._
+import util.collectionutil._
+import util.experiment._
+import util.ioutil._
+import util.MeteredTask
+import util.osutil.output_resource_usage
+import util.printutil._
+import util.textutil.with_commas
+import util.Twokenize
 
 /*
 

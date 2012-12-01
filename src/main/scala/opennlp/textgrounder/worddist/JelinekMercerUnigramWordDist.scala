@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
 /**
  * This class implements Jelinek-Mercer discounting, the simplest type of

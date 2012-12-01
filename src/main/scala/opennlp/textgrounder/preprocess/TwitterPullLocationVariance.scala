@@ -16,7 +16,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.preprocess
+package opennlp.textgrounder
+package preprocess
 
 import net.liftweb.json
 import com.nicta.scoobi.Scoobi._
@@ -25,9 +26,8 @@ import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
 import math.pow
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.Twokenize
-import tgutil.distances.{spheredist, SphereCoord}
+import util.Twokenize
+import util.distances.{spheredist, SphereCoord}
 
 /*
  * This program takes, as input, files which contain one tweet

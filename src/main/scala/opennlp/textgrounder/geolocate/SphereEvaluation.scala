@@ -18,23 +18,23 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import math.{round, floor}
 import collection.mutable
-import util.control.Breaks._
+import scala.util.control.Breaks._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil.{DoubleTableByRange}
-import tgutil.distances._
-import tgutil.experiment.ExperimentDriverStats
-import tgutil.mathutil.{mean, median}
-import tgutil.ioutil.{FileHandler}
-import tgutil.printutil.{errprint, warning}
-import tgutil.textutil.split_text_into_words
+import util.collectionutil.{DoubleTableByRange}
+import util.distances._
+import util.experiment.ExperimentDriverStats
+import util.mathutil.{mean, median}
+import util.ioutil.{FileHandler}
+import util.printutil.{errprint, warning}
+import util.textutil.split_text_into_words
 
-import opennlp.textgrounder.gridlocate._
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import gridlocate._
+import gridlocate.GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //

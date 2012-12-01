@@ -18,19 +18,19 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.Map
 
 import ags.utils.KdTree
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.distances.SphereCoord
-import tgutil.experiment._
-import tgutil.printutil.{errprint, warning}
+import util.distances.SphereCoord
+import util.experiment._
+import util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.worddist.UnigramWordDist
+import worddist.UnigramWordDist
 
 class KdTreeCell(
   cellgrid: KdTreeGrid,

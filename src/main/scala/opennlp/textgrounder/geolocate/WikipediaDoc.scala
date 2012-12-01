@@ -16,22 +16,22 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.distances._
-import tgutil.textdbutil.Schema
-import tgutil.printutil.{errprint, warning}
-import tgutil.Serializer._
-import tgutil.textutil.capfirst
+import util.collectionutil._
+import util.distances._
+import util.textdbutil.Schema
+import util.printutil.{errprint, warning}
+import util.Serializer._
+import util.textutil.capfirst
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist._
+import worddist.{WordDist,WordDistFactory}
+import worddist.WordDist._
 
 /**
  * A document corresponding to a Wikipedia article.

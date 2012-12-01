@@ -16,19 +16,19 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.distances._
-import tgutil.textdbutil.Schema
-import tgutil.printutil.warning
-import tgutil.Serializer._
+import util.distances._
+import util.textdbutil.Schema
+import util.printutil.warning
+import util.Serializer._
 
-import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory}
+import gridlocate.{GeoDoc,GeoDocFactory}
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
+import worddist.{WordDist,WordDistFactory}
 
 abstract class RealSphereDoc(
   schema: Schema,

@@ -16,19 +16,19 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.poligrounder
+package opennlp.textgrounder
+package poligrounder
 
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.distances._
-import tgutil.textdbutil.Schema
-import tgutil.printutil._
-import tgutil.Serializer._
+import util.distances._
+import util.textdbutil.Schema
+import util.printutil._
+import util.Serializer._
 
-import opennlp.textgrounder.gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
+import gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
+import worddist.{WordDist,WordDistFactory}
 
 class TimeDoc(
   schema: Schema,

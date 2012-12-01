@@ -16,15 +16,15 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.worddist
+package opennlp.textgrounder
+package worddist
 
 import math._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil._
-import tgutil.printutil.errprint
+import util.collectionutil._
+import util.printutil.errprint
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import gridlocate.GridLocateDriver.Debug._
 
 import WordDist._
 

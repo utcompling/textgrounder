@@ -18,26 +18,26 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder
+package geolocate
 
-import util.matching.Regex
-import util.Random
+import scala.util.matching.Regex
+import scala.util.Random
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.argparser._
-import tgutil.collectionutil._
-import tgutil.distances._
-import tgutil.experiment._
-import tgutil.ioutil.{FileHandler, LocalFileHandler}
-import tgutil.printutil.errprint
+import util.argparser._
+import util.collectionutil._
+import util.distances._
+import util.experiment._
+import util.ioutil.{FileHandler, LocalFileHandler}
+import util.printutil.errprint
 
-import opennlp.textgrounder.gridlocate._
+import gridlocate._
 import GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
-import opennlp.textgrounder.worddist.WordDist._
+import worddist.{WordDist,WordDistFactory}
+import worddist.WordDist._
 
 /*
 
