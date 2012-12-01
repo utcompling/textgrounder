@@ -1,4 +1,5 @@
-package opennlp.textgrounder.tr.app
+package opennlp.textgrounder.tr
+package app
 
 import processing.core._
 //import processing.opengl._
@@ -10,10 +11,10 @@ import de.fhpotsdam.unfolding.utils._
 import de.fhpotsdam.unfolding.providers.Microsoft
 import controlP5._
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.io._
-import opennlp.textgrounder.tr.text.prep._
-import opennlp.textgrounder.tr.util._
+import text._
+import text.io._
+import text.prep._
+import util._
 
 import java.io._
 import java.awt.event._

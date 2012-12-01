@@ -13,7 +13,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.text.io
+package opennlp.textgrounder.tr
+package text.io
 
 import java.io.BufferedReader
 import java.io.File
@@ -23,8 +24,8 @@ import java.util.List
 import scala.collection.JavaConversions._
 import scala.collection.mutable.Buffer
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.prep._
+import text._
+import text.prep._
 
 class GigawordSource(
   reader: BufferedReader,

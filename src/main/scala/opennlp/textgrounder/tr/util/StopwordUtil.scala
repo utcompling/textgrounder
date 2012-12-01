@@ -1,4 +1,5 @@
-package opennlp.textgrounder.tr.util
+package opennlp.textgrounder.tr
+package util
 
 import java.io._
 

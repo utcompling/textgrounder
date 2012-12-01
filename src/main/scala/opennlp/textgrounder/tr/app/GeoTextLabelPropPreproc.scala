@@ -1,14 +1,15 @@
-package opennlp.textgrounder.tr.app
+package opennlp.textgrounder.tr
+package app
 
 import java.io._
 import java.util._
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.io._
-import opennlp.textgrounder.tr.text.prep._
-import opennlp.textgrounder.tr.app._
-import opennlp.textgrounder.tr.util.StopwordUtil
-import opennlp.textgrounder.tr.util.TopoUtil
+import text._
+import text.io._
+import text.prep._
+import app._
+import util.StopwordUtil
+import util.TopoUtil
 
 import scala.collection.JavaConversions._
 

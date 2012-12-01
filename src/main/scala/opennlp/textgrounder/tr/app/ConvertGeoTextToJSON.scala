@@ -1,4 +1,5 @@
-package opennlp.textgrounder.tr.app
+package opennlp.textgrounder.tr
+package app
 
 import com.codahale.jerkson.Json._
 

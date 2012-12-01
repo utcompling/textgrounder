@@ -1,4 +1,5 @@
-package opennlp.textgrounder.tr.resolver
+package opennlp.textgrounder.tr
+package resolver
 
 import java.io._
 
@@ -6,9 +7,9 @@ import opennlp.maxent._
 import opennlp.maxent.io._
 import opennlp.model._
 
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.topo._
-import opennlp.textgrounder.tr.util._
+import text._
+import topo._
+import util._
 
 import scala.collection.JavaConversions._
 

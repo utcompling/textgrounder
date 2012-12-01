@@ -13,16 +13,17 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.util.sanity
+package opennlp.textgrounder.tr
+package util.sanity
 
 import java.io._
 import scala.collection.JavaConversions._
 
-import opennlp.textgrounder.tr.text.Corpus
-import opennlp.textgrounder.tr.text.Toponym
-import opennlp.textgrounder.tr.text.io.TrXMLDirSource
-import opennlp.textgrounder.tr.text.prep.OpenNLPTokenizer
-import opennlp.textgrounder.tr.topo.Location
+import text.Corpus
+import text.Toponym
+import text.io.TrXMLDirSource
+import text.prep.OpenNLPTokenizer
+import topo.Location
 
 object CandidateCheck extends App {
   override def main(args: Array[String]) {

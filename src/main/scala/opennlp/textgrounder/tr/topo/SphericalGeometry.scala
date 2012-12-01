@@ -13,13 +13,14 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.topo
+package opennlp.textgrounder.tr
+package topo
 
 import scala.io._
 
 import scala.collection.JavaConversions._
 
-import opennlp.textgrounder.tr.util.cluster._
+import util.cluster._
 
 object SphericalGeometry {
   implicit def g: Geometry[Coordinate] = new Geometry[Coordinate] {

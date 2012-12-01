@@ -13,17 +13,18 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.tr.app
+package opennlp.textgrounder.tr
+package app
 
 import java.io._
 
-import opennlp.textgrounder.tr.eval._
-import opennlp.textgrounder.tr.resolver._
-import opennlp.textgrounder.tr.topo.gaz._
-import opennlp.textgrounder.tr.text._
-import opennlp.textgrounder.tr.text.io._
-import opennlp.textgrounder.tr.text.prep._
-import opennlp.textgrounder.tr.util.Constants
+import eval._
+import resolver._
+import topo.gaz._
+import text._
+import text.io._
+import text.prep._
+import util.Constants
 
 object ReprocessTrApp {
   def main(args: Array[String]) {

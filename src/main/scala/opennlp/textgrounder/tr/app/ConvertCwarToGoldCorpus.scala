@@ -1,9 +1,10 @@
-package opennlp.textgrounder.tr.app
+package opennlp.textgrounder.tr
+package app
 
-import opennlp.textgrounder.tr.topo._
-import opennlp.textgrounder.tr.util._
-import opennlp.textgrounder.tr.topo.gaz._
-import opennlp.textgrounder.tr.text.io._
+import topo._
+import util._
+import topo.gaz._
+import text.io._
 import java.util.zip._
 
 import java.io._
