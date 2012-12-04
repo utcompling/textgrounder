@@ -1230,33 +1230,44 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         val docfact =
           create_document_factory(strategy.grid.docfact.word_dist_factory)
         val rerank_instance_factory = create_rerank_instance_factory
-        val reranker =
-          new LinearClassifierGridReranker[Co](
+        val reranker_trainer =
+          new LinearClassifierGridRerankerTrainer[Co](
             create_pointwise_classifier_trainer
           ) {
             val initial_ranker = basic_ranker
             val top_n = params.rerank_top_n
-            val training_data = new Iterable[(GeoDoc[Co], GeoCell[Co])] {
-              def iterator = {
-                read_training_documents(docfact,
-                    operation = "generating training data for reranker").
-                  map { doc =>
-                    val cell = strategy.grid.
-                      find_best_cell_for_document(doc, false)
-                    // We should already have a cell for each training doc,
-                    // right?
-                    assert(cell != None)
-                    (doc, cell.get)
-                  }
-              }
-            }
             protected def create_rerank_instance(query: GeoDoc[Co],
                 answer: GeoCell[Co], initial_score: Double,
-                is_correct: Boolean) = {
-              rerank_instance_factory(query, answer, initial_score, is_correct)
+                is_training: Boolean) = {
+              rerank_instance_factory(query, answer, initial_score, is_training)
             }
           }
-        reranker.train()
+        val training_data = new Iterable[(GeoDoc[Co], GeoCell[Co])] {
+          def iterator = {
+            read_training_documents(docfact,
+                operation = "generating training data for reranker").
+              map { doc =>
+                val cell = strategy.grid.
+                  find_best_cell_for_document(doc, false)
+                // We should already have a cell for each training doc,
+                // right?
+                assert(cell != None)
+                (doc, cell.get)
+              }
+          }
+        }
+        val the_rerank_classifier =
+          reranker_trainer(training_data, basic_ranker)
+        new PointwiseGridReranker[Co, FeatureVector] {
+          val rerank_classifier = the_rerank_classifier
+          val initial_ranker = basic_ranker
+          val top_n = params.rerank_top_n
+          protected def create_rerank_instance(query: GeoDoc[Co],
+              answer: GeoCell[Co], initial_score: Double,
+              is_training: Boolean) = {
+            rerank_instance_factory(query, answer, initial_score, is_training)
+          }
+        }
       }
     }
   }

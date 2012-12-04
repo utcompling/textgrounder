@@ -41,6 +41,26 @@ class GridRanker[Co](
 }
 
 /**
+ * Common methods and fields between `Reranker` and reranker trainers.
+ */
+trait RerankerLike[Query, Answer] {
+  /**
+   * Number of top-ranked items to submit to reranking.
+   */
+  protected val top_n: Int
+
+  /**
+   * Display a query item (typically for debugging purposes).
+   */
+  protected def display_query_item(item: Query) = item.toString
+
+  /**
+   * Display an answer (typically for debugging purposes).
+   */
+  protected def display_answer(answer: Answer) = answer.toString
+}
+
+/**
  * A reranker.  This is a particular type of ranker that involves two
  * steps: One to compute an initial ranking, and a second to do a more
  * accurate reranking of some subset of the highest-ranked answers.  The
@@ -49,18 +69,9 @@ class GridRanker[Co](
  * is able to include the correct answer near the top significantly more
  * often than actually at the top.
  */
-trait Reranker[Query, Answer] extends Ranker[Query, Answer] {
+trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Query, Answer] {
   /** Ranker for generating initial ranking. */
   protected def initial_ranker: Ranker[Query, Answer]
-
-  /**
-   * Number of top-ranked items to submit to reranking.
-   */
-  protected val top_n: Int
-
-  protected def display_query_item(item: Query) = item.toString
-
-  protected def display_answer(answer: Answer) = answer.toString
 
   /**
    * Rerank the given answers, based on an initial ranking.
@@ -101,7 +112,7 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
    * classifier.
    */
   protected def create_rerank_instance(query: Query, answer: Answer,
-    initial_score: Double, is_correct: Boolean): RerankInstance
+    initial_score: Double, is_training: Boolean): RerankInstance
 
   def rerank_answers(item: Query,
       answers: Iterable[(Answer, Double)]) = {
@@ -115,13 +126,9 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
   }
 }
 
-class PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer] {
-}
-
-
 /**
- * A pointwise classifying reranker that uses training data to train the
- * classifier.  The training data consists of query items and correct
+ * A class for training a pointwise classifying reranker.  Training data
+ * is supplied to train the classifier, consisting of query items and correct
  * answers.  From each data item, a series of training instances are
  * generated as follows: (1) rank the data item to produce a set of
  * possible answers; (2) if necessary, augment the possible answers to
@@ -129,19 +136,14 @@ class PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer] {
  * combination of query item and answer, with "correct" or "incorrect"
  * indicated.
  */
-trait PointwiseClassifyingRerankerWithTrainingData[
-    Query, RerankInstance, Answer] extends
-  PointwiseClassifyingReranker[Query, RerankInstance, Answer] {
-  /**
-   * Training data used to create the reranker.
-   */
-  protected val training_data: Iterable[(Query, Answer)]
-
+trait PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer]
+extends RerankerLike[Query, Answer] {
 //  /**
 //   * Number of splits used in the training data, to create the reranker.
 //   */
 //  protected val number_of_splits: Int
 //
+
   /**
    * Create the classifier used for reranking, given a set of training data
    * (in the form of pairs of reranking instances and whether they represent
@@ -150,6 +152,15 @@ trait PointwiseClassifyingRerankerWithTrainingData[
   protected def create_rerank_classifier(
     data: Iterable[(RerankInstance, Boolean)]
   ): ScoringBinaryClassifier[RerankInstance]
+
+  /**
+   * Create a reranking training instance to feed to the classifier, given
+   * a query item, a potential answer from the ranker, and whether the answer
+   * is correct.  These training instances will be used to train the
+   * classifier.
+   */
+  protected def create_rerank_instance(query: Query, answer: Answer,
+    initial_score: Double, is_training: Boolean): RerankInstance
 
   /**
    * Generate rerank training instances for a given ranker
@@ -196,7 +207,8 @@ trait PointwiseClassifyingRerankerWithTrainingData[
 //     val initrank_data = initrank_splits.map(_._1).flatten
 //     val split_initial_ranker = create_initial_ranker(initrank_data)
 
-  lazy protected val rerank_classifier = {
+  def apply(training_data: Iterable[(Query, Answer)],
+      initial_ranker: Ranker[Query, Answer]) = {
     val rerank_training_data =
       if (debug("rerank-training")) {
         training_data.zipWithIndex.flatMap {
@@ -223,20 +235,8 @@ trait PointwiseClassifyingRerankerWithTrainingData[
       }
     create_rerank_classifier(rerank_training_data.toIndexedSeq)
   }
-
-  /**
-   * Train the reranker and return a trained version.  Note that this isn't
-   * strictly necessary, because the first attempt to use the classifier
-   * will automatically train it.  However, calling this function allows
-   * the time at which training occurs to be controlled.
-   */
-  def train() = {
-    // Simply accessing the classifier will train it, since it's a lazy
-    // variable.
-    rerank_classifier
-    this
-  }
 }
+
 
 /**
  * A scoring binary classifier.  Given a query item, return a score, with
@@ -381,6 +381,17 @@ class TrivialScoringBinaryClassifier(
   }
 }
 
+trait GridRerankerLike[Co] extends RerankerLike[GeoDoc[Co], GeoCell[Co]] {
+  override def display_query_item(item: GeoDoc[Co]) = {
+    "%s, dist=%s" format (item, item.dist.debug_string)
+  }
+}
+
+trait PointwiseGridReranker[Co, RerankInstance]
+extends PointwiseClassifyingReranker[GeoDoc[Co], RerankInstance, GeoCell[Co]]
+   with GridRerankerLike[Co] {
+}
+
 /**
  * A trivial grid reranker.  A grid reranker is a reranker based on a grid
  * ranker (for ranking cells in a grid as possible matches for a given
@@ -390,9 +401,7 @@ class TrivialScoringBinaryClassifier(
 class TrivialGridReranker[Co](
   val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
   val top_n: Int
-) extends PointwiseClassifyingReranker[
-  GeoDoc[Co], Double, GeoCell[Co]
-] {
+) extends PointwiseGridReranker[Co, Double] {
   lazy protected val rerank_classifier =
     new TrivialScoringBinaryClassifier(
         0 // FIXME: This is incorrect but doesn't matter
@@ -418,11 +427,10 @@ class TrivialGridReranker[Co](
  *   cell and initial score.
  * @param top_n Number of top items to rerank.
  */
-abstract class LinearClassifierGridReranker[Co](
+abstract class LinearClassifierGridRerankerTrainer[Co](
   val trainer: BinaryLinearClassifierTrainer
-) extends PointwiseClassifyingRerankerWithTrainingData[
-  GeoDoc[Co], FeatureVector, GeoCell[Co]
-  ] {
+) extends PointwiseClassifyingRerankerTrainer[GeoDoc[Co], FeatureVector, GeoCell[Co]]
+    with GridRerankerLike[Co] {
   protected def create_rerank_classifier(
     data: Iterable[(FeatureVector, Boolean)]
   ) = {
@@ -442,9 +450,5 @@ abstract class LinearClassifierGridReranker[Co](
     errprint("Avg number of stored features per training item: %.2f",
       num_total_stored_feats.toDouble / data.size)
     new LinearClassifierAdapter(trainer(adapted_data, 2))
-  }
-
-  override def display_query_item(item: GeoDoc[Co]) = {
-    "%s, dist=%s" format (item, item.dist.debug_string)
   }
 }
