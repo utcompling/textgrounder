@@ -802,6 +802,17 @@ is '%default'.""")
       default = 50,
       help = """Number of top-ranked items to rerank.  Default is %default.""")
 
+  var rerank_num_training_splits =
+    ap.option[Int]("rerank-num-training-splits",
+      default = 5,
+      help = """Number of splits to use when training the reranker.
+The source training data is split into this many segments, and each segment
+is used to construct a portion of the actual training data for the reranker
+by creating an initial ranker based on the remaining segments.  This is
+similar to cross-validation for evaluation purposes and serves to avoid the
+problems that ensue when a given piece of data is evaluated on a machine
+trained on that same data. Default is %default.""")
+
   var rerank_classifier =
     ap.option[String]("rerank-classifier",
       default = "perceptron",
@@ -1218,23 +1229,34 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
       case _ => {
         val docfact =
           create_document_factory(strategy.grid.docfact.word_dist_factory)
-        val training_docs =
-          read_training_documents(docfact,
-              operation = "generating training data for reranker").
-            map { doc =>
-              val cell = strategy.grid.find_best_cell_for_document(doc, false)
-              // We should already have a cell for each training doc,
-              // right?
-              assert(cell != None)
-              (doc, cell.get)
+        val rerank_instance_factory = create_rerank_instance_factory
+        val reranker =
+          new LinearClassifierGridReranker[Co](
+            create_pointwise_classifier_trainer
+          ) {
+            val initial_ranker = basic_ranker
+            val top_n = params.rerank_top_n
+            val training_data = new Iterable[(GeoDoc[Co], GeoCell[Co])] {
+              def iterator = {
+                read_training_documents(docfact,
+                    operation = "generating training data for reranker").
+                  map { doc =>
+                    val cell = strategy.grid.
+                      find_best_cell_for_document(doc, false)
+                    // We should already have a cell for each training doc,
+                    // right?
+                    assert(cell != None)
+                    (doc, cell.get)
+                  }
+              }
             }
-        new LinearClassifierGridReranker[Co](
-          basic_ranker,
-          create_pointwise_classifier_trainer,
-          training_docs,
-          create_rerank_instance_factory,
-          params.rerank_top_n
-        ).train()
+            protected def create_rerank_instance(query: GeoDoc[Co],
+                answer: GeoCell[Co], initial_score: Double,
+                is_correct: Boolean) = {
+              rerank_instance_factory(query, answer, initial_score, is_correct)
+            }
+          }
+        reranker.train()
       }
     }
   }
