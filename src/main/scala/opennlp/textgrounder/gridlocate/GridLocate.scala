@@ -1256,18 +1256,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
               }
           }
         }
-        val the_rerank_classifier =
-          reranker_trainer(training_data, basic_ranker)
-        new PointwiseGridReranker[Co, FeatureVector] {
-          val rerank_classifier = the_rerank_classifier
-          val initial_ranker = basic_ranker
-          val top_n = params.rerank_top_n
-          protected def create_rerank_instance(query: GeoDoc[Co],
-              answer: GeoCell[Co], initial_score: Double,
-              is_training: Boolean) = {
-            rerank_instance_factory(query, answer, initial_score, is_training)
-          }
-        }
+        reranker_trainer(training_data, basic_ranker)
       }
     }
   }

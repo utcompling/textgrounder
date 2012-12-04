@@ -137,7 +137,7 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
  * indicated.
  */
 trait PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer]
-extends RerankerLike[Query, Answer] {
+extends RerankerLike[Query, Answer] { self =>
 //  /**
 //   * Number of splits used in the training data, to create the reranker.
 //   */
@@ -207,7 +207,7 @@ extends RerankerLike[Query, Answer] {
 //     val initrank_data = initrank_splits.map(_._1).flatten
 //     val split_initial_ranker = create_initial_ranker(initrank_data)
 
-  def apply(training_data: Iterable[(Query, Answer)],
+  def train_rerank_classifier(training_data: Iterable[(Query, Answer)],
       initial_ranker: Ranker[Query, Answer]) = {
     val rerank_training_data =
       if (debug("rerank-training")) {
@@ -234,6 +234,32 @@ extends RerankerLike[Query, Answer] {
         }
       }
     create_rerank_classifier(rerank_training_data.toIndexedSeq)
+  }
+
+  def apply(training_data: Iterable[(Query, Answer)],
+      initial_ranker: Ranker[Query, Answer]) = {
+    val rerank_classifier =
+      train_rerank_classifier(training_data, initial_ranker)
+    create_reranker(rerank_classifier, initial_ranker)
+  }
+
+  def create_reranker(
+    _rerank_classifier: ScoringBinaryClassifier[RerankInstance],
+    _initial_ranker: Ranker[Query, Answer]
+  ) = {
+    new PointwiseClassifyingReranker[Query, RerankInstance, Answer] {
+      val rerank_classifier = _rerank_classifier
+      val initial_ranker = _initial_ranker
+      val top_n = self.top_n
+      protected def create_rerank_instance(query: Query, answer: Answer,
+          initial_score: Double, is_training: Boolean) = {
+        self.create_rerank_instance(query, answer, initial_score, is_training)
+      }
+      override protected def display_query_item(item: Query) =
+        self.display_query_item(item)
+      override protected def display_answer(answer: Answer) =
+        self.display_answer(answer)
+    }
   }
 }
 
