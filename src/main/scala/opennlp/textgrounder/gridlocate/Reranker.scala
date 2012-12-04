@@ -100,28 +100,8 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
    * is correct.  These training instances will be used to train the
    * classifier.
    */
-  protected val create_rerank_instance:
-    (Query, Answer, Double, Boolean) => RerankInstance
-
-  /**
-   * Generate rerank training instances for a given ranker
-   * training instance.
-   */
-  protected def get_rerank_training_instances(item: Query,
-      true_answer: Answer) = {
-    val initial_answers = initial_ranker.evaluate(item, Iterable(true_answer))
-    val top_answers = initial_answers.take(top_n)
-    val answers =
-      if (top_answers.find(_._1 == true_answer) != None)
-        top_answers
-      else
-        top_answers ++ Iterable(initial_answers.find(_._1 == true_answer).get)
-    for {(possible_answer, score) <- answers
-         is_correct = possible_answer == true_answer
-        }
-      yield (
-        create_rerank_instance(item, possible_answer, score, true), is_correct)
-  }
+  protected def create_rerank_instance(query: Query, answer: Answer,
+    initial_score: Double, is_correct: Boolean): RerankInstance
 
   def rerank_answers(item: Query,
       answers: Iterable[(Answer, Double)]) = {
@@ -134,6 +114,10 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
     new_scores.toIndexedSeq sortWith (_._2 > _._2)
   }
 }
+
+class PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer] {
+}
+
 
 /**
  * A pointwise classifying reranker that uses training data to train the
@@ -151,15 +135,66 @@ trait PointwiseClassifyingRerankerWithTrainingData[
   /**
    * Training data used to create the reranker.
    */
-  protected val training_data: Iterator[(Query, Answer)]
+  protected val training_data: Iterable[(Query, Answer)]
 
+//  /**
+//   * Number of splits used in the training data, to create the reranker.
+//   */
+//  protected val number_of_splits: Int
+//
   /**
    * Create the classifier used for reranking, given a set of training data
    * (in the form of pairs of reranking instances and whether they represent
    * correct answers).
    */
-  protected val create_rerank_classifier:
-    Iterable[(RerankInstance, Boolean)] => ScoringBinaryClassifier[RerankInstance]
+  protected def create_rerank_classifier(
+    data: Iterable[(RerankInstance, Boolean)]
+  ): ScoringBinaryClassifier[RerankInstance]
+
+  /**
+   * Generate rerank training instances for a given ranker
+   * training instance.
+   */
+  protected def get_rerank_training_instances(item: Query,
+      true_answer: Answer, initial_ranker: Ranker[Query, Answer]) = {
+    val initial_answers = initial_ranker.evaluate(item, Iterable(true_answer))
+    val top_answers = initial_answers.take(top_n)
+    val answers =
+      if (top_answers.find(_._1 == true_answer) != None)
+        top_answers
+      else
+        top_answers ++ Iterable(initial_answers.find(_._1 == true_answer).get)
+    for {(possible_answer, score) <- answers
+         is_correct = possible_answer == true_answer
+        }
+      yield (
+        create_rerank_instance(item, possible_answer, score, true), is_correct)
+  }
+
+//  protected val create_initial_ranker(
+//    data: Iterable[(Query, Answer)]
+//  ): Ranker[Query, Answer]
+//
+//  lazy val initial_ranker = create_initial_ranker(training_data)
+//
+// protected def create_splits = {
+//   errprint("Computing total number of training documents ...")
+//   val numitems = training_data.size
+//   errprint("Total number of training documents: %s.", numitem)
+//   // If number of docs is not an even multiple of number of splits,
+//   // round the split size up -- we want the last split a bit smaller
+//   // rather than an extra split with only a couple of items.
+//   val splitsize = (numitems + number_of_splits - 1) / number_of_splits
+//   errprint("Number of splits for training reranker: %s.", number_of_splits)
+//   errprint("Size of each split: %s documents.", splitsize)
+//   (for (rerank_split_num <- (0 until number_of_splits).toIterator) yield {
+//     val split_training_data = training_data.grouped(splitsize).zipWithIndex
+//     val (rerank_splits, initrank_splits) = split_training_data partition {
+//       case (data, num) => num == rerank_split_num
+//     }
+//     val rerank_data = rerank_splits.map(_._1).flatten
+//     val initrank_data = initrank_splits.map(_._1).flatten
+//     val split_initial_ranker = create_initial_ranker(initrank_data)
 
   lazy protected val rerank_classifier = {
     val rerank_training_data =
@@ -170,7 +205,7 @@ trait PointwiseClassifyingRerankerWithTrainingData[
             errprint("%sTraining item: %s", prefix, display_query_item(item))
             errprint("%sTrue answer: %s", prefix, display_answer(true_answer))
             val training_insts =
-              get_rerank_training_instances(item, true_answer)
+              get_rerank_training_instances(item, true_answer, initial_ranker)
             for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
               val instpref = "%s#%d: " format (prefix, instind + 1)
               val correctstr =
@@ -183,7 +218,7 @@ trait PointwiseClassifyingRerankerWithTrainingData[
       } else {
         training_data.flatMap {
           case (item, true_answer) =>
-            get_rerank_training_instances(item, true_answer)
+            get_rerank_training_instances(item, true_answer, initial_ranker)
         }
       }
     create_rerank_classifier(rerank_training_data.toIndexedSeq)
@@ -230,36 +265,6 @@ class LinearClassifierAdapter (
    * negative; typically this will be 0 or 0.5. */
   def minimum_positive = 0.0
   def score_item(item: FeatureVector) = cfier.binary_score(item)
-}
-
-/**
- * Trainer for `LinearClassifierAdapter`. This is a simple factory class that
- * can be used as a function.  The data passed in is in the form of pairs of
- * reranking instances and whether they represent correct answers.
- */
-class LinearClassifierAdapterTrainer (
-  trainer: BinaryLinearClassifierTrainer
-) extends (
-  Iterable[(FeatureVector, Boolean)] => ScoringBinaryClassifier[FeatureVector]
-) {
-  def apply(data: Iterable[(FeatureVector, Boolean)]) = {
-    val adapted_data = data.map {
-      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
-    }
-    errprint("Training linear classifier ...")
-    errprint("Number of training items: %s", data.size)
-    val num_total_feats = data.map(_._1.length).sum
-    val num_total_stored_feats = data.map(_._1.stored_entries).sum
-    errprint("Total number of features in all training items: %s",
-      num_total_feats)
-    errprint("Avg number of features per training item: %.2f",
-      num_total_feats.toDouble / data.size)
-    errprint("Total number of stored features in all training items: %s",
-      num_total_stored_feats)
-    errprint("Avg number of stored features per training item: %.2f",
-      num_total_stored_feats.toDouble / data.size)
-    new LinearClassifierAdapter(trainer(adapted_data, 2))
-  }
 }
 
 trait RerankInstanceFactory[Co] extends (
@@ -392,9 +397,8 @@ class TrivialGridReranker[Co](
     new TrivialScoringBinaryClassifier(
         0 // FIXME: This is incorrect but doesn't matter
     )
-  protected val create_rerank_instance =
-    (item: GeoDoc[Co], answer: GeoCell[Co], score: Double,
-      is_training: Boolean) => score
+  protected def create_rerank_instance(item: GeoDoc[Co], answer: GeoCell[Co],
+    score: Double, is_training: Boolean) = score
 }
 
 /**
@@ -414,18 +418,31 @@ class TrivialGridReranker[Co](
  *   cell and initial score.
  * @param top_n Number of top items to rerank.
  */
-class LinearClassifierGridReranker[Co](
-  val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
-  val trainer: BinaryLinearClassifierTrainer,
-  val training_data: Iterator[(GeoDoc[Co], GeoCell[Co])],
-  val create_rerank_instance:
-    (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector,
-  val top_n: Int
+abstract class LinearClassifierGridReranker[Co](
+  val trainer: BinaryLinearClassifierTrainer
 ) extends PointwiseClassifyingRerankerWithTrainingData[
   GeoDoc[Co], FeatureVector, GeoCell[Co]
   ] {
-  protected val create_rerank_classifier =
-    new LinearClassifierAdapterTrainer(trainer)
+  protected def create_rerank_classifier(
+    data: Iterable[(FeatureVector, Boolean)]
+  ) = {
+    val adapted_data = data.map {
+      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
+    }
+    errprint("Training linear classifier ...")
+    errprint("Number of training items: %s", data.size)
+    val num_total_feats = data.map(_._1.length).sum
+    val num_total_stored_feats = data.map(_._1.stored_entries).sum
+    errprint("Total number of features in all training items: %s",
+      num_total_feats)
+    errprint("Avg number of features per training item: %.2f",
+      num_total_feats.toDouble / data.size)
+    errprint("Total number of stored features in all training items: %s",
+      num_total_stored_feats)
+    errprint("Avg number of stored features per training item: %.2f",
+      num_total_stored_feats.toDouble / data.size)
+    new LinearClassifierAdapter(trainer(adapted_data, 2))
+  }
 
   override def display_query_item(item: GeoDoc[Co]) = {
     "%s, dist=%s" format (item, item.dist.debug_string)
