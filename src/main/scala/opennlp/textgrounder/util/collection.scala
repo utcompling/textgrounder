@@ -769,6 +769,19 @@ package object collection {
     }
   }
 
+  def duplicate_iterator[T,U](items: Iterable[T], iter: Iterator[U]):
+      Iterable[(T, Iterator[U])] = {
+    items.size match {
+      case 0 => Iterable()
+      case 1 => Iterable((items.head, iter))
+      case _ => {
+        val (head, tail) = (items.head, items.tail)
+        val (left, right) = iter.duplicate
+        Iterable((head, left)) ++ duplicate_iterator(tail, right)
+      }
+    }
+  }
+
  /////////////////////////////////////////////////////////////////////////////
  //                        Misc. list/iterator functions                    //
  /////////////////////////////////////////////////////////////////////////////

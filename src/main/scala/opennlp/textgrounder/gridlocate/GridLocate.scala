@@ -714,9 +714,10 @@ that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
 prior probability (baseline) and all word probabilities the same.  If
 'equal-words', weight all the words the same but collectively weight all words
 against the baseline, giving the baseline weight according to --baseline-weight
-and assigning the remainder to the words.  If 'distance-weighted', similar to
-'equal-words' but don't weight each word the same as each other word; instead,
-weight the words according to distance from the toponym.""")
+and assigning the remainder to the words.  If 'distance-weighted' (NOT
+currently implemented), similar to 'equal-words' but don't weight each word
+the same as each other word; instead, weight the words according to distance
+from the toponym.""")
   var naive_bayes_baseline_weight =
     ap.option[Double]("naive-bayes-baseline-weight", "nbbw",
       metavar = "WEIGHT",
@@ -1067,17 +1068,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
       case "symmetric-partial-kl-divergence" =>
         new KLDivergenceStrategy[Co](grid, symmetric = true,
           partial = true)
-      case "none" =>
-        null
-      case other => {
-        assert(false, "Internal error: Unhandled strategy %s" format other)
-        null
-      }
     }
   }
-
-  def iter_strategies(grid: GeoGrid[Co]):
-    Iterable[(String, GridLocateDocStrategy[Co])]
 
   protected def create_pointwise_classifier_trainer = {
     params.rerank_classifier match {

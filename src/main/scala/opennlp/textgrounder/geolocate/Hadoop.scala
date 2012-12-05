@@ -222,28 +222,8 @@ class DocEvalMapper extends
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
-  type StrategyType = GridLocateDocStrategy[SphereCoord]
-  type DocStatsType = Iterator[DocStatus[SphereDoc]]
 
   lazy val filehand = driver.get_file_handler
-
-  def get_stat_iters(strats: Iterable[(String, StrategyType)],
-      docstats: DocStatsType
-    ): Iterable[(String, StrategyType, DocStatsType)] = {
-    strats.size match {
-      case 0 => Iterable[Nothing]()
-      case 1 => {
-        val (stratname, strategy) = strats.head
-        Iterable((stratname, strategy, docstats))
-      }
-      case _ => {
-        val (head, tail) = (strats.head, strats.tail)
-        val (stratname, strategy) = head
-        val (left, right) = docstats.duplicate
-        Iterable((stratname, strategy, left)) ++ get_stat_iters(tail, right)
-      }
-    }
-  }
 
   override def run(context: TContext) {
     super.init(context)
@@ -275,7 +255,7 @@ class DocEvalMapper extends
     }
 
     val lines = new HadoopIterator
-    val orig_docstats =
+    val docstats =
       lines.map {
         case (filehand, file, line, lineno) => {
           val docstat = grid.docfact.line_to_document(filehand, file, line,
@@ -287,15 +267,10 @@ class DocEvalMapper extends
           docstat
         }
       }
-    val stratname_evaluators =
-      for ((stratname, strategy, docstats) <-
-        get_stat_iters(driver.iter_strategies(grid), orig_docstats)) yield {
-          val evalobj = driver.create_cell_evaluator(strategy, stratname)
-          (stratname, evalobj.evaluate_documents(docstats))
-        }
-    val (stratnames, evaluators) = stratname_evaluators.unzip
-    for { results <- new TransposeIterator(evaluators);
-          (stratname, result) <- stratnames zip results } {
+    val stratname = driver.params.strategy
+    val strategy = driver.create_strategy(stratname, grid)
+    val evalobj = driver.create_cell_evaluator(strategy, stratname)
+    for (result <- evalobj.evaluate_documents(docstats)) {
       context.write(new Text(stratname),
         new DoubleWritable(result.pred_truedist))
     }
