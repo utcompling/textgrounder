@@ -227,7 +227,7 @@ class DocumentEvaluationMapper extends
   type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
-  val filehand = driver.get_file_handler
+  lazy val filehand = driver.get_file_handler
 
   def get_stat_iters(strats: Iterable[(String, StrategyType)],
       docstats: DocStatsType
