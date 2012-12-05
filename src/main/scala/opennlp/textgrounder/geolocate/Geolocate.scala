@@ -359,11 +359,9 @@ is in PCL-Travel XML format, and uses each chapter in the evaluation
 file as a document to evaluate.""")
 
   var strategy =
-    ap.multiOption[String]("s", "strategy",
-      default = Seq("partial-kl-divergence"),
+    ap.option[String]("s", "strategy",
+      default = "partial-kl-divergence",
       aliasedChoices = Seq(
-        Seq("baseline"),
-        Seq("none"),
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
         Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
         Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
@@ -377,13 +375,14 @@ file as a document to evaluate.""")
             "smoothed-part-cossim"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("naive-bayes-with-baseline", "nb-base"),
-        Seq("naive-bayes-no-baseline", "nb-nobase")),
+        Seq("naive-bayes-no-baseline", "nb-nobase"),
+        Seq("internal-link", "link"),
+        Seq("random"),
+        Seq("num-documents", "numdocs", "num-docs"),
+        Seq("link-most-common-toponym"),
+        Seq("cell-distribution-most-common-toponym",
+            "celldist-most-common-toponym")),
       help = """Strategy/strategies to use for geolocation.
-'baseline' means just use the baseline strategy (see --baseline-strategy).
-
-'none' means don't do any geolocation.  Useful for testing the parts that
-read in data and generate internal structures.
-
 'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
 divergence between the document and cell is smallest.
 
@@ -400,13 +399,37 @@ the count the word in the document.
 'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
 Bayes algorithm to match a test document against a training document (e.g.
 by assuming that the words of the test document are independent of each
-other, if we are using a unigram word distribution).  The "baseline" is
-currently 
+other, if we are using a unigram word distribution).  The variants with
+the "baseline" incorporate a prior probability into the calculations, while
+the non-baseline variants don't.  The baseline is currently derived from the
+number of documents in a cell.  See also 'naive-bayes-weighting' and
+'naive-bayes-baseline-weight' for options controlling how the different
+words are weighted against each other and how the baseline and word
+probabilities are weighted.
 
-Default is 'partial-kl-divergence'.
+'internal-link' (or 'link') means use number of internal links pointing to the
+document or cell.
 
-NOTE: Multiple --strategy options can be given, and each strategy will
-be tried, one after the other.""")
+In addition, the following "baseline" probabilities exist, which use
+simple algorithms meant for comparison purposes.
+
+'random' means choose randomly.
+
+'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
+use number of documents in cell.
+
+'link-most-common-toponym' means to look for the toponym that occurs the
+most number of times in the document, and then use the internal-link
+baseline to match it to a location.
+
+'celldist-most-common-toponym' is similar, but uses the cell distribution
+of the most common toponym.
+
+Default is '%s'.
+
+'none' means don't do any geolocation.  Useful for testing the parts that
+read in data and generate internal structures.
+""")
 
   var coord_strategy =
     ap.option[String]("coord-strategy", "cs",
@@ -468,40 +491,6 @@ Default '%default'.""")
 (see '--coord-strategy').
 
 Default '%default'.""")
-
-  var baseline_strategy =
-    ap.multiOption[String]("baseline-strategy", "bs",
-      default = Seq("internal-link"),
-      aliasedChoices = Seq(
-        Seq("internal-link", "link"),
-        Seq("random"),
-        Seq("num-documents", "numdocs", "num-docs"),
-        Seq("link-most-common-toponym"),
-        Seq("cell-distribution-most-common-toponym",
-            "celldist-most-common-toponym")),
-      help = """Strategy to use to compute the baseline.
-
-'internal-link' (or 'link') means use number of internal links pointing to the
-document or cell.
-
-'random' means choose randomly.
-
-'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
-use number of documents in cell.
-
-'link-most-common-toponym' means to look for the toponym that occurs the
-most number of times in the document, and then use the internal-link
-baseline to match it to a location.
-
-'celldist-most-common-toponym' is similar, but uses the cell distribution
-of the most common toponym.
-
-Default '%default'.
-
-NOTE: Multiple --baseline-strategy options can be given, and each strategy will
-be tried, one after the other.  Currently, however, the *-most-common-toponym
-strategies cannot be mixed with other baseline strategies, or with non-baseline
-strategies, since they require that --preserve-case-words be set internally.""")
 }
 
 // FUCK ME.  Have to make this abstract and GeolocateDocDriver a subclass
@@ -509,7 +498,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 trait GeolocateDocTypeDriver extends GeolocateDriver with
   GridLocateDocDriver[SphereCoord] {
   override type TParam <: GeolocateDocParameters
-  type TRunRes = Iterable[(String, GridLocateDocStrategy[SphereCoord], Iterable[_])]
+  type TRunRes = Iterable[_]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -517,24 +506,9 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
     // The *-most-common-toponym strategies require case preserving
     // (as if set by --preseve-case-words), while most other strategies want
     // the opposite.  So check to make sure we don't have a clash.
-    if (params.strategy contains "baseline") {
-      var need_case = false
-      var need_no_case = false
-      for (bstrat <- params.baseline_strategy) {
-        if (bstrat.endsWith("most-common-toponym"))
-          need_case = true
-        else
-          need_no_case = true
-      }
-      if (need_case) {
-        if (params.strategy.length > 1 || need_no_case) {
-          // That's because we have to set --preserve-case-words, which we
-          // generally don't want set for other strategies and which affects
-          // the way we construct the training-document distributions.
-          param_error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
-        }
-        params.preserve_case_words = true
-      }
+    if (params.strategy endsWith "most-common-toponym") {
+      errprint("Forcibly setting --preseve-case-words to true")
+      params.preserve_case_words = true
     }
 
     if (params.eval_format == "raw-text") {
@@ -559,22 +533,6 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
         new AverageCellProbabilityStrategy[SphereCoord](grid)
       case other => super.create_strategy(other, grid)
     }
-  }
-
-  def iter_strategies(grid: GeoGrid[SphereCoord]) = {
-    val strats_unflat =
-      for (stratname <- params.strategy) yield {
-        if (stratname == "baseline") {
-          for (basestratname <- params.baseline_strategy) yield {
-            val strategy = create_strategy(basestratname, grid)
-            ("baseline " + basestratname, strategy)
-          }
-        } else {
-          val strategy = create_strategy(stratname, grid)
-          Seq((stratname, strategy))
-        }
-      }
-    strats_unflat.flatten filter { case (name, strat) => strat != null }
   }
 
   /**
@@ -837,25 +795,21 @@ found   : (String, Iterator[evalobj.TEvalRes])
 
   /**
    * Do the actual document geolocation.  Results to stderr (see above), and
-   * also returned.
-   *
-   * The current return type is as follows:
-   *
-   * Iterable[(String, GridLocateDocStrategy[SphereCoord], Iterable[_])]
-   *
-   * This means you get a sequence of tuples of
-   * (strategyname, strategy, results)
-   * where:
-   * strategyname = name of strategy as given on command line
-   * strategy = strategy object
-   * results = Iterable over result objects, one per document.
+   * also returned.  The current return type is an Iterable of objects, one
+   * per evaluated document, describing the results of evaluation on that
+   * object.  The type of the object depends on the value of
+   * `params.eval_format`.
    *
    * NOTE: We force evaluation in this function because currently we mostly
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run() = {
     val grid = setup_for_run()
-    for ((stratname, strategy) <- iter_strategies(grid)) yield {
+    if (debug("no-evaluation"))
+      Iterable()
+    else {
+      val stratname = params.strategy
+      val strategy = create_strategy(stratname, grid)
       val results =
         params.eval_format match {
           case "pcl-travel" => {
@@ -878,8 +832,8 @@ found   : (String, Iterator[evalobj.TEvalRes])
               "raw-text eval format not yet implemented")
           }
         }
-      // The call to `toList` forces evaluation of the Iterator
-      (stratname, strategy, results.toList)
+      // The call to `toIndexedSeq` forces evaluation of the Iterator
+      results.toIndexedSeq
     }
   }
 }
