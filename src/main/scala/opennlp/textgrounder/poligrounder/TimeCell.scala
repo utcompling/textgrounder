@@ -123,10 +123,11 @@ class TimeGrid(
     }
   }
 
-  def read_training_documents_into_grid() {
-    default_read_training_documents_into_grid { doc =>
+  def add_training_documents_to_grid(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+    default_add_training_documents_to_grid(get_rawdocs, doc =>
       find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
-    }
+    )
   }
 
   def iter_nonempty_cells = {

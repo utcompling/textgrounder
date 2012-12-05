@@ -171,6 +171,8 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   }
 }
 
+case class RawDocument(schema: Schema, fields: Seq[String])
+
 
 /////////////////////////////////////////////////////////////////////////////
 //                              Document factories                         //
@@ -352,11 +354,11 @@ abstract class GeoDocFactory[Co : Serializer](
    * @param schema Schema for textdb, indicating names of fields, etc.
    */
   def line_to_raw_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema): DocStatus[Seq[String]] = {
+      lineno: Long, schema: Schema): DocStatus[RawDocument] = {
     line_to_fields(line, lineno, schema) match {
       case Some(fields) =>
-        DocStatus(filehand, file, lineno, Some(fields), "processed",
-          "", "")
+        DocStatus(filehand, file, lineno, Some(RawDocument(schema, fields)),
+          "processed", "", "")
       case None =>
         DocStatus(filehand, file, lineno, None, "bad",
           "badly formatted database row", "")
@@ -372,15 +374,15 @@ abstract class GeoDocFactory[Co : Serializer](
    *  factory.
    * @return a DocStatus describing the document.
    */
-  def raw_document_to_document(rawdoc: DocStatus[Seq[String]],
-      schema: Schema, record_in_factory: Boolean, note_globally: Boolean
+  def raw_document_to_document(rawdoc: DocStatus[RawDocument],
+      record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
-    rawdoc map_result { fieldvals =>
+    rawdoc map_result { rd =>
       try {
-        create_and_init_document(schema, fieldvals, record_in_factory) match {
+        create_and_init_document(rd.schema, rd.fields, record_in_factory) match {
           case None => {
             (None, "skipped", "unable to create document",
-              schema.get_field_or_else(fieldvals, "title",
+              rd.schema.get_field_or_else(rd.fields, "title",
                 "unknown title??"))
           }
           case Some(doc) => {
@@ -425,7 +427,7 @@ abstract class GeoDocFactory[Co : Serializer](
     ): DocStatus[GeoDoc[Co]] = {
     raw_document_to_document(
       line_to_raw_document(filehand, file, line, lineno, schema),
-      schema, record_in_factory, note_globally)
+      record_in_factory, note_globally)
   }
 
   /**
@@ -438,17 +440,73 @@ abstract class GeoDocFactory[Co : Serializer](
    * @return Iterator over document statuses.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String) = {
+      suffix: String): Iterator[DocStatus[RawDocument]] = {
     val (schema, files) =
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)
-    val rawdocs =
-      files.flatMap { file =>
-        filehand.openr(file).zipWithIndex.map {
-          case (line, idx) =>
-            line_to_raw_document(filehand, file, line, idx + 1, schema)
-        }
+    files.flatMap { file =>
+      filehand.openr(file).zipWithIndex.map {
+        case (line, idx) =>
+          line_to_raw_document(filehand, file, line, idx + 1, schema)
       }
-    (schema, rawdocs)
+    }
+  }
+
+  /**
+   * Convert raw documents into document statuses.
+   *
+   * @param filehand The FileHandler for the directory of the corpus.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata")
+   * @param record_in_factory Whether to record documents in any subfactories.
+   *   (FIXME: This should be an add-on to the iterator.)
+   * @param note_globally Whether to add each document's words to the global
+   *   (e.g. back-off) distribution statistics.  Normally false, but may be
+   *   true during bootstrapping of those statistics.
+   * @param finish_globally Whether to compute statistics of the documents'
+   *   distributions that depend on global (e.g. back-off) distribution
+   *   statistics.  Normally true, but may be false during bootstrapping of
+   *   those statistics.
+   * @return Iterator over document statuses.
+   */
+  def raw_documents_to_document_statuses(
+    rawdocs: Iterator[DocStatus[RawDocument]],
+    record_in_subfactory: Boolean = false,
+    note_globally: Boolean = false,
+    finish_globally: Boolean = true
+  ) = {
+    val docstats =
+      rawdocs map { rawdoc =>
+        raw_document_to_document(rawdoc, record_in_subfactory, note_globally)
+      }
+    if (!finish_globally)
+      docstats
+    else
+      docstats.map { stat =>
+        stat.maybedoc.foreach { doc =>
+          if (doc.dist != null)
+            doc.dist.finish_after_global()
+        }
+        stat
+      }
+  }
+
+  def document_statuses_to_documents(
+    docstats: Iterator[DocStatus[GeoDoc[Co]]]
+  ) = {
+    new DocCounterTrackerFactory[GeoDoc[Co]](driver).
+      process_statuses(docstats)
+  }
+
+  def raw_documents_to_documents(
+    rawdocs: Iterator[DocStatus[RawDocument]],
+    record_in_subfactory: Boolean = false,
+    note_globally: Boolean = false,
+    finish_globally: Boolean = true
+  ) = {
+    val docstats = raw_documents_to_document_statuses(rawdocs,
+      record_in_subfactory, note_globally, finish_globally)
+    document_statuses_to_documents(docstats)
   }
 
   /**
@@ -473,33 +531,18 @@ abstract class GeoDocFactory[Co : Serializer](
       suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
-    val (schema, rawdocs) =
-      read_raw_documents_from_textdb(filehand, dir, suffix)
-    val docstats =
-      rawdocs map { rawdoc =>
-        raw_document_to_document(rawdoc, schema, record_in_subfactory,
-          note_globally)
-      }
-    if (!finish_globally)
-      docstats
-    else
-      docstats.map { stat =>
-        stat.maybedoc.foreach { doc =>
-          if (doc.dist != null)
-            doc.dist.finish_after_global()
-        }
-        stat
-      }
+    val rawdocs = read_raw_documents_from_textdb(filehand, dir, suffix)
+    raw_documents_to_document_statuses(rawdocs, record_in_subfactory,
+      note_globally, finish_globally)
   }
 
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
       suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
-    val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
+    val docstats = read_document_statuses_from_textdb(filehand, dir, suffix,
       record_in_subfactory, note_globally, finish_globally)
-    new DocCounterTrackerFactory[GeoDoc[Co]](driver).
-      process_statuses(statuses)
+    document_statuses_to_documents(docstats)
   }
 
   def finish_document_loading() {

@@ -951,6 +951,38 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   protected def create_grid(docfact: GeoDocFactory[Co]): GeoGrid[Co]
 
   /**
+   * Read the raw training documents.  This uses the values of the parameters
+   * to determine where to read the documents from and how many documents to
+   * read.  A "raw document" is simply an encapsulation of the fields used
+   * to create a document (as read directly from the corpus), along with the
+   * schema describing the fields.
+   *
+   * @param docfact Document factory used to create documents.
+   * @param operation Name of logical operation, to be displayed in progress
+   *   messages.
+   * @return Iterator over raw documents.
+   */
+  def read_raw_training_documents(docfact: GeoDocFactory[Co],
+      operation: String): Iterator[DocStatus[RawDocument]] = {
+    val task = show_progress("document", operation,
+        maxtime = params.max_time_per_stage,
+        maxitems = params.num_training_docs)
+    val dociter = params.input_corpus.toIterator.flatMap(dir =>
+        docfact.read_raw_documents_from_textdb(get_file_handler,
+          dir, "training-" + document_file_suffix))
+    for (doc <- task.iterate(dociter)) yield {
+      val sleep_at = debugval("sleep-at-docs")
+      if (sleep_at != "") {
+        if (task.num_processed == sleep_at.toInt) {
+          errprint("Reached %d documents, sleeping ...")
+          Thread.sleep(5000)
+        }
+      }
+      doc
+    }
+  }
+
+  /**
    * Read the training documents.  This uses the values of the parameters
    * to determine where to read the documents from and how many documents to
    * read.
@@ -974,23 +1006,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
-    val task = show_progress("document", operation,
-        maxtime = params.max_time_per_stage,
-        maxitems = params.num_training_docs)
-    val dociter = params.input_corpus.toIterator.flatMap(dir =>
-        docfact.read_documents_from_textdb(get_file_handler,
-          dir, "training-" + document_file_suffix, 
-          record_in_subfactory, note_globally, finish_globally))
-    for (doc <- task.iterate(dociter)) yield {
-      val sleep_at = debugval("sleep-at-docs")
-      if (sleep_at != "") {
-        if (task.num_processed == sleep_at.toInt) {
-          errprint("Reached %d documents, sleeping ...")
-          Thread.sleep(5000)
-        }
-      }
-      doc
-    }
+    docfact.raw_documents_to_documents(
+      read_raw_training_documents(docfact, operation),
+      record_in_subfactory, note_globally, finish_globally)
   }
 
   def setup_for_run() = {
@@ -1000,7 +1018,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
     // to this in docfact.
-    grid.read_training_documents_into_grid()
+    grid.add_training_documents_to_grid(
+      operation => read_raw_training_documents(docfact, operation))
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       output_resource_usage()

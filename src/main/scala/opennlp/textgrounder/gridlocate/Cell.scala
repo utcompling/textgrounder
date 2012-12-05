@@ -307,12 +307,14 @@ abstract class GeoGrid[Co](
     Option[GeoCell[Co]]
 
   /**
-   * Read the training documents from the given corpora and add them to
-   * the given cell grid.
+   * Add the given training documents to the cell grid.
    *
-   * @param grid Cell grid into which the documents are added.
+   * @param get_rawdocs Function to read raw documents, given a string
+   *   indicating the nature of the operation (displayed in status updates
+   *   during reading).
    */
-  def read_training_documents_into_grid()
+  def add_training_documents_to_grid(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]])
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -352,11 +354,12 @@ abstract class GeoGrid[Co](
   }
 
   /**
-   * Standard implementation of `read_training_documents_into_grid`.
+   * Standard implementation of `add_training_documents_to_grid`.
    *
    * @param add_document_to_grid Function to add a document to the grid.
    */
-  protected def default_read_training_documents_into_grid(
+  protected def default_add_training_documents_to_grid(
+    get_rawdocs: String => Iterator[DocStatus[RawDocument]],
     add_document_to_grid: GeoDoc[Co] => Unit
   ) {
     // FIXME: The "finish_globally" flag needs to be tied into the
@@ -364,8 +367,7 @@ abstract class GeoGrid[Co](
     // In reality, all the glop handled by finish_before_global() and
     // note_dist_globally() (as well as record_in_subfactory) and such
     // should be handled by separate mapping stages onto the documents.
-    for (doc <- driver.read_training_documents(docfact,
-           "reading",
+    for (doc <- docfact.raw_documents_to_documents(get_rawdocs("reading"),
            record_in_subfactory = true,
            note_globally = true,
            finish_globally = false)) {

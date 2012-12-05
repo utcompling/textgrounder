@@ -25,6 +25,7 @@ import util.experiment._
 import util.print.{errprint, warning}
 
 import gridlocate.GeoDocFactory
+import gridlocate.{DocStatus, RawDocument}
 
 class CombinedModelGrid(
   docfact: SphereDocFactory, models: Seq[SphereGrid]
@@ -43,9 +44,10 @@ class CombinedModelGrid(
           cell => spheredist(cell.get_center_coord, doc.coord)))
   }
 
-  def read_training_documents_into_grid() {
+  def add_training_documents_to_grid(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
     for (model <- models)
-      model.read_training_documents_into_grid()
+      model.add_training_documents_to_grid(get_rawdocs)
   }
 
   protected def initialize_cells() {
