@@ -31,6 +31,7 @@ import util.experiment._
 import util.print.{errprint, warning}
 
 import worddist.UnigramWordDist
+import gridlocate.{DocStatus, RawDocument}
 
 class KdTreeCell(
   cellgrid: KdTreeGrid,
@@ -77,9 +78,10 @@ class KdTreeGrid(
   val nodes_to_cell: Map[KdTree, KdTreeCell] = Map()
   val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
 
-  override def read_training_documents_into_grid() {
-    for (doc <- driver.read_training_documents(docfact,
-           "preliminary pass to generate K-d tree: reading",
+  def add_training_documents_to_grid(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+    for (doc <- docfact.raw_documents_to_documents(
+           get_rawdocs("preliminary pass to generate K-d tree: reading"),
            record_in_subfactory = false,
            note_globally = false,
            finish_globally = false)) {
@@ -109,14 +111,14 @@ class KdTreeGrid(
     kdtree.annihilateData
 
     // Now read normally.
-    default_read_training_documents_into_grid { doc =>
+    default_add_training_documents_to_grid(get_rawdocs, doc => {
       val leaf = kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long))
       var n = leaf
       while (n != null) {
         nodes_to_cell(n).add_document(doc)
         n = n.parent
       }
-    }
+    })
   }
 
   def find_best_cell_for_document(doc: SphereDoc,

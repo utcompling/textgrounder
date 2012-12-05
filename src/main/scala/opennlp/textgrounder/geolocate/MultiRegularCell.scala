@@ -28,6 +28,7 @@ import util.print.{errout, errprint}
 import util.experiment._
 
 import gridlocate.GridLocateDriver.Debug._
+import gridlocate.{DocStatus, RawDocument}
 
 /////////////////////////////////////////////////////////////////////////////
 //                         A regularly spaced grid                         //
@@ -445,8 +446,9 @@ class MultiRegularGrid(
     }
   }
 
-  def read_training_documents_into_grid() {
-    default_read_training_documents_into_grid { doc =>
+  def add_training_documents_to_grid(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+    default_add_training_documents_to_grid(get_rawdocs, doc =>
       for (index <- iter_overlapping_multi_cells(doc.coord)) {
         val cell = find_cell_for_cell_index(index, create = true,
           record_created_cell = true).get
@@ -454,7 +456,7 @@ class MultiRegularGrid(
           errprint("Adding document %s to cell %s", doc, cell)
         cell.add_document(doc)
       }
-    }
+    )
   }
 
   protected def initialize_cells() {
