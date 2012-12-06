@@ -38,22 +38,22 @@ import util.print.{errprint, warning}
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class MMCParameters(ap: ArgParser) extends
-    ArgParserParameters(ap) {
+class MMCParameters(val parser: ArgParser) extends
+    ArgParserParameters {
   val output_dir =
-    ap.option[String]("o", "output-dir",
+    parser.option[String]("o", "output-dir",
       metavar = "DIR",
       help = """Directory to store output files in.""")
   val input_dir =
-    ap.option[String]("i", "input-dir",
+    parser.option[String]("i", "input-dir",
       metavar = "FILE",
       help = """Directory containing the input corpus, in old format.""")
   val counts_file =
-    ap.option[String]("counts-file",
+    parser.option[String]("counts-file",
       metavar = "FILE",
       help = """File containing the word counts, in old format.""")
   var output_file_prefix =
-    ap.option[String]("output-file-prefix",
+    parser.option[String]("output-file-prefix",
       metavar = "FILE",
       help = """Prefix to add to files in the output corpus dir.""")
 }

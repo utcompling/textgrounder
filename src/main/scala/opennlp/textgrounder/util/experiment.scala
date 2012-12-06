@@ -609,7 +609,8 @@ package object experiment {
    *   command-line arguments.
    */
 
-  abstract class ArgParserParameters(val parser: ArgParser) {
+  trait ArgParserParameters {
+    val parser: ArgParser
   }
 
   /**

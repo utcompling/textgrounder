@@ -418,8 +418,7 @@ object Whitelist {
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class GridLocateParameters(parser: ArgParser = null) extends
-    ArgParserParameters(parser) {
+trait GridLocateParameters extends ArgParserParameters {
   protected val ap =
     if (parser == null) new ArgParser("unknown") else parser
 
@@ -533,92 +532,6 @@ process all.""")
   //  def skip_every_n_test_docs =
   //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
   //      help = """Skip this many after each one processed.  Default 0.""")
-
-  //// Reranking options
-  var rerank =
-    ap.option[String]("rerank",
-      default = "none",
-      choices = Seq("none", "pointwise"),
-      help = """Type of reranking to do.  Possibilities are
-'none', 'pointwise' (do pointwise reranking using a classifier).  Default
-is '%default'.""")
-
-  var rerank_top_n =
-    ap.option[Int]("rerank-top-n",
-      default = 50,
-      help = """Number of top-ranked items to rerank.  Default is %default.""")
-
-  var rerank_classifier =
-    ap.option[String]("rerank-classifier",
-      default = "perceptron",
-      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
-        "trivial"),
-      help = """Type of classifier to use for reranking.  Possibilities are
-'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
-(perceptron using the basic algorithm, where the weights from the various
-rounds are averaged -- this usually improves results if the weights oscillate
-around a certain error rate, rather than steadily improving); 'pa-perceptron'
-(passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds);
-'trivial' (a trivial pointwise reranker for testing purposes).
-Default %default.
-
-For the perceptron classifiers, see also `--pa-variant`,
-`--perceptron-error-threshold`, `--perceptron-aggressiveness` and
-`--perceptron-rounds`.""")
-
-  var rerank_instance =
-    ap.option[String]("rerank-instance",
-      default = "matching-word-binary",
-      aliasedChoices = Seq(
-        Seq("kl-div", "kldiv"),
-        Seq("matching-word-binary"),
-        Seq("matching-word-count"),
-        Seq("matching-word-count-product"),
-        Seq("matching-word-probability"),
-        Seq("trivial")),
-      help = """How to generate rerank instances for the reranker, based on
-a combination of a document, a given cell as possible location of the
-document and the original ranking score. The original ranking score
-always serves as one of the features.  Possibilities are 'trivial' (just
-use the score as a feature, for testing purposes); 'matching-word-binary'
-(use the value 1 when a word exists in both document and cell, 0 otherwise);
-'matching-word-count' (use the document word count when a word exists in both
-document and cell); 'matching-word-probability' (use the document probability
-when a word exists in both document and cell); 'kl-div' (use the individual
-word components of the KL-divergence between document and cell).
-Default %default.
-
-Note that this only is used when --rerank=pointwise and --rerank-classifier
-specifies something other than 'trivial'.""")
-
-  var pa_variant =
-    ap.option[Int]("pa-variant",
-      metavar = "INT",
-      choices = Seq(0, 1, 2),
-      help = """For passive-aggressive perceptron when reranking: variant
-(0, 1, 2; default %default).""")
-
-  var perceptron_error_threshold =
-    ap.option[Double]("perceptron-error-threshold",
-      metavar = "DOUBLE",
-      default = 1e-10,
-      help = """For perceptron when reranking: Total error threshold below
-which training stops (default: %default).""")
-
-  var perceptron_aggressiveness =
-    ap.option[Double]("perceptron-aggressiveness",
-      metavar = "DOUBLE",
-      default = 1.0,
-      help = """For perceptron: aggressiveness factor > 0.0
-(default: %default).""")
-
-  var perceptron_rounds =
-    ap.option[Int]("perceptron-rounds",
-      metavar = "INT",
-      default = 10000,
-      help = """For perceptron: maximum number of training rounds
-(default: %default).""")
 
   //// Options used when creating word distributions
   var word_dist =
@@ -794,6 +707,158 @@ commontop: Extra info for debugging
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
 
+}
+
+trait GridLocateDocParameters extends GridLocateParameters {
+  protected def strategy_default = "partial-kl-divergence"
+  protected def strategy_choices = Seq(
+        Seq("full-kl-divergence", "full-kldiv", "full-kl"),
+        Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
+        Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
+            "symmetric-full-kl", "sym-full-kl"),
+        Seq("symmetric-partial-kl-divergence",
+            "symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
+        Seq("cosine-similarity", "cossim"),
+        Seq("partial-cosine-similarity", "partial-cossim", "part-cossim"),
+        Seq("smoothed-cosine-similarity", "smoothed-cossim"),
+        Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
+            "smoothed-part-cossim"),
+        Seq("naive-bayes-with-baseline", "nb-base"),
+        Seq("naive-bayes-no-baseline", "nb-nobase"),
+        Seq("internal-link", "link"),
+        Seq("random"),
+        Seq("num-documents", "numdocs", "num-docs"))
+
+  protected def strategy_non_baseline_help =
+"""'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
+divergence between the document and cell is smallest.
+
+'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
+abbreviated KL divergence measure that only considers the words seen in the
+document; empirically, this appears to work just as well as the full KL
+divergence.
+
+'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
+Bayes algorithm to match a test document against a training document (e.g.
+by assuming that the words of the test document are independent of each
+other, if we are using a unigram word distribution).  The variants with
+the "baseline" incorporate a prior probability into the calculations, while
+the non-baseline variants don't.  The baseline is currently derived from the
+number of documents in a cell.  See also 'naive-bayes-weighting' and
+'naive-bayes-baseline-weight' for options controlling how the different
+words are weighted against each other and how the baseline and word
+probabilities are weighted.
+
+"""
+
+  protected def strategy_baseline_help =
+"""'internal-link' (or 'link') means use number of internal links pointing to the
+document or cell.
+
+'random' means choose randomly.
+
+'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
+use number of documents in cell.
+
+"""
+
+  var strategy =
+    ap.option[String]("s", "strategy",
+      default = strategy_default,
+      aliasedChoices = strategy_choices,
+      help = """Strategy/strategies to use for geolocation.
+""" + strategy_non_baseline_help +
+"""In addition, the following "baseline" probabilities exist, which use
+simple algorithms meant for comparison purposes.
+
+""" + strategy_baseline_help +
+"""Default is '%default'.""")
+
+  //// Reranking options
+  var rerank =
+    ap.option[String]("rerank",
+      default = "none",
+      choices = Seq("none", "pointwise"),
+      help = """Type of reranking to do.  Possibilities are
+'none', 'pointwise' (do pointwise reranking using a classifier).  Default
+is '%default'.""")
+
+  var rerank_top_n =
+    ap.option[Int]("rerank-top-n",
+      default = 50,
+      help = """Number of top-ranked items to rerank.  Default is %default.""")
+
+  var rerank_classifier =
+    ap.option[String]("rerank-classifier",
+      default = "perceptron",
+      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
+        "trivial"),
+      help = """Type of classifier to use for reranking.  Possibilities are
+'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
+(perceptron using the basic algorithm, where the weights from the various
+rounds are averaged -- this usually improves results if the weights oscillate
+around a certain error rate, rather than steadily improving); 'pa-perceptron'
+(passive-aggressive perceptron, which usually leads to steady but gradually
+dropping-off error rate improvements with increased number of rounds);
+'trivial' (a trivial pointwise reranker for testing purposes).
+Default %default.
+
+For the perceptron classifiers, see also `--pa-variant`,
+`--perceptron-error-threshold`, `--perceptron-aggressiveness` and
+`--perceptron-rounds`.""")
+
+  var rerank_instance =
+    ap.option[String]("rerank-instance",
+      default = "matching-word-binary",
+      aliasedChoices = Seq(
+        Seq("kl-div", "kldiv"),
+        Seq("matching-word-binary"),
+        Seq("matching-word-count"),
+        Seq("matching-word-count-product"),
+        Seq("matching-word-probability"),
+        Seq("trivial")),
+      help = """How to generate rerank instances for the reranker, based on
+a combination of a document, a given cell as possible location of the
+document and the original ranking score. The original ranking score
+always serves as one of the features.  Possibilities are 'trivial' (just
+use the score as a feature, for testing purposes); 'matching-word-binary'
+(use the value 1 when a word exists in both document and cell, 0 otherwise);
+'matching-word-count' (use the document word count when a word exists in both
+document and cell); 'matching-word-probability' (use the document probability
+when a word exists in both document and cell); 'kl-div' (use the individual
+word components of the KL-divergence between document and cell).
+Default %default.
+
+Note that this only is used when --rerank=pointwise and --rerank-classifier
+specifies something other than 'trivial'.""")
+
+  var pa_variant =
+    ap.option[Int]("pa-variant",
+      metavar = "INT",
+      choices = Seq(0, 1, 2),
+      help = """For passive-aggressive perceptron when reranking: variant
+(0, 1, 2; default %default).""")
+
+  var perceptron_error_threshold =
+    ap.option[Double]("perceptron-error-threshold",
+      metavar = "DOUBLE",
+      default = 1e-10,
+      help = """For perceptron when reranking: Total error threshold below
+which training stops (default: %default).""")
+
+  var perceptron_aggressiveness =
+    ap.option[Double]("perceptron-aggressiveness",
+      metavar = "DOUBLE",
+      default = 1.0,
+      help = """For perceptron: aggressiveness factor > 0.0
+(default: %default).""")
+
+  var perceptron_rounds =
+    ap.option[Int]("perceptron-rounds",
+      metavar = "INT",
+      default = 10000,
+      help = """For perceptron: maximum number of training rounds
+(default: %default).""")
 }
 
 class DebugSettings {
@@ -1011,7 +1076,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       record_in_subfactory, note_globally, finish_globally)
   }
 
-  def setup_for_run() = {
+  def initialize_grid() = {
     val word_dist_factory = create_word_dist_factory
     val docfact = create_document_factory(word_dist_factory)
     val grid = create_grid(docfact)
@@ -1043,6 +1108,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 }
 
 trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
+  override type TParam <: GridLocateDocParameters
+
   override def handle_parameters() {
     super.handle_parameters()
     if (params.perceptron_aggressiveness <= 0)
@@ -1152,6 +1219,13 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         ).train()
       }
     }
+  }
+
+  def initialize_strategy() = {
+    val grid = initialize_grid()
+    val stratname = params.strategy
+    val strategy = create_strategy(stratname, grid)
+    (stratname, strategy)
   }
 }
 

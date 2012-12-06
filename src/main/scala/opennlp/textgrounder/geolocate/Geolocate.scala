@@ -212,8 +212,7 @@ class LinkMostCommonToponymGeolocateDocStrategy(
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class GeolocateParameters(parser: ArgParser = null) extends
-    GridLocateParameters(parser) {
+trait GeolocateParameters extends GridLocateParameters {
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
     ap.option[Double]("degrees-per-cell", "dpc", metavar = "DEGREES",
@@ -336,8 +335,8 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
 }
 
 class GeolocateDocParameters(
-  parser: ArgParser = null
-) extends GeolocateParameters(parser) {
+  val parser: ArgParser
+) extends GeolocateParameters with GridLocateDocParameters {
   var eval_format =
     ap.option[String]("f", "eval-format",
       default = "internal",
@@ -358,79 +357,31 @@ IMPLEMENTED.)
 is in PCL-Travel XML format, and uses each chapter in the evaluation
 file as a document to evaluate.""")
 
-  var strategy =
-    ap.option[String]("s", "strategy",
-      default = "partial-kl-divergence",
-      aliasedChoices = Seq(
-        Seq("full-kl-divergence", "full-kldiv", "full-kl"),
-        Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
-        Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
-            "symmetric-full-kl", "sym-full-kl"),
-        Seq("symmetric-partial-kl-divergence",
-            "symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
-        Seq("cosine-similarity", "cossim"),
-        Seq("partial-cosine-similarity", "partial-cossim", "part-cossim"),
-        Seq("smoothed-cosine-similarity", "smoothed-cossim"),
-        Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
-            "smoothed-part-cossim"),
+  override protected def strategy_choices = super.strategy_choices ++ Seq(
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
-        Seq("naive-bayes-with-baseline", "nb-base"),
-        Seq("naive-bayes-no-baseline", "nb-nobase"),
-        Seq("internal-link", "link"),
-        Seq("random"),
-        Seq("num-documents", "numdocs", "num-docs"),
         Seq("link-most-common-toponym"),
         Seq("cell-distribution-most-common-toponym",
-            "celldist-most-common-toponym")),
-      help = """Strategy/strategies to use for geolocation.
-'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
-divergence between the document and cell is smallest.
+            "celldist-most-common-toponym"))
 
-'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
-abbreviated KL divergence measure that only considers the words seen in the
-document; empirically, this appears to work just as well as the full KL
-divergence.
-
-'average-cell-probability' (or 'celldist') involves computing, for each word,
+  override protected def strategy_non_baseline_help =
+    super.strategy_non_baseline_help +
+"""'average-cell-probability' (or 'celldist') involves computing, for each word,
 a probability distribution over cells using the word distribution of each cell,
 and then combining the distributions over all words in a document, weighted by
 the count the word in the document.
 
-'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
-Bayes algorithm to match a test document against a training document (e.g.
-by assuming that the words of the test document are independent of each
-other, if we are using a unigram word distribution).  The variants with
-the "baseline" incorporate a prior probability into the calculations, while
-the non-baseline variants don't.  The baseline is currently derived from the
-number of documents in a cell.  See also 'naive-bayes-weighting' and
-'naive-bayes-baseline-weight' for options controlling how the different
-words are weighted against each other and how the baseline and word
-probabilities are weighted.
+"""
 
-'internal-link' (or 'link') means use number of internal links pointing to the
-document or cell.
-
-In addition, the following "baseline" probabilities exist, which use
-simple algorithms meant for comparison purposes.
-
-'random' means choose randomly.
-
-'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
-use number of documents in cell.
-
-'link-most-common-toponym' means to look for the toponym that occurs the
+  override protected def strategy_baseline_help =
+    super.strategy_baseline_help +
+"""'link-most-common-toponym' means to look for the toponym that occurs the
 most number of times in the document, and then use the internal-link
 baseline to match it to a location.
 
 'celldist-most-common-toponym' is similar, but uses the cell distribution
 of the most common toponym.
 
-Default is '%s'.
-
-'none' means don't do any geolocation.  Useful for testing the parts that
-read in data and generate internal structures.
-""")
-
+"""
   var coord_strategy =
     ap.option[String]("coord-strategy", "cs",
       default = "top-ranked",
@@ -804,12 +755,11 @@ found   : (String, Iterator[evalobj.TEvalRes])
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run() = {
-    val grid = setup_for_run()
+    val (stratname, strategy) = initialize_strategy()
+    val grid = strategy.grid
     if (debug("no-evaluation"))
       Iterable()
     else {
-      val stratname = params.strategy
-      val strategy = create_strategy(stratname, grid)
       val results =
         params.eval_format match {
           case "pcl-travel" => {
