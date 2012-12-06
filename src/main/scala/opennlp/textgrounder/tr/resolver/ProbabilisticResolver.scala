@@ -99,6 +99,9 @@ class ProbabilisticResolver(val logFilePath:String,
         var indexToSelect = -1
         var maxProb = 0.0
         var candIndex = 0
+
+        val totalPopulation = toponym.getCandidates.map(_.getPopulation).sum
+
         for(cand <- toponym.getCandidates) {
           val curCellNum = TopoUtil.getCellNumber(cand.getRegion.getCenter, DPC)
 
@@ -129,7 +132,14 @@ class ProbabilisticResolver(val logFilePath:String,
           val adminLevelComponent = getAdminLevelComponent(cand, toponym.getCandidates.toList/*cand.getType, cand.getAdmin1Code*/)
 
           // P(l|t,d)
-          val probOfLocation = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
+          val probComponent = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
+
+          val probOfLocation =
+          /*if(totalPopulation > 0) {
+            val popComponent = cand.getPopulation / totalPopulation
+            .5 * popComponent + .5 * probComponent
+          }
+          else */probComponent
 
           if(probOfLocation > maxProb) {
             indexToSelect = candIndex
