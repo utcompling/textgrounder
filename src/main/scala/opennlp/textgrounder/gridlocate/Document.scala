@@ -348,24 +348,6 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   /**
-   * Convert a line from a textdb database into a raw document status,
-   * listing the fields in the document.
-   *
-   * @param schema Schema for textdb, indicating names of fields, etc.
-   */
-  def line_to_raw_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema): DocStatus[RawDocument] = {
-    line_to_fields(line, lineno, schema) match {
-      case Some(fields) =>
-        DocStatus(filehand, file, lineno, Some(RawDocument(schema, fields)),
-          "processed", "", "")
-      case None =>
-        DocStatus(filehand, file, lineno, None, "bad",
-          "badly formatted database row", "")
-    }
-  }
-
-  /**
    * Convert a raw document (describing the fields of the document) to
    * an actual document object.
    *
@@ -426,29 +408,8 @@ abstract class GeoDocFactory[Co : Serializer](
       note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
     raw_document_to_document(
-      line_to_raw_document(filehand, file, line, lineno, schema),
+      GeoDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
       record_in_factory, note_globally)
-  }
-
-  /**
-   * Read the raw documents from a textdb corpus.
-   *
-   * @param filehand The FileHandler for the directory of the corpus.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata")
-   * @return Iterator over document statuses.
-   */
-  def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String): Iterator[DocStatus[RawDocument]] = {
-    val (schema, files) =
-      TextDBProcessor.get_textdb_files(filehand, dir, suffix)
-    files.flatMap { file =>
-      filehand.openr(file).zipWithIndex.map {
-        case (line, idx) =>
-          line_to_raw_document(filehand, file, line, idx + 1, schema)
-      }
-    }
   }
 
   /**
@@ -531,7 +492,8 @@ abstract class GeoDocFactory[Co : Serializer](
       suffix: String, record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
-    val rawdocs = read_raw_documents_from_textdb(filehand, dir, suffix)
+    val rawdocs =
+      GeoDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
     raw_documents_to_document_statuses(rawdocs, record_in_subfactory,
       note_globally, finish_globally)
   }
@@ -681,6 +643,47 @@ abstract class GeoDocFactory[Co : Serializer](
     errprint("Total: %s recorded documents having coordinates with %s total word tokens",
       total_num_recorded_documents_with_coordinates,
       total_word_tokens_of_recorded_documents_with_coordinates)
+  }
+}
+
+object GeoDocFactory {
+  /**
+   * Convert a line from a textdb database into a raw document status,
+   * listing the fields in the document.
+   *
+   * @param schema Schema for textdb, indicating names of fields, etc.
+   */
+  def line_to_raw_document(filehand: FileHandler, file: String, line: String,
+      lineno: Long, schema: Schema): DocStatus[RawDocument] = {
+    line_to_fields(line, lineno, schema) match {
+      case Some(fields) =>
+        DocStatus(filehand, file, lineno, Some(RawDocument(schema, fields)),
+          "processed", "", "")
+      case None =>
+        DocStatus(filehand, file, lineno, None, "bad",
+          "badly formatted database row", "")
+    }
+  }
+
+  /**
+   * Read the raw documents from a textdb corpus.
+   *
+   * @param filehand The FileHandler for the directory of the corpus.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata")
+   * @return Iterator over document statuses.
+   */
+  def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
+      suffix: String): Iterator[DocStatus[RawDocument]] = {
+    val (schema, files) =
+      TextDBProcessor.get_textdb_files(filehand, dir, suffix)
+    files.flatMap { file =>
+      filehand.openr(file).zipWithIndex.map {
+        case (line, idx) =>
+          line_to_raw_document(filehand, file, line, idx + 1, schema)
+      }
+    }
   }
 }
 
