@@ -1027,13 +1027,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   messages.
    * @return Iterator over raw documents.
    */
-  def read_raw_training_documents(docfact: GeoDocFactory[Co],
-      operation: String): Iterator[DocStatus[RawDocument]] = {
+  def read_raw_training_documents(operation: String):
+      Iterator[DocStatus[RawDocument]] = {
     val task = show_progress("document", operation,
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
     val dociter = params.input_corpus.toIterator.flatMap(dir =>
-        docfact.read_raw_documents_from_textdb(get_file_handler,
+        GeoDocFactory.read_raw_documents_from_textdb(get_file_handler,
           dir, "training-" + document_file_suffix))
     for (doc <- task.iterate(dociter)) yield {
       val sleep_at = debugval("sleep-at-docs")
@@ -1072,19 +1072,20 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
     docfact.raw_documents_to_documents(
-      read_raw_training_documents(docfact, operation),
+      read_raw_training_documents(operation),
       record_in_subfactory, note_globally, finish_globally)
   }
 
-  def initialize_grid() = {
+  def create_grid_from_documents(
+      get_rawdocs: String => Iterator[DocStatus[RawDocument]]
+  ) = {
     val word_dist_factory = create_word_dist_factory
     val docfact = create_document_factory(word_dist_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
     // to this in docfact.
-    grid.add_training_documents_to_grid(
-      operation => read_raw_training_documents(docfact, operation))
+    grid.add_training_documents_to_grid(get_rawdocs)
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       output_resource_usage()
@@ -1105,6 +1106,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
     grid
   }
+
+  def initialize_grid() =
+    create_grid_from_documents(read_raw_training_documents)
 }
 
 trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
@@ -1221,11 +1225,17 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  def initialize_strategy() = {
-    val grid = initialize_grid()
+  def create_strategy_from_documents(
+    get_rawdocs: String => Iterator[DocStatus[RawDocument]]
+  ) = {
+    val grid = create_grid_from_documents(get_rawdocs)
     val stratname = params.strategy
     val strategy = create_strategy(stratname, grid)
     (stratname, strategy)
+  }
+
+  def initialize_strategy() = {
+    create_strategy_from_documents(read_raw_training_documents)
   }
 }
 
