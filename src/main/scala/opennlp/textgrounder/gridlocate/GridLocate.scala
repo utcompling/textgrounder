@@ -76,6 +76,7 @@ object UnigramStrategy {
  * individual words).
  */
 abstract class GridLocateDocStrategy[Co](
+  val stratname: String,
   val grid: GeoGrid[Co]
 ) {
   /**
@@ -96,8 +97,9 @@ abstract class GridLocateDocStrategy[Co](
  */
 
 class RandomGridLocateDocStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](stratname, grid) {
   def return_ranked_cells(word_dist: WordDist,
       include: Iterable[GeoCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
@@ -113,9 +115,10 @@ class RandomGridLocateDocStrategy[Co](
  */
 
 class MostPopularGridLocateDocStrategy[Co] (
+  stratname: String,
   grid: GeoGrid[Co],
   internal_link: Boolean
-) extends GridLocateDocStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](stratname, grid) {
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
@@ -134,8 +137,9 @@ class MostPopularGridLocateDocStrategy[Co] (
  * in turn and computing a score.
  */
 abstract class PointwiseScoreStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](stratname, grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
@@ -208,10 +212,11 @@ abstract class PointwiseScoreStrategy[Co](
  * any case since it's comparing documents against cells.)
  */
 class KLDivergenceStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co],
   partial: Boolean = true,
   symmetric: Boolean = false
-) extends PointwiseScoreStrategy[Co](grid) {
+) extends PointwiseScoreStrategy[Co](stratname, grid) {
 
   var self_kl_cache: KLDivergenceCache = null
   val slow = false
@@ -281,10 +286,11 @@ class KLDivergenceStrategy[Co](
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co],
   smoothed: Boolean = false,
   partial: Boolean = false
-) extends PointwiseScoreStrategy[Co](grid) {
+) extends PointwiseScoreStrategy[Co](stratname, grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
     val cossim =
@@ -299,9 +305,10 @@ class CosineSimilarityStrategy[Co](
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co],
   use_baseline: Boolean = true
-) extends PointwiseScoreStrategy[Co](grid) {
+) extends PointwiseScoreStrategy[Co](stratname, grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
     val params = grid.driver.params
@@ -327,8 +334,9 @@ class NaiveBayesDocStrategy[Co](
 }
 
 class AverageCellProbabilityStrategy[Co](
+  stratname: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](grid) {
+) extends GridLocateDocStrategy[Co](stratname, grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[Co](lru_cache_size)
 
@@ -725,6 +733,7 @@ trait GridLocateDocParameters extends GridLocateParameters {
             "smoothed-part-cossim"),
         Seq("naive-bayes-with-baseline", "nb-base"),
         Seq("naive-bayes-no-baseline", "nb-nobase"),
+        Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("internal-link", "link"),
         Seq("random"),
         Seq("num-documents", "numdocs", "num-docs"))
@@ -748,6 +757,11 @@ number of documents in a cell.  See also 'naive-bayes-weighting' and
 'naive-bayes-baseline-weight' for options controlling how the different
 words are weighted against each other and how the baseline and word
 probabilities are weighted.
+
+'average-cell-probability' (or 'celldist') involves computing, for each word,
+a probability distribution over cells using the word distribution of each cell,
+and then combining the distributions over all words in a document, weighted by
+the count the word in the document.
 
 """
 
@@ -1123,41 +1137,41 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
     stratname match {
       case "random" =>
-        new RandomGridLocateDocStrategy[Co](grid)
+        new RandomGridLocateDocStrategy[Co](stratname, grid)
       case "internal-link" =>
-        new MostPopularGridLocateDocStrategy[Co](
-          grid, true)
+        new MostPopularGridLocateDocStrategy[Co](stratname, grid, true)
       case "num-documents" =>
-        new MostPopularGridLocateDocStrategy[Co](
-          grid, false)
+        new MostPopularGridLocateDocStrategy[Co](stratname, grid, false)
       case "naive-bayes-no-baseline" =>
-        new NaiveBayesDocStrategy[Co](grid, false)
+        new NaiveBayesDocStrategy[Co](stratname, grid, false)
       case "naive-bayes-with-baseline" =>
-        new NaiveBayesDocStrategy[Co](grid, true)
+        new NaiveBayesDocStrategy[Co](stratname, grid, true)
       case "cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](grid, smoothed = false,
+        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = false,
           partial = false)
       case "partial-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](grid, smoothed = false,
+        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = false,
           partial = true)
       case "smoothed-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](grid, smoothed = true,
+        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = true,
           partial = false)
       case "smoothed-partial-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](grid, smoothed = true,
+        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = true,
           partial = true)
       case "full-kl-divergence" =>
-        new KLDivergenceStrategy[Co](grid, symmetric = false,
+        new KLDivergenceStrategy[Co](stratname, grid, symmetric = false,
           partial = false)
       case "partial-kl-divergence" =>
-        new KLDivergenceStrategy[Co](grid, symmetric = false,
+        new KLDivergenceStrategy[Co](stratname, grid, symmetric = false,
           partial = true)
       case "symmetric-full-kl-divergence" =>
-        new KLDivergenceStrategy[Co](grid, symmetric = true,
+        new KLDivergenceStrategy[Co](stratname, grid, symmetric = true,
           partial = false)
       case "symmetric-partial-kl-divergence" =>
-        new KLDivergenceStrategy[Co](grid, symmetric = true,
+        new KLDivergenceStrategy[Co](stratname, grid, symmetric = true,
           partial = true)
+      case "average-cell-probability" =>
+        new AverageCellProbabilityStrategy[Co](stratname, grid)
     }
   }
 
@@ -1229,9 +1243,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
     val grid = create_grid_from_documents(get_rawdocs)
-    val stratname = params.strategy
-    val strategy = create_strategy(stratname, grid)
-    (stratname, strategy)
+    create_strategy(params.strategy, grid)
   }
 
   def initialize_strategy() = {

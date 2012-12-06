@@ -551,16 +551,14 @@ abstract class CorpusEvaluator(
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
- * @param stratname Name of the strategy used for performing evaluation.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 abstract class GridEvaluator[Co](
   val strategy: GridLocateDocStrategy[Co],
-  val stratname: String,
   override val driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
-) extends CorpusEvaluator(stratname, driver) {
+) extends CorpusEvaluator(strategy.stratname, driver) {
   type TEvalDoc = GeoDoc[Co]
   override type TEvalRes = DocEvalResult[Co]
 
@@ -715,17 +713,15 @@ abstract class GridEvaluator[Co](
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
- * @param stratname Name of the strategy used for performing evaluation.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 class RankedGridEvaluator[Co](
   strategy: GridLocateDocStrategy[Co],
-  stratname: String,
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
 ) extends GridEvaluator[Co] (
-  strategy, stratname, driver, evalstats
+  strategy, driver, evalstats
 ) {
   def imp_evaluate_document(document: GeoDoc[Co],
       true_cell: GeoCell[Co]) = {
@@ -923,17 +919,15 @@ class RankedDocEvalStats[Co](
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
- * @param stratname Name of the strategy used for performing evaluation.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 abstract class CoordGridEvaluator[Co](
   strategy: GridLocateDocStrategy[Co],
-  stratname: String,
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
 ) extends GridEvaluator[Co](
-  strategy, stratname, driver, evalstats
+  strategy, driver, evalstats
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
 
@@ -994,19 +988,17 @@ class CoordDocEvalStats[Co](
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
- * @param stratname Name of the strategy used for performing evaluation.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 class MeanShiftGridEvaluator[Co](
   strategy: GridLocateDocStrategy[Co],
-  stratname: String,
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co],
   k_best: Int,
   mean_shift_obj: MeanShift[Co]
 ) extends CoordGridEvaluator[Co](
-  strategy, stratname, driver, evalstats
+  strategy, driver, evalstats
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)

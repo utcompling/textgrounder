@@ -107,12 +107,14 @@ doing geolocation is split up into various classes:
 /////////////////////////////////////////////////////////////////////////////
 
 abstract class GeolocateDocStrategy(
+  stratname: String,
   sphere_grid: SphereGrid
-) extends GridLocateDocStrategy[SphereCoord](sphere_grid) { }
+) extends GridLocateDocStrategy[SphereCoord](stratname, sphere_grid) { }
 
 class CellDistMostCommonToponymGeolocateDocStrategy(
+  stratname: String,
   sphere_grid: SphereGrid
-) extends GeolocateDocStrategy(sphere_grid) {
+) extends GeolocateDocStrategy(stratname, sphere_grid) {
   val cdist_factory =
     new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
@@ -139,8 +141,9 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
 }
 
 class LinkMostCommonToponymGeolocateDocStrategy(
+  stratname: String,
   sphere_grid: SphereGrid
-) extends GeolocateDocStrategy(sphere_grid) {
+) extends GeolocateDocStrategy(stratname, sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
@@ -189,8 +192,8 @@ class LinkMostCommonToponymGeolocateDocStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGridLocateDocStrategy[SphereCoord](
-        sphere_grid).return_ranked_cells(word_dist, include))
+      new RandomGridLocateDocStrategy[SphereCoord](stratname, sphere_grid).
+        return_ranked_cells(word_dist, include))
   }
 }
 
@@ -358,19 +361,9 @@ is in PCL-Travel XML format, and uses each chapter in the evaluation
 file as a document to evaluate.""")
 
   override protected def strategy_choices = super.strategy_choices ++ Seq(
-        Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("link-most-common-toponym"),
         Seq("cell-distribution-most-common-toponym",
             "celldist-most-common-toponym"))
-
-  override protected def strategy_non_baseline_help =
-    super.strategy_non_baseline_help +
-"""'average-cell-probability' (or 'celldist') involves computing, for each word,
-a probability distribution over cells using the word distribution of each cell,
-and then combining the distributions over all words in a document, weighted by
-the count the word in the document.
-
-"""
 
   override protected def strategy_baseline_help =
     super.strategy_baseline_help +
@@ -477,11 +470,9 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
   override def create_strategy(stratname: String, grid: GeoGrid[SphereCoord]) = {
     stratname match {
       case "link-most-common-toponym" =>
-        new LinkMostCommonToponymGeolocateDocStrategy(grid)
+        new LinkMostCommonToponymGeolocateDocStrategy(stratname, grid)
       case "celldist-most-common-toponym" =>
-        new CellDistMostCommonToponymGeolocateDocStrategy(grid)
-      case "average-cell-probability" =>
-        new AverageCellProbabilityStrategy[SphereCoord](grid)
+        new CellDistMostCommonToponymGeolocateDocStrategy(stratname, grid)
       case other => super.create_strategy(other, grid)
     }
   }
@@ -496,11 +487,9 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
    *   corresponding scores.  The document evaluator then uses this to
    *   finish evaluating the document (e.g. picking the top-ranked one,
    *   applying the mean-shift algorithm, etc.).
-   * @param stratname Name of the strategy.
    */
   def create_cell_evaluator(
-      strategy: GridLocateDocStrategy[SphereCoord],
-      stratname: String
+      strategy: GridLocateDocStrategy[SphereCoord]
 /*
 If you leave off the return type of this function, then you get a compile
 crash when trying to compile the following code in
@@ -733,9 +722,9 @@ found   : (String, Iterator[evalobj.TEvalRes])
 
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereGridEvaluator(strategy, stratname, this, evalstats)
+        new RankedSphereGridEvaluator(strategy, this, evalstats)
       case "mean-shift" =>
-        new MeanShiftGridEvaluator[SphereCoord](strategy, stratname, this,
+        new MeanShiftGridEvaluator[SphereCoord](strategy, this,
           evalstats,
           params.k_best,
           new SphereMeanShift(params.mean_shift_window,
@@ -755,7 +744,8 @@ found   : (String, Iterator[evalobj.TEvalRes])
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run() = {
-    val (stratname, strategy) = initialize_strategy()
+    val strategy = initialize_strategy()
+    val stratname = strategy.stratname
     val grid = strategy.grid
     if (debug("no-evaluation"))
       Iterable()
@@ -764,7 +754,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
         params.eval_format match {
           case "pcl-travel" => {
             val evalobj =
-              new PCLTravelGeolocateDocEvaluator(strategy, stratname, grid,
+              new PCLTravelGeolocateDocEvaluator(strategy, grid,
                 get_file_handler, params.eval_file)
             evalobj.evaluate_documents(evalobj.iter_document_stats)
           }
@@ -774,7 +764,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
                 grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir,
                   params.eval_set + "-" + document_file_suffix))
-            val evalobj = create_cell_evaluator(strategy, stratname)
+            val evalobj = create_cell_evaluator(strategy)
             evalobj.evaluate_documents(docstats)
           }
           case "raw-text" => {
