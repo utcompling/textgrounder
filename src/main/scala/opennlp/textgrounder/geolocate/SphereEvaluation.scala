@@ -219,11 +219,10 @@ class GroupedSphereDocEvalStats(
  */
 class RankedSphereGridEvaluator(
   strategy: GridLocateDocStrategy[SphereCoord],
-  stratname: String,
   driver: GeolocateDocTypeDriver,
   evalstats: DocEvalStats[SphereCoord]
 ) extends RankedGridEvaluator[SphereCoord](
-  strategy, stratname, driver, evalstats
+  strategy, driver, evalstats
 ) {
   override def imp_evaluate_document(document: GeoDoc[SphereCoord],
       true_cell: GeoCell[SphereCoord]) = {
@@ -270,11 +269,10 @@ class TitledDocResult { }
  */
 class PCLTravelGeolocateDocEvaluator(
   strategy: GridLocateDocStrategy[SphereCoord],
-  stratname: String,
   grid: GeoGrid[SphereCoord],
   filehand: FileHandler,
   filenames: Iterable[String]
-) extends CorpusEvaluator(stratname, grid.driver) {
+) extends CorpusEvaluator(strategy.stratname, grid.driver) {
   type TEvalDoc = TitledDoc
   type TEvalRes = TitledDocResult
 
