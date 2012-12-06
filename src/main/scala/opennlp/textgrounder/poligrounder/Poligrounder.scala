@@ -104,8 +104,8 @@ See GridLocate.scala.
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class PoligrounderParameters(parser: ArgParser = null) extends
-    GridLocateParameters(parser) {
+class PoligrounderParameters(val parser: ArgParser = null) extends
+    GridLocateParameters {
   var from = ap.option[String]("f", "from",
     help = """Chunk of start time to compare.""")
 
@@ -212,7 +212,7 @@ class PoligrounderDriver extends
   }
 
   def run() {
-    val grid = setup_for_run()
+    val grid = initialize_grid()
     if (params.ideological_user_corpus == null)
       DistributionComparer.compare_cells_2way(
         grid.asInstanceOf[TimeGrid], "all",

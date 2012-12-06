@@ -236,7 +236,8 @@ class DocEvalMapper extends
           "FIXME: For Hadoop, currently need exactly one corpus")
       }
     }
-    val grid = driver.setup_for_run()
+    val (stratname, strategy) = driver.initialize_strategy()
+    val grid = strategy.grid
     context.progress
     val schema = TextDBProcessor.read_schema_from_textdb(filehand,
       driver.params.input_corpus(0),
@@ -267,8 +268,6 @@ class DocEvalMapper extends
           docstat
         }
       }
-    val stratname = driver.params.strategy
-    val strategy = driver.create_strategy(stratname, grid)
     val evalobj = driver.create_cell_evaluator(strategy, stratname)
     for (result <- evalobj.evaluate_documents(docstats)) {
       context.write(new Text(stratname),

@@ -45,8 +45,8 @@ class KMLParameters {
 }
 
 class GenerateKMLParameters(
-  parser: ArgParser = null
-) extends GeolocateParameters(parser) {
+  val parser: ArgParser = null
+) extends GeolocateParameters {
   //// Options used only in KML generation (--mode=generate-kml)
   var kml_words =
     ap.option[String]("k", "kml-words", "kw",
@@ -164,7 +164,7 @@ class GenerateKMLDriver extends
    */
 
   def run() {
-    val grid = setup_for_run()
+    val grid = initialize_grid()
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(grid, memoizer.memoize(word))

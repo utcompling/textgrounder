@@ -44,10 +44,10 @@ import util.io._
  *
  * @param ap ArgParser object.
  */
-class ProcessFilesParameters(ap: ArgParser) extends
-    ArgParserParameters(ap) {
+class ProcessFilesParameters(val parser: ArgParser) extends
+    ArgParserParameters {
   val output_dir =
-    ap.option[String]("o", "output-dir",
+    parser.option[String]("o", "output-dir",
       metavar = "DIR",
       help = """Directory to store output files in.  It must not already
 exist, and will be created (including any parent directories).""")
