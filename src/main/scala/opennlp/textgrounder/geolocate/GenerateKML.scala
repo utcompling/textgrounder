@@ -164,7 +164,7 @@ class GenerateKMLDriver extends
    */
 
   def run() {
-    val grid = initialize_grid()
+    val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(grid, memoizer.memoize(word))

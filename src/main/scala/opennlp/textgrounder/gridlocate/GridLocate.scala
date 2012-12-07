@@ -1132,8 +1132,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     grid
   }
 
-  def initialize_grid() =
-    create_grid_from_documents(read_raw_training_documents)
+  def initialize_grid = create_grid_from_documents(read_raw_training_documents)
 }
 
 trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
@@ -1219,13 +1218,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
-  def create_ranker(strategy: GridLocateDocStrategy[Co]) = {
-    val basic_ranker = new GridRanker[Co](strategy)
+  def create_ranker: GridRanker[Co] = {
+    def basic_ranker =
+      new { val strategy =
+              create_strategy_from_documents(read_raw_training_documents)
+          } with GridRanker[Co]
     if (params.rerank == "none") basic_ranker
     else params.rerank_classifier match {
       case "trivial" =>
-        new TrivialGridReranker[Co](
-          basic_ranker, params.rerank_top_n)
+        new TrivialGridReranker[Co](basic_ranker, params.rerank_top_n)
       case _ => {
         val rerank_instance_factory = create_rerank_instance_factory
         val reranker_trainer =
@@ -1244,15 +1245,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
                 is_training = false)
             protected def create_initial_ranker(
               data: Iterable[DocStatus[RawDocument]]
-            ) = new GridRanker[Co](create_strategy_from_documents(
-              _ => data.toIterator)
-            )
+            ) = new { val strategy =
+                       create_strategy_from_documents(_ => data.toIterator) }
+                  with GridRanker[Co]
             protected def external_instances_to_query_answer_pairs(
               insts: Iterator[DocStatus[RawDocument]],
               initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
             ) = {
               val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
-              val grid = strategy.grid
+              val grid = grid_ranker.grid
               grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
                 // Convert document to (doc, cell) pair.  But if a cell
                 // can't be found (i.e. there were no training docs in the
@@ -1277,10 +1278,6 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   ) = {
     val grid = create_grid_from_documents(get_rawdocs)
     create_strategy(params.strategy, grid)
-  }
-
-  def initialize_strategy() = {
-    create_strategy_from_documents(read_raw_training_documents)
   }
 }
 

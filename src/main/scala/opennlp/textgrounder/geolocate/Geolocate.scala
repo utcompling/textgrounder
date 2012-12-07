@@ -482,15 +482,14 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
    * Create the document evaluator object used to evaluate a given
    * cell in a cell grid.
    *
-   * @param strategy Strategy object that implements the mechanism for
+   * @param ranker Ranker object that implements the mechanism for
    *   scoring different pseudodocuments against a document.  The
-   *   strategy computes a ranked list of all pseudodocuments, with
+   *   ranker computes a ranked list of all pseudodocuments, with
    *   corresponding scores.  The document evaluator then uses this to
    *   finish evaluating the document (e.g. picking the top-ranked one,
    *   applying the mean-shift algorithm, etc.).
    */
-  def create_cell_evaluator(
-      strategy: GridLocateDocStrategy[SphereCoord]
+  def create_cell_evaluator(ranker: GridRanker[SphereCoord]
 /*
 If you leave off the return type of this function, then you get a compile
 crash when trying to compile the following code in
@@ -716,16 +715,16 @@ found   : (String, Iterator[evalobj.TEvalRes])
 
     val evalstats =
       if (params.results_by_range)
-        new GroupedSphereDocEvalStats(this, strategy.grid,
+        new GroupedSphereDocEvalStats(this, ranker.grid,
           create_stats = create_stats)
       else
         new SphereDocEvalStats(this, create_stats(this, ""))
 
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereGridEvaluator(strategy, this, evalstats)
+        new RankedSphereGridEvaluator(ranker, this, evalstats)
       case "mean-shift" =>
-        new MeanShiftGridEvaluator[SphereCoord](strategy, this,
+        new MeanShiftGridEvaluator[SphereCoord](ranker, this,
           evalstats,
           params.k_best,
           new SphereMeanShift(params.mean_shift_window,
@@ -745,9 +744,8 @@ found   : (String, Iterator[evalobj.TEvalRes])
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run() = {
-    val strategy = initialize_strategy()
-    val stratname = strategy.stratname
-    val grid = strategy.grid
+    val ranker = create_ranker
+    val grid = ranker.grid
     if (debug("no-evaluation"))
       Iterable()
     else {
@@ -765,7 +763,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
                 grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir,
                   params.eval_set + "-" + document_file_suffix))
-            val evalobj = create_cell_evaluator(strategy)
+            val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(docstats)
           }
           case "raw-text" => {
