@@ -1205,17 +1205,17 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   protected def create_rerank_instance_factory = {
     params.rerank_instance match {
       case "trivial" =>
-        new TrivialRerankInstanceFactory[Co]
+        new TrivialRerankInstFactory[Co]
       case "kl-div" =>
-        new KLDivRerankInstanceFactory[Co]
+        new KLDivRerankInstFactory[Co]
       case "matching-word-binary" =>
-        new WordMatchingRerankInstanceFactory[Co]("binary")
+        new WordMatchingRerankInstFactory[Co]("binary")
       case "matching-word-count" =>
-        new WordMatchingRerankInstanceFactory[Co]("count")
+        new WordMatchingRerankInstFactory[Co]("count")
       case "matching-word-count-product" =>
-        new WordMatchingRerankInstanceFactory[Co]("count-product")
+        new WordMatchingRerankInstFactory[Co]("count-product")
       case "matching-word-probability" =>
-        new WordMatchingRerankInstanceFactory[Co]("probability")
+        new WordMatchingRerankInstFactory[Co]("probability")
     }
   }
 
@@ -1227,36 +1227,47 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         new TrivialGridReranker[Co](
           basic_ranker, params.rerank_top_n)
       case _ => {
-        val docfact =
-          create_document_factory(strategy.grid.docfact.word_dist_factory)
         val rerank_instance_factory = create_rerank_instance_factory
         val reranker_trainer =
           new LinearClassifierGridRerankerTrainer[Co](
             create_pointwise_classifier_trainer
           ) {
-            val initial_ranker = basic_ranker
             val top_n = params.rerank_top_n
-            protected def create_rerank_instance(query: GeoDoc[Co],
-                answer: GeoCell[Co], initial_score: Double,
-                is_training: Boolean) = {
-              rerank_instance_factory(query, answer, initial_score, is_training)
+            val number_of_splits = params.rerank_num_training_splits
+            protected def create_rerank_training_instance(query: GeoDoc[Co],
+                answer: GeoCell[Co], initial_score: Double) =
+              rerank_instance_factory(query, answer, initial_score,
+                is_training = true)
+            protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
+                answer: GeoCell[Co], initial_score: Double) =
+              rerank_instance_factory(query, answer, initial_score,
+                is_training = false)
+            protected def create_initial_ranker(
+              data: Iterable[DocStatus[RawDocument]]
+            ) = new GridRanker[Co](create_strategy_from_documents(
+              _ => data.toIterator)
+            )
+            protected def external_instances_to_query_answer_pairs(
+              insts: Iterator[DocStatus[RawDocument]],
+              initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
+            ) = {
+              val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
+              val grid = strategy.grid
+              grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
+                // Convert document to (doc, cell) pair.  But if a cell
+                // can't be found (i.e. there were no training docs in the
+                // cell of this "test" doc), skip the entire instance rather
+                // than end up trying to score a fake cell
+                grid.find_best_cell_for_document(doc, false) map ((doc, _))
+              }
             }
           }
-        val training_data = new Iterable[(GeoDoc[Co], GeoCell[Co])] {
-          def iterator = {
-            read_training_documents(docfact,
-                operation = "generating training data for reranker").
-              map { doc =>
-                val cell = strategy.grid.
-                  find_best_cell_for_document(doc, false)
-                // We should already have a cell for each training doc,
-                // right?
-                assert(cell != None)
-                (doc, cell.get)
-              }
-          }
-        }
-        reranker_trainer(training_data, basic_ranker)
+        val training_data = new Iterable[DocStatus[RawDocument]] {
+          def iterator =
+            read_raw_training_documents(
+              "generating training data for reranker")
+        }.view
+        reranker_trainer(training_data)
       }
     }
   }
