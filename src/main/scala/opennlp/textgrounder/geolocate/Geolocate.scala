@@ -343,7 +343,8 @@ class GeolocateDocParameters(
   var eval_format =
     ap.option[String]("f", "eval-format",
       default = "internal",
-      choices = Seq("internal", "raw-text", "pcl-travel"),
+      choices = Seq("internal", "raw-text" //, "pcl-travel"
+      ),
       help = """Format of evaluation file(s).  The evaluation files themselves
 are specified using --eval-file.  The following formats are
 recognized:
@@ -355,10 +356,10 @@ no eval file for this format.
 
 'raw-text' assumes that the eval file is simply raw text.  (NOT YET
 IMPLEMENTED.)
-
-'pcl-travel' is another alternative.  It assumes that each evaluation file
-is in PCL-Travel XML format, and uses each chapter in the evaluation
-file as a document to evaluate.""")
+""")
+//'pcl-travel' is another alternative.  It assumes that each evaluation file
+//is in PCL-Travel XML format, and uses each chapter in the evaluation
+//file as a document to evaluate.""")
 
   override protected def strategy_choices = super.strategy_choices ++ Seq(
         Seq("link-most-common-toponym"),
@@ -752,12 +753,12 @@ found   : (String, Iterator[evalobj.TEvalRes])
     else {
       val results =
         params.eval_format match {
-          case "pcl-travel" => {
-            val evalobj =
-              new PCLTravelGeolocateDocEvaluator(strategy, grid,
-                get_file_handler, params.eval_file)
-            evalobj.evaluate_documents(evalobj.iter_document_stats)
-          }
+//          case "pcl-travel" => {
+//            val evalobj =
+//              new PCLTravelGeolocateDocEvaluator(strategy, grid,
+//                get_file_handler, params.eval_file)
+//            evalobj.evaluate_documents(evalobj.iter_document_stats)
+//          }
           case "internal" => {
             val docstats =
               params.input_corpus.toIterator.flatMap(dir =>
