@@ -356,7 +356,7 @@ abstract class GeoDocFactory[Co : Serializer](
    *  factory.
    * @return a DocStatus describing the document.
    */
-  def raw_document_to_document(rawdoc: DocStatus[RawDocument],
+  def raw_document_to_document_status(rawdoc: DocStatus[RawDocument],
       record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
     rawdoc map_result { rd =>
@@ -403,11 +403,11 @@ abstract class GeoDocFactory[Co : Serializer](
    * @param record_in_factory Whether to record the document in the document
    *  factory.
    */
-  def line_to_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema, record_in_factory: Boolean,
+  def line_to_document_status(filehand: FileHandler, file: String,
+      line: String, lineno: Long, schema: Schema, record_in_factory: Boolean,
       note_globally: Boolean
     ): DocStatus[GeoDoc[Co]] = {
-    raw_document_to_document(
+    raw_document_to_document_status(
       GeoDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
       record_in_factory, note_globally)
   }
@@ -438,7 +438,8 @@ abstract class GeoDocFactory[Co : Serializer](
   ) = {
     val docstats =
       rawdocs map { rawdoc =>
-        raw_document_to_document(rawdoc, record_in_subfactory, note_globally)
+        raw_document_to_document_status(rawdoc, record_in_subfactory,
+          note_globally)
       }
     if (!finish_globally)
       docstats

@@ -34,7 +34,7 @@ trait Ranker[Query, Answer] {
  *   ranking.
  */
 class GridRanker[Co](
-  strategy: GridLocateDocStrategy[Co]
+  val strategy: GridLocateDocStrategy[Co]
  ) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
   def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
     strategy.return_ranked_cells(item.dist, include)
@@ -47,17 +47,7 @@ trait RerankerLike[Query, Answer] {
   /**
    * Number of top-ranked items to submit to reranking.
    */
-  protected val top_n: Int
-
-  /**
-   * Display a query item (typically for debugging purposes).
-   */
-  protected def display_query_item(item: Query) = item.toString
-
-  /**
-   * Display an answer (typically for debugging purposes).
-   */
-  protected def display_answer(answer: Answer) = answer.toString
+  val top_n: Int
 }
 
 /**
@@ -76,7 +66,7 @@ trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Qu
   /**
    * Rerank the given answers, based on an initial ranking.
    */
-  def rerank_answers(item: Query,
+  protected def rerank_answers(item: Query,
     initial_ranking: Iterable[(Answer, Double)]): Iterable[(Answer, Double)]
 
   def evaluate_with_initial_ranking(item: Query,
@@ -97,28 +87,32 @@ trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Qu
 /**
  * A pointwise reranker that uses a scoring classifier to assign a score
  * to each possible answer to be reranked.  The idea is that, for each
- * possible answer, we create query instances based on a combination of the
+ * possible answer, we create test instances based on a combination of the
  * query item and answer and score the instances to determine the ranking.
+ *
+ * @tparam Query type of a query
+ * @tparam Answer type of a possible answer
+ * @tparam RerankInst type of the rerank instance encapsulating a query-answer pair
+ *   and fed to the rerank classifier
  */
-trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
+trait PointwiseClassifyingReranker[Query, Answer, RerankInst]
     extends Reranker[Query, Answer] {
   /** Scoring classifier for use in reranking. */
-  protected def rerank_classifier: ScoringBinaryClassifier[RerankInstance]
+  protected def rerank_classifier: ScoringBinaryClassifier[RerankInst]
 
   /**
-   * Create a reranking training instance to feed to the classifier, given
-   * a query item, a potential answer from the ranker, and whether the answer
-   * is correct.  These training instances will be used to train the
-   * classifier.
+   * Create a rerank instance to feed to the classifier during evaluation,
+   * given a query item, a potential answer from the ranker, and the score
+   * from the initial ranker on this answer.
    */
-  protected def create_rerank_instance(query: Query, answer: Answer,
-    initial_score: Double, is_training: Boolean): RerankInstance
+  protected def create_rerank_evaluation_instance(query: Query, answer: Answer,
+    initial_score: Double): RerankInst
 
-  def rerank_answers(item: Query,
+  protected def rerank_answers(item: Query,
       answers: Iterable[(Answer, Double)]) = {
     val new_scores =
       for {(answer, score) <- answers
-           instance = create_rerank_instance(item, answer, score, false)
+           instance = create_rerank_evaluation_instance(item, answer, score)
            new_score = rerank_classifier.score_item(instance)
           }
         yield (answer, new_score)
@@ -127,139 +121,241 @@ trait PointwiseClassifyingReranker[Query, RerankInstance, Answer]
 }
 
 /**
- * A class for training a pointwise classifying reranker.  Training data
- * is supplied to train the classifier, consisting of query items and correct
- * answers.  From each data item, a series of training instances are
- * generated as follows: (1) rank the data item to produce a set of
- * possible answers; (2) if necessary, augment the possible answers to
- * include the correct one; (3) create a training instance for each
- * combination of query item and answer, with "correct" or "incorrect"
- * indicated.
+ * A class for training a pointwise classifying reranker.
+ *
+ * There are various types of training data:
+ * -- External training data is the data supplied externally (e.g. from a
+ *    corpus), consisting of ExtInst items.
+ * -- Initial-ranker training data is the data used to train an initial ranker,
+ *    which supplies the base ranking upon which the reranker builds.
+ *    This also consists of ExtInst items and is taken directly from
+ *    the external training data or a subset.
+ * -- Reranker training data is the data used to train a rerank classifier,
+ *    i.e. the classifier used to compute the scores that underlie the reranking.
+ *    This consists of (RerankInst, Boolean) pairs, i.e. pairs of rerank
+ *    instances (computed from a query-answer pair) and booleans indicating
+ *    whether the instance corresponds to a true answer.
+ *
+ * Generally, a data instance of type `ExtInst` in the external training
+ * data will describe an object of type `Query`, along with the correct
+ * answer. However, it need not merely be a pair of `Query` and `Answer`. In
+ * particular, the `ExtInst` data may be the raw-data form of an object that
+ * can only be created with respect to some particular training corpus (e.g.
+ * for doing back-off when computing word distributions).  Hence, a method
+ * is provided to convert from one to the other, given a trained initial
+ * ranker against which the "cooked" query object will be looked up. For
+ * example, in the case of GridLocate, `ExtInst` is of type
+ * `DocStatus[RawDocument]`, which directly describes the data read from a
+ * corpus, while `Query` is of type `GeoDoc[Co]`, which contains (among other
+ * things) a word distribution with statistics computed using back-off, just
+ * as described above.
+ *
+ * Training is as follows:
+ *
+ * 1. External training data is supplied by the caller.
+ *
+ * 2. Split this data into N parts (`number_of_splits`).  Process each part
+ *    in turn.  For a given part, its data will be used to generate rerank
+ *    training data, using an initial ranker trained on the remaining parts.
+ *
+ * 3. From each data item in the external training data, a series of rerank
+ *    training instances are generated as follows:
+ *
+ *    (1) rank the data item using the initial ranker to produce a set of
+ *        possible answers;
+ *    (2) if necessary, augment the possible answers to include the correct
+ *        one;
+ *    (3) create a rerank training instance for each combination of query item
+ *        and answer, with "correct" or "incorrect" indicated.
+ *
+ * @tparam Query type of a query
+ * @tparam Answer type of a possible answer
+ * @tparam RerankInst type of the rerank instance encapsulating a query-answer pair
+ * @tparam ExtInst type of the instances used in external training data
  */
-trait PointwiseClassifyingRerankerTrainer[Query, RerankInstance, Answer]
+trait PointwiseClassifyingRerankerTrainer[Query, Answer, RerankInst, ExtInst]
 extends RerankerLike[Query, Answer] { self =>
-//  /**
-//   * Number of splits used in the training data, to create the reranker.
-//   */
-//  protected val number_of_splits: Int
-//
+  /**
+   * Number of splits used in the training data, to create the reranker.
+   */
+  val number_of_splits: Int
 
   /**
-   * Create the classifier used for reranking, given a set of training data
-   * (in the form of pairs of reranking instances and whether they represent
-   * correct answers).
+   * Create the classifier used for reranking, given a set of rerank training
+   * data.
    */
   protected def create_rerank_classifier(
-    data: Iterable[(RerankInstance, Boolean)]
-  ): ScoringBinaryClassifier[RerankInstance]
+    data: Iterable[(RerankInst, Boolean)]
+  ): ScoringBinaryClassifier[RerankInst]
 
   /**
-   * Create a reranking training instance to feed to the classifier, given
-   * a query item, a potential answer from the ranker, and whether the answer
-   * is correct.  These training instances will be used to train the
-   * classifier.
+   * Create a rerank training instance to train the classifier, given a query
+   * item, a potential answer from the ranker, and the score from the initial
+   * ranker on this answer.
    */
-  protected def create_rerank_instance(query: Query, answer: Answer,
-    initial_score: Double, is_training: Boolean): RerankInstance
+  protected def create_rerank_training_instance(query: Query, answer: Answer,
+    initial_score: Double): RerankInst
 
   /**
-   * Generate rerank training instances for a given ranker
-   * training instance.
+   * Create a rerank instance to feed to the classifier during evaluation,
+   * given a query item, a potential answer from the ranker, and the score
+   * from the initial ranker on this answer.  Note that this function may need
+   * to work differently from the corresponding function used during training
+   * (e.g. in the handling of previously unseen words).
    */
-  protected def get_rerank_training_instances(item: Query,
-      true_answer: Answer, initial_ranker: Ranker[Query, Answer]) = {
-    val initial_answers = initial_ranker.evaluate(item, Iterable(true_answer))
+  protected def create_rerank_evaluation_instance(query: Query, answer: Answer,
+    initial_score: Double): RerankInst
+
+  /**
+   * Create an initial ranker based on initial-ranker training data.
+   */
+  protected def create_initial_ranker(data: Iterable[ExtInst]):
+    Ranker[Query, Answer]
+
+  /**
+   * Convert an external instance into a query-answer pair, if possible,
+   * given the external instance and the initial ranker trained from other
+   * external instances.
+   */
+  protected def external_instances_to_query_answer_pairs(
+    inst: Iterator[ExtInst], initial_ranker: Ranker[Query, Answer]
+  ): Iterator[(Query, Answer)]
+
+  /**
+   * Display a query item (typically for debugging purposes).
+   */
+  def display_query_item(item: Query) = item.toString
+
+  /**
+   * Display an answer (typically for debugging purposes).
+   */
+  def display_answer(answer: Answer) = answer.toString
+
+  /**
+   * Generate rerank training instances for a given instance from the
+   * external training data.
+   *
+   * @param initial_ranker Initial ranker used to score the answer.
+   */
+  protected def get_rerank_training_instances(
+    query: Query, true_answer: Answer, initial_ranker: Ranker[Query, Answer]
+  ) = {
+    val initial_answers =
+      initial_ranker.evaluate(query, Iterable(true_answer))
     val top_answers = initial_answers.take(top_n)
     val answers =
       if (top_answers.find(_._1 == true_answer) != None)
         top_answers
       else
-        top_answers ++ Iterable(initial_answers.find(_._1 == true_answer).get)
+        top_answers ++
+          Iterable(initial_answers.find(_._1 == true_answer).get)
     for {(possible_answer, score) <- answers
          is_correct = possible_answer == true_answer
         }
       yield (
-        create_rerank_instance(item, possible_answer, score, true), is_correct)
+        create_rerank_training_instance(query, possible_answer, score),
+        is_correct
+      )
   }
 
-//  protected val create_initial_ranker(
-//    data: Iterable[(Query, Answer)]
-//  ): Ranker[Query, Answer]
-//
-//  lazy val initial_ranker = create_initial_ranker(training_data)
-//
-// protected def create_splits = {
-//   errprint("Computing total number of training documents ...")
-//   val numitems = training_data.size
-//   errprint("Total number of training documents: %s.", numitem)
-//   // If number of docs is not an even multiple of number of splits,
-//   // round the split size up -- we want the last split a bit smaller
-//   // rather than an extra split with only a couple of items.
-//   val splitsize = (numitems + number_of_splits - 1) / number_of_splits
-//   errprint("Number of splits for training reranker: %s.", number_of_splits)
-//   errprint("Size of each split: %s documents.", splitsize)
-//   (for (rerank_split_num <- (0 until number_of_splits).toIterator) yield {
-//     val split_training_data = training_data.grouped(splitsize).zipWithIndex
-//     val (rerank_splits, initrank_splits) = split_training_data partition {
-//       case (data, num) => num == rerank_split_num
-//     }
-//     val rerank_data = rerank_splits.map(_._1).flatten
-//     val initrank_data = initrank_splits.map(_._1).flatten
-//     val split_initial_ranker = create_initial_ranker(initrank_data)
-
-  def train_rerank_classifier(training_data: Iterable[(Query, Answer)],
-      initial_ranker: Ranker[Query, Answer]) = {
-    val rerank_training_data =
-      if (debug("rerank-training")) {
-        training_data.zipWithIndex.flatMap {
-          case ((item, true_answer), index) => {
-            val prefix = "#%d: " format (index + 1)
-            errprint("%sTraining item: %s", prefix, display_query_item(item))
-            errprint("%sTrue answer: %s", prefix, display_answer(true_answer))
-            val training_insts =
-              get_rerank_training_instances(item, true_answer, initial_ranker)
-            for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
-              val instpref = "%s#%d: " format (prefix, instind + 1)
-              val correctstr =
-                if (correct) "CORRECT" else "INCORRECT"
-              errprint("%s%s: %s", instpref, correctstr, featvec)
-            }
-            training_insts
+  /**
+   * Given one of the splits of external training data and an initial ranker
+   * created from the remainder, generate the corresponding rerank training
+   * instances.
+   */
+  protected def get_rerank_training_data_for_split(
+    data: Iterator[ExtInst], initial_ranker: Ranker[Query, Answer]
+  ) = {
+    val query_answer_pairs =
+      external_instances_to_query_answer_pairs(data, initial_ranker)
+    if (debug("rerank-training")) {
+      query_answer_pairs.zipWithIndex.flatMap {
+        case ((query, answer), index) => {
+          val prefix = "#%d: " format (index + 1)
+          errprint("%sTraining item: %s", prefix, display_query_item(query))
+          errprint("%sTrue answer: %s", prefix, display_answer(answer))
+          val training_insts =
+            get_rerank_training_instances(query, answer, initial_ranker)
+          for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
+            val instpref = "%s#%d: " format (prefix, instind + 1)
+            val correctstr =
+              if (correct) "CORRECT" else "INCORRECT"
+            errprint("%s%s: %s", instpref, correctstr, featvec)
           }
-        }
-      } else {
-        training_data.flatMap {
-          case (item, true_answer) =>
-            get_rerank_training_instances(item, true_answer, initial_ranker)
+          training_insts
         }
       }
-    create_rerank_classifier(rerank_training_data.toIndexedSeq)
+    } else {
+      query_answer_pairs.flatMap {
+        case (query, answer) =>
+          get_rerank_training_instances(query, answer, initial_ranker)
+      }
+    }
   }
 
-  def apply(training_data: Iterable[(Query, Answer)],
-      initial_ranker: Ranker[Query, Answer]) = {
-    val rerank_classifier =
-      train_rerank_classifier(training_data, initial_ranker)
-    create_reranker(rerank_classifier, initial_ranker)
+  /**
+   * Given external training data, generate the corresponding rerank training
+   * data.  This involves splitting up the rerank data into parts and training
+   * separate initial rankers, as described above.
+   */
+  protected def get_rerank_training_data(training_data: Iterable[ExtInst]) = {
+    val numitems = training_data.size
+    errprint("Total number of training documents: %s.", numitems)
+    // If number of docs is not an even multiple of number of splits,
+    // round the split size up -- we want the last split a bit smaller
+    // rather than an extra split with only a couple of items.
+    val splitsize = (numitems + number_of_splits - 1) / number_of_splits
+    errprint("Number of splits for training reranker: %s.", number_of_splits)
+    errprint("Size of each split: %s documents.", splitsize)
+    (for (rerank_split_num <- 0 until number_of_splits) yield {
+      errprint("Generating data for split %s" format rerank_split_num)
+      val split_training_data = training_data.grouped(splitsize).zipWithIndex
+      val (rerank_splits, initrank_splits) = split_training_data partition {
+        case (data, num) => num == rerank_split_num
+      }
+      val rerank_data = rerank_splits.map(_._1).flatten
+      val initrank_data = initrank_splits.map(_._1).flatten.toIterable
+      val split_initial_ranker = create_initial_ranker(initrank_data)
+      get_rerank_training_data_for_split(rerank_data, split_initial_ranker)
+    }).flatten
   }
 
-  def create_reranker(
-    _rerank_classifier: ScoringBinaryClassifier[RerankInstance],
+  /**
+   * Train a rerank classifier, based on external training data.
+   */
+  protected def train_rerank_classifier(
+    training_data: Iterable[ExtInst]
+  ) = {
+    val rerank_training_data = get_rerank_training_data(training_data)
+    create_rerank_classifier(rerank_training_data)
+  }
+
+  /**
+   * Actually create a reranker object, given a rerank classifier and
+   * initial ranker.
+   */
+  protected def create_reranker(
+    _rerank_classifier: ScoringBinaryClassifier[RerankInst],
     _initial_ranker: Ranker[Query, Answer]
   ) = {
-    new PointwiseClassifyingReranker[Query, RerankInstance, Answer] {
-      val rerank_classifier = _rerank_classifier
-      val initial_ranker = _initial_ranker
+    new PointwiseClassifyingReranker[Query, Answer, RerankInst] {
+      protected val rerank_classifier = _rerank_classifier
+      protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      protected def create_rerank_instance(query: Query, answer: Answer,
-          initial_score: Double, is_training: Boolean) = {
-        self.create_rerank_instance(query, answer, initial_score, is_training)
+      protected def create_rerank_evaluation_instance(query: Query,
+          answer: Answer, initial_score: Double) = {
+        self.create_rerank_evaluation_instance(query, answer, initial_score)
       }
-      override protected def display_query_item(item: Query) =
-        self.display_query_item(item)
-      override protected def display_answer(answer: Answer) =
-        self.display_answer(answer)
     }
+  }
+
+  /**
+   * Train a reranker, based on external training data.
+   */
+  def apply(training_data: Iterable[ExtInst]) = {
+    val rerank_classifier = train_rerank_classifier(training_data)
+    val initial_ranker = create_initial_ranker(training_data)
+    create_reranker(rerank_classifier, initial_ranker)
   }
 }
 
@@ -293,7 +389,7 @@ class LinearClassifierAdapter (
   def score_item(item: FeatureVector) = cfier.binary_score(item)
 }
 
-trait RerankInstanceFactory[Co] extends (
+trait RerankInstFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory =
@@ -314,19 +410,18 @@ trait RerankInstanceFactory[Co] extends (
  * A simple factory for generating rerank instances for a document, using
  * nothing but the score passed in.
  */
-class TrivialRerankInstanceFactory[Co] extends
-    RerankInstanceFactory[Co] {
+class TrivialRerankInstFactory[Co] extends
+    RerankInstFactory[Co] {
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
     is_training: Boolean) = make_feature_vector(Iterable(), score, is_training)
 }
 
 /**
  * A factory for generating rerank instances for a document, generating
- * separate features for each word.  using
- * individual KL-divergence components for each word in the document.
+ * separate features for each word.
  */
-abstract class WordByWordRerankInstanceFactory[Co] extends
-    RerankInstanceFactory[Co] {
+abstract class WordByWordRerankInstFactory[Co] extends
+    RerankInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
     celldist: UnigramWordDist): Option[Double]
 
@@ -353,8 +448,8 @@ abstract class WordByWordRerankInstanceFactory[Co] extends
  * A simple factory for generating rerank instances for a document, using
  * individual KL-divergence components for each word in the document.
  */
-class KLDivRerankInstanceFactory[Co] extends
-    WordByWordRerankInstanceFactory[Co] {
+class KLDivRerankInstFactory[Co] extends
+    WordByWordRerankInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
       celldist: UnigramWordDist) = {
     val p = docdist.lookup_word(word)
@@ -375,8 +470,8 @@ class KLDivRerankInstanceFactory[Co] extends
  *   count.  If "probability", assign the probability (essentially, word
  *   count normalized by the number of words in the document).
  */
-class WordMatchingRerankInstanceFactory[Co](value: String) extends
-    WordByWordRerankInstanceFactory[Co] {
+class WordMatchingRerankInstFactory[Co](value: String) extends
+    WordByWordRerankInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
       celldist: UnigramWordDist) = {
     val qcount = celldist.model.get_item(word)
@@ -407,15 +502,8 @@ class TrivialScoringBinaryClassifier(
   }
 }
 
-trait GridRerankerLike[Co] extends RerankerLike[GeoDoc[Co], GeoCell[Co]] {
-  override def display_query_item(item: GeoDoc[Co]) = {
-    "%s, dist=%s" format (item, item.dist.debug_string)
-  }
-}
-
-trait PointwiseGridReranker[Co, RerankInstance]
-extends PointwiseClassifyingReranker[GeoDoc[Co], RerankInstance, GeoCell[Co]]
-   with GridRerankerLike[Co] {
+trait PointwiseGridReranker[Co, RerankInst]
+extends PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co], RerankInst] {
 }
 
 /**
@@ -432,8 +520,8 @@ class TrivialGridReranker[Co](
     new TrivialScoringBinaryClassifier(
         0 // FIXME: This is incorrect but doesn't matter
     )
-  protected def create_rerank_instance(item: GeoDoc[Co], answer: GeoCell[Co],
-    score: Double, is_training: Boolean) = score
+  protected def create_rerank_evaluation_instance(item: GeoDoc[Co],
+    answer: GeoCell[Co], score: Double) = score
 }
 
 /**
@@ -455,8 +543,9 @@ class TrivialGridReranker[Co](
  */
 abstract class LinearClassifierGridRerankerTrainer[Co](
   val trainer: BinaryLinearClassifierTrainer
-) extends PointwiseClassifyingRerankerTrainer[GeoDoc[Co], FeatureVector, GeoCell[Co]]
-    with GridRerankerLike[Co] {
+) extends PointwiseClassifyingRerankerTrainer[
+    GeoDoc[Co], GeoCell[Co], FeatureVector, DocStatus[RawDocument]
+  ] {
   protected def create_rerank_classifier(
     data: Iterable[(FeatureVector, Boolean)]
   ) = {
@@ -476,5 +565,9 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     errprint("Avg number of stored features per training item: %.2f",
       num_total_stored_feats.toDouble / data.size)
     new LinearClassifierAdapter(trainer(adapted_data, 2))
+  }
+
+  override def display_query_item(item: GeoDoc[Co]) = {
+    "%s, dist=%s" format (item, item.dist.debug_string)
   }
 }
