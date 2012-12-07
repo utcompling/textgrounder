@@ -212,7 +212,7 @@ class PoligrounderDriver extends
   }
 
   def run() {
-    val grid = initialize_grid()
+    val grid = initialize_grid
     if (params.ideological_user_corpus == null)
       DistributionComparer.compare_cells_2way(
         grid.asInstanceOf[TimeGrid], "all",

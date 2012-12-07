@@ -549,16 +549,15 @@ abstract class CorpusEvaluator(
  *
  * @tparam Co Type of the coordinate assigned to a document
  *
- * @param strategy Object encapsulating the strategy used for performing
- *   evaluation.
+ * @param ranker Object describing how to rank a given document.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 abstract class GridEvaluator[Co](
-  val strategy: GridLocateDocStrategy[Co],
+  val ranker: GridRanker[Co],
   override val driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
-) extends CorpusEvaluator(strategy.stratname, driver) {
+) extends CorpusEvaluator(ranker.strategy.stratname, driver) {
   type TEvalDoc = GeoDoc[Co]
   override type TEvalRes = DocEvalResult[Co]
 
@@ -587,11 +586,6 @@ abstract class GridEvaluator[Co](
         }
       }
   }
-
-  // val evalstats = grouped_eval_stats_creator(driver,
-  //  strategy.grid, results_by_range = driver.params.results_by_range)
-
-  val ranker = driver.create_ranker(strategy)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results() // all_results = isfinal)
@@ -686,7 +680,7 @@ abstract class GridEvaluator[Co](
     assert(!skip)
     assert(document.dist.finished)
     val maybe_true_cell =
-      strategy.grid.find_best_cell_for_document(document, true)
+      ranker.grid.find_best_cell_for_document(document, true)
     assert(maybe_true_cell != None)
     val true_cell = maybe_true_cell.get
     if (debug("lots") || debug("commontop")) {
@@ -711,17 +705,16 @@ abstract class GridEvaluator[Co](
  *
  * @tparam Co Type of the coordinate assigned to a document
  *
- * @param strategy Object encapsulating the strategy used for performing
- *   evaluation.
+ * @param ranker Object describing how to rank a given document.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 class RankedGridEvaluator[Co](
-  strategy: GridLocateDocStrategy[Co],
+  ranker: GridRanker[Co],
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
 ) extends GridEvaluator[Co] (
-  strategy, driver, evalstats
+  ranker, driver, evalstats
 ) {
   def imp_evaluate_document(document: GeoDoc[Co],
       true_cell: GeoCell[Co]) = {
@@ -917,23 +910,22 @@ class RankedDocEvalStats[Co](
  *
  * @tparam Co Type of the coordinate assigned to a document
  *
- * @param strategy Object encapsulating the strategy used for performing
- *   evaluation.
+ * @param ranker Object describing how to rank a given document.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 abstract class CoordGridEvaluator[Co](
-  strategy: GridLocateDocStrategy[Co],
+  ranker: GridRanker[Co],
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co]
 ) extends GridEvaluator[Co](
-  strategy, driver, evalstats
+  ranker, driver, evalstats
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
 
   def imp_evaluate_document(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val pred_coord = find_best_point(document, true_cell)
-    new CoordDocEvalResult[Co](document, strategy.grid, pred_coord)
+    new CoordDocEvalResult[Co](document, ranker.grid, pred_coord)
   }
 }
 
@@ -986,19 +978,18 @@ class CoordDocEvalStats[Co](
  *
  * @tparam Co Type of the coordinate assigned to a document
  *
- * @param strategy Object encapsulating the strategy used for performing
- *   evaluation.
+ * @param ranker Object describing how to rank a given document.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
 class MeanShiftGridEvaluator[Co](
-  strategy: GridLocateDocStrategy[Co],
+  ranker: GridRanker[Co],
   driver: GridLocateDocDriver[Co],
   evalstats: DocEvalStats[Co],
   k_best: Int,
   mean_shift_obj: MeanShift[Co]
 ) extends CoordGridEvaluator[Co](
-  strategy, driver, evalstats
+  ranker, driver, evalstats
 ) {
   def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)

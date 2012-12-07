@@ -33,9 +33,9 @@ trait Ranker[Query, Answer] {
  * @param strategy Object encapsulating the strategy used for performing
  *   ranking.
  */
-class GridRanker[Co](
+trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
   val strategy: GridLocateDocStrategy[Co]
- ) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
+  def grid = strategy.grid
   def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
     strategy.return_ranked_cells(item.dist, include)
 }
@@ -77,7 +77,7 @@ trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Qu
     (initial_ranking, reranking)
   }
 
-  def evaluate(item: Query, include: Iterable[Answer]) = {
+  override def evaluate(item: Query, include: Iterable[Answer]) = {
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, include)
     reranking
@@ -503,7 +503,9 @@ class TrivialScoringBinaryClassifier(
 }
 
 trait PointwiseGridReranker[Co, RerankInst]
-extends PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co], RerankInst] {
+extends GridRanker[Co]
+   with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co], RerankInst] {
+  lazy val strategy = initial_ranker.asInstanceOf[GridRanker[Co]].strategy
 }
 
 /**
@@ -545,7 +547,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   val trainer: BinaryLinearClassifierTrainer
 ) extends PointwiseClassifyingRerankerTrainer[
     GeoDoc[Co], GeoCell[Co], FeatureVector, DocStatus[RawDocument]
-  ] {
+    ] { self =>
   protected def create_rerank_classifier(
     data: Iterable[(FeatureVector, Boolean)]
   ) = {
@@ -566,6 +568,32 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       num_total_stored_feats.toDouble / data.size)
     new LinearClassifierAdapter(trainer(adapted_data, 2))
   }
+
+  /**
+   * Actually create a reranker object, given a rerank classifier and
+   * initial ranker.
+   */
+  override protected def create_reranker(
+    _rerank_classifier: ScoringBinaryClassifier[FeatureVector],
+    _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
+  ) = {
+    new PointwiseGridReranker[Co, FeatureVector] {
+      protected val rerank_classifier = _rerank_classifier
+      protected val initial_ranker = _initial_ranker
+      val top_n = self.top_n
+      protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
+          answer: GeoCell[Co], initial_score: Double) = {
+        self.create_rerank_evaluation_instance(query, answer, initial_score)
+      }
+    }
+  }
+
+  /**
+   * Train a reranker, based on external training data.
+   */
+  override def apply(training_data: Iterable[DocStatus[RawDocument]]) =
+    super.apply(training_data).
+      asInstanceOf[PointwiseGridReranker[Co, FeatureVector]]
 
   override def display_query_item(item: GeoDoc[Co]) = {
     "%s, dist=%s" format (item, item.dist.debug_string)

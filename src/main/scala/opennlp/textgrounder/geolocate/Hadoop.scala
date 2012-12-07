@@ -236,7 +236,7 @@ class DocEvalMapper extends
           "FIXME: For Hadoop, currently need exactly one corpus")
       }
     }
-    val strategy = driver.initialize_strategy()
+    val ranker = driver.create_ranker
     context.progress
     val schema = TextDBProcessor.read_schema_from_textdb(filehand,
       driver.params.input_corpus(0),
@@ -259,7 +259,7 @@ class DocEvalMapper extends
       lines.map {
         case (filehand, file, line, lineno) => {
           val docstat =
-            strategy.grid.docfact.line_to_document_status(filehand, file, line,
+            ranker.grid.docfact.line_to_document_status(filehand, file, line,
                           lineno, schema, false, false)
           docstat.maybedoc.foreach { doc =>
             if (doc.dist != null)
@@ -268,9 +268,9 @@ class DocEvalMapper extends
           docstat
         }
       }
-    val evalobj = driver.create_cell_evaluator(strategy)
+    val evalobj = driver.create_cell_evaluator(ranker)
     for (result <- evalobj.evaluate_documents(docstats)) {
-      context.write(new Text(strategy.stratname),
+      context.write(new Text(ranker.strategy.stratname),
         new DoubleWritable(result.pred_truedist))
     }
   }
