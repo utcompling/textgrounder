@@ -260,74 +260,74 @@ class RankedSphereDocEvalResult(
   }
 }
 
-case class TitledDoc(title: String, text: String)
-class TitledDocResult { }
-
-/**
- * A class for geolocation where each test document is a chapter in a book
- * in the PCL Travel corpus.
- */
-class PCLTravelGeolocateDocEvaluator(
-  strategy: GridLocateDocStrategy[SphereCoord],
-  grid: GeoGrid[SphereCoord],
-  filehand: FileHandler,
-  filenames: Iterable[String]
-) extends CorpusEvaluator(strategy.stratname, grid.driver) {
-  type TEvalDoc = TitledDoc
-  type TEvalRes = TitledDocResult
-
-  def iter_document_stats = {
-    filenames.toIterator.flatMap { filename =>
-      val dom = try {
-        // On error, just return, so that we don't have problems when called
-        // on the whole PCL corpus dir (which includes non-XML files).
-        // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
-        xml.XML.loadFile(filename)
-      } catch {
-        case _ => {
-          warning("Unable to parse XML filename: %s", filename)
-          null
-        }
-      }
-
-      if (dom == null) Iterator[Nothing]()
-      else (for {
-        chapter <- dom \\ "div" if (chapter \ "@type").text == "chapter"
-        val (heads, nonheads) = chapter.child.partition(_.label == "head")
-        val headtext = (for (x <- heads) yield x.text) mkString ""
-        val text = (for (x <- nonheads) yield x.text) mkString ""
-        //errprint("Head text: %s", headtext)
-        //errprint("Non-head text: %s", text)
-      } yield DocStatus(filehand, filename, 0, Some(TitledDoc(headtext, text)),
-                "processed", "", "")).toIterator
-    }
-  }
-
-  def evaluate_document(doc: TitledDoc) = {
-    val dist = grid.docfact.word_dist_factory.create_word_dist
-    for (text <- Seq(doc.title, doc.text))
-      dist.add_document(split_text_into_words(text, ignore_punc = true))
-    dist.finish_before_global()
-    dist.finish_after_global()
-    val cells =
-      strategy.return_ranked_cells(dist, include = Iterable[SphereCell]())
-    // FIXME: This should be output by a result object we return.
-    errprint("")
-    errprint("Document with title: %s", doc.title)
-    val num_cells_to_show = 5
-    for ((rank, cellval) <- (1 to num_cells_to_show) zip cells) {
-      val (cell, vall) = cellval
-      if (debug("pcl-travel")) {
-        errprint("  Rank %d, goodness %g:", rank, vall)
-        errprint(cell.xmldesc.toString) // indent=4
-      } else
-        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
-    }
-
-    new TitledDocResult()
-  }
-
-  def output_results(isfinal: Boolean = false) {
-  }
-}
-
+//case class TitledDoc(title: String, text: String)
+//class TitledDocResult { }
+//
+///**
+// * A class for geolocation where each test document is a chapter in a book
+// * in the PCL Travel corpus.
+// */
+//class PCLTravelGeolocateDocEvaluator(
+//  strategy: GridLocateDocStrategy[SphereCoord],
+//  grid: GeoGrid[SphereCoord],
+//  filehand: FileHandler,
+//  filenames: Iterable[String]
+//) extends CorpusEvaluator(strategy.stratname, grid.driver) {
+//  type TEvalDoc = TitledDoc
+//  type TEvalRes = TitledDocResult
+//
+//  def iter_document_stats = {
+//    filenames.toIterator.flatMap { filename =>
+//      val dom = try {
+//        // On error, just return, so that we don't have problems when called
+//        // on the whole PCL corpus dir (which includes non-XML files).
+//        // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
+//        xml.XML.loadFile(filename)
+//      } catch {
+//        case _ => {
+//          warning("Unable to parse XML filename: %s", filename)
+//          null
+//        }
+//      }
+//
+//      if (dom == null) Iterator[Nothing]()
+//      else (for {
+//        chapter <- dom \\ "div" if (chapter \ "@type").text == "chapter"
+//        val (heads, nonheads) = chapter.child.partition(_.label == "head")
+//        val headtext = (for (x <- heads) yield x.text) mkString ""
+//        val text = (for (x <- nonheads) yield x.text) mkString ""
+//        //errprint("Head text: %s", headtext)
+//        //errprint("Non-head text: %s", text)
+//      } yield DocStatus(filehand, filename, 0, Some(TitledDoc(headtext, text)),
+//                "processed", "", "")).toIterator
+//    }
+//  }
+//
+//  def evaluate_document(doc: TitledDoc) = {
+//    val dist = grid.docfact.word_dist_factory.create_word_dist
+//    for (text <- Seq(doc.title, doc.text))
+//      dist.add_document(split_text_into_words(text, ignore_punc = true))
+//    dist.finish_before_global()
+//    dist.finish_after_global()
+//    val cells =
+//      strategy.return_ranked_cells(dist, include = Iterable[SphereCell]())
+//    // FIXME: This should be output by a result object we return.
+//    errprint("")
+//    errprint("Document with title: %s", doc.title)
+//    val num_cells_to_show = 5
+//    for ((rank, cellval) <- (1 to num_cells_to_show) zip cells) {
+//      val (cell, vall) = cellval
+//      if (debug("pcl-travel")) {
+//        errprint("  Rank %d, goodness %g:", rank, vall)
+//        errprint(cell.xmldesc.toString) // indent=4
+//      } else
+//        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
+//    }
+//
+//    new TitledDocResult()
+//  }
+//
+//  def output_results(isfinal: Boolean = false) {
+//  }
+//}
+//
