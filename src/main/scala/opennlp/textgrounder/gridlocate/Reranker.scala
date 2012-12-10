@@ -482,7 +482,14 @@ class WordMatchingRerankInstFactory[Co](value: String) extends
         case "binary" => 1
         case "count" => count
         case "count-product" => count * qcount
+        case "prob-product" =>
+          docdist.lookup_word(word) * celldist.lookup_word(word)
         case "probability" => docdist.lookup_word(word)
+        case "kl" => {
+          val p = docdist.lookup_word(word)
+          val q = celldist.lookup_word(word)
+          p*(log(p/q))
+        }
       }
       Some(wordval)
     }
