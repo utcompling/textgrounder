@@ -841,6 +841,8 @@ For the perceptron classifiers, see also `--pa-variant`,
         Seq("matching-word-count"),
         Seq("matching-word-count-product"),
         Seq("matching-word-probability"),
+        Seq("matching-word-prob-product"),
+        Seq("matching-word-kl"),
         Seq("trivial")),
       help = """How to generate rerank instances for the reranker, based on
 a combination of a document, a given cell as possible location of the
@@ -1215,6 +1217,10 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         new WordMatchingRerankInstFactory[Co]("count-product")
       case "matching-word-probability" =>
         new WordMatchingRerankInstFactory[Co]("probability")
+      case "matching-word-prob-product" =>
+        new WordMatchingRerankInstFactory[Co]("prob-product")
+      case "matching-word-kl" =>
+        new WordMatchingRerankInstFactory[Co]("kl")
     }
   }
 
