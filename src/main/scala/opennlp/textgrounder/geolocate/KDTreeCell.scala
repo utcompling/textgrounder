@@ -85,7 +85,6 @@ class KdTreeGrid(
            record_in_subfactory = false,
            note_globally = false,
            finish_globally = false)) {
-      assert(doc.dist != null)
       kdtree.addPoint(Array(doc.coord.lat, doc.coord.long))
     }
 

@@ -272,7 +272,7 @@ abstract class GeoDocFactory[Co : Serializer](
   /**
    * Create, initialize and return a document with the given fieldvals,
    * loaded from a corpus with the given schema.  Return value may be
-   * null, meaning that the given record was skipped (e.g. due to erroneous
+   * None, meaning that the given record was skipped (e.g. due to erroneous
    * field values or for some other reason -- e.g. Wikipedia records not
    * in the Main namespace are skipped).
    *
@@ -313,7 +313,6 @@ abstract class GeoDocFactory[Co : Serializer](
       }
       case Some(doc) => {
         assert(doc.split == split)
-        assert(doc.dist != null)
         val double_tokens = doc.dist.model.num_tokens
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
@@ -368,21 +367,19 @@ abstract class GeoDocFactory[Co : Serializer](
                 "unknown title??"))
           }
           case Some(doc) => {
-            if (doc.dist != null) {
-              if (note_globally) {
-                // Don't use the eval set's distributions in computing
-                // global smoothing values and such, to avoid contaminating
-                // the results (training on your eval set). In addition, if
-                // this isn't the training or eval set, we shouldn't be
-                // loading at all.
-                //
-                // Add the distribution to the global stats before
-                // eliminating infrequent words through
-                // `finish_before_global`.
-                doc.word_dist_factory.note_dist_globally(doc.dist)
-              }
-              doc.dist.finish_before_global()
+            if (note_globally) {
+              // Don't use the eval set's distributions in computing
+              // global smoothing values and such, to avoid contaminating
+              // the results (training on your eval set). In addition, if
+              // this isn't the training or eval set, we shouldn't be
+              // loading at all.
+              //
+              // Add the distribution to the global stats before
+              // eliminating infrequent words through
+              // `finish_before_global`.
+              doc.word_dist_factory.note_dist_globally(doc.dist)
             }
+            doc.dist.finish_before_global()
             (Some(doc), "processed", "", "")
           }
         }
@@ -445,10 +442,7 @@ abstract class GeoDocFactory[Co : Serializer](
       docstats
     else
       docstats.map { stat =>
-        stat.maybedoc.foreach { doc =>
-          if (doc.dist != null)
-            doc.dist.finish_after_global()
-        }
+        stat.maybedoc.foreach { doc => doc.dist.finish_after_global() }
         stat
       }
   }

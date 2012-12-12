@@ -118,7 +118,6 @@ class CombinedWordDist(factory: WordDistFactory) {
       case _ =>
     }
 
-    assert (doc.dist != null)
     word_dist.add_word_distribution(doc.dist, partial)
     num_docs += 1
   }
@@ -371,7 +370,6 @@ abstract class GeoGrid[Co](
            record_in_subfactory = true,
            note_globally = true,
            finish_globally = false)) {
-      assert(doc.dist != null)
       add_document_to_grid(doc)
     }
     // Compute overall distribution values (e.g. back-off statistics).
