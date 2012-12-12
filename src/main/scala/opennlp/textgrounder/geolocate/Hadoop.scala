@@ -261,10 +261,7 @@ class DocEvalMapper extends
           val docstat =
             ranker.grid.docfact.line_to_document_status(filehand, file, line,
                           lineno, schema, false, false)
-          docstat.maybedoc.foreach { doc =>
-            if (doc.dist != null)
-              doc.dist.finish_after_global()
-          }
+          docstat.maybedoc.foreach { doc => doc.dist.finish_after_global() }
           docstat
         }
       }

@@ -427,22 +427,22 @@ class MultiRegularGrid(
   /**
    * For a given multi cell index, find the corresponding cell.
    * If no such cell exists, create one if `create` is true;
-   * else, return null.  If a cell is created, record it in the
+   * else, return None.  If a cell is created, record it in the
    * grid if `record_created_cell` is true.
    */
   protected def find_cell_for_cell_index(index: RegularCellIndex,
       create: Boolean, record_created_cell: Boolean) = {
-    val cell = corner_to_multi_cell.getOrElse(index, null)
-    if (cell != null)
-      Some(cell)
-    else if (!create) None
-    else {
-      val newcell = new MultiRegularCell(this, index)
-      if (record_created_cell) {
-        num_non_empty_cells += 1
-        corner_to_multi_cell(index) = newcell
+    corner_to_multi_cell.get(index) match {
+      case x@Some(cell) => x
+      case None if !create => None
+      case _ => {
+        val newcell = new MultiRegularCell(this, index)
+        if (record_created_cell) {
+          num_non_empty_cells += 1
+          corner_to_multi_cell(index) = newcell
+        }
+        Some(newcell)
       }
-      Some(newcell)
     }
   }
 
@@ -526,14 +526,11 @@ class MultiRegularGrid(
         errprint("Grid for ranking:")
       else
         errprint("Grid for goodness/distance:")
-      for (lat <- max_latind to min_latind) {
-        for (long <- fromto(min_longind, max_longind)) {
-          val cellvalrank =
-            grid.getOrElse(RegularCellIndex.coerce(this, lat, long), null)
-          if (cellvalrank == null)
-            errout(" %-8s", "empty")
-          else {
-            val (cell, value, rank) = cellvalrank
+      for (lat <- max_latind to min_latind;
+           long <- fromto(min_longind, max_longind)) {
+        grid.get(RegularCellIndex.coerce(this, lat, long)) match {
+          case None => errout(" %-8s", "empty")
+          case Some((cell, value, rank)) => {
             val showit = if (doit == 0) rank else value
             if (lat == true_latind && long == true_longind)
               errout("!%-8.6s", showit)

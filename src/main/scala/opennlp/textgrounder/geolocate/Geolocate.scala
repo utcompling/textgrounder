@@ -123,7 +123,6 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     // Look for a toponym, then a proper noun, then any word.
-    // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?

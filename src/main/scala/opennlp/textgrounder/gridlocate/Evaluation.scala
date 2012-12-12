@@ -485,19 +485,13 @@ abstract class CorpusEvaluator(
           if (skip)
             (None, "skipped", reason, doctag)
           else {
-            val result = {
-              val (skip, reason) = would_skip_by_parameters()
-              if (skip)
-                (None, "skipped", reason, doctag)
-              else {
-                // Don't put side-effecting code inside of an assert!
-                val res1 = evaluate_document(doc)
-                assert(res1 != null)
-                (Some(res1), "processed", "", doctag)
-              }
+            val (skip, reason) = would_skip_by_parameters()
+            if (skip)
+              (None, "skipped", reason, doctag)
+            else {
+              val res = evaluate_document(doc)
+              (Some(res), "processed", "", doctag)
             }
-
-            result
           }
         }
       }
@@ -589,16 +583,6 @@ abstract class GridEvaluator[Co](
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results() // all_results = isfinal)
-  }
-
-  override def would_skip_document(document: GeoDoc[Co]) = {
-    if (document.dist == null) {
-      // This can (and does) happen when --max-time-per-stage is set,
-      // so that the counts for many documents don't get read in.
-      if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
-        warning("Can't evaluate document %s without distribution", document)
-      (true, "document has no distribution")
-    } else (false, "")
   }
 
   def get_true_rank(answers: Iterable[(GeoCell[Co], Double)],
