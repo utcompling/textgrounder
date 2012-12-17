@@ -34,9 +34,11 @@ import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.application.HadoopLogFactory
 
 import util.argparser._
-import util.os._
 import util.collection._
+import util.io.FileHandler
+import util.os._
 import util.print._
+import util.textdb.Schema
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",
@@ -227,8 +229,42 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
       map(_.getPath.toString)
   }
 
-  def rename_output_files(dir: String, corpus_name: String, suffix: String) {
-    // Rename output files appropriately
+  /**
+   * Output a textdb corpus given a schema and a DList of lines of text to
+   * output.
+   *
+   * @param schema Schema object for corpus.
+   * @param lines Lines of text, formatted properly for a textdb
+   *   (tab-separated, etc.).
+   * @param filehand File handler of output directory.
+   * @param outdir Directory to output corpus in.
+   * @param corpus_name Name of corpus; used to form the filenames.
+   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   */
+  def dlist_output_textdb(schema: Schema, lines: DList[String],
+      filehand: FileHandler, outdir: String,
+      corpus_name: String, corpus_suffix: String) {
+    // output data file
+    persist(TextOutput.toTextFile(lines, outdir))
+    rename_output_files(outdir, corpus_name, corpus_suffix)
+
+    // output schema file
+    val schema_filename =
+      schema.output_constructed_schema_file(filehand, outdir,
+        corpus_name, corpus_suffix)
+    logger.info("Schema file output to %s" format schema_filename)
+  }
+
+  /**
+   * The files persisted by Scoobi have a name that we can't control
+   * very much.  Rename them appropriately for a textdb corpus.
+   *
+   * @param dir Directory containing persisted files.
+   * @param corpus_name Name of corpus; used to form the filenames.
+   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   */ 
+  def rename_output_files(dir: String, corpus_name: String,
+      corpus_suffix: String) {
     errprint("Renaming output files ...")
     val globpat = "%s/*-r-*" format dir
     val fs = configuration.fs
@@ -236,7 +272,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
       val path = file.getPath
       val basename = path.getName
       val newname = "%s/%s-%s-%s.txt" format (
-        dir, corpus_name, basename, suffix)
+        dir, corpus_name, basename, corpus_suffix)
       errprint("Renaming %s to %s" format (path, newname))
       fs.rename(path, new Path(newname))
     }
