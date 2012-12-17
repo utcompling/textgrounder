@@ -82,10 +82,17 @@ package object textdb {
    *   same value for every row.  This is optional, but usually at least
    *   the "corpus-name" field should be given, with the name of the corpus
    *   (currently used purely for identification purposes).
+   * @param split_text Text used for separating field values in a row;
+   *   normally a tab character. (FIXME: There may be dependencies elsewhere
+   *   on the separator being a tab, e.g. in EncodeDecode.  Furthermore,
+   *   currently the text isn't properly regexp-encoded when calling
+   *   `split` on a string; hence it will fail with possibilities like
+   *   | as a separator.)
    */
   class Schema(
     val fieldnames: Iterable[String],
-    val fixed_values: Map[String, String] = Map[String, String]()
+    val fixed_values: Map[String, String] = Map[String, String](),
+    val split_text: String = "\t"
   ) {
 
     import Serializer._
@@ -166,8 +173,7 @@ package object textdb {
     /**
      * Output the schema to a file.
      */
-    def output_schema_file(filehand: FileHandler, schema_file: String,
-        split_text: String = "\t") {
+    def output_schema_file(filehand: FileHandler, schema_file: String) {
       val schema_outstream = filehand.openw(schema_file)
       schema_outstream.println(fieldnames mkString split_text)
       for ((field, value) <- fixed_values)
@@ -182,10 +188,10 @@ package object textdb {
      * @return Name of constructed schema file.
      */
     def output_constructed_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String, split_text: String = "\t") = {
+        prefix: String, suffix: String) = {
       val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
         suffix)
-      output_schema_file(filehand, schema_file, split_text)
+      output_schema_file(filehand, schema_file)
       schema_file
     }
 
@@ -198,8 +204,7 @@ package object textdb {
      *   There should be as many items as there are field names in the
      *   `fieldnames` field of the schema.
      */
-    def output_row(outstream: PrintStream, fieldvals: Iterable[String],
-        split_text: String = "\t") {
+    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
       assert(fieldvals.size == fieldnames.size,
         "values %s (length %s) not same length as fields %s (length %s)" format
           (fieldvals, fieldvals.size, fieldnames, fieldnames.size))
@@ -211,8 +216,9 @@ package object textdb {
     val filehand: FileHandler,
     val filename: String,
     fieldnames: Iterable[String],
-    fixed_values: Map[String, String] = Map[String, String]()
-  ) extends Schema(fieldnames, fixed_values) { }
+    fixed_values: Map[String, String] = Map[String, String](),
+    split_text: String = "\t"
+  ) extends Schema(fieldnames, fixed_values, split_text) { }
 
   /**
    * A Schema that can be used to select some fields from a larger schema.
@@ -268,23 +274,22 @@ package object textdb {
      *
      * @param filehand File handler of schema file name.
      * @param schema_file Name of the schema file.
-     * @param split_re Regular expression used to split the fields of the
-     *   schema file, usually TAB. (There's only one row, and each field in
-     *   the row gives the name of the corresponding field in the document
-     *   file.)
+     * @param split_text Text used to split the fields of the schema and data
+     *   files, usually TAB. (FIXME: This needs to be regexp-encoded to handle
+     *   possibilities like | as a separator.)
      */
     def read_schema_file(filehand: FileHandler, schema_file: String,
-        split_re: String = "\t") = {
+        split_text: String = "\t") = {
       val lines = filehand.openr(schema_file)
       val fieldname_line = lines.next()
-      val fieldnames = fieldname_line.split(split_re, -1)
+      val fieldnames = fieldname_line.split(split_text, -1)
       for (field <- fieldnames if field.length == 0)
         throw new FileFormatException(
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, fieldnames))
       var fixed_fields = Map[String,String]()
       for (line <- lines) {
-        val fixed = line.split(split_re, -1)
+        val fixed = line.split(split_text, -1)
         if (fixed.length != 2)
           throw new FileFormatException(
             "For fixed fields (i.e. lines other than first) in schema file %s, should have two values (FIELD and VALUE), instead of %s".
@@ -296,7 +301,8 @@ package object textdb {
               format(schema_file, line))
         fixed_fields += (from -> to)
       }
-      new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields)
+      new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields,
+        split_text)
     }
 
     /**
@@ -507,13 +513,13 @@ package object textdb {
   }
 
   /**
-   * Parse a line into fields, according to `split_re` (usually TAB).
+   * Parse a line into fields, according to `split_text` (usually TAB).
    * `lineno` and `schema` are used for verifying the correct number of
    * fields and handling errors.
    */
-  def line_to_fields(line: String, lineno: Long, schema: Schema,
-      split_re: String = "\t"): Option[IndexedSeq[String]] = {
-    val fieldvals = line.split(split_re, -1).toIndexedSeq
+  def line_to_fields(line: String, lineno: Long, schema: Schema
+      ): Option[IndexedSeq[String]] = {
+    val fieldvals = line.split(schema.split_text, -1).toIndexedSeq
     if (fieldvals.size != schema.fieldnames.size) {
       warning(
         """Line %s: Bad record, expected %s fields, saw %s fields;
@@ -536,12 +542,6 @@ package object textdb {
     val suffix: String
   ) {
     /**
-     * Text used to separate fields.  Currently this is always a tab
-     * character, and no provision is made for changing this.
-     */
-    val split_text = "\t"
-
-    /**
      * Open a document file and return an output stream.  The file will be
      * named `DIR/PREFIX-SUFFIX.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
@@ -558,12 +558,12 @@ package object textdb {
     /**
      * Output the schema to a file.  The file will be named
      * `DIR/PREFIX-SUFFIX-schema.txt`.
+     *
+     * @return Name of schema file.
      */
     def output_schema_file(filehand: FileHandler, dir: String,
-        prefix: String) {
-      schema.output_constructed_schema_file(filehand, dir, prefix, suffix,
-        split_text)
-    }
+        prefix: String) =
+      schema.output_constructed_schema_file(filehand, dir, prefix, suffix)
   }
 
   val document_metadata_suffix = "document-metadata"
