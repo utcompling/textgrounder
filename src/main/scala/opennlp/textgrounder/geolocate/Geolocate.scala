@@ -31,7 +31,7 @@ import util.collection._
 import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
-import util.print.errprint
+import util.print.{errprint, fixme_error}
 
 import gridlocate._
 import GridLocateDriver.Debug._
@@ -765,10 +765,8 @@ found   : (String, Iterator[evalobj.TEvalRes])
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(docstats)
           }
-          case "raw-text" => {
-            throw new UnsupportedOperationException(
-              "raw-text eval format not yet implemented")
-          }
+          case "raw-text" =>
+            fixme_error("raw-text eval format not yet implemented")
         }
       // The call to `toIndexedSeq` forces evaluation of the Iterator
       results.toIndexedSeq

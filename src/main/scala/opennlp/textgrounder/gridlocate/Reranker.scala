@@ -438,7 +438,8 @@ abstract class WordByWordRerankInstFactory[Co] extends
            yield (word, featval.get)
         }
         case _ =>
-          throw new UnsupportedOperationException("Don't know how to rerank when not using a unigram distribution")
+          fixme_error(
+            "Don't know how to rerank when not using a unigram distribution")
       }
     make_feature_vector(indiv_features, score, is_training)
   }

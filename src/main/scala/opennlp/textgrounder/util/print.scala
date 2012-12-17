@@ -164,6 +164,47 @@ package object print {
     writer.toString
   }
 
+  /**
+   * An exception thrown to indicate an internal error (program gets to a
+   * state it should never reach, similar to an assertion failure).
+   */
+  case class InternalError(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends RuntimeException(message) {
+    if (cause != None)
+      initCause(cause.get)
+
+    /**
+     * Alternate constructor.
+     *
+     * @param message  exception message
+     */
+    def this(msg: String) = this(msg, None)
+
+    /**
+     * Alternate constructor.
+     *
+     * @param message  exception message
+     * @param cause    wrapped, or nested, exception
+     */
+    def this(msg: String, cause: Throwable) = this(msg, Some(cause))
+  }
+
+  /**
+   * Signal an internal error (program gets to a state it should never reach,
+   * similar to an assertion failure).
+   */
+  def internal_error(message: String) =
+    throw new InternalError(message)
+
+  /**
+   * Signal an error due to a part of the code that isn't implemented yet,
+   * but should be.
+   */
+  def fixme_error(message: String) =
+    throw new UnsupportedOperationException(message)
+
   ////////////////////////////////////////////////////////////////////////////
   //                              Table Output                              //
   ////////////////////////////////////////////////////////////////////////////
