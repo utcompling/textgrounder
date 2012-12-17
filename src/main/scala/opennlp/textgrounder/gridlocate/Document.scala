@@ -797,18 +797,16 @@ abstract class GeoDoc[Co : Serializer](
    */
   def incoming_links: Option[Int] = None
 
-  def get_fields(fields: Seq[String]) = {
-    for (field <- fields;
-         value = get_field(field);
-         if value != null)
-      yield value
-  }
+  def get_fields(fields: Seq[String]) = fields map get_field
 
+  /**
+   * Return the value of the given field.
+   */
   def get_field(field: String) = {
     field match {
       case "title" => title
-      case "coord" => if (has_coord) put_x(coord) else null
-      case _ => null
+      case "coord" => if (has_coord) put_x(coord) else ""
+      case _ => internal_error("Unrecognized field name %s" format field)
     }
   }
 
