@@ -84,7 +84,7 @@ package object textdb {
    *   (currently used purely for identification purposes).
    */
   class Schema(
-    val fieldnames: Seq[String],
+    val fieldnames: Iterable[String],
     val fixed_values: Map[String, String] = Map[String, String]()
   ) {
 
@@ -92,31 +92,32 @@ package object textdb {
 
     val field_indices = fieldnames.zipWithIndex.toMap
 
-    def check_values_fit_schema(fieldvals: Seq[String]) {
-      if (fieldvals.length != fieldnames.length)
+    def check_values_fit_schema(fieldvals: IndexedSeq[String]) {
+      if (fieldvals.size != fieldnames.size)
         throw FileFormatException(
           "Wrong-length line, expected %d fields, found %d: %s" format (
-            fieldnames.length, fieldvals.length, fieldvals))
+            fieldnames.size, fieldvals.size, fieldvals))
     }
 
-    def get_value[T : Serializer](fieldvals: Seq[String], key: String): T = {
+    def get_value[T : Serializer](fieldvals: IndexedSeq[String],
+        key: String): T = {
       get_x[T](get_field(fieldvals, key))
     }
 
-    def get_value_if[T : Serializer](fieldvals: Seq[String],
+    def get_value_if[T : Serializer](fieldvals: IndexedSeq[String],
         key: String): Option[T] = {
       get_field_if(fieldvals, key) flatMap { x => get_x_or_none[T](x) }
     }
 
-    def get_value_or_else[T : Serializer](fieldvals: Seq[String], key: String,
-        default: T): T = {
+    def get_value_or_else[T : Serializer](fieldvals: IndexedSeq[String],
+        key: String, default: T): T = {
       get_value_if[T](fieldvals, key) match {
         case Some(x) => x
         case None => default
       }
     }
 
-    def get_field(fieldvals: Seq[String], key: String) = {
+    def get_field(fieldvals: IndexedSeq[String], key: String) = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         fieldvals(field_indices(key))
@@ -124,7 +125,7 @@ package object textdb {
         get_fixed_field(key)
     }
 
-    def get_field_if(fieldvals: Seq[String], key: String) = {
+    def get_field_if(fieldvals: IndexedSeq[String], key: String) = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         Some(fieldvals(field_indices(key)))
@@ -132,7 +133,7 @@ package object textdb {
         get_fixed_field_if(key)
     }
 
-    def get_field_or_else(fieldvals: Seq[String], key: String,
+    def get_field_or_else(fieldvals: IndexedSeq[String], key: String,
         default: String) = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
@@ -194,12 +195,11 @@ package object textdb {
      *   There should be as many items as there are field names in the
      *   `fieldnames` field of the schema.
      */
-    def output_row(outstream: PrintStream, fieldvals: Seq[String],
+    def output_row(outstream: PrintStream, fieldvals: Iterable[String],
         split_text: String = "\t") {
-      assert(fieldvals.length == fieldnames.length,
+      assert(fieldvals.size == fieldnames.size,
         "values %s (length %s) not same length as fields %s (length %s)" format
-          (fieldvals, fieldvals.length, fieldnames,
-            fieldnames.length))
+          (fieldvals, fieldvals.size, fieldnames, fieldnames.size))
       outstream.println(fieldvals mkString split_text)
     }
   }
@@ -207,7 +207,7 @@ package object textdb {
   class SchemaFromFile(
     val filehand: FileHandler,
     val filename: String,
-    fieldnames: Seq[String],
+    fieldnames: Iterable[String],
     fixed_values: Map[String, String] = Map[String, String]()
   ) extends Schema(fieldnames, fixed_values) { }
 
@@ -220,19 +220,21 @@ package object textdb {
    * @param orig_schema Original schema from which fields have been selected.
    */
   class SubSchema(
-    fieldnames: Seq[String],
+    fieldnames: Iterable[String],
     fixed_values: Map[String, String] = Map[String, String](),
     val orig_schema: Schema
   ) extends Schema(fieldnames, fixed_values) {
-    val orig_field_indices =
-      orig_schema.field_indices.filterKeys(fieldnames contains _).values.toSet
+    val orig_field_indices = {
+      val names_set = fieldnames.toSet
+      orig_schema.field_indices.filterKeys(names_set contains _).values.toSet
+    }
 
     /**
      * Given a set of field values corresponding to the original schema
      * (`orig_schema`), produce a list of field values corresponding to this
      * schema.
      */
-    def map_original_fieldvals(fieldvals: Seq[String]) =
+    def map_original_fieldvals(fieldvals: IndexedSeq[String]) =
       fieldvals.zipWithIndex.
         filter { case (x, ind) => orig_field_indices contains ind }.
         map { case (x, ind) => x }
@@ -303,13 +305,13 @@ package object textdb {
      * a field value results in the field getting moved to the end.)
      *
      */
-    def to_map(fieldnames: Seq[String], fieldvals: Seq[String]) =
+    def to_map(fieldnames: Iterable[String], fieldvals: IndexedSeq[String]) =
       mutable.LinkedHashMap[String, String]() ++ (fieldnames zip fieldvals)
 
     /**
      * Convert from a map back to a tuple of lists of field names and values.
      */
-    def from_map(map: mutable.Map[String, String]) =
+    def from_map(map: scala.collection.Map[String, String]) =
       map.toSeq.unzip
 
   }
@@ -496,7 +498,7 @@ package object textdb {
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
            all_files = filehand.list_files(dir)
            files = all_files.filter(_ endsWith full_ending)
-           if files.toSeq.length > 0}
+           if files.size > 0}
         yield pattern
     }
   }
@@ -507,13 +509,13 @@ package object textdb {
    * fields and handling errors.
    */
   def line_to_fields(line: String, lineno: Long, schema: Schema,
-      split_re: String = "\t"): Option[Seq[String]] = {
-    val fieldvals = line.split(split_re, -1).toSeq
-    if (fieldvals.length != schema.fieldnames.length) {
+      split_re: String = "\t"): Option[IndexedSeq[String]] = {
+    val fieldvals = line.split(split_re, -1).toIndexedSeq
+    if (fieldvals.size != schema.fieldnames.size) {
       warning(
         """Line %s: Bad record, expected %s fields, saw %s fields;
-        skipping line=%s""", lineno, schema.fieldnames.length,
-        fieldvals.length, line)
+        skipping line=%s""", lineno, schema.fieldnames.size,
+        fieldvals.size, line)
       None
     } else
       Some(fieldvals)
@@ -566,7 +568,7 @@ package object textdb {
   val ngram_counts_suffix = "ngram-counts"
   val text_suffix = "text"
 
-  class EncodeDecode(val chars_to_encode: Seq[Char]) {
+  class EncodeDecode(val chars_to_encode: Iterable[Char]) {
     private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
     private val encode_chars_map =
       chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
@@ -690,10 +692,10 @@ package object textdb {
    * in a corpus.  The word or ngram must already have been encoded using
    * `encode_string_for_count_map_field` or `encode_ngram_for_count_map_field`.
    */
-  def shallow_encode_count_map(seq: scala.collection.Seq[(String, Int)]) = {
+  def shallow_encode_count_map(seq: Iterable[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
     // as putting the most significant items first, for visual confirmation.
-    (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
+    (for ((word, count) <- seq.toSeq sortWith (_._2 > _._2)) yield
       ("%s:%s" format (word, count))) mkString " "
   }
 
@@ -701,7 +703,7 @@ package object textdb {
    * Serialize a sequence of (word, count) pairs into the format used
    * in a corpus.
    */
-  def encode_count_map(seq: scala.collection.Seq[(String, Int)]) = {
+  def encode_count_map(seq: Iterable[(String, Int)]) = {
     shallow_encode_count_map(seq map {
       case (word, count) => (encode_string_for_count_map_field(word), count)
     })
@@ -738,11 +740,11 @@ package object textdb {
   object Encoder {
     def count_map(x: scala.collection.Map[String, Int]) =
       encode_count_map(x.toSeq)
-    def count_map_seq(x: scala.collection.Seq[(String, Int)]) =
+    def count_map_seq(x: Iterable[(String, Int)]) =
       encode_count_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
-    def seq_string(x: scala.collection.Seq[String]) =
+    def seq_string(x: Iterable[String]) =
       x.map(encode_string_for_sequence_field) mkString ">>"
     def timestamp(x: Long) = x.toString
     def long(x: Long) = x.toString

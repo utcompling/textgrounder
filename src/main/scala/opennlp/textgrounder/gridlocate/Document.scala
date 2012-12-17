@@ -171,7 +171,7 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   }
 }
 
-case class RawDocument(schema: Schema, fields: Seq[String])
+case class RawDocument(schema: Schema, fields: IndexedSeq[String])
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -266,7 +266,7 @@ abstract class GeoDocFactory[Co : Serializer](
    * in the main factory.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], dist: WordDist, record_in_factory: Boolean
+      fieldvals: IndexedSeq[String], dist: WordDist, record_in_factory: Boolean
   ): Option[GeoDoc[Co]]
 
   /**
@@ -283,7 +283,7 @@ abstract class GeoDocFactory[Co : Serializer](
    *   the document in the cell grid; the caller needs to do that if
    *   needed.
    */
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       record_in_factory: Boolean) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     if (record_in_factory)
@@ -797,7 +797,7 @@ abstract class GeoDoc[Co : Serializer](
    */
   def incoming_links: Option[Int] = None
 
-  def get_fields(fields: Seq[String]) = fields map get_field
+  def get_fields(fields: Iterable[String]) = fields map get_field
 
   /**
    * Return the value of the given field.

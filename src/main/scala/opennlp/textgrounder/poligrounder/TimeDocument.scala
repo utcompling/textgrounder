@@ -71,8 +71,9 @@ class TimeDocFactory(
 ) extends GeoDocFactory[TimeCoord](
   driver, word_dist_factory
 ) {
-  def imp_create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      dist: WordDist, record_in_factory: Boolean) = Some(
+  def imp_create_and_init_document(schema: Schema,
+      fieldvals: IndexedSeq[String], dist: WordDist,
+      record_in_factory: Boolean) = Some(
     new TimeDoc(schema, word_dist_factory, dist,
       schema.get_value[TimeCoord](fieldvals, "min-timestamp"),
       schema.get_value[String](fieldvals, "user")

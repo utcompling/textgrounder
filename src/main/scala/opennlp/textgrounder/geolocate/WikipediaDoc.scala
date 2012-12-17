@@ -184,8 +184,9 @@ object WikipediaDoc {
 class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
-  override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = {
+  override def create_and_init_document(schema: Schema,
+      fieldvals: IndexedSeq[String], dist: WordDist, coord: SphereCoord,
+      record_in_factory: Boolean) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
     val namespace = schema.get_field_or_else(fieldvals, "namepace", "")

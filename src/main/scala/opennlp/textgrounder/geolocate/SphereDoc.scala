@@ -54,7 +54,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * and return a document.  Return value can be None if the document is
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       dist: WordDist, coord: SphereCoord, record_in_factory: Boolean
     ): Option[TDoc]
 
@@ -94,7 +94,8 @@ class SphereDocFactory(
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
   override def imp_create_and_init_document(schema: Schema,
-      fieldvals: Seq[String], dist: WordDist, record_in_factory: Boolean) = {
+      fieldvals: IndexedSeq[String], dist: WordDist,
+      record_in_factory: Boolean) = {
     val coord = schema.get_value_or_else[SphereCoord](fieldvals, "coord", null)
     find_subfactory(schema, fieldvals).
       create_and_init_document(schema, fieldvals, dist, coord, record_in_factory)
@@ -106,7 +107,7 @@ class SphereDocFactory(
    * parameter and calls `find_subfactory(java.lang.String)` to find
    * the appropriate subfactory.
    */
-  def find_subfactory(schema: Schema, fieldvals: Seq[String]):
+  def find_subfactory(schema: Schema, fieldvals: IndexedSeq[String]):
       SphereDocSubfactory[_ <: SphereDoc]  = {
     val cortype = schema.get_field_or_else(fieldvals, "corpus-type", "generic")
     find_subfactory(cortype)
@@ -162,7 +163,7 @@ class GenericSphereDoc(
 class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
     new GenericSphereDoc(schema, docfact.word_dist_factory, dist, coord,
       schema.get_value_or_else[String](fieldvals, "title", "unknown"))

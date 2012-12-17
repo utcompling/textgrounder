@@ -47,7 +47,7 @@ class TwitterTweetDoc(
 class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
     new TwitterTweetDoc(schema, docfact.word_dist_factory, dist, coord,
       schema.get_value_or_else[Long](fieldvals, "title", 0L))
@@ -76,7 +76,7 @@ class TwitterUserDoc(
 class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
     new TwitterUserDoc(schema, docfact.word_dist_factory, dist, coord,
       memoizer.memoize(
