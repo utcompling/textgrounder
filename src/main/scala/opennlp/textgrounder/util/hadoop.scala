@@ -36,10 +36,10 @@ import java.net.URI
 
 import argparser._
 import collection._
-import textdb._
 import experiment._
 import io._
-import print.{errprint, set_errout_prefix}
+import print._
+import textdb._
 
 package object hadoop {
   class HadoopFileHandler(conf: Configuration) extends FileHandler {
@@ -118,15 +118,14 @@ package object hadoop {
             if (multitype == classOf[String]) {
               conf.setStrings(confname, parser.get[Seq[String]](name): _*)
             } else
-              throw new UnsupportedOperationException(
+              internal_error(
                 "Don't know how to store sequence of type %s of parameter %s into a Hadoop Configuration"
                 format (multitype, name))
           }
-          case ty@_ => {
-            throw new UnsupportedOperationException(
+          case ty@_ =>
+            internal_error(
               "Don't know how to store type %s of parameter %s into a Hadoop Configuration"
               format (ty, name))
-          }
         }
       }
     }
@@ -165,11 +164,11 @@ package object hadoop {
           if (multitype == classOf[String])
             parser.set[Seq[String]](name, conf.getStrings(confname, parser.defaultValue[Seq[String]](name): _*).toSeq)
           else
-            throw new UnsupportedOperationException(
+            internal_error(
               "Don't know how to fetch sequence of type %s of parameter %s from a Hadoop Configuration"
               format (multitype, name))
         } else {
-          throw new UnsupportedOperationException(
+          internal_error(
             "Don't know how to store fetch %s of parameter %s from a Hadoop Configuration"
             format (ty, name))
         }

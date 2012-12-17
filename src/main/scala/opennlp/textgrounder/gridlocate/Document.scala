@@ -30,7 +30,7 @@ import util.textdb._
 import util.distances._
 import util.experiment._
 import util.io._
-import util.print.{errprint, warning}
+import util.print.{errprint, warning, internal_error}
 import util.Serializer
 import util.text.capfirst
 

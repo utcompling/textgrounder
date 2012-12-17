@@ -30,7 +30,7 @@ import util.distances._
 import util.experiment.ExperimentDriverStats
 import util.math.{mean, median}
 import util.io.{FileHandler}
-import util.print.{errprint, warning}
+import util.print.{errprint, warning, internal_error}
 import util.text.split_text_into_words
 
 import gridlocate._
@@ -68,7 +68,7 @@ class SphereDocEvalStats(
   }
 
   val output_result_with_units: Double => String =
-    (kmdist: Double) => throw new UnsupportedOperationException("should not be called")
+    (kmdist: Double) => internal_error("should not be called")
 
   override def output_incorrect_results() {
     wrapped.output_incorrect_results()

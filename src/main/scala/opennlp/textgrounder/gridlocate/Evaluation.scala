@@ -29,7 +29,7 @@ import util.experiment._
 import util.math._
 import util.io.FileHandler
 import util.os.{curtimehuman, output_resource_usage}
-import util.print.{errprint, warning}
+import util.print.{errprint, warning, internal_error}
 
 import GridLocateDriver.Debug._
 
@@ -385,7 +385,7 @@ class GroupedDocEvalStats[Co](
   }
 
   val output_result_with_units: Double => String =
-    (kmdist: Double) => throw new UnsupportedOperationException("should not be called")
+    (kmdist: Double) => internal_error("should not be called")
 }
 
 /////////////////////////////////////////////////////////////////////////////
