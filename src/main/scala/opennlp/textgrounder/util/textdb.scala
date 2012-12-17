@@ -178,12 +178,15 @@ package object textdb {
     /**
      * Output the schema to a file.  The file will be named
      * `DIR/PREFIX-SUFFIX-schema.txt`.
+     *
+     * @return Name of constructed schema file.
      */
     def output_constructed_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String, split_text: String = "\t") {
+        prefix: String, suffix: String, split_text: String = "\t") = {
       val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
         suffix)
       output_schema_file(filehand, schema_file, split_text)
+      schema_file
     }
 
     /**
