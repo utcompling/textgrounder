@@ -112,7 +112,7 @@ class FrobTextDBProcessor(
   var schema_prefix: String = _
   var current_document_prefix: String = _
 
-  def frob_row(schema: Schema, fieldvals: Seq[String]) = {
+  def frob_row(schema: Schema, fieldvals: IndexedSeq[String]) = {
     val docparams = mutable.LinkedHashMap[String, String]()
     docparams ++= (rename_fields(schema.fieldnames) zip fieldvals)
     for (field <- params.remove_field)
@@ -134,10 +134,10 @@ class FrobTextDBProcessor(
       val counts_text = encode_count_map(counts.toSeq)
       docparams += (("counts", counts_text))
     }
-    docparams.toSeq
+    docparams.toIndexedSeq
   }
 
-  def rename_fields(fieldnames: Seq[String]) = {
+  def rename_fields(fieldnames: Iterable[String]) = {
     for (field <- fieldnames) yield {
       var f = field
       for (rename_field <- params.rename_field) {
@@ -169,7 +169,7 @@ class FrobTextDBProcessor(
    * and one output stream per input file.
    */
   def get_unsplit_writer_and_outstream(schema: SchemaFromFile,
-      fieldnames: Seq[String], fieldvals: Seq[String]) = {
+      fieldnames: Iterable[String], fieldvals: IndexedSeq[String]) = {
     if (unsplit_writer == null) {
       /* Construct a new schema.  Create a new writer for this schema;
          write the schema out; and record the writer in
@@ -194,7 +194,7 @@ class FrobTextDBProcessor(
    * stream per split value per input file.
    */
   def get_split_writer_and_outstream(schema: SchemaFromFile,
-      fieldnames: Seq[String], fieldvals: Seq[String]) = {
+      fieldnames: Iterable[String], fieldvals: IndexedSeq[String]) = {
     new Schema(fieldnames).
       get_field_if(fieldvals, params.split_by_field) match {
         case None => (null, null)
@@ -227,7 +227,7 @@ class FrobTextDBProcessor(
       }
   }
 
-  def process_row(schema: SchemaFromFile, fieldvals: Seq[String]) = {
+  def process_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) = {
     val (new_fieldnames, new_fieldvals) = frob_row(schema, fieldvals).unzip
     if (params.split_by_field != null) {
       val (writer, outstream) =
@@ -349,7 +349,7 @@ based on the value of a field, e.g. "split" (--split-by-field).
 //""")
 //  }
 //
-//  def process_files(filehand: FileHandler, files: Seq[String]) {
+//  def process_files(filehand: FileHandler, files: Iterable[String]) {
 //    val task = new MeteredTask("tweet", "processing")
 //    var tweet_lineno = 0
 //    val task2 = new MeteredTask("user", "processing")

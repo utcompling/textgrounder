@@ -121,19 +121,19 @@ object FindPolitical extends
    * Count of total number of references given a sequence of
    * (data, weight, times) pairs of references to a particular data point.
    */
-  def count_refs[T](seq: Seq[(T, Double, Int)]) = seq.map(_._3).sum
+  def count_refs[T](seq: Iterable[(T, Double, Int)]) = seq.map(_._3).sum
   /**
    * Count of total weight given a sequence of (data, weight, times) pairs
    * of references to a particular data point.
    */
-  def count_weight[T](seq: Seq[(T, Double, Int)]) =
+  def count_weight[T](seq: Iterable[(T, Double, Int)]) =
     seq.map{ case (_, weight, times) => weight*times }.sum
 
   /**
    * Count of total number of accounts given a sequence of (data, times) pairs
    * of references to a particular data point.
    */
-  def count_accounts[T](seq: Seq[(T, Double, Int)]) = seq.length
+  def count_accounts[T](seq: Iterable[(T, Double, Int)]) = seq.size
 
 
   /**
@@ -141,14 +141,14 @@ object FindPolitical extends
    * known twitter accounts.
    */
   case class Politico(last: String, first: String, title: String,
-      party: String, where: String, accounts: Seq[String]) {
+      party: String, where: String, accounts: Iterable[String]) {
     def full_name = first + " " + last
   }
   implicit val politico_wire =
     mkCaseWireFormat(Politico.apply _, Politico.unapply _)
 
-  def encode_ideo_refs_map(seq: Seq[(String, Double, Int)]) =
-    (for ((account, ideology, count) <- seq sortWith (_._3 > _._3)) yield
+  def encode_ideo_refs_map(seq: Iterable[(String, Double, Int)]) =
+    (for ((account, ideology, count) <- seq.toSeq sortWith (_._3 > _._3)) yield
       ("%s:%.2f:%s" format (
         encode_string_for_count_map_field(account), ideology, count))
     ) mkString " "
@@ -172,10 +172,10 @@ object FindPolitical extends
    * @param fields Field values of user's tweets (concatenated)
    */
   case class IdeologicalUser(user: String, ideology: Double,
-      ideo_refs: Seq[(String, Double, Int)],
-      lib_ideo_refs: Seq[(String, Double, Int)],
-      cons_ideo_refs: Seq[(String, Double, Int)],
-      fields: Seq[String]) {
+      ideo_refs: Iterable[(String, Double, Int)],
+      lib_ideo_refs: Iterable[(String, Double, Int)],
+      cons_ideo_refs: Iterable[(String, Double, Int)],
+      fields: IndexedSeq[String]) {
     def get_feature_values(factory: IdeologicalUserAction, ty: String) = {
       ty match {
         case field@("retweets" | "user-mentions" | "hashtags") =>
@@ -241,7 +241,7 @@ object FindPolitical extends
         def subsetted_fields =
           if (include_extra_fields)
             user_subschema.map_original_fieldvals(fields)
-          else Seq[String]()
+          else IndexedSeq[String]()
 
         // get list of (refs, times) pairs
         val ideo_ref_field =
@@ -281,7 +281,8 @@ object FindPolitical extends
           } else {
             val ideo_user =
               IdeologicalUser(user, ideology, empty_ideo_refs_map,
-                empty_ideo_refs_map, empty_ideo_refs_map, Seq[String]())
+                empty_ideo_refs_map, empty_ideo_refs_map,
+                IndexedSeq[String]())
             Some(ideo_user)
           }
         } else if (accounts contains user.toLowerCase) {
@@ -331,7 +332,7 @@ object FindPolitical extends
     num_accounts: Int, num_refs: Int,
     num_lib_accounts: Int, num_lib_refs: Int,
     num_cons_accounts: Int, num_cons_refs: Int,
-    num_refs_ideo_weighted: Double, all_text: Seq[String]) {
+    num_refs_ideo_weighted: Double, all_text: Iterable[String]) {
     def to_row(opts: FindPoliticalParams) =
       Seq(value, encode_count_map(spellings.toSeq),
         num_accounts, num_refs,
@@ -521,12 +522,12 @@ object FindPolitical extends
       opts.output + "-" + corpus_suffix
 
     /**
-     * For the given sequence of lines and related info for writing output a corpus,
-     * return a tuple of two thunks: One for persisting the data, the other for
-     * fixing up the data into a proper corpus.
+     * For the given sequence of lines and related info for writing output a
+     * corpus, return a tuple of two thunks: One for persisting the data,
+     * the other for fixing up the data into a proper corpus.
      */
     def output_lines(lines: DList[String], corpus_suffix: String,
-        fields: Seq[String]) = {
+        fields: Iterable[String]) = {
       val outdir = output_directory_for_suffix(corpus_suffix)
       (TextOutput.toTextFile(lines, outdir), () => {
         rename_output_files(outdir, opts.corpus_name, corpus_suffix)
@@ -534,7 +535,8 @@ object FindPolitical extends
       })
     }
 
-    def output_schema_for_suffix(corpus_suffix: String, fields: Seq[String]) {
+    def output_schema_for_suffix(corpus_suffix: String,
+        fields: Iterable[String]) {
       val outdir = output_directory_for_suffix(corpus_suffix)
       val fixed_fields =
         Map("corpus-name" -> opts.corpus_name,

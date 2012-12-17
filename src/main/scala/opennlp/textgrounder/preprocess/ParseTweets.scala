@@ -358,7 +358,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     }
     incfields.toSeq
   }
-  var included_fields: Seq[String] = _
+  var included_fields: Iterable[String] = _
   var input_schema: Schema = _
 
   /* Whether we are doing tweet-level filtering.  To check whether doing
@@ -421,7 +421,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   case class Tweet(
     json: String,
     path: String,
-    text: Seq[String],
+    text: Iterable[String],
     user: String,
     id: TweetID,
     min_timestamp: Timestamp,
@@ -506,7 +506,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def row_fields(opts: ParseTweetsParams) = opts.included_fields
 
-    def from_row(schema: Schema, fields: Seq[String]) = {
+    def from_row(schema: Schema, fields: IndexedSeq[String]) = {
       var json = ""
       var path = ""
       var text = Seq[String]()
@@ -637,25 +637,26 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       // Not meant to be called externally.  Actually implement the matching,
       // with the text explicitly given (so it can be downcased to implement
       // case-insensitive matching).
-      def matches(tweet: Tweet, text: Seq[String]): Boolean
+      def matches(tweet: Tweet, text: Iterable[String]): Boolean
     }
 
-    case class EConst(value: Seq[String]) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) = text containsSlice value
+    case class EConst(value: Iterable[String]) extends Expr {
+      def matches(tweet: Tweet, text: Iterable[String]) =
+        text.toSeq containsSlice value.toSeq
     }
 
     case class EAnd(left:Expr, right:Expr) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) =
+      def matches(tweet: Tweet, text: Iterable[String]) =
         left.matches(tweet, text) && right.matches(tweet, text)
     }
 
     case class EOr(left:Expr, right:Expr) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) =
+      def matches(tweet: Tweet, text: Iterable[String]) =
         left.matches(tweet, text) || right.matches(tweet, text)
     }
 
     case class ENot(e:Expr) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) =
+      def matches(tweet: Tweet, text: Iterable[String]) =
         !e.matches(tweet, text)
     }
 
@@ -674,12 +675,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     case class TimeCompare(op: String, time: Timestamp) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) =
+      def matches(tweet: Tweet, text: Iterable[String]) =
         time_compare(tweet, op, time)
     }
 
     case class TimeWithin(interval: (Timestamp, Timestamp)) extends Expr {
-      def matches(tweet: Tweet, text: Seq[String]) = {
+      def matches(tweet: Tweet, text: Iterable[String]) = {
         val (start, end) = interval
         time_compare(tweet, ">=", start) &&
         time_compare(tweet, "<", end)
@@ -1676,7 +1677,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * and later grouping + combining will add all the 1's to get the
      * ngram count.
      */
-    def emit_ngrams(tweet_text: Seq[String]): String = {
+    def emit_ngrams(tweet_text: Iterable[String]): String = {
       val ngrams =
         tweet_text.flatMap(break_tweet_into_ngrams(_)).toSeq.
           map(encode_ngram_for_count_map_field)
