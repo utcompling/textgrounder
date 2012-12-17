@@ -1672,10 +1672,6 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     /**
      * Tokenize a tweet text string into ngrams and count them, emitting
      * the word-count pairs encoded into a string.
-     * and emit the ngrams individually.
-     * Each ngram is emitted along with the text data and a count of 1,
-     * and later grouping + combining will add all the 1's to get the
-     * ngram count.
      */
     def emit_ngrams(tweet_text: Iterable[String]): String = {
       val ngrams =
@@ -2015,12 +2011,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     /**
-     * Output a schema file of the appropriate name.
+     * Create a schema for the data to be output.
      */
-    def output_schema(filehand: FileHandler) {
-      val filename = Schema.construct_schema_file(filehand,
-        opts.output, opts.corpus_name, corpus_suffix)
-      logger.info("Outputting a schema to %s ..." format filename)
+    def create_schema = {
       // We add the counts data to what to_row() normally outputs so we
       // have to add the same field here
       val fields = Tweet.row_fields(opts)
@@ -2040,8 +2033,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         else
           Map[String, String]()
       )
-      val schema = new Schema(fields, fixed_fields)
-      schema.output_schema_file(filehand, filename)
+      new Schema(fields, fixed_fields)
     }
   }
 
@@ -2086,7 +2078,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       case "json" => "outputting as raw JSON"
       case "stats" => "outputting statistics on tweets"
     }))
-    val ptp = new ParseTweetsDriver(opts)
+    val ptd = new ParseTweetsDriver(opts)
     // Firstly we load up all the (new-line-separated) JSON or textdb lines.
     val lines: DList[(String, String)] = {
       opts.input_format match {
@@ -2114,29 +2106,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       opts.output + "-" + corpus_suffix
 
     // create a schema given a set of data fields plus user params
-    def create_schema(fields: Seq[String]) =
+    def create_schema(fields: Iterable[String]) =
       new Schema(fields, Map("corpus-name" -> opts.corpus_name))
-
-    // output lines of data in a DList to a corpus
-    def dlist_output_lines(lines: DList[String],
-        corpus_suffix: String, fields: Seq[String]) = {
-      // get output directory
-      val outdir = output_directory_for_suffix(corpus_suffix)
-
-      // output data file
-      persist(TextOutput.toTextFile(lines, outdir))
-      rename_output_files(outdir, opts.corpus_name, corpus_suffix)
-
-      // output schema file
-      val out_schema = create_schema(fields)
-      out_schema.output_constructed_schema_file(filehand, outdir,
-        opts.corpus_name, corpus_suffix)
-      outdir
-    }
 
     // output lines of data in an Iterable to a corpus
     def local_output_lines(lines: Iterable[String],
-        corpus_suffix: String, fields: Seq[String]) = {
+        corpus_suffix: String, fields: Iterable[String]) = {
       // get output directory
       val outdir = output_directory_for_suffix(corpus_suffix)
 
@@ -2155,26 +2130,23 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       outdir
     }
 
-    def rename_outfiles() {
-      rename_output_files(opts.output, opts.corpus_name, ptp.corpus_suffix)
-    }
-
     opts.output_format match {
       case "json" => {
         /* We're outputting JSON's directly. */
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
-        rename_outfiles()
+        rename_output_files(opts.output, opts.corpus_name, ptd.corpus_suffix)
       }
+
       case "textdb" => {
         val tfct = new TokenizeCountAndFormat(opts)
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.
         val nicely_formatted = tweets.map(tfct.tokenize_count_and_format)
-        persist(TextOutput.toTextFile(nicely_formatted, opts.output))
-        rename_outfiles()
-        // create a schema
-        ptp.output_schema(filehand)
+        val schema = ptd.create_schema
+        dlist_output_textdb(schema, nicely_formatted, filehand, opts.output,
+          opts.corpus_name, ptd.corpus_suffix)
       }
+
       case "stats" => {
         val get_stats = new GetStats(opts)
         val by_value = get_stats.get_by_value(tweets)
