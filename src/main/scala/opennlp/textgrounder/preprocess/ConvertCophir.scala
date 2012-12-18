@@ -14,8 +14,6 @@ class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
-  var split = ap.option[String]("split", default = "training",
-    help="""Split (training, dev, test) to place data in.  Default %default.""")
   var preserve_case = ap.flag("preserve-case",
     help="""Don't lowercase words.  This preserves the difference
     between e.g. the name "Mark" and the word "mark".""")
@@ -106,13 +104,25 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     }
   }
 
+  def safe_toInt(str: String) = {
+    try {
+      Some(str.toInt)
+    } catch {
+      case e:NumberFormatException => {
+        warning("Unable to parse number '%s': %s", str, e)
+        None
+      }
+    }
+  }
+
   /**
    * Given the filename of the XML file and the raw contents of the file,
-   * parse as XML and optionally return a list of key-value pairs.  If file
+   * parse as XML and optionally return a pair (ID, PROPS) where ID is the
+   * ID of the photo involved and PROPS is a list of key-value pairs.  If file
    * can't be parsed, return None.
    */
   def apply(filename: String, rawxml: String):
-      Option[Iterable[(String, String)]] = {
+      Option[(Int, Iterable[(String, String)])] = {
     val maybedom = try {
       Some(xml.XML.loadString(rawxml))
     } catch {
@@ -122,41 +132,52 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
       }
     }
 
-    maybedom map { dom =>
-      val id = extract_tags(dom, List("MediaUri"))
-      val photoprops = extract_props(dom \\ "photo",
-        List("dateuploaded"), "photo-")
-      val dateprops = extract_props(dom \\ "dates",
-        List("posted", "taken", "lastupdate"), "dates-")
-      val owner = extract_props(dom \\ "owner",
-        List("nsid", "username", "realname", "location"), "owner-")
-      val location = dom \\ "location"
-      val lat = (location \ "@latitude").text
-      val long = (location \ "@longitude").text
-      val coord =
-        if (lat.length > 0 && long.length > 0)
-          "%s,%s" format (lat, long)
-        else
-          ""
-      val coordprop = List(("coord", Encoder.string(coord)))
-      val locprops1 = extract_props(location, List("accuracy"), "location-")
-      val locprops2 = extract_tags(location,
-        List("neighbourhood", "locality", "county", "region", "country"),
-        "location-")
-      val other = extract_tags(dom, List("url", "title", "description"))
+    maybedom flatMap { dom =>
+      val idstr = (dom \\ "MediaUri").text
+      if (idstr == "") {
+        warning("Can't find photo ID in XML for file %s", filename)
+        None
+      } else {
+        val id = safe_toInt(idstr)
+        if (id == None) None
+        else {
+          val idprops = List(("id", Encoder.string(idstr)))
+          val photoprops = extract_props(dom \\ "photo",
+            List("dateuploaded"), "photo-")
+          val dateprops = extract_props(dom \\ "dates",
+            List("posted", "taken", "lastupdate"), "dates-")
+          val owner = extract_props(dom \\ "owner",
+            List("nsid", "username", "realname", "location"), "owner-")
+          val location = dom \\ "location"
+          val lat = (location \ "@latitude").text
+          val long = (location \ "@longitude").text
+          val coord =
+            if (lat.length > 0 && long.length > 0)
+              "%s,%s" format (lat, long)
+            else
+              ""
+          val coordprop = List(("coord", Encoder.string(coord)))
+          val locprops1 = extract_props(location, List("accuracy"), "location-")
+          val locprops2 = extract_tags(location,
+            List("neighbourhood", "locality", "county", "region", "country"),
+            "location-")
+          val other = extract_tags(dom, List("url", "title", "description"))
 
-      val rawtags = (dom \\ "tag") flatMap { tag =>
-        (tag \ "@machine_tag").text match {
-          case "1" => None
-          case _ => Some((tag \ "@raw").text)
+          val rawtags = (dom \\ "tag") flatMap { tag =>
+            (tag \ "@machine_tag").text match {
+              case "1" => None
+              case _ => Some((tag \ "@raw").text)
+            }
+          }
+          val tagprops =
+            List(("rawtags", Encoder.seq_string(rawtags)),
+                 ("tag-counts", emit_ngrams(rawtags)))
+          val filenameprops = List(("orig-filename", Encoder.string(filename)))
+          Some((id.get, idprops ++ photoprops ++ dateprops ++ owner ++
+            coordprop ++ locprops1 ++ locprops2 ++ other ++ filenameprops ++
+            tagprops))
         }
       }
-      val tagprops =
-        List(("rawtags", Encoder.seq_string(rawtags)),
-             ("tag-counts", emit_ngrams(rawtags)))
-      val filenameprops = List(("orig-filename", Encoder.string(filename)))
-      id ++ photoprops ++ dateprops ++ owner ++ coordprop ++
-        locprops1 ++ locprops2 ++ other ++ filenameprops ++ tagprops
     }
   }
 
@@ -167,8 +188,9 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
    * can't be found).
    */
   def row_fields = {
-    val fake_xml_fields = apply("foo.xml", "<foo />")
-    fake_xml_fields.get.map(_._1)
+    apply("foo.xml", "<MediaUri>0</MediaUri>").get match {
+      case (id, props) => props.map(_._1)
+    }
   }
 }
 
@@ -210,10 +232,7 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
         "corpus-name" -> opts.corpus_name,
         "generating-app" -> progname,
         "corpus-type" -> "cophir") ++
-      opts.non_default_params_string.toMap ++
-      Map(
-        "split" -> opts.split
-      )
+      opts.non_default_params_string.toMap
     new Schema(fields, fixed_fields)
   }
 }
@@ -241,13 +260,48 @@ object ConvertCophir
       }
     // Parse XML into a property list, with property values
     // encoded for textdb fields
-    val props_lines =
+    val id_props_lines =
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
-    val outlines = props_lines map { prop => schema.make_row(prop map (_._2)) }
+    val outlines = id_props_lines map {
+      case (id, props) => (id % 100, id, schema.make_row(props map (_._2)))
+    }
+    val training =
+      outlines.filter { case (modid, id, row) => modid < 80 }.
+               map    { case (modid, id, row) => row }
+    val dev =
+      outlines.filter { case (modid, id, row) => modid >= 80 && modid < 90 }.
+               map    { case (modid, id, row) => row }
+    val dev_srcdir = opts.output + "-dev"
+    val test =
+      outlines.filter { case (modid, id, row) => modid >= 90 }.
+               map    { case (modid, id, row) => row }
+    val test_srcdir = opts.output + "-test"
    
-    /////// Output textdb corpus
-    dlist_output_textdb(schema, outlines, filehand, opts.output,
-      opts.corpus_name, ccd.corpus_suffix)
+    // output data files
+    persist(
+      TextOutput.toTextFile(training, opts.output),
+      TextOutput.toTextFile(dev, dev_srcdir),
+      TextOutput.toTextFile(test, test_srcdir))
+
+    // move/rename data files
+    val corpsuff = ccd.corpus_suffix
+    rename_output_files(opts.output,
+      opts.corpus_name, "training-" + corpsuff)
+    move_output_files(dev_srcdir, opts.output,
+      opts.corpus_name, "dev-" + corpsuff)
+    move_output_files(test_srcdir, opts.output,
+      opts.corpus_name, "test-" + corpsuff)
+
+    // output schema files
+    schema.clone_with_changes(Map("split"->"training")).
+      output_constructed_schema_file(filehand, opts.output,
+        opts.corpus_name, "training-" + corpsuff)
+    schema.clone_with_changes(Map("split"->"dev")).
+      output_constructed_schema_file(filehand, opts.output,
+        opts.corpus_name, "dev-" + corpsuff)
+    schema.clone_with_changes(Map("split"->"test")).
+      output_constructed_schema_file(filehand, opts.output,
+        opts.corpus_name, "test-" + corpsuff)
   }
 }
