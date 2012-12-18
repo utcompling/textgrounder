@@ -97,7 +97,7 @@ package object textdb {
     val split_re = "\\Q" + split_text + "\\E"
     val field_indices = fieldnames.zipWithIndex.toMap
 
-    def check_values_fit_schema(fieldvals: IndexedSeq[String]) {
+    def check_values_fit_schema(fieldvals: Iterable[String]) {
       if (fieldvals.size != fieldnames.size)
         throw FileFormatException(
           "Wrong-length line, expected %d fields, found %d: %s" format (
@@ -169,11 +169,20 @@ package object textdb {
     }
 
     /**
+     * Convert a list of items into a row to be output directly to a text file.
+     * (This does not include a trailing newline character.)
+     */
+    def make_row(fieldvals: Iterable[String]) = {
+      check_values_fit_schema(fieldvals)
+      fieldvals mkString split_text
+    }
+
+    /**
      * Output the schema to a file.
      */
     def output_schema_file(filehand: FileHandler, schema_file: String) {
       val schema_outstream = filehand.openw(schema_file)
-      schema_outstream.println(fieldnames mkString split_text)
+      schema_outstream.println(make_row(fieldnames))
       for ((field, value) <- fixed_values)
         schema_outstream.println(Seq(field, value) mkString split_text)
       schema_outstream.close()
@@ -191,22 +200,6 @@ package object textdb {
         suffix)
       output_schema_file(filehand, schema_file)
       schema_file
-    }
-
-    /**
-     * Output a row describing a document.
-     *
-     * @param outstream The output stream to write to, as returned by
-     *   `open_document_file`.
-     * @param fieldvals Iterable describing the field values to be written.
-     *   There should be as many items as there are field names in the
-     *   `fieldnames` field of the schema.
-     */
-    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
-      assert(fieldvals.size == fieldnames.size,
-        "values %s (length %s) not same length as fields %s (length %s)" format
-          (fieldvals, fieldvals.size, fieldnames, fieldnames.size))
-      outstream.println(fieldvals mkString split_text)
     }
   }
 

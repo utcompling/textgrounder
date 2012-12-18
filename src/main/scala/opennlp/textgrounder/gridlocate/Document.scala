@@ -848,6 +848,6 @@ class GeoDocWriter[Co : Serializer](
   suffix: String
 ) extends TextDBWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: GeoDoc[Co]) {
-    schema.output_row(outstream, doc.get_fields(schema.fieldnames))
+    outstream.println(schema.make_row(doc.get_fields(schema.fieldnames)))
   }
 }

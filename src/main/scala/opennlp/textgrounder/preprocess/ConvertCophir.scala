@@ -244,7 +244,7 @@ object ConvertCophir
     val props_lines =
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
-    val outlines = props_lines map (prop => prop map (_._2) mkString "\t")
+    val outlines = props_lines map { prop => schema.make_row(prop map (_._2)) }
    
     /////// Output textdb corpus
     dlist_output_textdb(schema, outlines, filehand, opts.output,

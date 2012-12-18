@@ -450,9 +450,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   ) {
     def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) = {
       import Encoder.{long => elong, _}
-      val optfields = mutable.Buffer[String]()
-      for (field <- opts.included_fields) {
-        val fieldval = field match {
+      opts.included_fields map { field =>
+        field match {
           case "user" => string(user)
           case "id" => elong(id)
           case "path" => string(path)
@@ -476,9 +475,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "text" => seq_string(text)
           case "counts" => tokenize_act.emit_ngrams(text)
         }
-        optfields += fieldval
       }
-      optfields.toSeq mkString "\t"
     }
   }
 
@@ -1682,12 +1679,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     /**
      * Given a tweet, tokenize the text into ngrams, count words and format
-     * the result as a field; then convert the whole into a record to be
-     * written out.
+     * the result as a field; then convert the whole into a record (list of
+     * field values) to be written out.
      */
-    def tokenize_count_and_format(tweet: Tweet): String = {
-      tweet.to_row(this, opts)
-    }
+    def tokenize_count_and_format(tweet: Tweet) = tweet.to_row(this, opts)
   }
 
   /**
@@ -1717,7 +1712,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         int(num_tweets),
         timestamp(min_timestamp),
         timestamp(max_timestamp)
-      ) mkString "\t"
+      )
     }
   }
 
@@ -1802,7 +1797,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         int(num_value_types),
         int(num_value_occurrences),
         double(num_value_occurrences.toDouble/num_value_types)
-      ) mkString "\t"
+      )
     }
   }
 
@@ -2100,20 +2095,18 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     /* Maybe group tweets */
     val tweets = new GroupTweets(opts)(tweets1)
 
-    // Construct output directory for a given corpus suffix, based on
-    // user-provided output directory
-    def output_directory_for_suffix(corpus_suffix: String) =
-      opts.output + "-" + corpus_suffix
-
-    // create a schema given a set of data fields plus user params
-    def create_schema(fields: Iterable[String]) =
-      new Schema(fields, Map("corpus-name" -> opts.corpus_name))
-
-    // output lines of data in an Iterable to a corpus
-    def local_output_lines(lines: Iterable[String],
-        corpus_suffix: String, fields: Iterable[String]) = {
+    /**
+     * Output rows of data to a corpus.
+     *
+     * @param fields List of names of fields in data.
+     * @param rows Iterable over rows, each described by a list of field values.
+     *    There must be as many values per row as there are fields.
+     * @param corpus_suffix Suffix used in naming the corpus files.
+     */
+    def local_output_rows(fields: Iterable[String],
+        rows: Iterable[Iterable[String]], corpus_suffix: String) = {
       // get output directory
-      val outdir = output_directory_for_suffix(corpus_suffix)
+      val outdir = opts.output + "-" + corpus_suffix
 
       // output data file
       filehand.make_directories(outdir)
@@ -2124,7 +2117,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       outstr.close()
 
       // output schema file
-      val out_schema = create_schema(fields)
+      val out_schema =
+        new Schema(fields, Map("corpus-name" -> opts.corpus_name))
       out_schema.output_constructed_schema_file(filehand, outdir,
         opts.corpus_name, corpus_suffix)
       outdir
@@ -2141,8 +2135,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val tfct = new TokenizeCountAndFormat(opts)
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.
-        val nicely_formatted = tweets.map(tfct.tokenize_count_and_format)
         val schema = ptd.create_schema
+        val nicely_formatted = tweets.map { tw =>
+          schema.make_row(tfct.tokenize_count_and_format(tw)) }
         dlist_output_textdb(schema, nicely_formatted, filehand, opts.output,
           opts.corpus_name, ptd.corpus_suffix)
       }
@@ -2152,9 +2147,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
-        val stats_suffix = "stats"
-        local_output_lines(by_type.map(_.to_row(opts)),
-          stats_suffix, FeatureStats.row_fields)
+        local_output_rows(FeatureStats.row_fields, by_type.map(_.to_row(opts)),
+          "stats")
         val userstat = by_type.filter(x =>
           x.ty == "user" && x.key2 == "user").toSeq(0)
         errprint("\nCombined summary:")
