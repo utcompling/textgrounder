@@ -24,9 +24,30 @@ class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
 }
 
 /**
+ * Data for a particular CoPHiR image.
+ *
+ * @param rawtags Concatenated raw tags, for bulk filtering
+ * @param owner_id ID of photo owner
+ * @param photo_id ID of photo
+ * @param props List of pairs of properties (including the raw tags and ID's)
+ */
+case class CophirImage(
+  rawtags: String,
+  owner_id: Int,
+  photo_id: Int,
+  props: Iterable[(String, String)]
+)
+
+trait CophirImplicits {
+  implicit val cophirImageWire =
+    mkCaseWireFormat(CophirImage.apply _, CophirImage.unapply _)
+}
+
+/**
  * A generic action in the ConvertCophir app.
  */
-trait ConvertCophirAction extends ScoobiProcessFilesAction {
+trait ConvertCophirAction extends
+    ScoobiProcessFilesAction with CophirImplicits {
   val progname = "ConvertCophir"
 }
 
@@ -116,19 +137,16 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
   }
 
   /**
-   * Given the filename of the XML file and the raw contents of the file,
-   * parse as XML and optionally return `(tags_str, owner_id, photo_id, props)`
-   * where `tags_str` is the raw tags encoded into a string (as for outputting
-   * to a textdb row); `owner_id` is an integer indicating the ID of the owner
-   * of the photo; `photo_id` is an integer indicating the ID of the photo
-   * itself; and `props` is a list of key-value pairs describing the photo,
-   * including all relevant data (including the raw tags, owner ID and photo ID).
-   * The values returned separately are used for grouping and bulk-filtering and
-   * such, according to the algorithm described in O'Hare and Murdock.
-   * If file can't be parsed or other error, return None.
+   * Convert the contents of an XML file from the CoPHiR corpus into an
+   * object describing the image.  If file can't be parsed or other error,
+   * return None.
+   *
+   * The CophirImage object returned contains a key-value list of properties,
+   * which will be converted into a textdb corpus.  It also contains fields
+   * for some individual properties, for use in implementing the
+   * corpus-generation algorithm in O'Hare and Murdock (2012).
    */
-  def apply(filename: String, rawxml: String):
-      Option[(String, Int, Int, Iterable[(String, String)])] = {
+  def apply(filename: String, rawxml: String): Option[CophirImage] = {
     val maybedom = try {
       Some(xml.XML.loadString(rawxml))
     } catch {
@@ -193,7 +211,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
             List(("rawtags", rawtags_str),
                  ("tag-counts", emit_ngrams(rawtags)))
           val filenameprops = List(("orig-filename", Encoder.string(filename)))
-          Some((rawtags_str, owner_id, photo_id,
+          Some(CophirImage(rawtags_str, owner_id, photo_id,
             idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
             locprops1 ++ locprops2 ++ otherprops ++ filenameprops ++ tagprops))
         }
@@ -210,7 +228,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
   def row_fields = {
     apply("foo.xml",
       """<root><MediaUri>0</MediaUri><owner nsid="0@N00"/></root>""").get match {
-      case (tags_str, owner_id, photo_id, props) => props.map(_._1)
+      case CophirImage(_, _, _, props) => props.map(_._1)
     }
   }
 }
@@ -258,15 +276,18 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
   }
 }
 
+/**
+ * Convert the CoPHiR corpus into a textdb corpus;
+ * split into training/dev/test and apply bulk-upload filtering and such,
+ * according to the algorithm described in O'Hare and Murdock (2012).
+ */
 object ConvertCophir
     extends ScoobiProcessFilesApp[ConvertCophirParams]
        with ConvertCophirAction {
   def create_params(ap: ArgParser) = new ConvertCophirParams(ap)
 
-  def bulk_upload_combine(
-    x: (String, Int, Int, Iterable[(String, String)]),
-    y: (String, Int, Int, Iterable[(String, String)])
-  ) = if (x._3 < y._3) x else y
+  def bulk_upload_combine(x: CophirImage, y: CophirImage) =
+    if (x.photo_id < y.photo_id) x else y
 
 
   def run() {
@@ -291,11 +312,11 @@ object ConvertCophir
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
     val outlines = id_props_lines.
-      filter { case (rawtags, owner_id, photo_id, props) => rawtags.size > 0 }.
-      groupBy { case (rawtags, owner_id, photo_id, props) => (rawtags, owner_id) }.
+      filter { _.rawtags.size > 0 }.
+      groupBy { im => (im.rawtags, im.owner_id) }.
       combine(bulk_upload_combine).
-      map { case (_, (rawtags, owner_id, photo_id, props)) =>
-        (owner_id % 100, schema.make_row(props map (_._2)))
+      map { case (_, im) =>
+        (im.owner_id % 100, schema.make_row(im.props map (_._2)))
       }
     val training =
       outlines.filter { case (modid, row) => modid < 80 }.
