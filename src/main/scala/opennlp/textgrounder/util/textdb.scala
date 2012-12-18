@@ -84,10 +84,7 @@ package object textdb {
    *   (currently used purely for identification purposes).
    * @param split_text Text used for separating field values in a row;
    *   normally a tab character. (FIXME: There may be dependencies elsewhere
-   *   on the separator being a tab, e.g. in EncodeDecode.  Furthermore,
-   *   currently the text isn't properly regexp-encoded when calling
-   *   `split` on a string; hence it will fail with possibilities like
-   *   | as a separator.)
+   *   on the separator being a tab, e.g. in EncodeDecode.)
    */
   class Schema(
     val fieldnames: Iterable[String],
@@ -97,6 +94,7 @@ package object textdb {
 
     import Serializer._
 
+    val split_re = "\\Q" + split_text + "\\E"
     val field_indices = fieldnames.zipWithIndex.toMap
 
     def check_values_fit_schema(fieldvals: IndexedSeq[String]) {
@@ -275,21 +273,21 @@ package object textdb {
      * @param filehand File handler of schema file name.
      * @param schema_file Name of the schema file.
      * @param split_text Text used to split the fields of the schema and data
-     *   files, usually TAB. (FIXME: This needs to be regexp-encoded to handle
-     *   possibilities like | as a separator.)
+     *   files, usually TAB.
      */
     def read_schema_file(filehand: FileHandler, schema_file: String,
         split_text: String = "\t") = {
+      val split_re = "\\Q" + split_text + "\\E"
       val lines = filehand.openr(schema_file)
       val fieldname_line = lines.next()
-      val fieldnames = fieldname_line.split(split_text, -1)
+      val fieldnames = fieldname_line.split(split_re, -1)
       for (field <- fieldnames if field.length == 0)
         throw new FileFormatException(
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, fieldnames))
       var fixed_fields = Map[String,String]()
       for (line <- lines) {
-        val fixed = line.split(split_text, -1)
+        val fixed = line.split(split_re, -1)
         if (fixed.length != 2)
           throw new FileFormatException(
             "For fixed fields (i.e. lines other than first) in schema file %s, should have two values (FIELD and VALUE), instead of %s".
@@ -519,7 +517,7 @@ package object textdb {
    */
   def line_to_fields(line: String, lineno: Long, schema: Schema
       ): Option[IndexedSeq[String]] = {
-    val fieldvals = line.split(schema.split_text, -1).toIndexedSeq
+    val fieldvals = line.split(schema.split_re, -1).toIndexedSeq
     if (fieldvals.size != schema.fieldnames.size) {
       warning(
         """Line %s: Bad record, expected %s fields, saw %s fields;
