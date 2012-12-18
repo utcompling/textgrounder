@@ -1,6 +1,7 @@
 package opennlp.textgrounder.tr.resolver
 
 import java.io._
+import java.util.ArrayList
 
 import opennlp.textgrounder.tr.text._
 import opennlp.textgrounder.tr.topo._
@@ -20,6 +21,10 @@ class ProbabilisticResolver(val logFilePath:String,
   val WINDOW_SIZE = 20
 
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
+
+  val toponymLexicon:Lexicon[String] = TopoUtil.buildLexicon(corpus)
+  val weightsForWMD:ArrayList[ArrayList[Double]] = new ArrayList[ArrayList[Double]](toponymLexicon.size)
+  for(i <- 0 until toponymLexicon.size) weightsForWMD.add(null)
 
   val docIdToCellDist:Map[String, Map[Int, Double]] =
   (for(pe <- LogUtil.parseLogFile(logFilePath)) yield {
@@ -102,6 +107,12 @@ class ProbabilisticResolver(val logFilePath:String,
 
         val totalPopulation = toponym.getCandidates.map(_.getPopulation).sum
 
+        var candDist = weightsForWMD.get(toponymLexicon.get(toponym.getForm))
+        if(candDist == null) {
+          candDist = new ArrayList[Double](toponym.getAmbiguity)
+          for(i <- 0 until toponym.getAmbiguity) candDist.add(0.0)
+        }
+
         for(cand <- toponym.getCandidates) {
           val curCellNum = TopoUtil.getCellNumber(cand.getRegion.getCenter, DPC)
 
@@ -141,6 +152,8 @@ class ProbabilisticResolver(val logFilePath:String,
           }
           else */probComponent
 
+          candDist.set(candIndex, candDist.get(candIndex) + probOfLocation)
+
           if(probOfLocation > maxProb) {
             indexToSelect = candIndex
             maxProb = probOfLocation
@@ -148,6 +161,8 @@ class ProbabilisticResolver(val logFilePath:String,
 
           candIndex += 1
         }
+
+        weightsForWMD.set(toponymLexicon.get(toponym.getForm), candDist)
 
         /*if(indexToSelect == -1) {
           val predDocLocation = predDocLocations.getOrElse(doc.getId, null)
@@ -159,13 +174,30 @@ class ProbabilisticResolver(val logFilePath:String,
           }
         }*/
 
-        if(indexToSelect >= 0)
-          toponym.setSelectedIdx(indexToSelect)
+        toponym.setSelectedIdx(indexToSelect)
 
       }
       tokIndex += 1
     }
   }
+
+  val out = new DataOutputStream(new FileOutputStream("probToWMD.dat"))
+  for(weights <- weightsForWMD/*.filterNot(x => x == null)*/) {
+    if(weights == null)
+      out.writeInt(0)
+    else {
+      val sum = weights.sum
+      out.writeInt(weights.size)
+      for(i <- 0 until weights.size) {
+        val newWeight = if(sum > 0) (weights.get(i) / sum) * weights.size else 1.0
+        weights.set(i, newWeight)
+        out.writeDouble(newWeight)
+        //println(newWeight)
+      }
+      //println
+    }
+  }
+  out.close
 
   // Backoff to DocDist:
   val docDistResolver = new DocDistResolver(logFilePath)

@@ -9,6 +9,7 @@ import opennlp.textgrounder.tr.text.*;
 import opennlp.textgrounder.tr.topo.*;
 import opennlp.textgrounder.tr.util.*;
 import java.util.*;
+import java.io.*;
 
 public class WeightedMinDistResolver extends Resolver {
 
@@ -18,14 +19,17 @@ public class WeightedMinDistResolver extends Resolver {
     Lexicon<String> toponymLexicon = null;
 
     private int numIterations;
+    private boolean readWeightsFromFile;
+    private List<List<Double> > weightsFromFile = null;
     //private Map<Long, Double> distanceCache = new HashMap<Long, Double>();
     //private int maxCoeff = Integer.MAX_VALUE;
     private DistanceTable distanceTable;
     private static final int PHANTOM_COUNT = 0; // phantom/imagined counts for smoothing
 
-    public WeightedMinDistResolver(int numIterations) {
+    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile) {
         super();
         this.numIterations = numIterations;
+        this.readWeightsFromFile = readWeightsFromFile;
     }
 
     @Override
@@ -39,7 +43,32 @@ public class WeightedMinDistResolver extends Resolver {
         weights = new ArrayList<List<Double> >(toponymLexicon.size());
         for(int i = 0; i < toponymLexicon.size(); i++) weights.add(null);
 
-        initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT);
+        if(readWeightsFromFile) {
+            weightsFromFile = new ArrayList<List<Double> >(toponymLexicon.size());
+            try {
+                DataInputStream in = new DataInputStream(new FileInputStream("probToWMD.dat"));
+                for(int i = 0; i < toponymLexicon.size(); i++) {
+                    int ambiguity = in.readInt();
+                    weightsFromFile.add(new ArrayList<Double>(ambiguity));
+                    for(int j = 0; j < ambiguity; j++) {
+                        weightsFromFile.get(i).add(in.readDouble());
+                    }
+                }
+                in.close();
+            } catch(Exception e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
+
+            /*for(int i = 0; i < weightsFromFile.size(); i++) {
+                for(int j = 0; j < weightsFromFile.get(i).size(); j++) {
+                    System.out.println(weightsFromFile.get(i).get(j));
+                }
+                System.out.println();
+                }*/
+        }
+
+        initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT, weightsFromFile);
 
         for(int i = 0; i < numIterations; i++) {
             System.out.println("Iteration: " + (i+1));
@@ -77,7 +106,8 @@ public class WeightedMinDistResolver extends Resolver {
     }
 
     private void initializeCountsAndWeights(List<List<Integer> > counts, List<List<Double> > weights,
-            StoredCorpus corpus, Lexicon<String> lexicon, int initialCount) {
+                                            StoredCorpus corpus, Lexicon<String> lexicon, int initialCount,
+                                            List<List<Double> > weightsFromFile) {
 
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
@@ -89,7 +119,11 @@ public class WeightedMinDistResolver extends Resolver {
                             weights.set(index, new ArrayList<Double>(toponym.getAmbiguity()));
                             for(int i = 0; i < toponym.getAmbiguity(); i++) {
                                 counts.get(index).add(initialCount);
-                                weights.get(index).add(1.0);
+                                if(weightsFromFile != null
+                                   && weightsFromFile.get(index).size() > 0)
+                                    weights.get(index).add(weightsFromFile.get(index).get(i));
+                                else
+                                    weights.get(index).add(1.0);
                             }
                         }
                     }
@@ -287,10 +321,10 @@ public class WeightedMinDistResolver extends Resolver {
     }*/
 
     private class DistanceTable {
-        private double[][][][] allDistances;
+        //private double[][][][] allDistances;
 
         public DistanceTable(int numToponymTypes) {
-            allDistances = new double[numToponymTypes][numToponymTypes][][];
+            //allDistances = new double[numToponymTypes][numToponymTypes][][];
         }
 
         public double getDistance(StoredToponym t1, int i1, StoredToponym t2, int i2) {

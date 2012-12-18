@@ -43,6 +43,7 @@ public class BaseApp {
     private String stoplistInputPath = null;
     
     private int numIterations = 1;
+    private boolean readWeightsFromFile = false;
 
     private int knnForLP = -1;
 
@@ -81,6 +82,7 @@ public class BaseApp {
         options.addOption("ig", "input-graph", true, "path to input graph for label propagation resolvers");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver, LabelPropComplexResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
+        options.addOption("rwf", "read-weights-file", false, "read initial weights from probToWMD.dat");
         options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("okd", "output-kml-dynamic", true, "dynamic kml output path");
@@ -176,32 +178,37 @@ public class BaseApp {
                         seedOutputPath = value;
                     break;
                 case 'r':
-                    if(value.toLowerCase().startsWith("r"))
-                        resolverType = RESOLVER_TYPE.RANDOM;
-                    else if(value.toLowerCase().startsWith("w"))
-                        resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
-                    else if(value.toLowerCase().startsWith("d"))
-                        resolverType = RESOLVER_TYPE.DOC_DIST;
-                    else if(value.toLowerCase().startsWith("t"))
-                        resolverType = RESOLVER_TYPE.TOPO_AS_DOC_DIST;
-                    else if(value.equalsIgnoreCase("labelprop"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP;
-                    else if(value.toLowerCase().startsWith("labelpropd"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
-                    else if(value.toLowerCase().startsWith("labelpropcontext"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
-                    else if(value.toLowerCase().startsWith("labelpropcomplex"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
-                    else if(value.toLowerCase().startsWith("m"))
-                        resolverType = RESOLVER_TYPE.MAXENT;
-                    else if(value.toLowerCase().startsWith("pr"))
-                        resolverType = RESOLVER_TYPE.PROB;
-                    else if(value.toLowerCase().startsWith("po"))
-                        resolverType = RESOLVER_TYPE.POPULATION;
-                    else if(value.toLowerCase().startsWith("bayes"))
-                        resolverType = RESOLVER_TYPE.BAYES_RULE;
-                    else
-                        resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+                    if(option.getOpt().equals("r")) {
+                        if(value.toLowerCase().startsWith("r"))
+                            resolverType = RESOLVER_TYPE.RANDOM;
+                        else if(value.toLowerCase().startsWith("w"))
+                            resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
+                        else if(value.toLowerCase().startsWith("d"))
+                            resolverType = RESOLVER_TYPE.DOC_DIST;
+                        else if(value.toLowerCase().startsWith("t"))
+                            resolverType = RESOLVER_TYPE.TOPO_AS_DOC_DIST;
+                        else if(value.equalsIgnoreCase("labelprop"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP;
+                        else if(value.toLowerCase().startsWith("labelpropd"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
+                        else if(value.toLowerCase().startsWith("labelpropcontext"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
+                        else if(value.toLowerCase().startsWith("labelpropcomplex"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
+                        else if(value.toLowerCase().startsWith("m"))
+                            resolverType = RESOLVER_TYPE.MAXENT;
+                        else if(value.toLowerCase().startsWith("pr"))
+                            resolverType = RESOLVER_TYPE.PROB;
+                        else if(value.toLowerCase().startsWith("po"))
+                            resolverType = RESOLVER_TYPE.POPULATION;
+                        else if(value.toLowerCase().startsWith("bayes"))
+                            resolverType = RESOLVER_TYPE.BAYES_RULE;
+                        else
+                            resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+                    }
+                    else if(option.getOpt().equals("rwf")) {
+                        readWeightsFromFile = true;
+                    }
                     break; 
                 case 'g':
                     if(option.getOpt().equals("g"))
@@ -304,6 +311,10 @@ public class BaseApp {
 
     public int getNumIterations() {
         return numIterations;
+    }
+
+    public boolean getReadWeightsFromFile() {
+        return readWeightsFromFile;
     }
 
     public String getOutputPath() {
