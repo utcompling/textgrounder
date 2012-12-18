@@ -201,6 +201,14 @@ package object textdb {
       output_schema_file(filehand, schema_file)
       schema_file
     }
+
+    /**
+     * Create a clone of this Schema, with updated fixed values as given.
+     * These will augment any existing fixed values, overwriting those of
+     * the same name.
+     */
+    def clone_with_changes(new_fixed_values: Map[String, String]) =
+      new Schema(fieldnames, fixed_values ++ new_fixed_values, split_text)
   }
 
   class SchemaFromFile(
