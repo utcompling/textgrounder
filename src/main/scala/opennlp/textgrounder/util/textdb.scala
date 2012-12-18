@@ -31,15 +31,15 @@ import io._
  * Package for databases stored in "textdb" format.
  * The database has the following format:
  *
- * (1) The documents are stored as field-text files, separated by a TAB
- *     character.
+ * (1) Entries stored as field-text files, normally separated by a
+ *     TAB character.
  * (2) There is a corresponding schema file, which lists the names of
  *     each field, separated by a TAB character, as well as any
  *     "fixed" fields that have the same value for all rows (one per
  *     line, with the name, a TAB, and the value).
- * (3) The document and schema files are identified by a suffix.
- *     The document files are named `DIR/PREFIX-SUFFIX.txt`
- *     (or `DIR/PREFIX-SUFFIX.txt.bz2` or similar, for compressed files),
+ * (3) The data and schema files are identified by a suffix.
+ *     The document files are named `DIR/PREFIX-SUFFIX-data.txt`
+ *     (or `DIR/PREFIX-SUFFIX-data.txt.bz2` or similar, for compressed files),
  *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
  *     The SUFFIX typically specifies the category of corpus being
  *     read (e.g. "text" for corpora containing text or "unigram-counts"
@@ -50,22 +50,22 @@ import io._
  *     of prefix, will be loaded.  The prefix of the currently-loading
  *     document file is available though the field `current_document_prefix`.
  *
- * The most common setup is to have the schema file and any document files
+ * The most common setup is to have the schema file and any data files
  * placed in the same directory, although it's possible to have them in
- * different directories or to have document files scattered across multiple
+ * different directories or to have data files scattered across multiple
  * directories.  Note that the naming of the files allows for multiple
- * document files in a single directory, as well as multiple corpora to
+ * data files in a single directory, as well as multiple corpora to
  * coexist in the same directory, as long as they have different suffixes.
  * This is often used to present different "views" onto the same corpus
  * (e.g. one containing raw text, one containing unigram counts, etc.), or
  * different splits (e.g. training vs. dev vs. test). (In fact, it is
  * common to divide a corpus into sub-corpora according to the split.
- * In such a case, document files will be named `DIR/PREFIX-SPLIT-SUFFIX.txt`
+ * In such a case, data files will be named `DIR/PREFIX-SPLIT-SUFFIX-data.txt`
  * or similar.  This allows all files for all splits to be located using a
  * suffix consisting only of the final "SUFFIX" part, while a particular
  * split can be located using a larger prefix of the form "SPLIT-SUFFIX".)
  *
- * There are many functions in `TextDBProcessor` for reading from textdb
+ * There are many functions in `TextDB` for reading from textdb
  * databases.  Most generally, a schema needs to be read and then the data
  * files read; both are located according to the suffix described above.
  * However, there are a number of convenience functions for handling
@@ -249,23 +249,54 @@ package object textdb {
   }
 
   object Schema {
+    val schema_ending_match = """-schema\.txt"""
+    val schema_ending_make = "-schema.txt"
+
+    /**
+     * For a given suffix, create a regular expression
+     * ([[scala.util.matching.Regex]]) that matches schema files of the
+     * suffix.
+     */
+    def make_schema_file_suffix_regex(suffix: String) =
+      TextDB.make_textdb_file_suffix_regex(suffix, schema_ending_match)
+
     /**
      * Construct the name of a schema file, based on the given file handler,
      * directory, prefix and suffix.  The file will end with "-schema.txt".
      */
     def construct_schema_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String) =
-      TextDBProcessor.construct_output_file(filehand, dir, prefix,
-        suffix, "-schema.txt")
+      TextDB.construct_textdb_file(filehand, dir, prefix,
+        suffix, schema_ending_make)
 
     /**
-     * Locate the prefix in a schema after the directory and suffix have
-     * been removed.
+     * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
+     * ENDING). The suffix needs to be given. For example, if the suffix
+     * is "tweets" and the file is named "foo/bar-1-tweets-schema.txt",
+     * the return value will be ("foo", "bar-1", "-tweets", "-schema.txt").
      */
-    def get_schema_prefix(filehand: FileHandler, schema_file: String,
-        suffix: String) = {
-      val (_, base) = filehand.split_filename(schema_file)
-      base.stripSuffix("-" + suffix + "-schema.txt")
+    def split_schema_file(filehand: FileHandler, file: String,
+        suffix: String): Option[(String, String, String, String)] =
+      TextDB.split_textdb_file(filehand, file, suffix, schema_ending_match)
+
+    /**
+     * Locate the schema file of the appropriate suffix in the given directory.
+     */
+    def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
+      val schema_regex = make_schema_file_suffix_regex(suffix)
+      val all_files = filehand.list_files(dir)
+      val files =
+        (for (file <- all_files
+          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
+      if (files.length == 0)
+        throw new FileFormatException(
+          "Found no schema files (matching %s) in directory %s"
+          format (schema_regex, dir))
+      if (files.length > 1)
+        throw new FileFormatException(
+          "Found multiple schema files (matching %s) in directory %s: %s"
+          format (schema_regex, dir, files))
+      files(0)
     }
 
     /**
@@ -305,6 +336,16 @@ package object textdb {
     }
 
     /**
+     * Locate and read the schema file of the appropriate suffix in the
+     * given directory.
+     */
+    def read_schema_from_textdb(filehand: FileHandler, dir: String,
+          suffix: String) = {
+      val schema_file = find_schema_file(filehand, dir, suffix)
+      read_schema_file(filehand, schema_file)
+    }
+
+    /**
      * Convert a set of field names and values to a map, to make it easier
      * to work with them.  The result is a mutable order-preserving map,
      * which is important so that when converted back to separate lists of
@@ -324,86 +365,91 @@ package object textdb {
 
   }
 
-  object TextDBProcessor {
-    val possible_compression_re = """(\.bz2|\.bzip2|\.gz|\.gzip)?$"""
+  object TextDB {
     val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
+    val possible_compression_re = """(?:%s)?""" format (
+      possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
+    // For the moment, allow the "-data" part to be omitted, because formerly
+    // it wasn't present.
+    val data_ending_match = """(?:-data)?\.txt"""
+    val data_ending_make = "-data.txt"
+
     /**
-     * For a given suffix, create a regular expression
-     * ([[scala.util.matching.Regex]]) that matches document files of the
-     * suffix.
+     * For a given suffix and file ending, create a regular expression
+     * ([[scala.util.matching.Regex]]) that matches corresponding files.
      */
-    def make_document_file_suffix_regex(suffix: String) = {
-      val re_quoted_suffix = """-%s\.txt""" format suffix
-      (re_quoted_suffix + possible_compression_re).r
-    }
-    /**
-     * For a given suffix, create a regular expression
-     * ([[scala.util.matching.Regex]]) that matches schema files of the
-     * suffix.
-     */
-    def make_schema_file_suffix_regex(suffix: String) = {
-      val re_quoted_suffix = """-%s-schema\.txt""" format suffix
-      (re_quoted_suffix + possible_compression_re).r
+    def make_textdb_file_suffix_regex(suffix: String, file_ending: String) = {
+      // val re_quoted_suffix = """-%s\.txt""" format suffix
+      val re_quoted_suffix =
+        """(-%s)(%s%s)$""" format (suffix, file_ending, possible_compression_re)
+      re_quoted_suffix.r
     }
 
     /**
-     * Construct the name of a file (either schema or document file), based
+     * Construct the name of a file (either schema or data file), based
      * on the given file handler, directory, prefix, suffix and file ending.
      * For example, if the file ending is "-schema.txt", the file will be
      * named `DIR/PREFIX-SUFFIX-schema.txt`.
      */
-    def construct_output_file(filehand: FileHandler, dir: String,
+    def construct_textdb_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String, file_ending: String) = {
       val new_base = prefix + "-" + suffix + file_ending
       filehand.join_filename(dir, new_base)
     }
 
-    def get_document_prefix(filehand: FileHandler, file: String,
-        suffix: String): String = {
-      val (_, base) = filehand.split_filename(file)
-      for (ending <- possible_compression_endings) {
-        val compressed_ending = ".txt" + ending
-        if (base.endsWith(compressed_ending))
-          return base.stripSuffix("-" + suffix + compressed_ending)
+    /**
+     * For a given suffix, create a regular expression
+     * ([[scala.util.matching.Regex]]) that matches data files of the
+     * suffix.
+     */
+    def make_data_file_suffix_regex(suffix: String) =
+      make_textdb_file_suffix_regex(suffix, data_ending_match)
+
+    /**
+     * Construct the name of a data file, based on the given file handler,
+     * directory, prefix, and suffix.  The file will be named
+     * `DIR/PREFIX-SUFFIX-data.txt`.
+     */
+    def construct_data_file(filehand: FileHandler, dir: String,
+        prefix: String, suffix: String) =
+      construct_textdb_file(filehand, dir, prefix, suffix, data_ending_make)
+
+    /**
+     * Split the name of a textdb file into (DIR, PREFIX, SUFFIX, ENDING).
+     * The suffix needs to be given, along with the file ending, not
+     * including any compression ending.  For example, if the suffix is
+     * "tweets" and the file ending is "-data.txt", and the file is named
+     * "foo/bar-1-tweets-data.txt.gz", the return value will be
+     * ("foo", "bar-1", "-tweets", "-data.txt.gz").
+     */
+    def split_textdb_file(filehand: FileHandler, file: String,
+      suffix: String, file_ending: String
+    ): Option[(String, String, String, String)] = {
+      val (dir, base) = filehand.split_filename(file)
+      val re = ("""^(.*)(-%s)(%s%s)$""" format
+        (suffix, file_ending, possible_compression_re)).r
+      base match {
+        case re(prefix, suffix1, ending1) =>
+          Some(dir, prefix, suffix1, ending1)
+        case _ => None
       }
-      base.stripSuffix("-" + suffix + ".txt")
     }
 
     /**
-     * Locate the schema file of the appropriate suffix in the given directory.
+     * Split the name of a textdb data file into (DIR, PREFIX, SUFFIX,
+     * ENDING). The suffix needs to be given. For example, if the suffix
+     * is "tweets" and the file is named "foo/bar-1-tweets-data.txt.gz",
+     * the return value will be ("foo", "bar-1", "-tweets", "-data.txt.gz").
      */
-    def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
-      val schema_regex = make_schema_file_suffix_regex(suffix)
-      val all_files = filehand.list_files(dir)
-      val files =
-        (for (file <- all_files
-          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
-      if (files.length == 0)
-        throw new FileFormatException(
-          "Found no schema files (matching %s) in directory %s"
-          format (schema_regex, dir))
-      if (files.length > 1)
-        throw new FileFormatException(
-          "Found multiple schema files (matching %s) in directory %s: %s"
-          format (schema_regex, dir, files))
-      files(0)
-    }
+    def split_data_file(filehand: FileHandler, file: String,
+        suffix: String): Option[(String, String, String, String)] =
+      split_textdb_file(filehand, file, suffix, data_ending_match)
 
     /**
-     * Locate and read the schema file of the appropriate suffix in the
-     * given directory.
-     */
-    def read_schema_from_textdb(filehand: FileHandler, dir: String,
-          suffix: String) = {
-      val schema_file = find_schema_file(filehand, dir, suffix)
-      Schema.read_schema_file(filehand, schema_file)
-    }
-
-    /**
-     * List only the document files of the appropriate suffix.
+     * List only the data files of the appropriate suffix.
      */
     def filter_file_by_suffix(file: String, suffix: String) = {
-      val filter = make_document_file_suffix_regex(suffix)
+      val filter = make_data_file_suffix_regex(suffix)
       filter.findFirstMatchIn(file) != None
     }
 
@@ -427,7 +473,7 @@ package object textdb {
      */
     def get_textdb_files(filehand: FileHandler, dir: String,
         suffix: String, with_messages: Boolean = true) = {
-      val schema = read_schema_from_textdb(filehand, dir, suffix)
+      val schema = Schema.read_schema_from_textdb(filehand, dir, suffix)
       val files = iter_files_recursively(filehand, Iterable(dir)).
           filter(filter_file_by_suffix(_, suffix))
       val files_with_message =
@@ -441,7 +487,7 @@ package object textdb {
     /**
      * Read a corpus from a directory and return the result of processing the
      * rows in the corpus. (If you want more control over the processing,
-     * call `read_schema_from_textdb` and use `NewTextDBProcessor`.)
+     * call `read_schema_from_textdb` and use `NewTextDB`.)
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
@@ -494,7 +540,7 @@ package object textdb {
     */
 
     /**
-     * Return a list of shell-style wildcard patterns matching all the document
+     * Return a list of shell-style wildcard patterns matching all the data
      * files in the given directory with the given suffix (including compressed
      * files).
      */
@@ -532,7 +578,7 @@ package object textdb {
   /**
    * Class for writing a textdb database.
    *
-   * @param schema the schema describing the fields in the document file
+   * @param schema the schema describing the fields in the data file
    * @param suffix the suffix of the data files, as described in the
    *   `textdb` package
    */
@@ -541,16 +587,16 @@ package object textdb {
     val suffix: String
   ) {
     /**
-     * Open a document file and return an output stream.  The file will be
-     * named `DIR/PREFIX-SUFFIX.txt`, possibly with an additional suffix
+     * Open a data file and return an output stream.  The file will be
+     * named `DIR/PREFIX-SUFFIX-data.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
      * to no compression).  Call `output_row` to output a row describing
      * a document.
      */
-    def open_document_file(filehand: FileHandler, dir: String,
+    def open_data_file(filehand: FileHandler, dir: String,
         prefix: String, compression: String = "none") = {
-      val file = TextDBProcessor.construct_output_file(filehand, dir,
-        prefix, suffix, ".txt")
+      val file = TextDB.construct_data_file(filehand, dir, prefix,
+        suffix)
       filehand.openw(file, compression = compression)
     }
 

@@ -137,7 +137,7 @@ class MMCUnigramWordDistHandler(
     schema.fixed_values)
   val writer = new TextDBWriter(new_schema, "unigram-counts")
   writer.output_schema_file(filehand, output_dir, output_file_prefix)
-  val outstream = writer.open_document_file(filehand, output_dir,
+  val outstream = writer.open_data_file(filehand, output_dir,
     output_file_prefix, compression = "bzip2")
  
   def handle_document(title: String, keys: Array[String], values: Array[Int],
@@ -190,7 +190,7 @@ counts file also containing the metadata.
         params.output_dir)
 
     val (schema, field_iter) =
-      TextDBProcessor.read_textdb_with_schema(filehand, params.input_dir,
+      TextDB.read_textdb_with_schema(filehand, params.input_dir,
         document_metadata_suffix)
 
     if (params.output_file_prefix == null) {

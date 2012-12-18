@@ -2079,9 +2079,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       opts.input_format match {
         case "textdb" => {
           val insuffix = "tweets"
-          opts.input_schema = TextDBProcessor.read_schema_from_textdb(
+          opts.input_schema = Schema.read_schema_from_textdb(
             filehand, opts.input, insuffix)
-          val matching_patterns = TextDBProcessor.get_matching_patterns(
+          val matching_patterns = TextDB.get_matching_patterns(
             filehand, opts.input, insuffix)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
@@ -2110,8 +2110,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // output data file
       filehand.make_directories(outdir)
-      val outfile = TextDBProcessor.construct_output_file(filehand, outdir,
-        opts.corpus_name, corpus_suffix, ".txt")
+      val outfile = TextDB.construct_data_file(filehand, outdir,
+        opts.corpus_name, corpus_suffix)
       val outstr = filehand.openw(outfile)
       lines.map(outstr.println(_))
       outstr.close()
@@ -2128,7 +2128,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       case "json" => {
         /* We're outputting JSON's directly. */
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
-        rename_output_files(opts.output, opts.corpus_name, ptd.corpus_suffix)
+        rename_output_files(filehand, opts.output, opts.corpus_name,
+          ptd.corpus_suffix)
       }
 
       case "textdb" => {

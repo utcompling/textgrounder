@@ -167,7 +167,7 @@ class PoligrounderDriver extends
 
     if (params.ideological_user_corpus != null) {
       val (schema, field_iter) =
-        TextDBProcessor.read_textdb_with_schema(new LocalFileHandler,
+        TextDB.read_textdb_with_schema(new LocalFileHandler,
           params.ideological_user_corpus, "ideo-users")
       val users =
         (for (fieldvals <- field_iter.flatten) yield {

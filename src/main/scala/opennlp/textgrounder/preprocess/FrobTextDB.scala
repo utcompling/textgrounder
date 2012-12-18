@@ -101,7 +101,7 @@ containing unigram counts.""")
  *   taken from parameters)
  * @param params Parameters retrieved from the command-line arguments
  */
-class FrobTextDBProcessor(
+class FrobTextDB(
   output_filehand: FileHandler,
   params: FrobTextDBParameters
 ) {
@@ -182,7 +182,7 @@ class FrobTextDBProcessor(
         schema_prefix)
     }
     if (unsplit_outstream == null)
-      unsplit_outstream = unsplit_writer.open_document_file(output_filehand,
+      unsplit_outstream = unsplit_writer.open_data_file(output_filehand,
         params.output_dir, current_document_prefix)
     (unsplit_writer, unsplit_outstream)
   }
@@ -219,7 +219,7 @@ class FrobTextDBProcessor(
           if (!(split_value_to_outstream contains split)) {
             val writer = split_value_to_writer(split)
             split_value_to_outstream(split) =
-              writer.open_document_file(output_filehand, params.output_dir,
+              writer.open_data_file(output_filehand, params.output_dir,
                 current_document_prefix + "-" + split)
           }
           (split_value_to_writer(split), split_value_to_outstream(split))
@@ -253,16 +253,20 @@ class FrobTextDBProcessor(
     }
     Some(())
   }
+
   def process_dir(filehand: FileHandler, dir: String) {
     val (schema, files) =
-      TextDBProcessor.get_textdb_files(filehand, dir, params.input_suffix)
-    schema_prefix = Schema.get_schema_prefix(filehand, schema.filename,
-      params.input_suffix)
+      TextDB.get_textdb_files(filehand, dir, params.input_suffix)
+    val (_, schpref, _, _) = Schema.split_schema_file(filehand,
+      schema.filename, params.input_suffix).get
+    schema_prefix = schpref    
+    
     for (file <- files) {
-      current_document_prefix = TextDBProcessor.get_document_prefix(
-        filehand, file, params.input_suffix)
+      val (_, prefix, _, _) = TextDB.split_data_file(
+        filehand, file, params.input_suffix).get
+      current_document_prefix = prefix
       for (fieldvals <-
-          TextDBProcessor.read_textdb_file(filehand, file, schema))
+          TextDB.read_textdb_file(filehand, file, schema))
         process_row(schema, fieldvals)
       /* Close the output stream(s), clearing the appropriate variable(s)
          so that the necessary stream(s) will be re-created again for the
@@ -270,7 +274,7 @@ class FrobTextDBProcessor(
 
          FIXME: This is rather bogus, since we directly know now when we're
          opening a new file. (It was written this way using an internal
-         iterator -- the no-longer-existing TextDBProcessor and
+         iterator -- the no-longer-existing TextDB and
          FileProcessor interface.)
        */
       if (params.split_by_field != null) {
@@ -313,7 +317,7 @@ class FrobTextDBDriver extends
     super.run()
 
     val filehand = get_file_handler
-    val fileproc = new FrobTextDBProcessor(filehand, params)
+    val fileproc = new FrobTextDB(filehand, params)
     fileproc.process_dir(filehand, params.input_dir)
   }
 }
