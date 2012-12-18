@@ -109,7 +109,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
       Some(str.toInt)
     } catch {
       case e:NumberFormatException => {
-        warning("Unable to parse number '%s': %s", str, e)
+        warning("", "Unable to parse number '%s': %s", str, e)
         None
       }
     }
@@ -117,37 +117,56 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
 
   /**
    * Given the filename of the XML file and the raw contents of the file,
-   * parse as XML and optionally return a pair (ID, PROPS) where ID is the
-   * ID of the photo involved and PROPS is a list of key-value pairs.  If file
-   * can't be parsed, return None.
+   * parse as XML and optionally return `(tags_str, owner_id, photo_id, props)`
+   * where `tags_str` is the raw tags encoded into a string (as for outputting
+   * to a textdb row); `owner_id` is an integer indicating the ID of the owner
+   * of the photo; `photo_id` is an integer indicating the ID of the photo
+   * itself; and `props` is a list of key-value pairs describing the photo,
+   * including all relevant data (including the raw tags, owner ID and photo ID).
+   * The values returned separately are used for grouping and bulk-filtering and
+   * such, according to the algorithm described in O'Hare and Murdock.
+   * If file can't be parsed or other error, return None.
    */
   def apply(filename: String, rawxml: String):
-      Option[(Int, Iterable[(String, String)])] = {
+      Option[(String, Int, Int, Iterable[(String, String)])] = {
     val maybedom = try {
       Some(xml.XML.loadString(rawxml))
     } catch {
       case _ => {
-        warning("Unable to parse XML filename: %s", filename)
+        warning("", "Unable to parse XML filename %s", filename)
         None
       }
     }
 
     maybedom flatMap { dom =>
-      val idstr = (dom \\ "MediaUri").text
-      if (idstr == "") {
-        warning("Can't find photo ID in XML for file %s", filename)
+      val photo_idstr = (dom \\ "MediaUri").text
+      val owner_idstr = (dom \\ "owner" \ "@nsid").text
+      if (photo_idstr == "") {
+        warning("", "Can't find photo ID in XML for file %s", filename)
+        None
+      } else if (owner_idstr == "") {
+        warning("", "Can't find owner ID in XML for file %s", filename)
+        None
+      } else if (!owner_idstr.endsWith("@N00")) {
+        warning("", "Misformatted owner ID %s in XML for file %s, should end in @N00",
+          owner_idstr, filename)
         None
       } else {
-        val id = safe_toInt(idstr)
-        if (id == None) None
+        val maybe_photo_id = safe_toInt(photo_idstr)
+        val maybe_owner_id = safe_toInt(owner_idstr.stripSuffix("@N00"))
+        if (maybe_photo_id == None || maybe_owner_id == None) None
         else {
-          val idprops = List(("id", Encoder.string(idstr)))
+          val photo_id = maybe_photo_id.get
+          val owner_id = maybe_owner_id.get
+          val idprops =
+            List(("photo-id", Encoder.int(photo_id)),
+                 ("owner-id", Encoder.int(owner_id)))
           val photoprops = extract_props(dom \\ "photo",
             List("dateuploaded"), "photo-")
           val dateprops = extract_props(dom \\ "dates",
             List("posted", "taken", "lastupdate"), "dates-")
-          val owner = extract_props(dom \\ "owner",
-            List("nsid", "username", "realname", "location"), "owner-")
+          val ownerprops = extract_props(dom \\ "owner",
+            List("username", "realname", "location"), "owner-")
           val location = dom \\ "location"
           val lat = (location \ "@latitude").text
           val long = (location \ "@longitude").text
@@ -161,7 +180,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
           val locprops2 = extract_tags(location,
             List("neighbourhood", "locality", "county", "region", "country"),
             "location-")
-          val other = extract_tags(dom, List("url", "title", "description"))
+          val otherprops = extract_tags(dom, List("url", "title", "description"))
 
           val rawtags = (dom \\ "tag") flatMap { tag =>
             (tag \ "@machine_tag").text match {
@@ -169,13 +188,14 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
               case _ => Some((tag \ "@raw").text)
             }
           }
+          val rawtags_str = Encoder.seq_string(rawtags)
           val tagprops =
-            List(("rawtags", Encoder.seq_string(rawtags)),
+            List(("rawtags", rawtags_str),
                  ("tag-counts", emit_ngrams(rawtags)))
           val filenameprops = List(("orig-filename", Encoder.string(filename)))
-          Some((id.get, idprops ++ photoprops ++ dateprops ++ owner ++
-            coordprop ++ locprops1 ++ locprops2 ++ other ++ filenameprops ++
-            tagprops))
+          Some((rawtags_str, owner_id, photo_id,
+            idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
+            locprops1 ++ locprops2 ++ otherprops ++ filenameprops ++ tagprops))
         }
       }
     }
@@ -188,8 +208,9 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
    * can't be found).
    */
   def row_fields = {
-    apply("foo.xml", "<MediaUri>0</MediaUri>").get match {
-      case (id, props) => props.map(_._1)
+    apply("foo.xml",
+      """<root><MediaUri>0</MediaUri><owner nsid="0@N00"/></root>""").get match {
+      case (tags_str, owner_id, photo_id, props) => props.map(_._1)
     }
   }
 }
@@ -242,6 +263,12 @@ object ConvertCophir
        with ConvertCophirAction {
   def create_params(ap: ArgParser) = new ConvertCophirParams(ap)
 
+  def bulk_upload_combine(
+    x: (String, Int, Int, Iterable[(String, String)]),
+    y: (String, Int, Int, Iterable[(String, String)])
+  ) = if (x._3 < y._3) x else y
+
+
   def run() {
     ////// Initialize
     val opts = init_scoobi_app()
@@ -263,19 +290,23 @@ object ConvertCophir
     val id_props_lines =
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
-    val outlines = id_props_lines map {
-      case (id, props) => (id % 100, id, schema.make_row(props map (_._2)))
-    }
+    val outlines = id_props_lines.
+      filter { case (rawtags, owner_id, photo_id, props) => rawtags.size > 0 }.
+      groupBy { case (rawtags, owner_id, photo_id, props) => (rawtags, owner_id) }.
+      combine(bulk_upload_combine).
+      map { case (_, (rawtags, owner_id, photo_id, props)) =>
+        (owner_id % 100, schema.make_row(props map (_._2)))
+      }
     val training =
-      outlines.filter { case (modid, id, row) => modid < 80 }.
-               map    { case (modid, id, row) => row }
+      outlines.filter { case (modid, row) => modid < 80 }.
+               map    { case (modid, row) => row }
     val dev =
-      outlines.filter { case (modid, id, row) => modid >= 80 && modid < 90 }.
-               map    { case (modid, id, row) => row }
+      outlines.filter { case (modid, row) => modid >= 80 && modid < 90 }.
+               map    { case (modid, row) => row }
     val dev_srcdir = opts.output + "-dev"
     val test =
-      outlines.filter { case (modid, id, row) => modid >= 90 }.
-               map    { case (modid, id, row) => row }
+      outlines.filter { case (modid, row) => modid >= 90 }.
+               map    { case (modid, row) => row }
     val test_srcdir = opts.output + "-test"
    
     // output data files
