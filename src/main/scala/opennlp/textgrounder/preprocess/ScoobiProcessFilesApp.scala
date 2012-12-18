@@ -257,25 +257,39 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
 
   /**
    * The files persisted by Scoobi have a name that we can't control
-   * very much.  Rename them appropriately for a textdb corpus.
+   * very much.  Move them from one directory to another and rename them
+   * appropriately for a textdb corpus.
+   *
+   * @param srcdir Directory containing persisted files.
+   * @param destdir Directory to contain results.
+   * @param corpus_name Name of corpus; used to form the filenames.
+   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   */ 
+  def move_output_files(srcdir: String, destdir: String,
+      corpus_name: String, corpus_suffix: String) {
+    errprint("Moving/renaming output files ...")
+    val globpat = "%s/*-r-*" format srcdir
+    val fs = configuration.fs
+    for (file <- fs.globStatus(new Path(globpat))) {
+      val path = file.getPath
+      val basename = path.getName
+      val newname = "%s/%s-%s-%s.txt" format (
+        destdir, corpus_name, basename, corpus_suffix)
+      errprint("Moving %s to %s" format (path, newname))
+      fs.rename(path, new Path(newname))
+    }
+  }
+
+  /**
+   * Similar to `move_output_files` but just rename them, keeping them in the
+   * same directory.
    *
    * @param dir Directory containing persisted files.
    * @param corpus_name Name of corpus; used to form the filenames.
    * @param corpus_suffix Suffix of corpus; used to form the filenames.
    */ 
   def rename_output_files(dir: String, corpus_name: String,
-      corpus_suffix: String) {
-    errprint("Renaming output files ...")
-    val globpat = "%s/*-r-*" format dir
-    val fs = configuration.fs
-    for (file <- fs.globStatus(new Path(globpat))) {
-      val path = file.getPath
-      val basename = path.getName
-      val newname = "%s/%s-%s-%s.txt" format (
-        dir, corpus_name, basename, corpus_suffix)
-      errprint("Renaming %s to %s" format (path, newname))
-      fs.rename(path, new Path(newname))
-    }
-  }
+      corpus_suffix: String) =
+    move_output_files(dir, dir, corpus_name, corpus_suffix)
 }
 
