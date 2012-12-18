@@ -244,12 +244,12 @@ class FrobTextDBProcessor(
         assert(nosplit_fieldnames == writer.schema.fieldnames,
           "resulting fieldnames %s should be same as schema fieldnames %s"
             format (nosplit_fieldnames, writer.schema.fieldnames))
-        writer.schema.output_row(outstream, nosplit_fieldvals)
+        outstream.println(writer.schema.make_row(nosplit_fieldvals))
       }
     } else {
       val (writer, outstream) =
         get_unsplit_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
-      writer.schema.output_row(outstream, new_fieldvals)
+      outstream.println(writer.schema.make_row(new_fieldvals))
     }
     Some(())
   }
