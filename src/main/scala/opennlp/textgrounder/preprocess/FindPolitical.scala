@@ -503,7 +503,7 @@ object FindPolitical extends
       }
       else {
         val (schema, field_iter) =
-          TextDBProcessor.read_textdb_with_schema(filehand,
+          TextDB.read_textdb_with_schema(filehand,
             opts.political_twitter_accounts, "ideo-users")
         (for (fieldvals <- field_iter.flatten) yield {
           val user = schema.get_field(fieldvals, "user")
@@ -515,8 +515,7 @@ object FindPolitical extends
     // errprint("Accounts: %s", accounts)
 
     val suffix = "tweets"
-    opts.schema =
-      TextDBProcessor.read_schema_from_textdb(filehand, opts.input, suffix)
+    opts.schema = Schema.read_schema_from_textdb(filehand, opts.input, suffix)
 
     def output_directory_for_suffix(corpus_suffix: String) =
       opts.output + "-" + corpus_suffix
@@ -530,7 +529,7 @@ object FindPolitical extends
         fields: Iterable[String]) = {
       val outdir = output_directory_for_suffix(corpus_suffix)
       (TextOutput.toTextFile(lines, outdir), () => {
-        rename_output_files(outdir, opts.corpus_name, corpus_suffix)
+        rename_output_files(filehand, outdir, opts.corpus_name, corpus_suffix)
         output_schema_for_suffix(corpus_suffix, fields)
       })
     }
@@ -555,7 +554,7 @@ object FindPolitical extends
     var ideo_users: DList[IdeologicalUser] = null
 
     val ideo_fact = new IdeologicalUserAction(opts)
-    val matching_patterns = TextDBProcessor.
+    val matching_patterns = TextDB.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 

@@ -33,7 +33,7 @@ import util.hadoop._
 import util.io.FileHandler
 import util.math.{mean, median}
 import util.print.{errprint, warning}
-import util.textdb.TextDBProcessor
+import util.textdb.Schema
 
 import gridlocate._
 
@@ -238,7 +238,7 @@ class DocEvalMapper extends
     }
     val ranker = driver.create_ranker
     context.progress
-    val schema = TextDBProcessor.read_schema_from_textdb(filehand,
+    val schema = Schema.read_schema_from_textdb(filehand,
       driver.params.input_corpus(0),
       driver.params.eval_set + "-" + driver.document_file_suffix)
     context.progress

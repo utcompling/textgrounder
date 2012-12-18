@@ -317,11 +317,11 @@ object ConvertCophir
 
     // move/rename data files
     val corpsuff = ccd.corpus_suffix
-    rename_output_files(opts.output,
+    rename_output_files(filehand, opts.output,
       opts.corpus_name, "training-" + corpsuff)
-    move_output_files(dev_srcdir, opts.output,
+    move_output_files(filehand, dev_srcdir, opts.output,
       opts.corpus_name, "dev-" + corpsuff)
-    move_output_files(test_srcdir, opts.output,
+    move_output_files(filehand, test_srcdir, opts.output,
       opts.corpus_name, "test-" + corpsuff)
 
     // output schema files

@@ -33,6 +33,7 @@ import util.MeteredTask
 import util.os.output_resource_usage
 import util.print._
 import util.text.with_commas
+import util.textdb._
 import util.Twokenize
 
 /*
@@ -159,8 +160,9 @@ class ConvertTwitterInfochimpsFileProcessor(
       val (lines, compression_type, realname) =
         filehand.openr_with_compression_info(file)
       val (_, outname) = filehand.split_filename(realname)
-      val out_text_name = "%s/twitter-infochimps-%s-%s.txt" format (
-        params.output_dir, outname, suffix)
+      val out_text_name =
+        TextDB.construct_data_file(filehand, params.output_dir,
+          "twitter-infochimps-%s" format outname, suffix)
       errprint("Text document file is %s..." format out_text_name)
       val outstream =
         filehand.openw(out_text_name, compression = compression_type)
@@ -172,7 +174,8 @@ class ConvertTwitterInfochimpsFileProcessor(
         if (this.schema == null) {
           // Output the schema file, first time we see a line
           val schema_file_name =
-            "%s/twitter-infochimps-%s-schema.txt" format (params.output_dir, suffix)
+            Schema.construct_schema_file(filehand, params.output_dir,
+              "twitter-infochimps", suffix)
           val schema_stream = filehand.openw(schema_file_name)
           errprint("Schema file is %s..." format schema_file_name)
           schema_stream.println(schema mkString "\t")

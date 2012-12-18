@@ -247,7 +247,7 @@ package object hadoop {
          seen, for Hadoop's benefit. */
       val files =
         iter_files_recursively(driver.get_file_handler, corpus_dirs).
-          filter(TextDBProcessor.filter_file_by_suffix(_, corpus_suffix))
+          filter(TextDB.filter_file_by_suffix(_, corpus_suffix))
       for (file <- files) {
          errprint("Adding %s to input path", file)
          FileInputFormat.addInputPath(job, new Path(file))

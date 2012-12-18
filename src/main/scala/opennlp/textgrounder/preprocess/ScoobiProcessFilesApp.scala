@@ -38,7 +38,7 @@ import util.collection._
 import util.io.FileHandler
 import util.os._
 import util.print._
-import util.textdb.Schema
+import util.textdb._
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",
@@ -246,7 +246,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
       corpus_name: String, corpus_suffix: String) {
     // output data file
     persist(TextOutput.toTextFile(lines, outdir))
-    rename_output_files(outdir, corpus_name, corpus_suffix)
+    rename_output_files(filehand, outdir, corpus_name, corpus_suffix)
 
     // output schema file
     val schema_filename =
@@ -265,7 +265,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param corpus_name Name of corpus; used to form the filenames.
    * @param corpus_suffix Suffix of corpus; used to form the filenames.
    */ 
-  def move_output_files(srcdir: String, destdir: String,
+  def move_output_files(filehand: FileHandler, srcdir: String, destdir: String,
       corpus_name: String, corpus_suffix: String) {
     errprint("Moving/renaming output files ...")
     val globpat = "%s/*-r-*" format srcdir
@@ -273,8 +273,8 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     for (file <- fs.globStatus(new Path(globpat))) {
       val path = file.getPath
       val basename = path.getName
-      val newname = "%s/%s-%s-%s.txt" format (
-        destdir, corpus_name, basename, corpus_suffix)
+      val newname = TextDB.construct_data_file(filehand, destdir,
+        "%s-%s" format (corpus_name, basename), corpus_suffix)
       errprint("Moving %s to %s" format (path, newname))
       fs.rename(path, new Path(newname))
     }
@@ -288,8 +288,8 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param corpus_name Name of corpus; used to form the filenames.
    * @param corpus_suffix Suffix of corpus; used to form the filenames.
    */ 
-  def rename_output_files(dir: String, corpus_name: String,
-      corpus_suffix: String) =
-    move_output_files(dir, dir, corpus_name, corpus_suffix)
+  def rename_output_files(filehand: FileHandler, dir: String,
+      corpus_name: String, corpus_suffix: String) =
+    move_output_files(filehand, dir, dir, corpus_name, corpus_suffix)
 }
 
