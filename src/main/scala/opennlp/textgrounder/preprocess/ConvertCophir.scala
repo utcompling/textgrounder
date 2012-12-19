@@ -129,10 +129,8 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     try {
       Some(str.toInt)
     } catch {
-      case e:NumberFormatException => {
-        warning("", "Unable to parse number '%s': %s", str, e)
-        None
-      }
+      case e:NumberFormatException =>
+        problem("Unable to parse number", "'%s': %s" format (str, e))
     }
   }
 
@@ -150,26 +148,21 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     val maybedom = try {
       Some(xml.XML.loadString(rawxml))
     } catch {
-      case _ => {
-        warning("", "Unable to parse XML filename %s", filename)
-        None
-      }
+      case _ =>
+        problem("Unable to parse XML filename", filename)
     }
 
     maybedom flatMap { dom =>
       val photo_idstr = (dom \\ "MediaUri").text
       val owner_idstr = (dom \\ "owner" \ "@nsid").text
-      if (photo_idstr == "") {
-        warning("", "Can't find photo ID in XML for file %s", filename)
-        None
-      } else if (owner_idstr == "") {
-        warning("", "Can't find owner ID in XML for file %s", filename)
-        None
-      } else if (!owner_idstr.endsWith("@N00")) {
-        warning("", "Misformatted owner ID %s in XML for file %s, should end in @N00",
-          owner_idstr, filename)
-        None
-      } else {
+      if (photo_idstr == "")
+        problem("Can't find photo ID in XML", "file %s" format filename)
+      else if (owner_idstr == "")
+        problem("Can't find owner ID in XML", "file %s" format filename)
+      else if (!owner_idstr.endsWith("@N00"))
+        problem("Misformatted owner ID in XML, should end in @N00",
+          "'%s' in file %s" format (owner_idstr, filename))
+      else {
         val maybe_photo_id = safe_toInt(photo_idstr)
         val maybe_owner_id = safe_toInt(owner_idstr.stripSuffix("@N00"))
         if (maybe_photo_id == None || maybe_owner_id == None) None
