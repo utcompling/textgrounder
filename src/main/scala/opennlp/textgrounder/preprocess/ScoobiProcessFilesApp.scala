@@ -101,6 +101,33 @@ trait ScoobiProcessFilesAction {
   }
 
   /**
+   * Report a non-fatal problem during operation, typically due to bad data
+   * of some sort.  Logs a warning and increments a counter indicating
+   * how many times this type of problem occurred. (Counters are automatically
+   * added up across all mappers and reducers, and output by Scoobi at the
+   * end of operations.)
+   *
+   * @param message Message describing the problem, without including the
+   *   particular data that triggered the problem.  This is used as the name
+   *   of the counter associated with the problem.
+   * @param tag Optional string describing the particular data that triggered
+   *   the problem.  The warning logged will be of the form `message: tag` if
+   *   the tag is non-blank; otherwise it will just be `message`. (This, of
+   *   course, is in additional to any prefix output by the logging mechanism
+   *   itself.)
+   * @return `None` (useful in the common case when a function returns
+   *   `Some(x)` on success, `None` on failure)
+   */
+  def problem(message: String, tag: String = "") = {
+    if (tag == "")
+      logger.warn(message)
+    else
+      logger.warn("%s: %s" format (message, tag))
+    bump_counter(message)
+    None
+  }
+
+  /**
    * A class used internally by `error_wrap`.
    */
   private class ErrorWrapper {
