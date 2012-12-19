@@ -415,7 +415,7 @@ abstract class GeoDocFactory[Co : Serializer](
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata")
+   *   (e.g. "-counts" or "-document-metadata")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
@@ -471,7 +471,7 @@ abstract class GeoDocFactory[Co : Serializer](
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata")
+   *   (e.g. "-counts" or "-document-metadata")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
@@ -666,7 +666,7 @@ object GeoDocFactory {
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata")
+   *   (e.g. "-counts" or "-document-metadata")
    * @return Iterator over document statuses.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,

@@ -249,16 +249,16 @@ package object textdb {
   }
 
   object Schema {
-    val schema_ending_match = """-schema\.txt"""
-    val schema_ending_make = "-schema.txt"
+    val schema_ending_re = """-schema\.txt"""
+    val schema_ending_text = "-schema.txt"
 
     /**
      * For a given suffix, create a regular expression
      * ([[scala.util.matching.Regex]]) that matches schema files of the
      * suffix.
      */
-    def make_schema_file_suffix_regex(suffix: String) =
-      TextDB.make_textdb_file_suffix_regex(suffix, schema_ending_match)
+    def make_schema_file_suffix_regex(suffix_re: String) =
+      TextDB.make_textdb_file_suffix_regex(suffix_re, schema_ending_re)
 
     /**
      * Construct the name of a schema file, based on the given file handler,
@@ -267,7 +267,7 @@ package object textdb {
     def construct_schema_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String) =
       TextDB.construct_textdb_file(filehand, dir, prefix,
-        suffix, schema_ending_make)
+        suffix, schema_ending_text)
 
     /**
      * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
@@ -276,14 +276,15 @@ package object textdb {
      * the return value will be ("foo", "bar-1", "-tweets", "-schema.txt").
      */
     def split_schema_file(filehand: FileHandler, file: String,
-        suffix: String): Option[(String, String, String, String)] =
-      TextDB.split_textdb_file(filehand, file, suffix, schema_ending_match)
+        suffix_re: String): Option[(String, String, String, String)] =
+      TextDB.split_textdb_file(filehand, file, suffix_re, schema_ending_re)
 
     /**
      * Locate the schema file of the appropriate suffix in the given directory.
      */
-    def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
-      val schema_regex = make_schema_file_suffix_regex(suffix)
+    def find_schema_file(filehand: FileHandler, dir: String,
+        suffix_re: String) = {
+      val schema_regex = make_schema_file_suffix_regex(suffix_re).r
       val all_files = filehand.list_files(dir)
       val files =
         (for (file <- all_files
@@ -340,8 +341,8 @@ package object textdb {
      * given directory.
      */
     def read_schema_from_textdb(filehand: FileHandler, dir: String,
-          suffix: String) = {
-      val schema_file = find_schema_file(filehand, dir, suffix)
+          suffix_re: String) = {
+      val schema_file = find_schema_file(filehand, dir, suffix_re)
       read_schema_file(filehand, schema_file)
     }
 
@@ -371,19 +372,18 @@ package object textdb {
       possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
     // For the moment, allow the "-data" part to be omitted, because formerly
     // it wasn't present.
-    val data_ending_match = """(?:-data)?\.txt"""
-    val data_ending_make = "-data.txt"
+    val data_ending_re = """(?:-data)?\.txt"""
+    val data_ending_text = "-data.txt"
 
     /**
      * For a given suffix and file ending, create a regular expression
-     * ([[scala.util.matching.Regex]]) that matches corresponding files.
+     * ([[scala.util.matching.Regex]]) that matches corresponding files,
+     * with groups for matching the suffix and actual file ending.
      */
-    def make_textdb_file_suffix_regex(suffix: String, file_ending: String) = {
-      // val re_quoted_suffix = """-%s\.txt""" format suffix
-      val re_quoted_suffix =
-        """(-%s)(%s%s)$""" format (suffix, file_ending, possible_compression_re)
-      re_quoted_suffix.r
-    }
+    def make_textdb_file_suffix_regex(suffix_re: String,
+        file_ending_re: String) =
+      """(%s)(%s%s)$""" format (suffix_re, file_ending_re,
+        possible_compression_re)
 
     /**
      * Construct the name of a file (either schema or data file), based
@@ -393,7 +393,7 @@ package object textdb {
      */
     def construct_textdb_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String, file_ending: String) = {
-      val new_base = prefix + "-" + suffix + file_ending
+      val new_base = prefix + suffix + file_ending
       filehand.join_filename(dir, new_base)
     }
 
@@ -402,8 +402,8 @@ package object textdb {
      * ([[scala.util.matching.Regex]]) that matches data files of the
      * suffix.
      */
-    def make_data_file_suffix_regex(suffix: String) =
-      make_textdb_file_suffix_regex(suffix, data_ending_match)
+    def make_data_file_suffix_regex(suffix_re: String) =
+      make_textdb_file_suffix_regex(suffix_re, data_ending_re)
 
     /**
      * Construct the name of a data file, based on the given file handler,
@@ -412,25 +412,27 @@ package object textdb {
      */
     def construct_data_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String) =
-      construct_textdb_file(filehand, dir, prefix, suffix, data_ending_make)
+      construct_textdb_file(filehand, dir, prefix, suffix, data_ending_text)
 
     /**
      * Split the name of a textdb file into (DIR, PREFIX, SUFFIX, ENDING).
-     * The suffix needs to be given, along with the file ending, not
-     * including any compression ending.  For example, if the suffix is
-     * "tweets" and the file ending is "-data.txt", and the file is named
+     * Regular expressions matching the suffix and file ending need to be given,
+     * although the resulting regexp will be extended to allow for any
+     * compression ending (e.g. ".gz"). For example, if the suffix is
+     * "-tweets" and the file ending is "-data.txt", and the file is named
      * "foo/bar-1-tweets-data.txt.gz", the return value will be
      * ("foo", "bar-1", "-tweets", "-data.txt.gz").
      */
     def split_textdb_file(filehand: FileHandler, file: String,
-      suffix: String, file_ending: String
+      suffix_re: String, file_ending_re: String
     ): Option[(String, String, String, String)] = {
       val (dir, base) = filehand.split_filename(file)
-      val re = ("""^(.*)(-%s)(%s%s)$""" format
-        (suffix, file_ending, possible_compression_re)).r
+      val full_suffix_re =
+        make_textdb_file_suffix_regex(suffix_re, file_ending_re)
+      val re = ("""^(.*)""" + full_suffix_re).r
       base match {
-        case re(prefix, suffix1, ending1) =>
-          Some(dir, prefix, suffix1, ending1)
+        case re(prefix, suffix, ending) =>
+          Some(dir, prefix, suffix, ending)
         case _ => None
       }
     }
@@ -438,18 +440,18 @@ package object textdb {
     /**
      * Split the name of a textdb data file into (DIR, PREFIX, SUFFIX,
      * ENDING). The suffix needs to be given. For example, if the suffix
-     * is "tweets" and the file is named "foo/bar-1-tweets-data.txt.gz",
+     * is "-tweets" and the file is named "foo/bar-1-tweets-data.txt.gz",
      * the return value will be ("foo", "bar-1", "-tweets", "-data.txt.gz").
      */
-    def split_data_file(filehand: FileHandler, file: String,
-        suffix: String): Option[(String, String, String, String)] =
-      split_textdb_file(filehand, file, suffix, data_ending_match)
+    def split_data_file(filehand: FileHandler, file: String, suffix_re: String
+        ): Option[(String, String, String, String)] =
+      split_textdb_file(filehand, file, suffix_re, data_ending_re)
 
     /**
      * List only the data files of the appropriate suffix.
      */
-    def filter_file_by_suffix(file: String, suffix: String) = {
-      val filter = make_data_file_suffix_regex(suffix)
+    def filter_file_by_suffix(file: String, suffix_re: String) = {
+      val filter = make_data_file_suffix_regex(suffix_re).r
       filter.findFirstMatchIn(file) != None
     }
 
@@ -463,7 +465,7 @@ package object textdb {
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
-     * @param suffix Suffix picking out the correct data files
+     * @param suffix_re Suffix regexp picking out the correct data files
      * @param with_message If true, "Processing ..." messages will be
      *   displayed as each file is processed and as each directory is visited
      *   during processing.
@@ -472,10 +474,10 @@ package object textdb {
      *   corpus and `files` is an iterator over data files.
      */
     def get_textdb_files(filehand: FileHandler, dir: String,
-        suffix: String, with_messages: Boolean = true) = {
-      val schema = Schema.read_schema_from_textdb(filehand, dir, suffix)
+        suffix_re: String, with_messages: Boolean = true) = {
+      val schema = Schema.read_schema_from_textdb(filehand, dir, suffix_re)
       val files = iter_files_recursively(filehand, Iterable(dir)).
-          filter(filter_file_by_suffix(_, suffix))
+          filter(filter_file_by_suffix(_, suffix_re))
       val files_with_message =
         if (with_messages)
           iter_files_with_message(filehand, files)
@@ -491,7 +493,7 @@ package object textdb {
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
-     * @param suffix Suffix picking out the correct data files
+     * @param suffix_re Suffix regexp picking out the correct data files
      * @param with_message If true, "Processing ..." messages will be
      *   displayed as each file is processed and as each directory is visited
      *   during processing.
@@ -502,9 +504,9 @@ package object textdb {
      *   if some rows were badly formatted.)
      */
     def read_textdb(filehand: FileHandler, dir: String,
-        suffix: String, with_messages: Boolean = true) = {
+        suffix_re: String, with_messages: Boolean = true) = {
       val (schema, fields) =
-        read_textdb_with_schema(filehand, dir, suffix, with_messages)
+        read_textdb_with_schema(filehand, dir, suffix_re, with_messages)
       fields
     }
 
@@ -526,9 +528,9 @@ package object textdb {
      *   iterator of iterators of fields.
      */
     def read_textdb_with_schema(filehand: FileHandler, dir: String,
-        suffix: String, with_messages: Boolean = true) = {
+        suffix_re: String, with_messages: Boolean = true) = {
       val (schema, files) =
-        get_textdb_files(filehand, dir, suffix, with_messages)
+        get_textdb_files(filehand, dir, suffix_re, with_messages)
       val fields = files.map(read_textdb_file(filehand, _, schema))
       (schema, fields)
     }
@@ -544,17 +546,21 @@ package object textdb {
      * files in the given directory with the given suffix (including compressed
      * files).
      */
-    def get_matching_patterns(filehand: FileHandler, dir: String,
-        suffix: String) = {
+    def textdb_file_matching_patterns(filehand: FileHandler, dir: String,
+        suffix: String, file_ending: String) = {
       val possible_endings = Seq("") ++ possible_compression_endings
       for {ending <- possible_endings
-           full_ending = "-%s.txt%s" format (suffix, ending)
+           full_ending = "%s%s" format (suffix, file_ending)
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
            all_files = filehand.list_files(dir)
            files = all_files.filter(_ endsWith full_ending)
            if files.size > 0}
         yield pattern
     }
+
+    def data_file_matching_patterns(filehand: FileHandler, dir: String,
+        suffix: String) =
+      textdb_file_matching_patterns(filehand, dir, suffix, data_ending_text)
   }
 
   /**
@@ -595,8 +601,7 @@ package object textdb {
      */
     def open_data_file(filehand: FileHandler, dir: String,
         prefix: String, compression: String = "none") = {
-      val file = TextDB.construct_data_file(filehand, dir, prefix,
-        suffix)
+      val file = TextDB.construct_data_file(filehand, dir, prefix, suffix)
       filehand.openw(file, compression = compression)
     }
 
@@ -611,10 +616,10 @@ package object textdb {
       schema.output_constructed_schema_file(filehand, dir, prefix, suffix)
   }
 
-  val document_metadata_suffix = "document-metadata"
-  val unigram_counts_suffix = "unigram-counts"
-  val ngram_counts_suffix = "ngram-counts"
-  val text_suffix = "text"
+  val document_metadata_suffix = "-document-metadata"
+  val unigram_counts_suffix = "-unigram-counts"
+  val ngram_counts_suffix = "-ngram-counts"
+  val text_suffix = "-text"
 
   class EncodeDecode(val chars_to_encode: Iterable[Char]) {
     private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r

@@ -231,7 +231,7 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
 
   val operation_category = "Driver"
 
-  def corpus_suffix = "cophir"
+  def corpus_suffix = "-cophir"
 
   /**
    * Compute name of corpus, derived either from explicitly specified
@@ -332,21 +332,21 @@ object ConvertCophir
     // move/rename data files
     val corpsuff = ccd.corpus_suffix
     rename_output_files(filehand, opts.output,
-      opts.corpus_name, "training-" + corpsuff)
+      opts.corpus_name, "-training" + corpsuff)
     move_output_files(filehand, dev_srcdir, opts.output,
-      opts.corpus_name, "dev-" + corpsuff)
+      opts.corpus_name, "-dev" + corpsuff)
     move_output_files(filehand, test_srcdir, opts.output,
-      opts.corpus_name, "test-" + corpsuff)
+      opts.corpus_name, "-test" + corpsuff)
 
     // output schema files
     schema.clone_with_changes(Map("split"->"training")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "training-" + corpsuff)
+        opts.corpus_name, "-training" + corpsuff)
     schema.clone_with_changes(Map("split"->"dev")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "dev-" + corpsuff)
+        opts.corpus_name, "-dev" + corpsuff)
     schema.clone_with_changes(Map("split"->"test")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "test-" + corpsuff)
+        opts.corpus_name, "-test" + corpsuff)
   }
 }

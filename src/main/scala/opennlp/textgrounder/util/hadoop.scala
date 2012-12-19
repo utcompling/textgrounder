@@ -236,12 +236,12 @@ package object hadoop {
     }
   }
 
-  trait HadoopTextDBApp extends HadoopExperimentDriverApp {
-    // driver.params.eval_set + "-" + driver.document_file_suffix
+  trait HadoopTextDBMixin {
     def corpus_suffix: String
-
     def corpus_dirs: Iterable[String]
+  }
 
+  trait HadoopTextDBApp extends HadoopExperimentDriverApp with HadoopTextDBMixin {
     def initialize_hadoop_input(job: Job) {
       /* A very simple file processor that does nothing but note the files
          seen, for Hadoop's benefit. */

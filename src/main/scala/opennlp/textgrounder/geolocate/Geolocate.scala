@@ -760,8 +760,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
             val docstats =
               params.input_corpus.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
-                  get_file_handler, dir,
-                  params.eval_set + "-" + document_file_suffix))
+                  get_file_handler, dir, document_textdb_suffix))
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(docstats)
           }

@@ -987,6 +987,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       textdb.unigram_counts_suffix
   }
 
+  /**
+   * Suffix to pass when locating/reading files from a textdb database of
+   * documents.
+   */
+  def document_textdb_suffix = "-" + params.eval_set + document_file_suffix
+
   protected def read_stopwords() = {
     Stopwords.read_stopwords(get_file_handler, params.stopwords_file,
       params.language)
@@ -1061,7 +1067,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         maxitems = params.num_training_docs)
     val dociter = params.input_corpus.toIterator.flatMap(dir =>
         GeoDocFactory.read_raw_documents_from_textdb(get_file_handler,
-          dir, "training-" + document_file_suffix))
+          dir, "-training" + document_file_suffix))
     for (doc <- task.iterate(dociter)) yield {
       val sleep_at = debugval("sleep-at-docs")
       if (sleep_at != "") {

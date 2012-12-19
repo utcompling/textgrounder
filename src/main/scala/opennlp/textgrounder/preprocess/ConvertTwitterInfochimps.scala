@@ -527,7 +527,7 @@ class ConvertTwitterInfochimpsDriver extends
         process_files(filehand, params.files)
     else {
       super.run()
-      new ConvertTwitterInfochimpsFileProcessor(params, "text").
+      new ConvertTwitterInfochimpsFileProcessor(params, "-text").
         process_files(filehand, params.files)
     }
   }
