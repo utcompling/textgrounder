@@ -1995,7 +1995,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def corpus_suffix = {
       val dist_type = if (opts.max_ngram == 1) "unigram" else "ngram"
-      "%s-%s-counts-tweets" format (opts.split, dist_type)
+      "-%s-%s-counts-tweets" format (opts.split, dist_type)
     }
 
     /**
@@ -2071,10 +2071,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val lines: DList[(String, String)] = {
       opts.input_format match {
         case "textdb" => {
-          val insuffix = "tweets"
+          val insuffix = "-tweets"
           opts.input_schema = Schema.read_schema_from_textdb(
             filehand, opts.input, insuffix)
-          val matching_patterns = TextDB.get_matching_patterns(
+          val matching_patterns = TextDB.data_file_matching_patterns(
             filehand, opts.input, insuffix)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
@@ -2099,7 +2099,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def local_output_rows(fields: Iterable[String],
         rows: Iterable[Iterable[String]], corpus_suffix: String) = {
       // get output directory
-      val outdir = opts.output + "-" + corpus_suffix
+      val outdir = opts.output + corpus_suffix
 
       // output data file
       filehand.make_directories(outdir)
@@ -2142,7 +2142,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
         local_output_rows(FeatureStats.row_fields, by_type.map(_.to_row(opts)),
-          "stats")
+          "-stats")
         val userstat = by_type.filter(x =>
           x.ty == "user" && x.key2 == "user").toSeq(0)
         errprint("\nCombined summary:")

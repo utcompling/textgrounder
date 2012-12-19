@@ -46,14 +46,14 @@ class FrobTextDBParameters(ap: ArgParser) extends
     ap.option[String]("s", "input-suffix",
       metavar = "DIR",
       help = """Suffix used to select the appropriate files to operate on.
-Defaults to 'unigram-counts' unless --convert-to-unigram-counts is given,
-in which case it defaults to 'text'.""")
+Defaults to '-unigram-counts' unless --convert-to-unigram-counts is given,
+in which case it defaults to '-text'.""")
   var output_suffix =
     ap.option[String]("output-suffix",
       metavar = "DIR",
       help = """Suffix used when generating the output files.  Defaults to
 the value of --input-suffix, unless --convert-to-unigram-counts is given,
-in which case it defaults to 'unigram-counts'.""")
+in which case it defaults to '-unigram-counts'.""")
   val add_field =
     ap.multiOption[String]("a", "add-field",
       metavar = "FIELD=VALUE",
@@ -304,11 +304,11 @@ class FrobTextDBDriver extends
     }
     if (params.input_suffix == null)
       params.input_suffix =
-        if (params.convert_to_unigram_counts) "text"
-        else "unigram-counts"
+        if (params.convert_to_unigram_counts) "-text"
+        else "-unigram-counts"
     if (params.output_suffix == null)
       params.output_suffix =
-        if (params.convert_to_unigram_counts) "unigram-counts"
+        if (params.convert_to_unigram_counts) "-unigram-counts"
         else params.input_suffix
     super.handle_parameters()
   }

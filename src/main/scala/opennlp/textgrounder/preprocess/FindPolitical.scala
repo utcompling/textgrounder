@@ -514,11 +514,11 @@ object FindPolitical extends
       }
     // errprint("Accounts: %s", accounts)
 
-    val suffix = "tweets"
+    val suffix = "-tweets"
     opts.schema = Schema.read_schema_from_textdb(filehand, opts.input, suffix)
 
     def output_directory_for_suffix(corpus_suffix: String) =
-      opts.output + "-" + corpus_suffix
+      opts.output + corpus_suffix
 
     /**
      * For the given sequence of lines and related info for writing output a
@@ -540,7 +540,7 @@ object FindPolitical extends
       val fixed_fields =
         Map("corpus-name" -> opts.corpus_name,
             "generating-app" -> "FindPolitical",
-            "corpus-type" -> "twitter-%s".format(corpus_suffix)) ++
+            "corpus-type" -> "twitter%s".format(corpus_suffix)) ++
         opts.non_default_params_string.toMap ++
         Map(
           "ideological-ref-type" -> opts.ideological_ref_type,
@@ -554,8 +554,8 @@ object FindPolitical extends
     var ideo_users: DList[IdeologicalUser] = null
 
     val ideo_fact = new IdeologicalUserAction(opts)
-    val matching_patterns = TextDB.
-        get_matching_patterns(filehand, opts.input, suffix)
+    val matching_patterns =
+      TextDB.data_file_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 
     errprint("Step 1, pass 0: %d ideological users on input",
@@ -578,7 +578,7 @@ object FindPolitical extends
     }
 
     val (ideo_users_persist, ideo_users_fixup) =
-      output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
+      output_lines(ideo_users.map(_.to_row(opts)), "-ideo-users",
         ideo_fact.row_fields)
     /* This is a separate function because including it inline in the for loop
        below results in a weird deserialization error. */
@@ -591,7 +591,7 @@ object FindPolitical extends
         combine(PoliticalFeature.merge_political_features).
         map(_._2)
       output_lines(political_features.map(_.to_row(opts)),
-        "political-features-%s" format ty, PoliticalFeature.row_fields)
+        "-political-features-%s" format ty, PoliticalFeature.row_fields)
     }
 
     errprint("Step 2: Generate political features.")

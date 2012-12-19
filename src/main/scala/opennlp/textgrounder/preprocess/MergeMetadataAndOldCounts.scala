@@ -194,12 +194,10 @@ counts file also containing the metadata.
         document_metadata_suffix)
 
     if (params.output_file_prefix == null) {
-      var (_, base) = filehand.split_filename(schema.filename)
-      params.output_file_prefix = base.replaceAll("-[^-]*$", "")
-      params.output_file_prefix =
-        params.output_file_prefix.stripSuffix("-document-metadata")
-      errprint("Setting new output-file prefix to '%s'",
-        params.output_file_prefix)
+      var (_, prefix, _, _) = Schema.split_schema_file(filehand, schema.filename,
+        document_metadata_suffix).get
+      errprint("Setting new output-file prefix to '%s'", prefix)
+      params.output_file_prefix = prefix
     }
 
     val document_fieldvals =

@@ -165,15 +165,19 @@ import gridlocate._
 /*                  General Hadoop code for Geolocate app               */
 /************************************************************************/
    
+trait HadoopGeolocateTextDBMixin extends HadoopTextDBMixin {
+  type TDriver <: HadoopGeolocateDriver
+  val driver: TDriver
+
+  def corpus_suffix = driver.document_textdb_suffix
+  def corpus_dirs = driver.params.input_corpus
+}
+
 abstract class HadoopGeolocateApp(
   progname: String
-) extends GeolocateApp(progname) with HadoopTextDBApp {
-  override type TDriver <: HadoopGeolocateDriver
-
-  def corpus_suffix =
-    driver.params.eval_set + "-" + driver.document_file_suffix
-  def corpus_dirs = params.input_corpus
-
+) extends GeolocateApp(progname)
+    with HadoopTextDBApp
+    with HadoopGeolocateTextDBMixin {
   override def initialize_hadoop_input(job: Job) {
     super.initialize_hadoop_input(job)
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
@@ -198,8 +202,9 @@ variable (e.g. in Hadoop).""")
  * @see HadoopGeolocateDriver
  */
 
-trait HadoopGeolocateDriver extends
-    GeolocateDriver with HadoopExperimentDriver {
+trait HadoopGeolocateDriver
+    extends GeolocateDriver
+       with HadoopExperimentDriver {
   override type TParam <: HadoopGeolocateParameters
 
   override def handle_parameters() {
@@ -213,9 +218,10 @@ trait HadoopGeolocateDriver extends
 /*                Hadoop implementation of geolocate-document           */
 /************************************************************************/
 
-class DocEvalMapper extends
-    Mapper[Object, Text, Text, DoubleWritable] with
-    HadoopExperimentMapReducer {
+class DocEvalMapper
+    extends Mapper[Object, Text, Text, DoubleWritable]
+       with HadoopExperimentMapReducer
+       with HadoopGeolocateTextDBMixin {
   def progname = HadoopGeolocateDocumentApp.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
   type TDriver = HadoopGeolocateDocDriver
@@ -239,8 +245,7 @@ class DocEvalMapper extends
     val ranker = driver.create_ranker
     context.progress
     val schema = Schema.read_schema_from_textdb(filehand,
-      driver.params.input_corpus(0),
-      driver.params.eval_set + "-" + driver.document_file_suffix)
+      corpus_dirs(0), corpus_suffix)
     context.progress
 
     class HadoopIterator extends Iterator[(FileHandler, String, String, Long)] {
