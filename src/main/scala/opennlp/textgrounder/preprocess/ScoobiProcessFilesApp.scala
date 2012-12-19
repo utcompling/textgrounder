@@ -92,7 +92,12 @@ trait ScoobiProcessFilesAction {
   }
 
   def bump_counter(counter: String, amount: Long = 1) {
-    incrCounter(full_operation_category, counter, amount)
+    // HACK!! Fix this by fixing Scoobi.
+    try {
+      incrCounter(full_operation_category, counter, amount)
+    } catch {
+      case e:IllegalStateException => ()
+    }
   }
 
   /**
