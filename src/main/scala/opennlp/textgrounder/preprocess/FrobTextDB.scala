@@ -260,7 +260,7 @@ class FrobTextDBProcessor(
       params.input_suffix)
     for (file <- files) {
       current_document_prefix = TextDBProcessor.get_document_prefix(
-        filehand, dir, params.input_suffix)
+        filehand, file, params.input_suffix)
       for (fieldvals <-
           TextDBProcessor.read_textdb_file(filehand, file, schema))
         process_row(schema, fieldvals)
