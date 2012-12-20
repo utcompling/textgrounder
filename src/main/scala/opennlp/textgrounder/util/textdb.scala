@@ -91,8 +91,11 @@ package object textdb {
     val fixed_values: Map[String, String] = Map[String, String](),
     val split_text: String = "\t"
   ) {
-
     import Serializer._
+
+    override def toString =
+      "Schema(%s, %s, %s)" format (
+        fieldnames, fixed_values, split_text)
 
     val split_re = "\\Q" + split_text + "\\E"
     val field_indices = fieldnames.zipWithIndex.toMap
@@ -217,7 +220,11 @@ package object textdb {
     fieldnames: Iterable[String],
     fixed_values: Map[String, String] = Map[String, String](),
     split_text: String = "\t"
-  ) extends Schema(fieldnames, fixed_values, split_text) { }
+  ) extends Schema(fieldnames, fixed_values, split_text) {
+    override def toString =
+      "SchemaFromFile(%s, %s, %s, %s, %s)" format (
+        filehand, filename, fieldnames, fixed_values, split_text)
+  }
 
   /**
    * A Schema that can be used to select some fields from a larger schema.
