@@ -188,10 +188,6 @@ class PoligrounderDriver extends
     super.handle_parameters()
   }
 
-  override def document_file_suffix = {
-    super.document_file_suffix + "-tweets"
-  }
-
   protected def create_document_factory(word_dist_factory: WordDistFactory) =
     new TimeDocFactory(this, word_dist_factory)
 

@@ -261,7 +261,11 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'text': Actual text of all tweets, separate by >> signs
 
-    'counts': All words, with counts
+    'unigram-counts': All words, with counts
+
+    'ngram-counts': All n-grams, with counts
+
+    'counts': 'ngram-counts' if --max-ngram > 1, else 'unigram-counts' 
 
     The default is as follows:
     
@@ -302,7 +306,7 @@ Look for any tweets containing the word "clinton" as well as either the words
   import ParseTweets.Tweet
 
   private def match_field(field: String) =
-    if (Tweet.all_fields contains field)
+    if (Tweet.possible_fields contains field)
       Some(Seq(field))
     else if (field == "big-fields")
       Some(Tweet.big_fields)
@@ -356,8 +360,12 @@ Look for any tweets containing the word "clinton" as well as either the words
         }
       }
     }
-    incfields.toSeq
+    incfields.toSeq map {
+      case "counts" => if (max_ngram > 1) "ngram-counts" else "unigram-counts"
+      case x => x
+    }
   }
+
   var included_fields: Iterable[String] = _
   var input_schema: Schema = _
 
@@ -473,7 +481,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "hashtags" => count_map(hashtags)
           case "urls" => count_map(urls)
           case "text" => seq_string(text)
-          case "counts" => tokenize_act.emit_ngrams(text)
+          case "unigram-counts" => tokenize_act.emit_unigrams(text)
+          case "ngram-counts" => tokenize_act.emit_ngrams(text)
         }
       }
     }
@@ -492,13 +501,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     val all_fields = small_fields ++ big_fields
 
+    val possible_fields = all_fields ++ Seq("unigram-counts", "ngram-counts")
+
     def default_fields(opts: ParseTweetsParams) = {
       if (opts.input_format == "raw-lines")
         Seq("path", "numtweets", "text", "counts")
       else if (opts.grouping == "file")
         small_fields
       else
-        all_fields
+        small_fields ++ big_fields
     }
 
     def row_fields(opts: ParseTweetsParams) = opts.included_fields
@@ -1643,7 +1654,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     /**
      * Use Twokenize to break up a tweet into tokens and separate into ngrams.
      */
-    def break_tweet_into_ngrams(text: String):
+    def break_tweet_into_ngrams(text: String, max_ngram: Int):
         Iterable[Iterable[String]] = {
       val words = Twokenize(text)
       val normwords = words.map(normalize_word)
@@ -1655,20 +1666,36 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       // generate all 1-grams, then all 2-grams, etc. up to the maximum size,
       // and then concatenate the separate lists together (that's what `flatMap`
       // does).
-      (1 to opts.max_ngram).
+      (1 to max_ngram).
         flatMap(normwords.sliding(_)).filter(!reject_ngram(_))
     }
 
     /**
-     * Tokenize a tweet text string into ngrams and count them, emitting
-     * the word-count pairs encoded into a string.
+     * Tokenize a tweet text string into ngrams up to a maximum specified
+     * size and count them, emitting the word-count pairs encoded into a
+     * string.
      */
-    def emit_ngrams(tweet_text: Iterable[String]): String = {
+    def emit_ngrams(tweet_text: Iterable[String], max_ngram: Int): String = {
       val ngrams =
-        tweet_text.flatMap(break_tweet_into_ngrams(_)).toSeq.
+        tweet_text.flatMap(break_tweet_into_ngrams(_, max_ngram)).toSeq.
           map(encode_ngram_for_count_map_field)
       shallow_encode_count_map(list_to_item_count_map(ngrams).toSeq)
     }
+
+    /**
+     * Tokenize a tweet text string into ngrams up to the size given in
+     * --max-ngram and count them, emitting the word-count pairs encoded
+     * into a string.
+     */
+    def emit_ngrams(tweet_text: Iterable[String]): String =
+      emit_ngrams(tweet_text, opts.max_ngram)
+
+    /**
+     * Tokenize a tweet text string into unigrams and count them, emitting
+     * the word-count pairs encoded into a string.
+     */
+    def emit_unigrams(tweet_text: Iterable[String]): String =
+      emit_ngrams(tweet_text, 1)
 
     /**
      * Given a tweet, tokenize the text into ngrams, count words and format
@@ -1993,11 +2020,6 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     val operation_category = "Driver"
 
-    def corpus_suffix = {
-      val dist_type = if (opts.max_ngram == 1) "unigram" else "ngram"
-      "-%s-%s-counts-tweets" format (opts.split, dist_type)
-    }
-
     /**
      * Create a schema for the data to be output.
      */
@@ -2071,11 +2093,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val lines: DList[(String, String)] = {
       opts.input_format match {
         case "textdb" => {
-          val insuffix = "-tweets"
           opts.input_schema = Schema.read_schema_from_textdb(
-            filehand, opts.input, insuffix)
+            filehand, opts.input)
           val matching_patterns = TextDB.data_file_matching_patterns(
-            filehand, opts.input, insuffix)
+            filehand, opts.input)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
         case "json" | "raw-lines"  => TextInput.fromTextFileWithPath(opts.input)
@@ -2088,41 +2109,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     /* Maybe group tweets */
     val tweets = new GroupTweets(opts)(tweets1)
 
-    /**
-     * Output rows of data to a corpus.
-     *
-     * @param fields List of names of fields in data.
-     * @param rows Iterable over rows, each described by a list of field values.
-     *    There must be as many values per row as there are fields.
-     * @param corpus_suffix Suffix used in naming the corpus files.
-     */
-    def local_output_rows(fields: Iterable[String],
-        rows: Iterable[Iterable[String]], corpus_suffix: String) = {
-      // get output directory
-      val outdir = opts.output + corpus_suffix
-
-      // output data file
-      filehand.make_directories(outdir)
-      val outfile = TextDB.construct_data_file(filehand, outdir,
-        opts.corpus_name, corpus_suffix)
-      val outstr = filehand.openw(outfile)
-      lines.map(outstr.println(_))
-      outstr.close()
-
-      // output schema file
-      val out_schema =
-        new Schema(fields, Map("corpus-name" -> opts.corpus_name))
-      out_schema.output_constructed_schema_file(filehand, outdir,
-        opts.corpus_name, corpus_suffix)
-      outdir
-    }
-
     opts.output_format match {
       case "json" => {
         /* We're outputting JSON's directly. */
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
-        rename_output_files(filehand, opts.output, opts.corpus_name,
-          ptd.corpus_suffix)
+        rename_output_files(filehand, opts.output, opts.corpus_name)
       }
 
       case "textdb" => {
@@ -2133,7 +2124,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val nicely_formatted = tweets.map { tw =>
           schema.make_row(tfct.tokenize_count_and_format(tw)) }
         dlist_output_textdb(schema, nicely_formatted, filehand, opts.output,
-          opts.corpus_name, ptd.corpus_suffix)
+          opts.corpus_name)
       }
 
       case "stats" => {
@@ -2141,8 +2132,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
-        local_output_rows(FeatureStats.row_fields, by_type.map(_.to_row(opts)),
-          "-stats")
+        val schema = new Schema(FeatureStats.row_fields,
+          Map("corpus-name" -> opts.corpus_name,
+              "corpus-type" -> "tweet-stats"))
+        local_output_textdb(schema,
+          by_type.map(x => schema.make_row(x.to_row(opts))),
+          filehand, opts.output + "-tweet-stats", opts.corpus_name)
         val userstat = by_type.filter(x =>
           x.ty == "user" && x.key2 == "user").toSeq(0)
         errprint("\nCombined summary:")

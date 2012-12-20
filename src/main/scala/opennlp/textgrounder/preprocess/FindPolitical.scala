@@ -504,7 +504,7 @@ object FindPolitical extends
       else {
         val (schema, field_iter) =
           TextDB.read_textdb_with_schema(filehand,
-            opts.political_twitter_accounts, "ideo-users")
+            opts.political_twitter_accounts)
         (for (fieldvals <- field_iter.flatten) yield {
           val user = schema.get_field(fieldvals, "user")
           val ideology =
@@ -514,33 +514,32 @@ object FindPolitical extends
       }
     // errprint("Accounts: %s", accounts)
 
-    val suffix = "-tweets"
-    opts.schema = Schema.read_schema_from_textdb(filehand, opts.input, suffix)
+    opts.schema = Schema.read_schema_from_textdb(filehand, opts.input)
 
-    def output_directory_for_suffix(corpus_suffix: String) =
-      opts.output + corpus_suffix
+    def output_directory_for_corpus_type(corpus_type: String) =
+      opts.output + "-" + corpus_type
 
     /**
      * For the given sequence of lines and related info for writing output a
      * corpus, return a tuple of two thunks: One for persisting the data,
      * the other for fixing up the data into a proper corpus.
      */
-    def output_lines(lines: DList[String], corpus_suffix: String,
+    def output_lines(lines: DList[String], corpus_type: String,
         fields: Iterable[String]) = {
-      val outdir = output_directory_for_suffix(corpus_suffix)
+      val outdir = output_directory_for_corpus_type(corpus_type)
       (TextOutput.toTextFile(lines, outdir), () => {
-        rename_output_files(filehand, outdir, opts.corpus_name, corpus_suffix)
-        output_schema_for_suffix(corpus_suffix, fields)
+        rename_output_files(filehand, outdir, opts.corpus_name)
+        output_schema_for_corpus_type(corpus_type, fields)
       })
     }
 
-    def output_schema_for_suffix(corpus_suffix: String,
+    def output_schema_for_corpus_type(corpus_type: String,
         fields: Iterable[String]) {
-      val outdir = output_directory_for_suffix(corpus_suffix)
+      val outdir = output_directory_for_corpus_type(corpus_type)
       val fixed_fields =
         Map("corpus-name" -> opts.corpus_name,
             "generating-app" -> "FindPolitical",
-            "corpus-type" -> "twitter%s".format(corpus_suffix)) ++
+            "corpus-type" -> "twitter-%s".format(corpus_type)) ++
         opts.non_default_params_string.toMap ++
         Map(
           "ideological-ref-type" -> opts.ideological_ref_type,
@@ -548,14 +547,14 @@ object FindPolitical extends
         )
       val out_schema = new Schema(fields, fixed_fields)
       out_schema.output_constructed_schema_file(filehand, outdir,
-        opts.corpus_name, corpus_suffix)
+        opts.corpus_name)
     }
 
     var ideo_users: DList[IdeologicalUser] = null
 
     val ideo_fact = new IdeologicalUserAction(opts)
     val matching_patterns =
-      TextDB.data_file_matching_patterns(filehand, opts.input, suffix)
+      TextDB.data_file_matching_patterns(filehand, opts.input)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 
     errprint("Step 1, pass 0: %d ideological users on input",
@@ -578,7 +577,7 @@ object FindPolitical extends
     }
 
     val (ideo_users_persist, ideo_users_fixup) =
-      output_lines(ideo_users.map(_.to_row(opts)), "-ideo-users",
+      output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
         ideo_fact.row_fields)
     /* This is a separate function because including it inline in the for loop
        below results in a weird deserialization error. */
@@ -591,7 +590,7 @@ object FindPolitical extends
         combine(PoliticalFeature.merge_political_features).
         map(_._2)
       output_lines(political_features.map(_.to_row(opts)),
-        "-political-features-%s" format ty, PoliticalFeature.row_fields)
+        "political-features-%s" format ty, PoliticalFeature.row_fields)
     }
 
     errprint("Step 2: Generate political features.")

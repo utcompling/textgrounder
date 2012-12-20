@@ -2,14 +2,14 @@
 
 # Usage: convert-old-docfile-to-metadata-schema-and-file [--no-dir-prefix] DIR ...
 
-# For a given dir, split the old document-data file into a document metadata
+# For a given dir, split the old document-info file into a document metadata
 # file and associated schema.  Specifically:
 #
-# -- Find the document-data file (possibly compressed); note its compression.
+# -- Find the document-info file (possibly compressed); note its compression.
 # -- Generate a new document-metadata file by removing the first line (which
 #    contains the schema).
 # -- Output that first line to a corresponding schema file.
-# -- In the process, keep the compression of the original document-data file.
+# -- In the process, keep the compression of the original document-info file.
 #
 # If --no-dir-prefix, don't include the directory as part of the prefix.
 
@@ -121,7 +121,7 @@ EOF
 }
 
 do_dir() {
-  suffix="-combined-document-data"
+  suffix="-combined-document-info"
   docsuffix="$suffix.txt"
   dir="$1"
   dirbase=`basename $dir`
@@ -140,11 +140,10 @@ do_dir() {
 
   mkdir -p "$output_dir"
 
-  newsuffix="-document-metadata"
-  schema_file="$output_dir/$prefix$newsuffix-schema.txt"
+  schema_file="$output_dir/$prefix-schema.txt"
   echo "Generating schema file $schema_file from $infile ..."
   uncompressfile $compression $infile | head -1 > $schema_file
-  metadata_file=`add_compression_extension $compression "$output_dir/$prefix$newsuffix.txt"`
+  metadata_file=`add_compression_extension $compression "$output_dir/$prefix-data.txt"`
   echo "Generating metadata file $metadata_file from $infile ..."
   uncompressfile $compression $infile | tail -n +2 | compressfile $compression > $metadata_file
   echo "Done."

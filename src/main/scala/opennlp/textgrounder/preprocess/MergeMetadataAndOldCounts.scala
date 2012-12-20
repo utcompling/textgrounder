@@ -133,9 +133,9 @@ class MMCUnigramWordDistHandler(
   output_dir: String,
   output_file_prefix: String
 ) extends SimpleUnigramWordDistConstructor {
-  val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
+  val new_schema = new Schema(schema.fieldnames ++ Seq("unigram-counts"),
     schema.fixed_values)
-  val writer = new TextDBWriter(new_schema, "unigram-counts")
+  val writer = new TextDBWriter(new_schema, "")
   writer.output_schema_file(filehand, output_dir, output_file_prefix)
   val outstream = writer.open_data_file(filehand, output_dir,
     output_file_prefix, compression = "bzip2")
@@ -190,12 +190,11 @@ counts file also containing the metadata.
         params.output_dir)
 
     val (schema, field_iter) =
-      TextDB.read_textdb_with_schema(filehand, params.input_dir,
-        document_metadata_suffix)
+      TextDB.read_textdb_with_schema(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {
-      var (_, prefix, _, _) = Schema.split_schema_file(filehand, schema.filename,
-        document_metadata_suffix).get
+      var (_, prefix, _, _) =
+        Schema.split_schema_file(filehand, schema.filename).get
       errprint("Setting new output-file prefix to '%s'", prefix)
       params.output_file_prefix = prefix
     }

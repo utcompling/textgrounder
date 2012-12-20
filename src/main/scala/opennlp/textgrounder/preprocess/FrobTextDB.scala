@@ -45,15 +45,14 @@ class FrobTextDBParameters(ap: ArgParser) extends
   var input_suffix =
     ap.option[String]("s", "input-suffix",
       metavar = "DIR",
+      default = "",
       help = """Suffix used to select the appropriate files to operate on.
-Defaults to '-unigram-counts' unless --convert-to-unigram-counts is given,
-in which case it defaults to '-text'.""")
+Defaults to the empty string, which will match any TextDB file.""")
   var output_suffix =
     ap.option[String]("output-suffix",
       metavar = "DIR",
       help = """Suffix used when generating the output files.  Defaults to
-the value of --input-suffix, unless --convert-to-unigram-counts is given,
-in which case it defaults to '-unigram-counts'.""")
+the value of --input-suffix.""")
   val add_field =
     ap.multiOption[String]("a", "add-field",
       metavar = "FIELD=VALUE",
@@ -85,8 +84,9 @@ action with any of the other actions, and they will be done in the right
 order.""")
   val convert_to_unigram_counts =
     ap.flag("convert-to-unigram-counts",
-      help = """If specified, convert the 'text' field to a 'counts' field
-containing unigram counts.""")
+      help = """If specified, convert the data in the 'text' field to
+unigram counts and add a new 'unigram-counts' field containing
+those counts.""")
 
   var split_field: String = null
   var max_training_val: String = null
@@ -127,12 +127,11 @@ class FrobTextDB(
     }
     if (params.convert_to_unigram_counts) {
       val text = docparams("text")
-      docparams -= "text"
-      val counts = intmap[String]()
+      val unigram_counts = intmap[String]()
       for (word <- text.split(" ", -1))
-        counts(word) += 1
-      val counts_text = encode_count_map(counts.toSeq)
-      docparams += (("counts", counts_text))
+        unigram_counts(word) += 1
+      val unigram_counts_text = encode_count_map(unigram_counts.toSeq)
+      docparams += (("unigram-counts", unigram_counts_text))
     }
     docparams.toIndexedSeq
   }
@@ -302,14 +301,8 @@ class FrobTextDBDriver extends
       params.max_training_val = training_max
       params.max_dev_val = dev_max
     }
-    if (params.input_suffix == null)
-      params.input_suffix =
-        if (params.convert_to_unigram_counts) "-text"
-        else "-unigram-counts"
     if (params.output_suffix == null)
-      params.output_suffix =
-        if (params.convert_to_unigram_counts) "-unigram-counts"
-        else params.input_suffix
+      params.output_suffix = params.input_suffix
     super.handle_parameters()
   }
 
@@ -330,9 +323,9 @@ object FrobTextDB extends
 """Modify a corpus by changing particular fields.  Fields can be added
 (--add-field) or removed (--remove-field); the "split" field can be
 set based on the value of another field (--set-split-by-value);
-the corpus can be changed from text to unigram counts
-(--convert-to-unigram-counts); and it can be divided into sub-corpora
-based on the value of a field, e.g. "split" (--split-by-field).
+unigram counts can be generated from text (--convert-to-unigram-counts);
+and it can be divided into sub-corpora based on the value of a field,
+e.g. "split" (--split-by-field).
 """
 
   def create_param_object(ap: ArgParser) = new TParam(ap)

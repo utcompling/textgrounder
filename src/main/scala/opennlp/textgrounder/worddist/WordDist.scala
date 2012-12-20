@@ -194,7 +194,8 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
 
   /**
    * Create the word distribution of a document, given the value of the field
-   * describing the distribution (typically called "counts" or "text").
+   * describing the distribution (typically called "unigram-counts" or
+   * "ngram-counts" or "text").
    *
    * @param doc Document to set the distribution of.
    * @param diststr String from the document file, describing the distribution.

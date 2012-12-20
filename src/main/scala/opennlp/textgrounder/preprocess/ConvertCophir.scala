@@ -202,7 +202,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
           val rawtags_str = Encoder.seq_string(rawtags)
           val tagprops =
             List(("rawtags", rawtags_str),
-                 ("tag-counts", emit_ngrams(rawtags)))
+                 ("unigram-counts", emit_ngrams(rawtags)))
           val filenameprops = List(("orig-filename", Encoder.string(filename)))
           Some(CophirImage(rawtags_str, owner_id, photo_id,
             idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
@@ -230,8 +230,6 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
     extends ConvertCophirAction {
 
   val operation_category = "Driver"
-
-  def corpus_suffix = "-cophir"
 
   /**
    * Compute name of corpus, derived either from explicitly specified
@@ -330,23 +328,22 @@ object ConvertCophir
       TextOutput.toTextFile(test, test_srcdir))
 
     // move/rename data files
-    val corpsuff = ccd.corpus_suffix
     rename_output_files(filehand, opts.output,
-      opts.corpus_name, "-training" + corpsuff)
+      opts.corpus_name, "-training")
     move_output_files(filehand, dev_srcdir, opts.output,
-      opts.corpus_name, "-dev" + corpsuff)
+      opts.corpus_name, "-dev")
     move_output_files(filehand, test_srcdir, opts.output,
-      opts.corpus_name, "-test" + corpsuff)
+      opts.corpus_name, "-test")
 
     // output schema files
     schema.clone_with_changes(Map("split"->"training")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-training" + corpsuff)
+        opts.corpus_name, "-training")
     schema.clone_with_changes(Map("split"->"dev")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-dev" + corpsuff)
+        opts.corpus_name, "-dev")
     schema.clone_with_changes(Map("split"->"test")).
       output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-test" + corpsuff)
+        opts.corpus_name, "-test")
   }
 }
