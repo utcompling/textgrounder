@@ -4,18 +4,18 @@ for x in ${1+"$@"}; do
   DIR="$x"
   DUMP=`basename $DIR | sed 's/.*\([a-zA-Z][a-zA-Z]wiki-[0-9]*\).*/\1/'`
   echo "For Wikipedia $DUMP in directory $DIR, of this date:"
-  DOCDATAFILE=$DIR/$DUMP-document-data.txt
+  DOCDATAFILE=$DIR/$DUMP-document-info.txt
   ls -l $DOCDATAFILE
   echo -n "Total articles in dump: "
   val=`cat $DOCDATAFILE | wc -l`
   expr $val - 1
   echo -n "Total articles, including redirects (Main namespace only): "
-  #egrep '	Main	(yes|no)	(yes|no)	(yes|no)' $DIR/$DUMP-document-data.txt | wc -l
+  #egrep '	Main	(yes|no)	(yes|no)	(yes|no)' $DIR/$DUMP-document-info.txt | wc -l
   egrep '	Main	' $DOCDATAFILE | wc -l
   echo -n "Total articles, not including redirects (Main namespace only): "
   egrep '		Main	' $DOCDATAFILE | wc -l
   echo -n "Articles with extracted coordinates, or redirects to those articles: "
-  COMBINED_DATAFILE=$DIR/$DUMP-permuted-combined-document-data.txt
+  COMBINED_DATAFILE=$DIR/$DUMP-permuted-combined-document-info.txt
   val=`cat $COMBINED_DATAFILE | wc -l`
   expr $val - 1
   echo -n "Articles with extracted coordinates: "

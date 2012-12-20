@@ -119,8 +119,8 @@ GEOTEXT_OUTPUT_DIR="$TG_CORPUS_DIR/twitter-geotext/output-40-docthresh"
 
 # The partial names of the various files we generate or read from -- i.e.
 # minus any dump prefix or path.
-ORIG_DOCUMENT_DATA_SUFFIX="document-data.txt"
-COMBINED_DOCUMENT_DATA_SUFFIX="combined-document-data.txt"
+ORIG_DOCUMENT_DATA_SUFFIX="document-info.txt"
+COMBINED_DOCUMENT_DATA_SUFFIX="combined-document-info.txt"
 COORDS_SUFFIX="coords.txt"
 COORD_COUNTS_SUFFIX="counts-only-coord-documents.txt"
 ALL_COUNTS_SUFFIX="counts-all-documents.txt"

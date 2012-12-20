@@ -35,7 +35,7 @@ At least one step must be given.
 
 Possible steps:
 
-convert-to-schema-and-document = Split the old document-data file into a
+convert-to-schema-and-document = Split the old document-info file into a
                                  document metadata file and associated schema.
 
 merge-metadata-and-old-counts = Merge metadata and old counts files into
@@ -86,11 +86,11 @@ if [ -z "$*" -o -z "$steps" ]; then
 fi
 
 if [ "$steps" = all ]; then
-  steps="convert-to-schema-and-document merge-metadata-and-old-counts frob-geotext split-by-training"
-fi
-
-if [ "$steps" = wiki ]; then
   steps="convert-to-schema-and-document merge-metadata-and-old-counts split-by-training"
+elif [ "$steps" = geotext ]; then
+  steps="convert-to-schema-and-document merge-metadata-and-old-counts frob-geotext split-by-training"
+elif [ "$steps" = wiki ]; then
+  steps="convert-to-schema-and-document merge-metadata-and-old-counts frob-wikipedia split-by-training"
 fi
 
 echo "Steps are $steps"
@@ -118,20 +118,25 @@ if [ "$step" = convert-to-schema-and-document ]; then
     $add_dir_prefix --output-dir "$output_dir" "$input_dir"
 
 elif [ "$step" = merge-metadata-and-old-counts ]; then
-  textgrounder run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts \
+  textgrounder --verbose run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts \
     -o "$output_dir" -i "$input_dir" \
     --counts-file $dir/*-counts-only-coord-documents.txt*
 
 elif [ "$step" = frob-geotext ]; then
-  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus \
+  textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \
     -o "$output_dir" -i "$input_dir" \
     --rename-field title=user \
     -a corpus=twitter-geotext-$dirbase -a corpus-type=twitter-user \
     -r id -r redir -r namespace -r is_list_of -r is_disambig \
     -r is_list -r incoming_links
 
+elif [ "$step" = frob-wikipedia ]; then
+  textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \
+    -o "$output_dir" -i "$input_dir" \
+    -a corpus=$dirbase -a corpus-type=wikipedia
+
 elif [ "$step" = split-by-training ]; then
-  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus \
+  textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \
     -o "$output_dir" -i "$input_dir" \
     --split-by-field split
 

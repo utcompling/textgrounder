@@ -4,24 +4,13 @@
 #
 # where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
 
-# Process options
-
-#DONT_DOWNLOAD=no
-while true; do
-  case "$1" in
-    --no-download ) DONT_DOWNLOAD=yes; shift ;;
-    -- ) shift; break ;;
-    * ) break ;;
-  esac
-done
-
 wikitag="$1"
 echo "Converting Wikipedia corpus $wikitag to latest format ..."
 mkdir convert
 cd convert
 ln -s .. $wikitag
 run-convert-corpus --steps wiki $wikitag
-mv convert-corpora-3/$wikitag/* $wikitag
+mv convert-corpora-4/$wikitag/* $wikitag
 cd ..
 rm -rf convert
 echo "Converting Wikipedia corpus $wikitag to latest format ... done."

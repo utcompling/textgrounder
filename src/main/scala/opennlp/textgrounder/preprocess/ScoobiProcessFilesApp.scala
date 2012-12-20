@@ -275,10 +275,40 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    */
   def dlist_output_textdb(schema: Schema, lines: DList[String],
       filehand: FileHandler, outdir: String,
-      corpus_name: String, corpus_suffix: String) {
+      corpus_name: String, corpus_suffix: String = "") {
     // output data file
     persist(TextOutput.toTextFile(lines, outdir))
     rename_output_files(filehand, outdir, corpus_name, corpus_suffix)
+
+    // output schema file
+    val schema_filename =
+      schema.output_constructed_schema_file(filehand, outdir,
+        corpus_name, corpus_suffix)
+    logger.info("Schema file output to %s" format schema_filename)
+  }
+
+  /**
+   * Output a textdb corpus given a schema and an Iterable of lines of text to
+   * output.
+   *
+   * @param schema Schema object for corpus.
+   * @param lines Lines of text, formatted properly for a textdb
+   *   (tab-separated, etc.).
+   * @param filehand File handler of output directory.
+   * @param outdir Directory to output corpus in.
+   * @param corpus_name Name of corpus; used to form the filenames.
+   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   */
+  def local_output_textdb(schema: Schema, lines: Iterable[String],
+      filehand: FileHandler, outdir: String,
+      corpus_name: String, corpus_suffix: String = "") {
+    // output data file
+    filehand.make_directories(outdir)
+    val outfile = TextDB.construct_data_file(filehand, outdir,
+      corpus_name, corpus_suffix)
+    val outstr = filehand.openw(outfile)
+    lines.map(outstr.println(_))
+    outstr.close()
 
     // output schema file
     val schema_filename =
@@ -298,7 +328,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param corpus_suffix Suffix of corpus; used to form the filenames.
    */ 
   def move_output_files(filehand: FileHandler, srcdir: String, destdir: String,
-      corpus_name: String, corpus_suffix: String) {
+      corpus_name: String, corpus_suffix: String = "") {
     errprint("Moving/renaming output files ...")
     val globpat = "%s/*-r-*" format srcdir
     val fs = configuration.fs
@@ -321,7 +351,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param corpus_suffix Suffix of corpus; used to form the filenames.
    */ 
   def rename_output_files(filehand: FileHandler, dir: String,
-      corpus_name: String, corpus_suffix: String) =
+      corpus_name: String, corpus_suffix: String = "") =
     move_output_files(filehand, dir, dir, corpus_name, corpus_suffix)
 }
 

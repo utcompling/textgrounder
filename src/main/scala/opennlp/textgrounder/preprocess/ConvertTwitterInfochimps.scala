@@ -150,8 +150,7 @@ trait TwitterInfochimpsFileProcessor {
 }
 
 class ConvertTwitterInfochimpsFileProcessor(
-  params: ConvertTwitterInfochimpsParameters,
-  suffix: String
+  params: ConvertTwitterInfochimpsParameters
 ) extends TwitterInfochimpsFileProcessor {
   var schema: Seq[String] = null
 
@@ -162,7 +161,7 @@ class ConvertTwitterInfochimpsFileProcessor(
       val (_, outname) = filehand.split_filename(realname)
       val out_text_name =
         TextDB.construct_data_file(filehand, params.output_dir,
-          "twitter-infochimps-%s" format outname, suffix)
+          "twitter-infochimps-%s" format outname)
       errprint("Text document file is %s..." format out_text_name)
       val outstream =
         filehand.openw(out_text_name, compression = compression_type)
@@ -175,7 +174,7 @@ class ConvertTwitterInfochimpsFileProcessor(
           // Output the schema file, first time we see a line
           val schema_file_name =
             Schema.construct_schema_file(filehand, params.output_dir,
-              "twitter-infochimps", suffix)
+              "twitter-infochimps")
           val schema_stream = filehand.openw(schema_file_name)
           errprint("Schema file is %s..." format schema_file_name)
           schema_stream.println(schema mkString "\t")
@@ -527,7 +526,7 @@ class ConvertTwitterInfochimpsDriver extends
         process_files(filehand, params.files)
     else {
       super.run()
-      new ConvertTwitterInfochimpsFileProcessor(params, "-text").
+      new ConvertTwitterInfochimpsFileProcessor(params).
         process_files(filehand, params.files)
     }
   }

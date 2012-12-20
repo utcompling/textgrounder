@@ -37,33 +37,45 @@ import io._
  *     each field, separated by a TAB character, as well as any
  *     "fixed" fields that have the same value for all rows (one per
  *     line, with the name, a TAB, and the value).
- * (3) The data and schema files are identified by a suffix.
- *     The document files are named `DIR/PREFIX-SUFFIX-data.txt`
- *     (or `DIR/PREFIX-SUFFIX-data.txt.bz2` or similar, for compressed files),
- *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
- *     The SUFFIX typically specifies the category of corpus being
- *     read (e.g. "text" for corpora containing text or "unigram-counts"
- *     for a corpus containing unigram counts).  The directory is specified
- *     in a particular call to `process_files` or `read_schema_from_textdb`.
- *     The prefix is arbitrary and descriptive -- i.e. any files in the
- *     appropriate directory and with the appropriate suffix, regardless
- *     of prefix, will be loaded.  The prefix of the currently-loading
- *     document file is available though the field `current_document_prefix`.
- *
+ * (3) The data and schema files are identified by ending.
+ *     The document files are named `DIR/NAME-data.txt` (or
+ *     `DIR/NAME-data.txt.bz2` or similar, for compressed files),
+ *     while the schema file is named `DIR/NAME-schema.txt`. NAME is
+ *     arbitrary, and may not necessarily be the same across the various
+ *     files in a single database.
+ * (4) Commonly, NAME is structured so that in data files, it has the form
+ *     "PREFIX-ID", where PREFIX is common to all the data files while "ID"
+ *     is different for each individual file.
+ * (5) Another way to structure the NAME of a data or schema file is through
+ *     the use of a SUFFIX.  The SUFFIX part is used when multiple textdb
+ *     databases are contained in a single directory. For example, when
+ *     representing document corpora using textdb databases, there might be
+ *     separate corpora for "training", "dev", and "test" slices of the total
+ *     set of documents.  When a SUFFIX is used, the NAME has the form
+ *     BASE + SUFFIX, i.e. BASE and SUFFIX are directly adjoined. Then, in the
+ *     above example, the SUFFIX might be either "-training", "-dev" or
+ *     "-test". Having BASE and SUFFIX directly adjoined allows the above
+ *     (no-SUFFIX) scheme to be processed by code expecting a SUFFIX by
+ *     supplying a blank SUFFIX.  When both the BASE/SUFFIX and PREFIX-ID
+ *     schemes are in use, the data files will have a name of the form
+ *     "PREFIX-IDSUFFIX-data.txt(.bz2)" and the schema file will have a name
+ *     of the form "PREFIXSUFFIX-schema.txt", e.g.
+ *     -- schema: "twitter-infochimps-dev-schema.txt"
+ *     -- data file #1: "twitter-infochimps-1-dev-data.txt.bz2"
+ *     -- data file #2: "twitter-infochimps-2-dev-data.txt.bz2"
+ *     etc.
+ * 
  * The most common setup is to have the schema file and any data files
  * placed in the same directory, although it's possible to have them in
  * different directories or to have data files scattered across multiple
- * directories.  Note that the naming of the files allows for multiple
- * data files in a single directory, as well as multiple corpora to
- * coexist in the same directory, as long as they have different suffixes.
- * This is often used to present different "views" onto the same corpus
- * (e.g. one containing raw text, one containing unigram counts, etc.), or
- * different splits (e.g. training vs. dev vs. test). (In fact, it is
- * common to divide a corpus into sub-corpora according to the split.
- * In such a case, data files will be named `DIR/PREFIX-SPLIT-SUFFIX-data.txt`
- * or similar.  This allows all files for all splits to be located using a
- * suffix consisting only of the final "SUFFIX" part, while a particular
- * split can be located using a larger prefix of the form "SPLIT-SUFFIX".)
+ * directories.  Note that the use of suffixes (described above) allows for
+ * multiple data files in a single directory, as well as multiple databases
+ * to coexist in the same directory, as long as they have different suffixes.
+ * This is often used to present different splits (e.g. training vs. dev
+ * vs. test) of a corpus/database. It could conceivably be used to present
+ * different "views" on a corpus (e.g. one containing raw text, one containing
+ * unigram counts, etc.), but that is more commonly handled by simply
+ * including all the fields for all the views into a single textdb database.
  *
  * There are many functions in `TextDB` for reading from textdb
  * databases.  Most generally, a schema needs to be read and then the data
@@ -193,12 +205,12 @@ package object textdb {
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIX-SUFFIX-schema.txt`.
+     * `DIR/PREFIXSUFFIX-schema.txt`.
      *
      * @return Name of constructed schema file.
      */
     def output_constructed_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String) = {
+        prefix: String, suffix: String = "") = {
       val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
         suffix)
       output_schema_file(filehand, schema_file)
@@ -272,25 +284,28 @@ package object textdb {
      * directory, prefix and suffix.  The file will end with "-schema.txt".
      */
     def construct_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String) =
+        prefix: String, suffix: String = "") =
       TextDB.construct_textdb_file(filehand, dir, prefix,
         suffix, schema_ending_text)
 
     /**
      * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
-     * ENDING). The suffix needs to be given. For example, if the suffix
-     * is "tweets" and the file is named "foo/bar-1-tweets-schema.txt",
-     * the return value will be ("foo", "bar-1", "-tweets", "-schema.txt").
+     * ENDING). A regular expression matching the suffix may be given; else
+     * a blank string will be substituted. For example, if the suffix is
+     * "-dev" and the file is named "foo/tweets-1-dev-schema.txt", the return
+     * value will be ("foo", "tweets-1", "-dev", "-schema.txt"). By
+     * contatenating all parts of the basename together (all but the
+     * directory), the original basename is retrieved.
      */
     def split_schema_file(filehand: FileHandler, file: String,
-        suffix_re: String): Option[(String, String, String, String)] =
+        suffix_re: String = ""): Option[(String, String, String, String)] =
       TextDB.split_textdb_file(filehand, file, suffix_re, schema_ending_re)
 
     /**
      * Locate the schema file of the appropriate suffix in the given directory.
      */
     def find_schema_file(filehand: FileHandler, dir: String,
-        suffix_re: String) = {
+        suffix_re: String = "") = {
       val schema_regex = make_schema_file_suffix_regex(suffix_re).r
       val all_files = filehand.list_files(dir)
       val files =
@@ -348,7 +363,7 @@ package object textdb {
      * given directory.
      */
     def read_schema_from_textdb(filehand: FileHandler, dir: String,
-          suffix_re: String) = {
+          suffix_re: String = "") = {
       val schema_file = find_schema_file(filehand, dir, suffix_re)
       read_schema_file(filehand, schema_file)
     }
@@ -377,9 +392,7 @@ package object textdb {
     val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
     val possible_compression_re = """(?:%s)?""" format (
       possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
-    // For the moment, allow the "-data" part to be omitted, because formerly
-    // it wasn't present.
-    val data_ending_re = """(?:-data)?\.txt"""
+    val data_ending_re = """-data\.txt"""
     val data_ending_text = "-data.txt"
 
     /**
@@ -396,7 +409,7 @@ package object textdb {
      * Construct the name of a file (either schema or data file), based
      * on the given file handler, directory, prefix, suffix and file ending.
      * For example, if the file ending is "-schema.txt", the file will be
-     * named `DIR/PREFIX-SUFFIX-schema.txt`.
+     * named `DIR/PREFIXSUFFIX-schema.txt`.
      */
     def construct_textdb_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String, file_ending: String) = {
@@ -415,20 +428,22 @@ package object textdb {
     /**
      * Construct the name of a data file, based on the given file handler,
      * directory, prefix, and suffix.  The file will be named
-     * `DIR/PREFIX-SUFFIX-data.txt`.
+     * `DIR/PREFIXSUFFIX-data.txt`.
      */
     def construct_data_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String) =
+        prefix: String, suffix: String = "") =
       construct_textdb_file(filehand, dir, prefix, suffix, data_ending_text)
 
     /**
      * Split the name of a textdb file into (DIR, PREFIX, SUFFIX, ENDING).
-     * Regular expressions matching the suffix and file ending need to be given,
-     * although the resulting regexp will be extended to allow for any
-     * compression ending (e.g. ".gz"). For example, if the suffix is
-     * "-tweets" and the file ending is "-data.txt", and the file is named
-     * "foo/bar-1-tweets-data.txt.gz", the return value will be
-     * ("foo", "bar-1", "-tweets", "-data.txt.gz").
+     * Regular expressions matching the suffix and file ending need to be
+     * given, although the resulting regexp will be extended to allow for any
+     * compression ending (e.g. ".gz"). For example, if the suffix is "-dev"
+     * and the file ending is "-data.txt", and the file is named
+     * "foo/tweets-1-dev-data.txt.gz", the return value will be
+     * ("foo", "tweets-1", "-dev", "-data.txt.gz"). By contatenating all parts
+     * of the basename together (all but the directory), the original basename
+     * is retrieved.
      */
     def split_textdb_file(filehand: FileHandler, file: String,
       suffix_re: String, file_ending_re: String
@@ -446,18 +461,21 @@ package object textdb {
 
     /**
      * Split the name of a textdb data file into (DIR, PREFIX, SUFFIX,
-     * ENDING). The suffix needs to be given. For example, if the suffix
-     * is "-tweets" and the file is named "foo/bar-1-tweets-data.txt.gz",
-     * the return value will be ("foo", "bar-1", "-tweets", "-data.txt.gz").
+     * ENDING). A regular expression matching the suffix may be given; else
+     * a blank string will be substituted. For example, if the suffix is
+     * "-dev" and the file is named "foo/tweets-1-dev-data.txt.gz", the return
+     * value will be ("foo", "tweets-1", "-dev", "-data.txt.gz"). By
+     * contatenating all parts of the basename together (all but the
+     * directory), the original basename is retrieved.
      */
-    def split_data_file(filehand: FileHandler, file: String, suffix_re: String
-        ): Option[(String, String, String, String)] =
+    def split_data_file(filehand: FileHandler, file: String,
+        suffix_re: String = ""): Option[(String, String, String, String)] =
       split_textdb_file(filehand, file, suffix_re, data_ending_re)
 
     /**
      * List only the data files of the appropriate suffix.
      */
-    def filter_file_by_suffix(file: String, suffix_re: String) = {
+    def filter_file_by_suffix(file: String, suffix_re: String = "") = {
       val filter = make_data_file_suffix_regex(suffix_re).r
       filter.findFirstMatchIn(file) != None
     }
@@ -481,7 +499,7 @@ package object textdb {
      *   corpus and `files` is an iterator over data files.
      */
     def get_textdb_files(filehand: FileHandler, dir: String,
-        suffix_re: String, with_messages: Boolean = true) = {
+        suffix_re: String = "", with_messages: Boolean = true) = {
       val schema = Schema.read_schema_from_textdb(filehand, dir, suffix_re)
       val files = iter_files_recursively(filehand, Iterable(dir)).
           filter(filter_file_by_suffix(_, suffix_re))
@@ -511,7 +529,7 @@ package object textdb {
      *   if some rows were badly formatted.)
      */
     def read_textdb(filehand: FileHandler, dir: String,
-        suffix_re: String, with_messages: Boolean = true) = {
+        suffix_re: String = "", with_messages: Boolean = true) = {
       val (schema, fields) =
         read_textdb_with_schema(filehand, dir, suffix_re, with_messages)
       fields
@@ -535,7 +553,7 @@ package object textdb {
      *   iterator of iterators of fields.
      */
     def read_textdb_with_schema(filehand: FileHandler, dir: String,
-        suffix_re: String, with_messages: Boolean = true) = {
+        suffix_re: String = "", with_messages: Boolean = true) = {
       val (schema, files) =
         get_textdb_files(filehand, dir, suffix_re, with_messages)
       val fields = files.map(read_textdb_file(filehand, _, schema))
@@ -566,7 +584,7 @@ package object textdb {
     }
 
     def data_file_matching_patterns(filehand: FileHandler, dir: String,
-        suffix: String) =
+        suffix: String = "") =
       textdb_file_matching_patterns(filehand, dir, suffix, data_ending_text)
   }
 
@@ -597,11 +615,11 @@ package object textdb {
    */
   class TextDBWriter(
     val schema: Schema,
-    val suffix: String
+    val suffix: String = ""
   ) {
     /**
      * Open a data file and return an output stream.  The file will be
-     * named `DIR/PREFIX-SUFFIX-data.txt`, possibly with an additional suffix
+     * named `DIR/PREFIXSUFFIX-data.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
      * to no compression).  Call `output_row` to output a row describing
      * a document.
@@ -614,7 +632,7 @@ package object textdb {
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIX-SUFFIX-schema.txt`.
+     * `DIR/PREFIXSUFFIX-schema.txt`.
      *
      * @return Name of schema file.
      */
@@ -622,11 +640,6 @@ package object textdb {
         prefix: String) =
       schema.output_constructed_schema_file(filehand, dir, prefix, suffix)
   }
-
-  val document_metadata_suffix = "-document-metadata"
-  val unigram_counts_suffix = "-unigram-counts"
-  val ngram_counts_suffix = "-ngram-counts"
-  val text_suffix = "-text"
 
   class EncodeDecode(val chars_to_encode: Iterable[Char]) {
     private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
@@ -652,7 +665,7 @@ package object textdb {
     new EncodeDecode(Seq('%', '\t', '\n', '\r', '\f'))
 
   /**
-   * Encode a word for placement inside a "counts" field.  Colons and spaces
+   * Encode a word for placement inside a word-counts field.  Colons and spaces
    * are used for separation inside of a field, and tabs and newlines are used
    * for separating fields and records.  We need to escape all of these
    * characters (normally whitespace should be filtered out during
@@ -670,7 +683,7 @@ package object textdb {
     endec_string_for_count_map_field.encode(word)
 
   /**
-   * Encode an n-gram into text suitable for the "counts" field.
+   * Encode an n-gram into text suitable for an n-gram-counts field.
    The
    * individual words are separated by colons, and each word is encoded
    * using `encode_string_for_count_map_field`.  We need to encode '\n'

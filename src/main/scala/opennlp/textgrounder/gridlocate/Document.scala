@@ -288,7 +288,7 @@ abstract class GeoDocFactory[Co : Serializer](
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     if (record_in_factory)
       num_records_by_split(split) += 1
-    val counts = schema.get_field(fieldvals, "counts")
+    val counts = schema.get_field(fieldvals, driver.word_count_field)
     val dist = word_dist_factory.constructor.create_distribution(counts)
     val maybedoc =
       if (debug("rethrow"))
@@ -414,8 +414,8 @@ abstract class GeoDocFactory[Co : Serializer](
    *
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "-counts" or "-document-metadata")
+   * @param suffix Suffix specifying a particular corpus if many exist in
+   *   the same dir (e.g. "-dev")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
@@ -470,8 +470,8 @@ abstract class GeoDocFactory[Co : Serializer](
    *
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "-counts" or "-document-metadata")
+   * @param suffix Suffix specifying a particular corpus if many exist in
+   *   the same dir (e.g. "-dev")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
@@ -484,7 +484,7 @@ abstract class GeoDocFactory[Co : Serializer](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subfactory: Boolean = false,
+      suffix: String = "", record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val rawdocs =
@@ -494,7 +494,7 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subfactory: Boolean = false,
+      suffix: String = "", record_in_subfactory: Boolean = false,
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val docstats = read_document_statuses_from_textdb(filehand, dir, suffix,
@@ -665,12 +665,12 @@ object GeoDocFactory {
    *
    * @param filehand The FileHandler for the directory of the corpus.
    * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "-counts" or "-document-metadata")
+   * @param suffix Suffix specifying a particular corpus if many exist in
+   *   the same dir (e.g. "-dev")
    * @return Iterator over document statuses.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String): Iterator[DocStatus[RawDocument]] = {
+      suffix: String = ""): Iterator[DocStatus[RawDocument]] = {
     val (schema, files) =
       TextDB.get_textdb_files(filehand, dir, suffix)
     files.flatMap { file =>
@@ -833,7 +833,7 @@ abstract class GeoDoc[Co : Serializer](
 
 
 /////////////////////////////////////////////////////////////////////////////
-//                       GeoDoc File Processors                      //
+//                               GeoDocWriter                              //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -845,7 +845,7 @@ abstract class GeoDoc[Co : Serializer](
  */
 class GeoDocWriter[Co : Serializer](
   schema: Schema,
-  suffix: String
+  suffix: String = ""
 ) extends TextDBWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: GeoDoc[Co]) {
     outstream.println(schema.make_row(doc.get_fields(schema.fieldnames)))
