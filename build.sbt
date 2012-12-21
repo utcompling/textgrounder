@@ -77,7 +77,7 @@ libraryDependencies ++= Seq(
   // This should hopefully indicate that we want the dependencies of
   // Scoobi 0.5 but we "provide" the library itself (i.e. in reality we
   // replace the library with an updated version, stored in the lib/ dir)
-  "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3" % "provided",
+  "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3",
   // "provided" if we use Scoobi's package-hadoop instead of sbt-assembly.
   // This is another way of building an assembly for Hadoop that includes all
   // the dependent libraries into the JAR file.  To do that, we have to move
@@ -127,6 +127,10 @@ test in assembly := {}
 //excludedJars in assembly <<= (fullClasspath in assembly) map { cp => 
 //  cp filter {x => Seq("jasper-compiler-5.5.12.jar", "jasper-runtime-5.5.12.jar", "commons-beanutils-1.7.0.jar", "servlet-api-2.5-20081211.jar") contains x.data.getName }
 //}
+
+excludedJars in assembly <<= (fullClasspath in assembly) map { cp => 
+  cp filter {_.data.getName == "scoobi_2.9.2-0.5.0-cdh3.jar"}
+}
 
 // FUCK ME TO (JAR) HELL! This is an awful hack. Boys and girls, repeat after
 // me: say "fragile library problem" and "Java sucks rocks compared with C#".
