@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# USAGE: preprocess-dump [--no-permute] WIKITAG
+# USAGE: preprocess-dump [--no-permute] WIKITAG [STEPS ...]
 #
 # This script goes through a series of steps to preprocess a raw Wikipedia
 # dump (as downloaded from dumps.wikipedia.org) in a set of data files
@@ -37,10 +37,28 @@ FOO
   exit 1
 fi
 
-dumppref="$1"
+dumppref="$1"; shift
 
 # This needs to be set for all subprocesses we call
 export WP_VERSION="$dumppref"
+
+steps="$*"
+if [ "$steps" = "" ]; then
+  steps="all"
+fi
+
+# steps:
+#   combined-article-data: Generate permuted combined article-data file
+#   coord-counts: Generate word-count values for articles with coordinates
+#   all-counts: Generate word-count values for all articles
+#   coord-words: Generate actual words for articles with coordinates
+#   all-words: Generate actual words for all articles
+
+if [ "$steps" = "all" ]; then
+  steps="combined-article-data coord-counts all-counts coord-words all-words"
+elif [ "$steps" = "wiki" ]; then
+  steps="combined-article-data coord-counts"
+fi
 
 if [ "$DONT_PERMUTE" != yes ]; then
   # Generate article-data file from orginal dump
@@ -60,10 +78,11 @@ run-processwiki split-dump
 # Now make everything be simultaneous if possible
 export NUM_SIMULTANEOUS=8
 
-# Generate permuted combined article-data file
-run-processwiki combined-article-data
-
-run-processwiki coord-counts all-counts coord-words all-words
+for step in $steps; do
+  echo "Beginning at `date`: run-processwiki $step"
+  run-processwiki $step
+  echo "Ending at `date`: run-processwiki $step"
+done
 
 echo "Removing remaining split files ..."
 rm -rf $dumppref-split*

@@ -10,11 +10,9 @@
 
 # Process options
 
-DONT_DOWNLOAD=no
 PREPROCESS_OPTS=
 while true; do
   case "$1" in
-    --no-download ) DONT_DOWNLOAD=yes; shift ;;
     --no-permute ) PREPROCESS_OPTS="$PREPROCESS_OPTS --no-permute"; shift ;;
     -- ) shift; break ;;
     * ) break ;;
@@ -33,22 +31,51 @@ FOO
   exit 1
 fi
 
-wikitag="$1"
+wikitag="$1"; shift
+steps="$*"
+if [ "$steps" = "" ]; then
+  steps="all"
+fi
+
+# steps:
+#   download: Download Wikipedia corpus from the web
+#   preprocess: Convert the corpus into preprocessed files
+#   convert: Convert into a textdb corpus
+#   set-permissions: Set permissions appropriately
+
+if [ "$steps" = "all" ]; then
+  steps="download preprocess convert set-permissions"
+fi
+
 mkdir -p $wikitag
 cd $wikitag
-if [ "$DONT_DOWNLOAD" != "yes" ]; then
-  echo "Downloading Wikipedia corpus $wikitag ..."
-  wikidir="`echo $wikitag | sed 's/-/\//'`"
-  wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2
-  echo "Downloading Wikipedia corpus $wikitag ... done."
-fi
-echo "Preprocessing Wikipedia corpus $wikitag ..."
-preprocess-dump $PREPROCESS_OPTS $wikitag
-echo "Preprocessing Wikipedia corpus $wikitag ... done."
-echo "Converting $wikitag to latest format ..."
-convert-corpus-to-latest $wikitag
-echo "Converting $wikitag to latest format ... done."
-echo "Settings permissions on $wikitag ..."
-# Make tree world-readable
-chmod -R u+w,a+rX $wikitag
-echo "Settings permissions on $wikitag ... done."
+for step in $steps; do
+  case "$step" in
+    download )
+      echo "Downloading Wikipedia corpus $wikitag ..."
+      wikidir="`echo $wikitag | sed 's/-/\//'`"
+      wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2
+      echo "Downloading Wikipedia corpus $wikitag ... done."
+    ;;
+    preprocess )
+      echo "Preprocessing Wikipedia corpus $wikitag ..."
+      preprocess-dump $PREPROCESS_OPTS $wikitag wiki
+      echo "Preprocessing Wikipedia corpus $wikitag ... done."
+    ;;
+    convert )
+      echo "Converting $wikitag to latest format ..."
+      convert-corpus-to-latest $wikitag
+      echo "Converting $wikitag to latest format ... done."
+    ;;
+    set-permissions )
+      echo "Settings permissions on $wikitag ..."
+      # Make tree world-readable
+      chmod -R u+w,a+rX .
+      echo "Settings permissions on $wikitag ... done."
+    ;;
+    * )
+      echo "Unknown step: $step"
+      exit 1
+    ;;
+  esac
+done
