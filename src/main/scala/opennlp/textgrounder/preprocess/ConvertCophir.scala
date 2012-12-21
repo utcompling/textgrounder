@@ -17,6 +17,9 @@ class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
   var preserve_case = ap.flag("preserve-case",
     help="""Don't lowercase words.  This preserves the difference
     between e.g. the name "Mark" and the word "mark".""")
+  var allow_missing_coord = ap.flag("allow-missing-coord",
+    help="""Allow for records with missing coordinates; otherwise, they will be
+skipped.""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
     help="""Largest size of n-grams to create.  Default 1, i.e. distribution
@@ -165,7 +168,16 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
       else {
         val maybe_photo_id = safe_toInt(photo_idstr)
         val maybe_owner_id = safe_toInt(owner_idstr.stripSuffix("@N00"))
-        if (maybe_photo_id == None || maybe_owner_id == None) None
+        val location = dom \\ "location"
+        val lat = (location \ "@latitude").text
+        val long = (location \ "@longitude").text
+        val coord =
+          if (lat.length > 0 && long.length > 0)
+            "%s,%s" format (lat, long)
+          else
+            ""
+        if (maybe_photo_id == None || maybe_owner_id == None ||
+            (coord.length == 0 && !opts.allow_missing_coord)) None
         else {
           val photo_id = maybe_photo_id.get
           val owner_id = maybe_owner_id.get
@@ -178,14 +190,6 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
             List("posted", "taken", "lastupdate"), "dates-")
           val ownerprops = extract_props(dom \\ "owner",
             List("username", "realname", "location"), "owner-")
-          val location = dom \\ "location"
-          val lat = (location \ "@latitude").text
-          val long = (location \ "@longitude").text
-          val coord =
-            if (lat.length > 0 && long.length > 0)
-              "%s,%s" format (lat, long)
-            else
-              ""
           val coordprop = List(("coord", Encoder.string(coord)))
           val locprops1 = extract_props(location, List("accuracy"), "location-")
           val locprops2 = extract_tags(location,
@@ -194,11 +198,12 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
           val otherprops = extract_tags(dom, List("url", "title", "description"))
 
           val rawtags = (dom \\ "tag") flatMap { tag =>
+            // filter machine-added tags (geotags, etc.)
             (tag \ "@machine_tag").text match {
               case "1" => None
               case _ => Some((tag \ "@raw").text)
             }
-          }
+          } map { _.trim } filter { _.length > 0 } // Filter out blank tags
           val rawtags_str = Encoder.seq_string(rawtags)
           val tagprops =
             List(("rawtags", rawtags_str),
@@ -220,7 +225,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
    */
   def row_fields = {
     apply("foo.xml",
-      """<root><MediaUri>0</MediaUri><owner nsid="0@N00"/></root>""").get match {
+      """<root><MediaUri>0</MediaUri><location latitude="50" longitude="50"/><owner nsid="0@N00"/></root>""").get match {
       case CophirImage(_, _, _, props) => props.map(_._1)
     }
   }
