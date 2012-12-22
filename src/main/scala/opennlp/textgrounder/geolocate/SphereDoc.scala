@@ -23,7 +23,7 @@ import collection.mutable
 
 import util.distances._
 import util.textdb.Schema
-import util.print.warning
+import util.print.warning_once
 import util.Serializer._
 
 import gridlocate.{GeoDoc,GeoDocFactory}
@@ -120,7 +120,7 @@ class SphereDocFactory(
     if (corpus_type_to_subfactory contains cortype)
       corpus_type_to_subfactory(cortype)
     else {
-      warning("Unrecognized corpus type: %s", cortype)
+      warning_once("Unrecognized corpus type: %s", cortype)
       corpus_type_to_subfactory("generic")
     }
   }
