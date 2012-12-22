@@ -564,8 +564,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     }
     errprint("Training linear classifier ...")
     errprint("Number of training items: %s", data.size)
-    val num_total_feats = data.map(_._1.length).sum
-    val num_total_stored_feats = data.map(_._1.stored_entries).sum
+    val num_total_feats = data.map(_._1.length.toLong).sum
+    val num_total_stored_feats = data.map(_._1.stored_entries.toLong).sum
     errprint("Total number of features in all training items: %s",
       num_total_feats)
     errprint("Avg number of features per training item: %.2f",
