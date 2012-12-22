@@ -129,10 +129,26 @@ package object print {
   }
 
   /**
-    Output a warning, formatting into UTF-8 as necessary.
+    * Output a warning, formatting into UTF-8 as necessary.
     */
   def warning(format: String, args: Any*) {
     errprint("Warning: " + format, args: _*)
+  }
+  
+  private[print] object WarningsSeen {
+    val warnings_seen = mutable.Set[String]()
+  }
+
+  /**
+    * Output a warning, formatting into UTF-8 as necessary.
+    * But don't output if already seen.
+    */
+  def warning_once(format: String, args: Any*) {
+    val warnstr = format_outtext("Warning: " + format, args: _*)
+    if (!(WarningsSeen.warnings_seen contains warnstr)) {
+      WarningsSeen.warnings_seen += warnstr
+      errprint(warnstr)
+    }
   }
   
   /**
