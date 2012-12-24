@@ -93,7 +93,7 @@ class KdTreeGrid(
     // clean out the data.
 
     val task =
-      driver.show_progress("K-d tree structure", "generating").start()
+      driver.show_progress("generating", "K-d tree structure").start()
 
     // build the full kd-tree structure.
     kdtree.balance
@@ -157,7 +157,7 @@ class KdTreeGrid(
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
-      driver.show_progress("K-d tree cell", "interpolating").
+      driver.show_progress("interpolating", "K-d tree cell").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist

@@ -6,6 +6,7 @@ import math.log
 import worddist.WordDist._
 import worddist.UnigramWordDist
 import util.print._
+import util.metering._
 import perceptron._
 
 import GridLocateDriver.Debug._
@@ -264,12 +265,14 @@ extends RerankerLike[Query, Answer] { self =>
    * instances.
    */
   protected def get_rerank_training_data_for_split(
-    data: Iterator[ExtInst], initial_ranker: Ranker[Query, Answer]
-  ) = {
+      splitnum: Int, data: Iterator[ExtInst],
+      initial_ranker: Ranker[Query, Answer]) = {
     val query_answer_pairs =
       external_instances_to_query_answer_pairs(data, initial_ranker)
+    val task = new Meter("generating",
+      "split-#%d rerank training instance" format splitnum)
     if (debug("rerank-training")) {
-      query_answer_pairs.zipWithIndex.flatMap {
+      query_answer_pairs.zipWithIndex.flatMapMetered(task) {
         case ((query, answer), index) => {
           val prefix = "#%d: " format (index + 1)
           errprint("%sTraining item: %s", prefix, display_query_item(query))
@@ -286,7 +289,7 @@ extends RerankerLike[Query, Answer] { self =>
         }
       }
     } else {
-      query_answer_pairs.flatMap {
+      query_answer_pairs.flatMapMetered(task) {
         case (query, answer) =>
           get_rerank_training_instances(query, answer, initial_ranker)
       }
@@ -307,17 +310,18 @@ extends RerankerLike[Query, Answer] { self =>
     val splitsize = (numitems + number_of_splits - 1) / number_of_splits
     errprint("Number of splits for training reranker: %s.", number_of_splits)
     errprint("Size of each split: %s documents.", splitsize)
-    (for (rerank_split_num <- 0 until number_of_splits) yield {
+    (0 until number_of_splits) flatMap { rerank_split_num =>
       errprint("Generating data for split %s" format rerank_split_num)
       val split_training_data = training_data.grouped(splitsize).zipWithIndex
       val (rerank_splits, initrank_splits) = split_training_data partition {
         case (data, num) => num == rerank_split_num
       }
-      val rerank_data = rerank_splits.map(_._1).flatten
-      val initrank_data = initrank_splits.map(_._1).flatten.toIterable
+      val rerank_data = rerank_splits.flatMap(_._1)
+      val initrank_data = initrank_splits.flatMap(_._1).toIterable
       val split_initial_ranker = create_initial_ranker(initrank_data)
-      get_rerank_training_data_for_split(rerank_data, split_initial_ranker)
-    }).flatten
+      get_rerank_training_data_for_split(rerank_split_num, rerank_data,
+        split_initial_ranker)
+    }
   }
 
   /**

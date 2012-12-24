@@ -24,6 +24,7 @@ import scala.collection.mutable
 import argparser._
 import collection._
 import io.{FileHandler, LocalFileHandler}
+import metering._
 import os._
 import print.{errprint, set_stdout_stderr_utf_8}
 import text._
@@ -99,14 +100,14 @@ package object experiment {
       run()
     }
 
-    def show_progress(item_name: String, verb: String,
+    def show_progress(verb: String, item_name: String,
       secs_between_output: Double = 15, maxtime: Double = 0.0,
       maxitems: Int = 0
-    ): MeteredTask =
+    ): Meter =
       // Call `driver.heartbeat` every time an item is processed or we
       // otherwise do something, to let Hadoop know that we're actually
       // making progress.
-      new MeteredTask(item_name, verb, secs_between_output, maxtime,
+      new Meter(verb, item_name, secs_between_output, maxtime,
           maxitems) {
         override def start() = {
           // This is kind of overkill, but shouldn't hurt.

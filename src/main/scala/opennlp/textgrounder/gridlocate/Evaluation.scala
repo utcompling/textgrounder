@@ -454,7 +454,7 @@ abstract class CorpusEvaluator(
    */
   def output_results(isfinal: Boolean = false): Unit
 
-  val task = driver.show_progress("document", "evaluating",
+  val task = driver.show_progress("evaluating", "document",
     maxtime = driver.params.max_time_per_stage,
     maxitems = driver.params.num_test_docs)
   var last_elapsed = 0.0
