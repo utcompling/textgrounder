@@ -31,7 +31,7 @@ import io.Source
 
 import util.print._
 import util.memoizer._
-import util.MeteredTask
+import util.metering._
 import gridlocate.GridLocateDriver.Debug._
 
 /**
@@ -471,7 +471,7 @@ trait LinearClassifierTrainer {
   /** Iterate Train a linear classifier given a set of labeled instances. */
   def iterate(error_threshold: Double, max_iterations: Int)(
       fun: Int => Double) = {
-    val task = new MeteredTask("perceptron training iteration", "running")
+    val task = new Meter("running", "perceptron training iteration")
     task.start()
     var iter = 0
     var total_error = 0.0

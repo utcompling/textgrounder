@@ -29,7 +29,7 @@ import util.argparser._
 import util.collection._
 import util.experiment._
 import util.io._
-import util.MeteredTask
+import util.metering._
 import util.os.output_resource_usage
 import util.print._
 import util.text.with_commas
@@ -146,7 +146,7 @@ trait TwitterInfochimpsFileProcessor {
     iter_files_recursively_with_message(filehand, files)
 
   def iter_fields(lines: Iterator[String]) =
-    new MeteredTask("tweet", "parsing").iterate(yield_fields(lines))
+    new Meter("parsing", "tweet").iterate(yield_fields(lines))
 }
 
 class ConvertTwitterInfochimpsFileProcessor(

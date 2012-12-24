@@ -25,12 +25,13 @@ import math._
 
 import util.argparser._
 import util.collection._
-import util.textdb
 import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
+import util.metering._
 import util.os.output_resource_usage
 import util.print.errprint
+import util.textdb
 
 import perceptron._
 import worddist._
@@ -1062,13 +1063,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def read_raw_training_documents(operation: String):
       Iterator[DocStatus[RawDocument]] = {
-    val task = show_progress("document", operation,
+    val task = show_progress(operation, "training document",
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
-    val dociter = params.input_corpus.toIterator.flatMap(dir =>
+    val dociter = params.input_corpus.toIterator.flatMapMetered(task) { dir =>
         GeoDocFactory.read_raw_documents_from_textdb(get_file_handler,
-          dir, "-training"))
-    for (doc <- task.iterate(dociter)) yield {
+          dir, "-training")
+    }
+    for (doc <- dociter) yield {
       val sleep_at = debugval("sleep-at-docs")
       if (sleep_at != "") {
         if (task.num_processed == sleep_at.toInt) {
@@ -1278,7 +1280,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         val training_data = new Iterable[DocStatus[RawDocument]] {
           def iterator =
             read_raw_training_documents(
-              "generating training data for reranker")
+              "reading %s for generating reranker training data")
         }.view
         reranker_trainer(training_data)
       }
