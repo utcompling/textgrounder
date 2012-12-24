@@ -18,7 +18,7 @@
 
 package opennlp.textgrounder
 
-package object perceptron {
+package object learning {
   type WeightVector = Array[Double]
 }
 
