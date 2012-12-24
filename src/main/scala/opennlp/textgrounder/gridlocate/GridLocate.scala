@@ -33,7 +33,8 @@ import util.os.output_resource_usage
 import util.print.errprint
 import util.textdb
 
-import perceptron._
+import learning.Ranker
+import learning.perceptron._
 import worddist._
 
 import WordDist._

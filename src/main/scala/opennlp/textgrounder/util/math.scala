@@ -22,6 +22,28 @@ package util
 import scala.math._
 
 package object math {
+  /** Return the argument producing the maximum when the function is applied
+    * to it. */
+  def argmax[T](args: Iterable[T], fun: T => Double) =
+    argandmax(args, fun)._1
+
+  /** Return both the argument producing the maximum and the maximum value
+    * itself, when the function is applied to the arguments. */
+  def argandmax[T](args: Iterable[T], fun: T => Double) = {
+    (args zip args.map(fun)).maxBy(_._2)
+  }
+
+  /** Return the argument producing the minimum when the function is applied
+    * to it. */
+  def argmin[T](args: Iterable[T], fun: T => Double) =
+    argandmin(args, fun)._1
+
+  /** Return both the argument producing the minimum and the minimum value
+    * itself, when the function is applied to the arguments. */
+  def argandmin[T](args: Iterable[T], fun: T => Double) = {
+    (args zip args.map(fun)).minBy(_._2)
+  }
+
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
    */

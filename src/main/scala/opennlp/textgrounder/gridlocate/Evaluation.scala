@@ -22,12 +22,13 @@ package opennlp.textgrounder
 package gridlocate
 
 import scala.util.control.Breaks._
-import collection.mutable
+import scala.collection.mutable
 
+import learning.{Ranker, Reranker}
 import util.collection._
 import util.experiment._
-import util.math._
 import util.io.FileHandler
+import util.math._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.{errprint, warning, internal_error}
 
