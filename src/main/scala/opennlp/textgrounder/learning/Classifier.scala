@@ -32,6 +32,9 @@ import util.math.argmax
 import util.metering._
 import util.print._
 
+/**
+ * A basic linear classifier.
+ */
 trait LinearClassifier {
   /** Return number of labels. */
   def number_of_labels: Int
@@ -73,14 +76,39 @@ class BinaryLinearClassifier (
 /**
  * Class for training a linear classifier given a set of training instances and
  * associated labels.
+ *
+ * @tparam WVType Type of weight-vector object.  Will hold a single weight vector
+ *   for single-weight variants and multiple weight vectors for multi-weight
+ *   variants.
  */
-trait LinearClassifierTrainer {
+trait LinearClassifierTrainer[WVType] {
+  type WV = WVType
+
+  /** Check that the arguments passed in are kosher, and return an array of
+    * the weights to be learned. */
+  def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val len = check_sequence_lengths(data)
+    assert(num_classes >= 2)
+    for ((inst, label) <- data)
+      assert(label >= 0 && label < num_classes)
+    new_weights(len, num_classes)
+  }
+
   /** Create and initialize a vector of weights of length `len`.
     * By default, initialized to all 0's, but could be changed. */
-  def new_weights(len: Int) = new WeightVector(len)
+  def new_weights(len: Int, num_classes: Int) =
+    new_zero_weights(len, num_classes)
 
   /** Create and initialize a vector of weights of length `len` to all 0's. */
-  def new_zero_weights(len: Int) = new WeightVector(len)
+  def new_zero_weights(len: Int, num_classes: Int): WV
+
+  def weight_length(wv: WV): Int
+
+  def weight_for_label(weights: WV, label: Int): WeightVector
+
+  def add_weight_to_weight(accum: WV, addto: WV)
+
+  def divide_weight_by_value(accum: WV, value: Double)
 
   /** Check that all instances have the same length, and return it. */
   def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) = {
@@ -96,7 +124,7 @@ trait LinearClassifierTrainer {
     len
   }
 
-  /** Iterate Train a linear classifier given a set of labeled instances. */
+  /** Iterate over a function to train a linear classifier. */
   def iterate(error_threshold: Double, max_iterations: Int)(
       fun: Int => Double) = {
     val task = new Meter("running", "classifier training iteration")
@@ -113,16 +141,95 @@ trait LinearClassifierTrainer {
     iter
   }
 
+  /** Iterate over a function to train a linear classifier,
+    * optionally averaging over the weight vectors at each iteration. */
+  def iterate_averaged(num_classes: Int, weights: WV, averaged: Boolean,
+        error_threshold: Double, max_iterations: Int)(
+      fun: (WV, Int) => Double) = {
+    if (!averaged) {
+      val num_iterations =
+        iterate(error_threshold, max_iterations){ iter =>
+          fun(weights, iter)
+        }
+      (weights, num_iterations)
+    } else {
+      val avg_weights = new_zero_weights(weight_length(weights), num_classes)
+      val num_iterations =
+        iterate(error_threshold, max_iterations){ iter =>
+          val total_error = fun(weights, iter)
+          add_weight_to_weight(avg_weights, weights)
+          total_error
+        }
+      divide_weight_by_value(avg_weights, num_iterations)
+      (avg_weights, num_iterations)
+    }
+  }
+
   /** Train a linear classifier given a set of labeled instances. */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
     LinearClassifier
+}
+
+ 
+/**
+ * Class for training a linear classifier with a single weight vector for
+ * all lablels.
+ */
+trait SingleWeightLinearClassifierTrainer extends
+    LinearClassifierTrainer[WeightVector] {
+  /** Create and initialize a vector of weights of length `len` to all 0's. */
+  def new_zero_weights(len: Int, num_classes: Int) = new WeightVector(len)
+
+  final def weight_length(wv: WV) = wv.length
+
+  final def weight_for_label(weights: WV, label: Int) = weights
+
+  def add_weight_to_weight(accum: WV, addto: WV) {
+    (0 until addto.length).foreach(i => accum(i) += addto(i))
+  }
+
+  def divide_weight_by_value(wv: WV, value: Double) {
+    (0 until wv.length).foreach(i => wv(i) /= value)
+  }
+}
+
+/**
+ * Class for training a multi-weight linear classifier.
+ */
+trait MultiWeightLinearClassifierTrainer extends
+    LinearClassifierTrainer[IndexedSeq[WeightVector]] {
+
+  /** Create and initialize a vector of weights of length `len` to all 0's. */
+  def new_zero_weights(len: Int, num_classes: Int) =
+    IndexedSeq[WeightVector](
+      (for (i <- 0 until num_classes) yield new WeightVector(len)) :_*)
+
+  final def weight_length(wv: WV) = wv(0).length
+
+  final def weight_for_label(weights: WV, label: Int) = weights(label)
+
+  def add_weight_to_weight(accum: WV, addto: WV) {
+    for (j <- 0 until accum.length) {
+      val awv = accum(j)
+      val bwv = addto(j)
+      assert(awv.length == bwv.length)
+      (0 until awv.length).foreach(i => awv(i) += bwv(i))
+    }
+  }
+
+  def divide_weight_by_value(wv: WV, value: Double) {
+    for (j <- 0 until wv.length) {
+      val awv = wv(j)
+      (0 until awv.length).foreach(i => awv(i) /= value)
+    }
+  }
 }
 
 /**
  * Class for training a linear classifier given a set of training instances and
  * associated labels.
  */
-trait BinaryLinearClassifierTrainer extends LinearClassifierTrainer {
+trait BinaryLinearClassifierTrainer extends SingleWeightLinearClassifierTrainer {
   /** Train a linear classifier given a set of labeled instances. */
   def apply(data: Iterable[(FeatureVector, Int)]): 
     BinaryLinearClassifier
@@ -165,7 +272,7 @@ class SingleWeightMultiClassLinearClassifier (
  * Note that the feature vector is also passed the class in when a value is
  * requested.
  */
-class MultiClassLinearClassifier (
+class MultiWeightMultiClassLinearClassifier (
   val weights: IndexedSeq[WeightVector]
 ) extends LinearClassifier {
   val number_of_labels = weights.length
@@ -186,21 +293,28 @@ class MultiClassLinearClassifier (
 }
 
 /**
+ * Mix-in for training a multi-class linear classifier.
+ */
+trait MultiClassLinearClassifierTrainer {
+  /** Return set of "yes" labels associated with an instance.  Currently only
+    * one yes label per instance, but this could be changed by redoing this
+    * function. */
+  def yes_labels(label: Int, num_classes: Int) =
+    (0 until 0) ++ (label to label)
+
+  /** Return set of "no" labels associated with an instance -- complement of
+    * the set of "yes" labels. */
+  def no_labels(label: Int, num_classes: Int) =
+    (0 until label) ++ (label until num_classes)
+}
+
+/**
  * Class for training a multi-class linear classifier with only a single set of
  * weights for all classes.
  */
 trait SingleWeightMultiClassLinearClassifierTrainer
-  extends LinearClassifierTrainer {
-  /** Check that the arguments passed in are kosher, and return an array of
-    * the weights to be learned. */
-  def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
-    val len = check_sequence_lengths(data)
-    assert(num_classes >= 2)
-    for ((inst, label) <- data)
-      assert(label >= 0 && label < num_classes)
-    new_weights(len)
-  }
-
+  extends SingleWeightLinearClassifierTrainer
+  with MultiClassLinearClassifierTrainer {
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
     SingleWeightMultiClassLinearClassifier
 }
@@ -209,18 +323,9 @@ trait SingleWeightMultiClassLinearClassifierTrainer
  * Class for training a multi-class linear classifier with separate weights for each
  * class.
  */
-trait MultiClassLinearClassifierTrainer extends LinearClassifierTrainer {
-  /** Check that the arguments passed in are kosher, and return an array of
-    * the weights to be learned. */
-  def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
-    val len = check_sequence_lengths(data)
-    assert(num_classes >= 2)
-    for ((inst, label) <- data)
-      assert(label >= 0 && label < num_classes)
-    IndexedSeq[WeightVector](
-      (for (i <- 0 until num_classes) yield new_weights(len)) :_*)
-  }
-
+trait MultiWeightMultiClassLinearClassifierTrainer
+  extends MultiWeightLinearClassifierTrainer
+  with MultiClassLinearClassifierTrainer {
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
-    MultiClassLinearClassifier
+    MultiWeightMultiClassLinearClassifier
 }
