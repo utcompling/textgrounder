@@ -18,6 +18,7 @@
 
 package opennlp.textgrounder
 package learning.perceptron
+import learning._
 
 /**
  * A perceptron for statistical classification.
@@ -178,11 +179,6 @@ package learning.perceptron
  *    problem, where the correct candidate is associated with the "correct"
  *    label, and the labels of all other candidates are given "incorrect"
  *    labels.
- * 5. FIXME: Because different instances may have different numbers of
- *    candidates, we need to modify the algorithm to allow for this.  This
- *    means that rather than having a fixed `num_labels` value passed in,
- *    it needs to have a function to retrieve the number of labels from a
- *    given instance.
  * 6. Note also that the cost-insensitive algorithms are capable of supporting
  *    multiple correct candidates with some work done to the scaffolding,
  *    and for the cost-sensitive algorithms, choose as "correct" the one
@@ -195,6 +191,14 @@ package learning.perceptron
 import learning._
 import util.math.{argmax,argmin,argandmax,argandmin}
 import util.print._
+
+trait PerceptronTrainer {
+  val averaged: Boolean
+  val error_threshold: Double
+  val max_iterations: Int
+  assert(error_threshold >= 0)
+  assert(max_iterations > 0)
+}
 
 /**
  * Class for training a binary perceptron given a set of training instances
@@ -217,22 +221,8 @@ import util.print._
  *    when the threshold constraint succeeds of the maximum number of
  *    iterations is reached.
  */
-abstract class BinaryPerceptronTrainer(
-  averaged: Boolean = false,
-  error_threshold: Double = 1e-10,
-  max_iterations: Int = 1000
-) extends BinaryLinearClassifierTrainer {
-  assert(error_threshold >= 0)
-  assert(max_iterations > 0)
-
-  /** Check that the arguments passed in are kosher, and return an array of
-    * the weights to be learned. */
-  def initialize(data: Iterable[(FeatureVector, Int)]) = {
-    val len = check_sequence_lengths(data)
-    for ((inst, label) <- data)
-      assert(label == 0 || label == 1)
-    new_weights(len, 2)
-  }
+trait BinaryPerceptronTrainer extends
+    BinaryLinearClassifierTrainer with PerceptronTrainer {
 
   /** Return the scale factor used for updating the weight vector to a
     * new weight vector.  This will be 0 if no updating should be
@@ -251,16 +241,17 @@ abstract class BinaryPerceptronTrainer(
   /** Train a binary perceptron given a set of labeled instances. */
   def apply(data: Iterable[(FeatureVector, Int)]) = {
     val debug = false
-    val weights = initialize(data)
+    val weight_aggr = initialize(data)
+    val weights = weight_aggr(0)
     def print_weights() {
-      errprint("Weights: length=%s,max=%s,min=%s",
-        weights.length, weights.max, weights.min)
+       errprint("Weights: length=%s,max=%s,min=%s",
+         weights.length, weights.max, weights.min)
       // errprint("Weights: [%s]", weights.mkString(","))
     }
     if (debug)
       print_weights()
     val (final_weights, num_iterations) =
-      iterate_averaged(2, weights, averaged, error_threshold, max_iterations) {
+      iterate_averaged(weight_aggr, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
         var total_error = 0.0
         if (debug)
@@ -268,14 +259,14 @@ abstract class BinaryPerceptronTrainer(
         for ((inst, label) <- data) {
           if (debug)
             errprint("Instance %s, label %s", inst, label)
-          val score = inst.dot_product(weights, 1)
+          val score = inst.dot_product(weights(0), 1)
           if (debug)
             errprint("Score %s", score)
           val scale = get_scale_factor(inst, label, score)
           if (debug)
             errprint("Scale %s", scale)
           if (scale != 0) {
-            inst.update_weights(weights, scale, 1)
+            inst.update_weights(weights(0), scale, 1)
             if (debug)
               print_weights()
             total_error += math.abs(scale)
@@ -283,7 +274,7 @@ abstract class BinaryPerceptronTrainer(
         }
         total_error
       }
-    new BinaryLinearClassifier(final_weights)
+    new BinaryLinearClassifier(final_weights.asInstanceOf[SingleVectorAggregate])
   }
 }
 
@@ -296,11 +287,12 @@ abstract class BinaryPerceptronTrainer(
  * vector of the instance we just evaluated on.
  */
 class BasicBinaryPerceptronTrainer(
-  alpha: Double,
-  averaged: Boolean = false,
-  error_threshold: Double = 1e-10,
-  max_iterations: Int = 1000
-) extends BinaryPerceptronTrainer(averaged, error_threshold, max_iterations) {
+  val vector_factory: SimpleVectorFactory,
+  val alpha: Double,
+  val averaged: Boolean = false,
+  val error_threshold: Double = 1e-10,
+  val max_iterations: Int = 1000
+) extends BinaryPerceptronTrainer {
   def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
     val pred = if (score > 0) 1 else -1
     // Map from 0/1 to -1/1
@@ -346,11 +338,13 @@ trait PassiveAggressivePerceptronTrainer {
  *   allow more aggressive changes to the weight vector during training.
  */
 class PassiveAggressiveBinaryPerceptronTrainer(
+  val vector_factory: SimpleVectorFactory,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
-  error_threshold: Double = 1e-10,
-  max_iterations: Int = 1000
-) extends BinaryPerceptronTrainer(false, error_threshold, max_iterations)
+  val error_threshold: Double = 1e-10,
+  val max_iterations: Int = 1000
+) extends { val averaged = false }
+    with BinaryPerceptronTrainer
     with PassiveAggressivePerceptronTrainer {
   def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
     // Map from 0/1 to -1/1
@@ -363,39 +357,30 @@ class PassiveAggressiveBinaryPerceptronTrainer(
 
 /**
  * Class for training a multi-label perceptron.
- *
- * @tparam WVType Type of the weights used to initialize the perceptron
- *   (either a single vector of weights or an array of vectors).
  */
-trait MultiLabelPerceptronTrainer[WVType] extends
-    LinearClassifierTrainer[WVType] with MultiLabelLinearClassifierTrainer {
-  val averaged: Boolean
-  val error_threshold: Double
-  val max_iterations: Int
-
-  assert(error_threshold >= 0)
-  assert(max_iterations > 0)
-
+trait MultiLabelPerceptronTrainer
+    extends LinearClassifierTrainer
+       with PerceptronTrainer {
   /**
    * Compute the weights used to initialize a linear classifier.
    *
    * @return Tuple of the weights and number of iterations used to compute
    *   the weights.
    */
-  def get_weights(data: Iterable[(FeatureVector, Int)], num_labels: Int
-  ): (WV, Int)
+  def get_weights(data: Iterable[(FeatureVector, Int)]
+  ): (VectorAggregate, Int)
 }
 
 /**
  * Class for training a multi-label perceptron with only a single set of
  * weights for all labels.
  */
-trait SingleWeightMultiLabelPerceptronTrainer extends
-    SingleWeightMultiLabelLinearClassifierTrainer with
-    MultiLabelPerceptronTrainer[WeightVector] {
-  def apply(data: Iterable[(FeatureVector, Int)], num_labels: Int) = {
-    val (weights, _) = get_weights(data, num_labels)
-    new SingleWeightMultiLabelLinearClassifier(weights, num_labels)
+trait SingleWeightMultiLabelPerceptronTrainer
+    extends SingleWeightMultiLabelLinearClassifierTrainer
+       with MultiLabelPerceptronTrainer {
+  def apply(data: Iterable[(FeatureVector, Int)]) = {
+    val (weights, _) = get_weights(data)
+    new VariableDepthLinearClassifier(weights)
   }
 }
 
@@ -403,13 +388,13 @@ trait SingleWeightMultiLabelPerceptronTrainer extends
  * Class for training a multi-label perceptron with separate weights for each
  * label.
  */
-trait MultiWeightMultiLabelPerceptronTrainer extends
-     MultiWeightMultiLabelLinearClassifierTrainer with
-     MultiLabelPerceptronTrainer[IndexedSeq[WeightVector]] {
+trait MultiWeightMultiLabelPerceptronTrainer
+    extends MultiWeightMultiLabelLinearClassifierTrainer
+       with MultiLabelPerceptronTrainer {
 
-  def apply(data: Iterable[(FeatureVector, Int)], num_labels: Int) = {
-    val (weights, _) = get_weights(data, num_labels)
-    new MultiWeightMultiLabelLinearClassifier(weights)
+  def apply(data: Iterable[(FeatureVector, Int)]) = {
+    val (weights, _) = get_weights(data)
+    new FixedDepthLinearClassifier(weights, num_labels)
   }
 }
 
@@ -420,8 +405,8 @@ trait MultiWeightMultiLabelPerceptronTrainer extends
  * correct labels for a given instance, although the supporting code is not
  * currently written to handle this.
  */
-trait NoCostMultiLabelPerceptronTrainer[WVType] extends
-    MultiLabelPerceptronTrainer[WVType] {
+trait NoCostMultiLabelPerceptronTrainer extends
+    MultiLabelPerceptronTrainer {
   /** Return the scale factor used for updating the weight vector to a
     * new weight vector.  This will be 0 if no updating should be
     * done. (In the basic perceptron algorithm, this happens whenever
@@ -440,23 +425,23 @@ trait NoCostMultiLabelPerceptronTrainer[WVType] extends
   def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
       max_no_label: Int, margin: Double): Double
 
-  def get_weights(data: Iterable[(FeatureVector, Int)], num_labels: Int
-  ): (WV, Int) = {
-    val weights = initialize(data, num_labels)
-    iterate_averaged(num_labels, weights, averaged, error_threshold,
-        max_iterations) { (weights, iter) =>
+  def get_weights(data: Iterable[(FeatureVector, Int)]
+      ): (VectorAggregate, Int) = {
+    val weights = initialize(data)
+    iterate_averaged(weights, averaged, error_threshold, max_iterations) {
+        (weights, iter) =>
       var total_error = 0.0
       for ((inst, label) <- data) {
         def dotprod(x: Int) =
-          inst.dot_product(weight_for_label(weights,x), x)
-        val yeslabs = yes_labels(label, num_labels)
-        val nolabs = no_labels(label, num_labels)
+          inst.dot_product(weights(x), x)
+        val yeslabs = yes_labels(inst, label)
+        val nolabs = no_labels(inst, label)
         val (r,rscore) = argandmin[Int](yeslabs, dotprod(_))
         val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
         val scale = get_scale_factor(inst, r, s, rscore - sscore)
         if (scale != 0) {
-          inst.update_weights(weight_for_label(weights,r), scale, r)
-          inst.update_weights(weight_for_label(weights,s), -scale, s)
+          inst.update_weights(weights(r), scale, r)
+          inst.update_weights(weights(s), -scale, s)
           total_error += math.abs(scale)
         }
       }
@@ -477,7 +462,7 @@ trait NoCostMultiLabelPerceptronTrainer[WVType] extends
  */
 trait NoCostSingleWeightMultiLabelPerceptronTrainer extends
     SingleWeightMultiLabelPerceptronTrainer with
-    NoCostMultiLabelPerceptronTrainer[WeightVector] {
+    NoCostMultiLabelPerceptronTrainer {
 }
 
 /**
@@ -485,7 +470,7 @@ trait NoCostSingleWeightMultiLabelPerceptronTrainer extends
  */
 trait NoCostMultiWeightMultiLabelPerceptronTrainer extends
      MultiWeightMultiLabelPerceptronTrainer with
-     NoCostMultiLabelPerceptronTrainer[IndexedSeq[WeightVector]] {
+     NoCostMultiLabelPerceptronTrainer {
 }
 
 /**
@@ -513,6 +498,7 @@ trait BasicNoCostMultiLabelPerceptronTrainer {
  * factor.
  */
 class BasicSingleWeightMultiLabelPerceptronTrainer(
+  val vector_factory: SimpleVectorFactory,
   val alpha: Double,
   val averaged: Boolean = false,
   val error_threshold: Double = 1e-10,
@@ -528,6 +514,8 @@ class BasicSingleWeightMultiLabelPerceptronTrainer(
  * factor.
  */
 class BasicMultiWeightMultiLabelPerceptronTrainer(
+  val vector_factory: SimpleVectorFactory,
+  val num_labels: Int,
   val alpha: Double,
   val averaged: Boolean = false,
   val error_threshold: Double = 1e-10,
@@ -584,6 +572,7 @@ trait PassiveAggressiveNoCostMultiLabelPerceptronTrainer {
  * using a passive-aggressive algorithm.
  */
 class PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer(
+  val vector_factory: SimpleVectorFactory,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
   val error_threshold: Double = 1e-10,
@@ -599,6 +588,8 @@ class PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer(
  * using a passive-aggressive algorithm.
  */
 class PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer(
+  val vector_factory: SimpleVectorFactory,
+  val num_labels: Int,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
   val error_threshold: Double = 1e-10,
@@ -612,8 +603,8 @@ class PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer(
 /**
  * Class for training a cost-sensitive multi-label perceptron.
  */
-trait CostSensitiveMultiLabelPerceptronTrainer[WVType] extends
-    MultiLabelPerceptronTrainer[WVType] {
+trait CostSensitiveMultiLabelPerceptronTrainer extends
+    MultiLabelPerceptronTrainer {
   val prediction_based: Boolean
 
   /** Return the scale factor used for updating the weight vector to a
@@ -637,15 +628,14 @@ trait CostSensitiveMultiLabelPerceptronTrainer[WVType] extends
     */
   def cost(inst: FeatureVector, correct: Int, predicted: Int): Double
 
-  def get_weights(data: Iterable[(FeatureVector, Int)], num_labels: Int
-  ): (WV, Int) = {
-    val weights = initialize(data, num_labels)
-    val all_labs = 0 until num_labels
-    iterate_averaged(num_labels, weights, averaged, error_threshold,
+  def get_weights(data: Iterable[(FeatureVector, Int)]): (VectorAggregate, Int) = {
+    val weights = initialize(data)
+    iterate_averaged(weights, averaged, error_threshold,
          max_iterations) { (weights, iter) =>
       var total_error = 0.0
       for ((inst, correct) <- data) {
-        def dotprod(x: Int) = inst.dot_product(weight_for_label(weights, x), x)
+        val all_labs = 0 until number_of_labels(inst)
+        def dotprod(x: Int) = inst.dot_product(weights(x), x)
         val goldscore = dotprod(correct)
         val predicted =
           if (prediction_based)
@@ -657,8 +647,8 @@ trait CostSensitiveMultiLabelPerceptronTrainer[WVType] extends
           math.sqrt(cost(inst, correct, predicted))
         val scale = get_scale_factor(inst, correct, predicted, loss)
         if (scale != 0) {
-          inst.update_weights(weight_for_label(weights, correct), scale, correct)
-          inst.update_weights(weight_for_label(weights, predicted), -scale, predicted)
+          inst.update_weights(weights(correct), scale, correct)
+          inst.update_weights(weights(predicted), -scale, predicted)
           total_error += math.abs(scale)
         }
       }
@@ -674,7 +664,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[WVType] extends
  */
 trait CostSensitiveSingleWeightMultiLabelPerceptronTrainer extends
     SingleWeightMultiLabelPerceptronTrainer with
-    CostSensitiveMultiLabelPerceptronTrainer[WeightVector] {
+    CostSensitiveMultiLabelPerceptronTrainer {
 }
 
 /**
@@ -683,7 +673,7 @@ trait CostSensitiveSingleWeightMultiLabelPerceptronTrainer extends
  */
 trait CostSensitiveMultiWeightMultiLabelPerceptronTrainer extends
      MultiWeightMultiLabelPerceptronTrainer with
-     CostSensitiveMultiLabelPerceptronTrainer[IndexedSeq[WeightVector]] {
+     CostSensitiveMultiLabelPerceptronTrainer {
 }
 
 /**
@@ -720,6 +710,7 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTra
  * using a passive-aggressive algorithm.
  */
 abstract class PassiveAggressiveCostSensitiveMultiWeightMultiLabelPerceptronTrainer(
+  val num_labels: Int,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
   val error_threshold: Double = 1e-10,
