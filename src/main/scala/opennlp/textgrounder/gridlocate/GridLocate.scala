@@ -33,7 +33,7 @@ import util.os.output_resource_usage
 import util.print.errprint
 import util.textdb
 
-import learning.Ranker
+import learning.{ArrayVector, Ranker}
 import learning.perceptron._
 import worddist._
 
@@ -818,16 +818,14 @@ trained on that same data. Default is %default.""")
   var rerank_classifier =
     ap.option[String]("rerank-classifier",
       default = "perceptron",
-      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
-        "trivial"),
+      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron"),
       help = """Type of classifier to use for reranking.  Possibilities are
 'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
 (perceptron using the basic algorithm, where the weights from the various
 rounds are averaged -- this usually improves results if the weights oscillate
 around a certain error rate, rather than steadily improving); 'pa-perceptron'
 (passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds);
-'trivial' (a trivial pointwise reranker for testing purposes).
+dropping-off error rate improvements with increased number of rounds).
 Default %default.
 
 For the perceptron classifiers, see also `--pa-variant`,
@@ -1197,39 +1195,40 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   }
 
   protected def create_pointwise_classifier_trainer = {
+    val vec_factory = ArrayVector
     params.rerank_classifier match {
       case "pa-perceptron" =>
-        new PassiveAggressiveBinaryPerceptronTrainer(
-          params.pa_variant, params.perceptron_aggressiveness,
+        new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer(
+          vec_factory, params.pa_variant, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds)
       case "perceptron" | "avg-perceptron" =>
-        new BasicBinaryPerceptronTrainer(
-          params.perceptron_aggressiveness,
+        new BasicSingleWeightMultiLabelPerceptronTrainer(
+          vec_factory, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds,
           averaged = params.rerank_classifier == "avg-perceptron")
     }
   }
 
-  protected def create_rerank_instance_factory = {
+  protected def create_candidate_instance_factory = {
     params.rerank_instance match {
       case "trivial" =>
-        new TrivialRerankInstFactory[Co]
+        new TrivialCandidateInstFactory[Co]
       case "kl-div" =>
-        new KLDivRerankInstFactory[Co]
+        new KLDivCandidateInstFactory[Co]
       case "matching-word-binary" =>
-        new WordMatchingRerankInstFactory[Co]("binary")
+        new WordMatchingCandidateInstFactory[Co]("binary")
       case "matching-word-count" =>
-        new WordMatchingRerankInstFactory[Co]("count")
+        new WordMatchingCandidateInstFactory[Co]("count")
       case "matching-word-count-product" =>
-        new WordMatchingRerankInstFactory[Co]("count-product")
+        new WordMatchingCandidateInstFactory[Co]("count-product")
       case "matching-word-probability" =>
-        new WordMatchingRerankInstFactory[Co]("probability")
+        new WordMatchingCandidateInstFactory[Co]("probability")
       case "matching-word-prob-product" =>
-        new WordMatchingRerankInstFactory[Co]("prob-product")
+        new WordMatchingCandidateInstFactory[Co]("prob-product")
       case "matching-word-kl" =>
-        new WordMatchingRerankInstFactory[Co]("kl")
+        new WordMatchingCandidateInstFactory[Co]("kl")
     }
   }
 
@@ -1239,52 +1238,48 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
               create_strategy_from_documents(read_raw_training_documents)
           } with GridRanker[Co]
     if (params.rerank == "none") basic_ranker
-    else params.rerank_classifier match {
-      case "trivial" =>
-        new TrivialGridReranker[Co](basic_ranker, params.rerank_top_n)
-      case _ => {
-        val rerank_instance_factory = create_rerank_instance_factory
-        val reranker_trainer =
-          new LinearClassifierGridRerankerTrainer[Co](
-            create_pointwise_classifier_trainer
-          ) {
-            val top_n = params.rerank_top_n
-            val number_of_splits = params.rerank_num_training_splits
-            protected def create_rerank_training_instance(query: GeoDoc[Co],
-                candidate: GeoCell[Co], initial_score: Double) =
-              rerank_instance_factory(query, candidate, initial_score,
-                is_training = true)
-            protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
-                candidate: GeoCell[Co], initial_score: Double) =
-              rerank_instance_factory(query, candidate, initial_score,
-                is_training = false)
-            protected def create_initial_ranker(
-              data: Iterable[DocStatus[RawDocument]]
-            ) = new { val strategy =
-                       create_strategy_from_documents(_ => data.toIterator) }
-                  with GridRanker[Co]
-            protected def external_instances_to_query_candidate_pairs(
-              insts: Iterator[DocStatus[RawDocument]],
-              initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
-            ) = {
-              val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
-              val grid = grid_ranker.grid
-              grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
-                // Convert document to (doc, cell) pair.  But if a cell
-                // can't be found (i.e. there were no training docs in the
-                // cell of this "test" doc), skip the entire instance rather
-                // than end up trying to score a fake cell
-                grid.find_best_cell_for_document(doc, false) map ((doc, _))
-              }
+    else {
+      val candidate_instance_factory = create_candidate_instance_factory
+      val reranker_trainer =
+        new LinearClassifierGridRerankerTrainer[Co](
+          create_pointwise_classifier_trainer
+        ) {
+          val top_n = params.rerank_top_n
+          val number_of_splits = params.rerank_num_training_splits
+          protected def create_candidate_training_instance(query: GeoDoc[Co],
+              candidate: GeoCell[Co], initial_score: Double) =
+            candidate_instance_factory(query, candidate, initial_score,
+              is_training = true)
+          protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
+              candidate: GeoCell[Co], initial_score: Double) =
+            candidate_instance_factory(query, candidate, initial_score,
+              is_training = false)
+          protected def create_initial_ranker(
+            data: Iterable[DocStatus[RawDocument]]
+          ) = new { val strategy =
+                     create_strategy_from_documents(_ => data.toIterator) }
+                with GridRanker[Co]
+          protected def external_instances_to_query_candidate_pairs(
+            insts: Iterator[DocStatus[RawDocument]],
+            initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
+          ) = {
+            val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
+            val grid = grid_ranker.grid
+            grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
+              // Convert document to (doc, cell) pair.  But if a cell
+              // can't be found (i.e. there were no training docs in the
+              // cell of this "test" doc), skip the entire instance rather
+              // than end up trying to score a fake cell
+              grid.find_best_cell_for_document(doc, false) map ((doc, _))
             }
           }
-        val training_data = new Iterable[DocStatus[RawDocument]] {
-          def iterator =
-            read_raw_training_documents(
-              "reading %s for generating reranker training data")
-        }.view
-        reranker_trainer(training_data)
-      }
+        }
+      val training_data = new Iterable[DocStatus[RawDocument]] {
+        def iterator =
+          read_raw_training_documents(
+            "reading %s for generating reranker training data")
+      }.view
+      reranker_trainer(training_data)
     }
   }
 

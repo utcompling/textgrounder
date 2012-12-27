@@ -23,7 +23,7 @@ trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
     strategy.return_ranked_cells(item.dist, include)
 }
 
-trait RerankInstFactory[Co] extends (
+trait CandidateInstFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory =
@@ -41,21 +41,21 @@ trait RerankInstFactory[Co] extends (
 }
 
 /**
- * A simple factory for generating rerank instances for a document, using
+ * A simple factory for generating candidate instances for a document, using
  * nothing but the score passed in.
  */
-class TrivialRerankInstFactory[Co] extends
-    RerankInstFactory[Co] {
+class TrivialCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
     is_training: Boolean) = make_feature_vector(Iterable(), score, is_training)
 }
 
 /**
- * A factory for generating rerank instances for a document, generating
+ * A factory for generating candidate instances for a document, generating
  * separate features for each word.
  */
-abstract class WordByWordRerankInstFactory[Co] extends
-    RerankInstFactory[Co] {
+abstract class WordByWordCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
     celldist: UnigramWordDist): Option[Double]
 
@@ -80,11 +80,11 @@ abstract class WordByWordRerankInstFactory[Co] extends
 }
 
 /**
- * A simple factory for generating rerank instances for a document, using
+ * A simple factory for generating candidate instances for a document, using
  * individual KL-divergence components for each word in the document.
  */
-class KLDivRerankInstFactory[Co] extends
-    WordByWordRerankInstFactory[Co] {
+class KLDivCandidateInstFactory[Co] extends
+    WordByWordCandidateInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
       celldist: UnigramWordDist) = {
     val p = docdist.lookup_word(word)
@@ -97,7 +97,7 @@ class KLDivRerankInstFactory[Co] extends
 }
 
 /**
- * A simple factory for generating rerank instances for a document, using
+ * A simple factory for generating candidate instances for a document, using
  * the presence of matching words between document and cell.
  *
  * @param value How to compute the value assigned to the words that are
@@ -105,8 +105,8 @@ class KLDivRerankInstFactory[Co] extends
  *   count.  If "probability", assign the probability (essentially, word
  *   count normalized by the number of words in the document).
  */
-class WordMatchingRerankInstFactory[Co](value: String) extends
-    WordByWordRerankInstFactory[Co] {
+class WordMatchingCandidateInstFactory[Co](value: String) extends
+    WordByWordCandidateInstFactory[Co] {
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
       celldist: UnigramWordDist) = {
     val qcount = celldist.model.get_item(word)
@@ -131,28 +131,10 @@ class WordMatchingRerankInstFactory[Co](value: String) extends
   }
 }
 
-trait PointwiseGridReranker[Co, RerankInst]
+trait PointwiseGridReranker[Co]
 extends GridRanker[Co]
-   with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co], RerankInst] {
+   with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co]] {
   lazy val strategy = initial_ranker.asInstanceOf[GridRanker[Co]].strategy
-}
-
-/**
- * A trivial grid reranker.  A grid reranker is a reranker based on a grid
- * ranker (for ranking cells in a grid as possible matches for a given
- * document).  This simply returns the initial score as the new score,
- * meaning that the ranking will be unchanged.
- */
-class TrivialGridReranker[Co](
-  val initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]],
-  val top_n: Int
-) extends PointwiseGridReranker[Co, Double] {
-  lazy protected val rerank_classifier =
-    new TrivialScoringBinaryClassifier(
-        0 // FIXME: This is incorrect but doesn't matter
-    )
-  protected def create_rerank_evaluation_instance(item: GeoDoc[Co],
-    candidate: GeoCell[Co], score: Double) = score
 }
 
 /**
@@ -160,29 +142,17 @@ class TrivialGridReranker[Co](
  * based on a grid ranker (for ranking cells in a grid as possible matches
  * for a given document).
  *
- * @param initial_ranker The ranker used to create the initial ranking over
- *   the grid.
  * @param trainer Factory object for training a linear classifier used for
  *   pointwise reranking.
- * @param training_data Training data used to generate training instances
- *   for the reranking linear classifier.  Generally the same as what was
- *   used to train the initial ranker.
- * @param create_rerank_instance Factory object for creating appropriate
- *   feature vectors describing the combination of document, possible
- *   cell and initial score.
- * @param top_n Number of top items to rerank.
  */
 abstract class LinearClassifierGridRerankerTrainer[Co](
-  val trainer: BinaryLinearClassifierTrainer
+  val trainer: SingleWeightLinearClassifierTrainer
 ) extends PointwiseClassifyingRerankerTrainer[
-    GeoDoc[Co], GeoCell[Co], FeatureVector, DocStatus[RawDocument]
+    GeoDoc[Co], GeoCell[Co], DocStatus[RawDocument]
     ] { self =>
   protected def create_rerank_classifier(
-    data: Iterable[(FeatureVector, Boolean)]
+    data: Iterable[(FeatureVector, Int)]
   ) = {
-    val adapted_data = data.map {
-      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
-    }
     errprint("Training linear classifier ...")
     errprint("Number of training items: %s", data.size)
     val num_total_feats = data.map(_._1.length.toLong).sum
@@ -195,7 +165,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       num_total_stored_feats)
     errprint("Avg number of stored features per training item: %.2f",
       num_total_stored_feats.toDouble / data.size)
-    new LinearClassifierAdapter(trainer(adapted_data, 2))
+    trainer(data)
   }
 
   /**
@@ -203,16 +173,16 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
    * initial ranker.
    */
   override protected def create_reranker(
-    _rerank_classifier: ScoringBinaryClassifier[FeatureVector],
+    _rerank_classifier: ScoringClassifier,
     _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
   ) = {
-    new PointwiseGridReranker[Co, FeatureVector] {
+    new PointwiseGridReranker[Co] {
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
+      protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
           candidate: GeoCell[Co], initial_score: Double) = {
-        self.create_rerank_evaluation_instance(query, candidate, initial_score)
+        self.create_candidate_evaluation_instance(query, candidate, initial_score)
       }
     }
   }
@@ -222,7 +192,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
    */
   override def apply(training_data: Iterable[DocStatus[RawDocument]]) =
     super.apply(training_data).
-      asInstanceOf[PointwiseGridReranker[Co, FeatureVector]]
+      asInstanceOf[PointwiseGridReranker[Co]]
 
   override def display_query_item(item: GeoDoc[Co]) = {
     "%s, dist=%s" format (item, item.dist.debug_string)
