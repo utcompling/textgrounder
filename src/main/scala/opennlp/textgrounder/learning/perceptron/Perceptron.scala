@@ -58,36 +58,50 @@ package learning.perceptron
  * a dot product of the weight vector and the instance's feature vector.
  * In the binary case, the sign of the score indicates which of the two
  * possible labels to predict, and the magnitude indicates the relative
- * confidence.
+ * confidence.  Note that, in general the relative confidence cannot be
+ * related to any absolute measure (e.g. probability); all that can be said
+ * is that a score with higher magnitude indicates greater confidence than
+ * one with a lower magnitude, provided that both scores came from the
+ * same perceptron.
  *
  * In the multi-label perceptron algorithm, there are multiple possible
- * labels that can be predicted.  In this situation, there will in general
- * be a different set of weights for each label.  When classifying an
- * instance, we compute a separate score for each label using a dot product
- * of the instance's feature vector and the weight vector for that label,
- * and choose the label associated with the highest score.  Note that in
- * the most general case, the value of a given feature in a given instance
- * may vary depending on the label to be predicted; we allow for this by
- * indexing an instance's feature vector by both the feature in question
- * and the label to be predicted.
+ * labels that can be predicted.  In this situation, we compute a separate
+ * score for each possible label -- again, using a dot product of a learned
+ * weight vector and a feature vector derived from the instance in question --
+ * and choose the label with the highest score.  In this situation, the
+ * sign and magnitude of the scores themselves have no significance.  The only
+ * thing that matters is the difference between two scores, which indicates
+ * a relative confidence that one label is better than the other.
  * 
  * In the multi-label case, there are two variants for handling the weights:
- * Either we simply maintain an array of weight vectors, one per label, or we
- * concatenate all the weights into one large vector and index this vector
- * by both feature index and label.  The latter variant is more general in
- * that it allows, e.g., for two features or two labels to share the same
- * weights or for more complex schemes for tying weights together.  These
- * two variants are described below as "multi-weight" and "single-weight",
- * respectively.
+ * Either we use a single weight vector for all labels or maintain a separate
+ * weight vector for each label.  The former case is most appropriate when
+ * an instance has a separate feature vector for each label being predicted
+ * (or at least, the feature values differ significantly from label to label).
+ * The latter is required in the more common case where an instance is
+ * described by a single feature vector that is independent of the label,
+ * although it can also be used when there are separate per-label feature
+ * vectors associated with an instance.  In the discussion below, we term
+ * these variants "single-weight" and "multi-weight", respectively. (Crammer
+ * et al.'s 2006 paper on passive-aggressive perceptrons uses
+ * "single-prototype" and "multi-prototype", respectively.)
+ *
+ * Note that the multi-weight variant can be subsumed by the single-weight
+ * variant as follows: Given N features and K labels, create a single
+ * weight vector of length NK.  Then create K separate feature vectors of
+ * length NK, with the kth original feature vector occupying positions in
+ * the range [Nk, N(k+1)) in the kth new vector and all other positions
+ * having 0's.  A similar arrangement could be used to create various sorts
+ * of arrangements with partly tied weights.
  *
  * In the multi-label case, every time we need to update weights, we update
  * the weights associated both with the correct label and the incorrectly
  * predicted label.  As in the binary case, we add a scalar multiple of the
- * appropriate feature vector to each of the two weight vectors.  The two
- * weight vectors in general use scalar multiples with the same magnitudes
- * but opposite signs, so that they get pushed in opposite directions
- * (biasing the weights towards the correct label and away from the incorrect
- * one).
+ * appropriate feature vector to each of the two weight vectors (or to the
+ * same weight vector if there is only one).  The two weight vectors in
+ * general use scalar multiples with the same magnitudes but opposite signs,
+ * so that they get pushed in opposite directions (biasing the weights
+ * towards the correct label and away from the incorrect one).
  *
  * The basic algorithm is very simple: Whenever a label is correctly
  * predicted, no weights are changed, and in other cases, a fixed,
@@ -160,20 +174,10 @@ package learning.perceptron
  *    candidate. In general, the number of candidates may vary from instance
  *    to instance.
  * 4. To rank using a perceptron (and probably also any other scoring linear
- *    classifier), treat it as a multi-label classification problem, where the
- *    label of the correct candidate is the "correct" label, and the labels
- *    of all other candidates are the "incorrect" labels.  The following
- *    modifications need to be made:
- *    -- There is no real significance to the different labels, so having
- *       separate per-label weight vectors won't work.  Instead, have only
- *       a single weight vector for all labels.
- *    -- The normal multi-label classification problem has a single
- *       feature vector per instance, but allows the features to vary
- *       depending on the label.  Use this to implement the per-candidate
- *       ranking-feature vectors: Each label maps to a candidate, and the
- *       value of a given feature for a given label maps to the value of
- *       the feature in the ranking-feature vector for the corresponding
- *       candidate.
+ *    classifier), treat it as a single-weight multi-label classification
+ *    problem, where the correct candidate is associated with the "correct"
+ *    label, and the labels of all other candidates are given "incorrect"
+ *    labels.
  * 5. FIXME: Because different instances may have different numbers of
  *    candidates, we need to modify the algorithm to allow for this.  This
  *    means that rather than having a fixed `num_labels` value passed in,
@@ -555,7 +559,6 @@ trait PassiveAggressiveMultiWeightMultiLabelPerceptronTrainer extends
       loss: Double) = {
     val rmag = inst.squared_magnitude(correct)
     val smag = inst.squared_magnitude(predicted)
-    // FIXME: Is this really correct with a summation???
     val sqmagdiff = rmag + smag
     compute_update_factor(loss, sqmagdiff)
   }
