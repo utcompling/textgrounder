@@ -29,11 +29,11 @@ object SupervisedTRFeatureExtractor extends App {
   val gazInputFile = parser.option[String](List("g", "gaz"), "gaz", "serialized gazetteer input file")
   val stoplistInputFile = parser.option[String](List("s", "stoplist"), "stoplist", "stopwords input file")
   val modelsOutputDir = parser.option[String](List("d", "models-dir"), "models-dir", "models output directory")
-  val thresholdParam = parser.option[Double](List("t", "threshold"), "threshold", "maximum distance threshold")
+  //val thresholdParam = parser.option[Double](List("t", "threshold"), "threshold", "maximum distance threshold")
 
   val windowSize = 20
   val dpc = 1.0
-  val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
+  //val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
 
   try {
     parser.parse(args)
@@ -106,7 +106,7 @@ object SupervisedTRFeatureExtractor extends App {
         }
         if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0 && toponyms(token.getForm)) {
           val toponym = token.asInstanceOf[Toponym]
-          val bestCellNum = getBestCellNum(toponym, docCoord, threshold, dpc)
+          val bestCellNum = getBestCellNum(toponym, docCoord, dpc)
           if(bestCellNum != -1) {
             val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, windowSize, stoplist)
             val prevSet = toponymsToTrainingSets.getOrElse(token.getForm, Nil)
@@ -157,9 +157,9 @@ object SupervisedTRFeatureExtractor extends App {
 
   println("All done.")
 
-  def getBestCellNum(toponym:Toponym, docCoord:Coordinate, threshold:Double, dpc:Double): Int = {
+  def getBestCellNum(toponym:Toponym, docCoord:Coordinate, dpc:Double): Int = {
     for(loc <- toponym.getCandidates) {
-      if(loc.getRegion.distanceInKm(new PointRegion(docCoord)) < threshold) {
+      if(loc.getRegion.distanceInKm(new PointRegion(docCoord)) < loc.getThreshold) {
         return TopoUtil.getCellNumber(loc.getRegion.getCenter, dpc)
       }
     }

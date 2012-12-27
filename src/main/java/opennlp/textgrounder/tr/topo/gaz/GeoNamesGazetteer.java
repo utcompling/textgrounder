@@ -31,8 +31,8 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
   /**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
-private final boolean expandRegions;
+  private static final long serialVersionUID = 1L;
+  private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;
   private final int maxPoints;
@@ -85,12 +85,7 @@ private final boolean expandRegions;
 
     this.load(reader);
     if (this.expandRegions) {
-        //for(Location loc : this.lookup("united states"))
-        //    System.out.println(loc.getRegion().getCenter());
-        //System.out.println("------------"); RECOMPILE
       this.expandIPE();
-      //for(Location loc : this.lookup("united states"))
-      //     System.out.println(loc.getRegion().getCenter());
       this.expandADM();
     }
   }
@@ -130,11 +125,8 @@ private final boolean expandRegions;
       if (contained.size() > 0) {
         List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
         representatives = Coordinate.removeNaNs(representatives);
-        //if(location.getName().equalsIgnoreCase("united states"))
-        //    System.out.println(location.getRegion().getCenter());
         location.setRegion(new PointSetRegion(representatives));
-        //if(location.getName().equalsIgnoreCase("united states"))
-        //    System.out.println(location.getRegion().getCenter());
+        location.recomputeThreshold();
         //contained.clear();
         //contained = null;
       }
@@ -172,12 +164,7 @@ private final boolean expandRegions;
           List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
           representatives = Coordinate.removeNaNs(representatives);
           location.setRegion(new PointSetRegion(representatives));
-
-          /*for (Coordinate c : representatives) {
-            System.out.println("<Placemark><Point><coordinates>" +
-                               c.getLngDegrees() + "," + c.getLatDegrees() +
-                               "</coordinates></Point></Placemark>");
-                               }*/
+          location.recomputeThreshold();
         }
       }
     }
@@ -279,7 +266,8 @@ private final boolean expandRegions;
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
-            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population, admin1code);
+            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population, admin1code,
+                                             10.0);
             this.locations.add(location);
 
             for (String name : nameSet) {
