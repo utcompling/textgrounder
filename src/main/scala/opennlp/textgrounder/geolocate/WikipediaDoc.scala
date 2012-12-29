@@ -31,7 +31,6 @@ import util.text.capfirst
 import gridlocate.GridLocateDriver.Debug._
 
 import worddist.{WordDist,WordDistFactory}
-import worddist.WordDist._
 
 /**
  * A document corresponding to a Wikipedia article.
@@ -220,12 +219,12 @@ class WikipediaDocSubfactory(
    * Mapping from document names to WikipediaDoc objects, using the actual
    * case of the document.
    */
-  val name_to_document = mutable.Map[Word, WikipediaDoc]()
+  val name_to_document = mutable.Map[String, WikipediaDoc]()
 
   /**
    * For each toponym, list of documents matching the name.
    */
-  val lower_toponym_to_document = bufmap[Word, WikipediaDoc]()
+  val lower_toponym_to_document = bufmap[String, WikipediaDoc]()
 
   /**
    * Total # of incoming links for all documents in each split.
@@ -247,8 +246,7 @@ class WikipediaDocSubfactory(
   def lookup_document(name: String) = {
     assert(name != null)
     assert(name.length > 0)
-    name_to_document.getOrElse(memoizer.memoize(capfirst(name)),
-      null.asInstanceOf[WikipediaDoc])
+    name_to_document.getOrElse(capfirst(name), null.asInstanceOf[WikipediaDoc])
   }
 
   /**
@@ -268,16 +266,14 @@ class WikipediaDocSubfactory(
     assert(name != null)
     assert(name.length > 0)
     assert(name == capfirst(name))
-    name_to_document(memoizer.memoize(name)) = doc
+    name_to_document(name) = doc
     val loname = name.toLowerCase
-    val loname_word = memoizer.memoize(loname)
     val (short, div) = WikipediaDoc.compute_short_form(loname)
-    val short_word = memoizer.memoize(short)
-    if (!(lower_toponym_to_document(loname_word) contains doc))
-      lower_toponym_to_document(loname_word) += doc
-    if (short_word != loname_word &&
-        !(lower_toponym_to_document(short_word) contains doc))
-      lower_toponym_to_document(short_word) += doc
+    if (!(lower_toponym_to_document(loname) contains doc))
+      lower_toponym_to_document(loname) += doc
+    if (short != loname &&
+        !(lower_toponym_to_document(short) contains doc))
+      lower_toponym_to_document(short) += doc
   }
 
   /**
@@ -313,12 +309,10 @@ class WikipediaDocSubfactory(
   }
 
   def construct_candidates(toponym: String) = {
-    val lw = memoizer.memoize(toponym.toLowerCase)
-    lower_toponym_to_document(lw)
+    lower_toponym_to_document(toponym.toLowerCase)
   }
 
   def word_is_toponym(word: String) = {
-    val lw = memoizer.memoize(word.toLowerCase)
-    lower_toponym_to_document contains lw
+    lower_toponym_to_document contains word.toLowerCase
   }
 }
