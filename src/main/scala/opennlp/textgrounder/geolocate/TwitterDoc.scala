@@ -23,7 +23,6 @@ import util.distances._
 import util.textdb.Schema
 
 import worddist.{WordDist,WordDistFactory}
-import worddist.WordDist._
 
 class TwitterTweetDoc(
   schema: Schema,
@@ -59,13 +58,13 @@ class TwitterUserDoc(
   word_dist_factory: WordDistFactory,
   dist: WordDist,
   coord: SphereCoord,
-  val userind: Word
+  val user: String
 ) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
-  def title = memoizer.unmemoize(userind)
+  def title = user
 
   def xmldesc =
     <TwitterUserDoc>
-      <user>{ memoizer.unmemoize(userind) }</user>
+      <user>{ user }</user>
       {
         if (has_coord)
           <location>{ coord }</location>
@@ -79,7 +78,6 @@ class TwitterUserDocSubfactory(
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
     new TwitterUserDoc(schema, docfact.word_dist_factory, dist, coord,
-      memoizer.memoize(
-        schema.get_value_or_else[String](fieldvals, "user", "")))
+        schema.get_value_or_else[String](fieldvals, "user", ""))
     )
 }
