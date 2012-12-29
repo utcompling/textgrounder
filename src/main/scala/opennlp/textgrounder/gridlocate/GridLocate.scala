@@ -1251,19 +1251,19 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
             val top_n = params.rerank_top_n
             val number_of_splits = params.rerank_num_training_splits
             protected def create_rerank_training_instance(query: GeoDoc[Co],
-                answer: GeoCell[Co], initial_score: Double) =
-              rerank_instance_factory(query, answer, initial_score,
+                candidate: GeoCell[Co], initial_score: Double) =
+              rerank_instance_factory(query, candidate, initial_score,
                 is_training = true)
             protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
-                answer: GeoCell[Co], initial_score: Double) =
-              rerank_instance_factory(query, answer, initial_score,
+                candidate: GeoCell[Co], initial_score: Double) =
+              rerank_instance_factory(query, candidate, initial_score,
                 is_training = false)
             protected def create_initial_ranker(
               data: Iterable[DocStatus[RawDocument]]
             ) = new { val strategy =
                        create_strategy_from_documents(_ => data.toIterator) }
                   with GridRanker[Co]
-            protected def external_instances_to_query_answer_pairs(
+            protected def external_instances_to_query_candidate_pairs(
               insts: Iterator[DocStatus[RawDocument]],
               initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
             ) = {
