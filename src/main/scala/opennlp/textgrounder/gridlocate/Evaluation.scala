@@ -586,9 +586,9 @@ abstract class GridEvaluator[Co](
     evalstats.output_results() // all_results = isfinal)
   }
 
-  def get_true_rank(answers: Iterable[(GeoCell[Co], Double)],
+  def get_true_rank(candidates: Iterable[(GeoCell[Co], Double)],
       true_cell: GeoCell[Co]) = {
-    answers.zipWithIndex.find {
+    candidates.zipWithIndex.find {
       case ((cell, score), index) => cell == true_cell
     } match {
       case Some(((cell, score), index)) => index + 1

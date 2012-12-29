@@ -9,25 +9,25 @@ import learning._
 import gridlocate.GridLocateDriver.Debug._
 
 /**
- * A basic ranker.  Given a query item, return a list of ranked answers from
+ * A basic ranker.  Given a query item, return a list of ranked candidates from
  * best to worst, with a score for each.  The score must not increase from
- * any answer to the next one.
+ * any candidate to the next one.
  */
-trait Ranker[Query, Answer] {
+trait Ranker[Query, Candidate] {
   /**
-   * Evaluate a query item, returning a list of ranked answers from best to
+   * Evaluate a query item, returning a list of ranked candidates from best to
    * worst, with a score for each.  The score must not increase from any
-   * answer to the next one.  Any answers mentioned in `include` must be
+   * candidate to the next one.  Any candidates mentioned in `include` must be
    * included in the returned list.
    */
-  def evaluate(item: Query, include: Iterable[Answer]):
-    Iterable[(Answer, Double)]
+  def evaluate(item: Query, include: Iterable[Candidate]):
+    Iterable[(Candidate, Double)]
 }
 
 /**
  * Common methods and fields between `Reranker` and reranker trainers.
  */
-trait RerankerLike[Query, Answer] {
+trait RerankerLike[Query, Candidate] {
   /**
    * Number of top-ranked items to submit to reranking.
    */
@@ -37,31 +37,31 @@ trait RerankerLike[Query, Answer] {
 /**
  * A reranker.  This is a particular type of ranker that involves two
  * steps: One to compute an initial ranking, and a second to do a more
- * accurate reranking of some subset of the highest-ranked answers.  The
+ * accurate reranking of some subset of the highest-ranked candidates.  The
  * idea is that a more accurate value can be computed when there are fewer
- * possible answers to distinguish -- assuming that the initial ranker
- * is able to include the correct answer near the top significantly more
+ * possible candidates to distinguish -- assuming that the initial ranker
+ * is able to include the correct candidate near the top significantly more
  * often than actually at the top.
  */
-trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Query, Answer] {
+trait Reranker[Query, Candidate] extends Ranker[Query, Candidate] with RerankerLike[Query, Candidate] {
   /** Ranker for generating initial ranking. */
-  protected def initial_ranker: Ranker[Query, Answer]
+  protected def initial_ranker: Ranker[Query, Candidate]
 
   /**
-   * Rerank the given answers, based on an initial ranking.
+   * Rerank the given candidates, based on an initial ranking.
    */
-  protected def rerank_answers(item: Query,
-    initial_ranking: Iterable[(Answer, Double)]): Iterable[(Answer, Double)]
+  protected def rerank_candidates(item: Query,
+    initial_ranking: Iterable[(Candidate, Double)]): Iterable[(Candidate, Double)]
 
   def evaluate_with_initial_ranking(item: Query,
-      include: Iterable[Answer]) = {
+      include: Iterable[Candidate]) = {
     val initial_ranking = initial_ranker.evaluate(item, include)
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
-    val reranking = rerank_answers(item, to_rerank) ++ others
+    val reranking = rerank_candidates(item, to_rerank) ++ others
     (initial_ranking, reranking)
   }
 
-  override def evaluate(item: Query, include: Iterable[Answer]) = {
+  override def evaluate(item: Query, include: Iterable[Candidate]) = {
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, include)
     reranking
@@ -70,36 +70,36 @@ trait Reranker[Query, Answer] extends Ranker[Query, Answer] with RerankerLike[Qu
 
 /**
  * A pointwise reranker that uses a scoring classifier to assign a score
- * to each possible answer to be reranked.  The idea is that, for each
- * possible answer, we create test instances based on a combination of the
- * query item and answer and score the instances to determine the ranking.
+ * to each possible candidate to be reranked.  The idea is that, for each
+ * possible candidate, we create test instances based on a combination of the
+ * query item and candidate and score the instances to determine the ranking.
  *
  * @tparam Query type of a query
- * @tparam Answer type of a possible answer
- * @tparam RerankInst type of the rerank instance encapsulating a query-answer pair
+ * @tparam Candidate type of a possible candidate
+ * @tparam RerankInst type of the rerank instance encapsulating a query-candidate pair
  *   and fed to the rerank classifier
  */
-trait PointwiseClassifyingReranker[Query, Answer, RerankInst]
-    extends Reranker[Query, Answer] {
+trait PointwiseClassifyingReranker[Query, Candidate, RerankInst]
+    extends Reranker[Query, Candidate] {
   /** Scoring classifier for use in reranking. */
   protected def rerank_classifier: ScoringBinaryClassifier[RerankInst]
 
   /**
    * Create a rerank instance to feed to the classifier during evaluation,
-   * given a query item, a potential answer from the ranker, and the score
-   * from the initial ranker on this answer.
+   * given a query item, a potential candidate from the ranker, and the score
+   * from the initial ranker on this candidate.
    */
-  protected def create_rerank_evaluation_instance(query: Query, answer: Answer,
+  protected def create_rerank_evaluation_instance(query: Query, candidate: Candidate,
     initial_score: Double): RerankInst
 
-  protected def rerank_answers(item: Query,
-      answers: Iterable[(Answer, Double)]) = {
+  protected def rerank_candidates(item: Query,
+      candidates: Iterable[(Candidate, Double)]) = {
     val new_scores =
-      for {(answer, score) <- answers
-           instance = create_rerank_evaluation_instance(item, answer, score)
+      for {(candidate, score) <- candidates
+           instance = create_rerank_evaluation_instance(item, candidate, score)
            new_score = rerank_classifier.score_item(instance)
           }
-        yield (answer, new_score)
+        yield (candidate, new_score)
     new_scores.toIndexedSeq sortWith (_._2 > _._2)
   }
 }
@@ -117,12 +117,12 @@ trait PointwiseClassifyingReranker[Query, Answer, RerankInst]
  * -- Reranker training data is the data used to train a rerank classifier,
  *    i.e. the classifier used to compute the scores that underlie the reranking.
  *    This consists of (RerankInst, Boolean) pairs, i.e. pairs of rerank
- *    instances (computed from a query-answer pair) and booleans indicating
- *    whether the instance corresponds to a true answer.
+ *    instances (computed from a query-candidate pair) and booleans indicating
+ *    whether the instance corresponds to a true candidate.
  *
  * Generally, a data instance of type `ExtInst` in the external training
  * data will describe an object of type `Query`, along with the correct
- * answer. However, it need not merely be a pair of `Query` and `Answer`. In
+ * candidate. However, it need not merely be a pair of `Query` and `Candidate`. In
  * particular, the `ExtInst` data may be the raw-data form of an object that
  * can only be created with respect to some particular training corpus (e.g.
  * for doing back-off when computing word distributions).  Hence, a method
@@ -146,19 +146,19 @@ trait PointwiseClassifyingReranker[Query, Answer, RerankInst]
  *    training instances are generated as follows:
  *
  *    (1) rank the data item using the initial ranker to produce a set of
- *        possible answers;
- *    (2) if necessary, augment the possible answers to include the correct
+ *        possible candidates;
+ *    (2) if necessary, augment the possible candidates to include the correct
  *        one;
  *    (3) create a rerank training instance for each combination of query item
- *        and answer, with "correct" or "incorrect" indicated.
+ *        and candidate, with "correct" or "incorrect" indicated.
  *
  * @tparam Query type of a query
- * @tparam Answer type of a possible answer
- * @tparam RerankInst type of the rerank instance encapsulating a query-answer pair
+ * @tparam Candidate type of a possible candidate
+ * @tparam RerankInst type of the rerank instance encapsulating a query-candidate pair
  * @tparam ExtInst type of the instances used in external training data
  */
-trait PointwiseClassifyingRerankerTrainer[Query, Answer, RerankInst, ExtInst]
-extends RerankerLike[Query, Answer] { self =>
+trait PointwiseClassifyingRerankerTrainer[Query, Candidate, RerankInst, ExtInst]
+extends RerankerLike[Query, Candidate] { self =>
   /**
    * Number of splits used in the training data, to create the reranker.
    */
@@ -174,36 +174,36 @@ extends RerankerLike[Query, Answer] { self =>
 
   /**
    * Create a rerank training instance to train the classifier, given a query
-   * item, a potential answer from the ranker, and the score from the initial
-   * ranker on this answer.
+   * item, a potential candidate from the ranker, and the score from the initial
+   * ranker on this candidate.
    */
-  protected def create_rerank_training_instance(query: Query, answer: Answer,
+  protected def create_rerank_training_instance(query: Query, candidate: Candidate,
     initial_score: Double): RerankInst
 
   /**
    * Create a rerank instance to feed to the classifier during evaluation,
-   * given a query item, a potential answer from the ranker, and the score
-   * from the initial ranker on this answer.  Note that this function may need
+   * given a query item, a potential candidate from the ranker, and the score
+   * from the initial ranker on this candidate.  Note that this function may need
    * to work differently from the corresponding function used during training
    * (e.g. in the handling of previously unseen words).
    */
-  protected def create_rerank_evaluation_instance(query: Query, answer: Answer,
+  protected def create_rerank_evaluation_instance(query: Query, candidate: Candidate,
     initial_score: Double): RerankInst
 
   /**
    * Create an initial ranker based on initial-ranker training data.
    */
   protected def create_initial_ranker(data: Iterable[ExtInst]):
-    Ranker[Query, Answer]
+    Ranker[Query, Candidate]
 
   /**
-   * Convert an external instance into a query-answer pair, if possible,
+   * Convert an external instance into a query-candidate pair, if possible,
    * given the external instance and the initial ranker trained from other
    * external instances.
    */
-  protected def external_instances_to_query_answer_pairs(
-    inst: Iterator[ExtInst], initial_ranker: Ranker[Query, Answer]
-  ): Iterator[(Query, Answer)]
+  protected def external_instances_to_query_candidate_pairs(
+    inst: Iterator[ExtInst], initial_ranker: Ranker[Query, Candidate]
+  ): Iterator[(Query, Candidate)]
 
   /**
    * Display a query item (typically for debugging purposes).
@@ -211,33 +211,33 @@ extends RerankerLike[Query, Answer] { self =>
   def display_query_item(item: Query) = item.toString
 
   /**
-   * Display an answer (typically for debugging purposes).
+   * Display an candidate (typically for debugging purposes).
    */
-  def display_answer(answer: Answer) = answer.toString
+  def display_candidate(candidate: Candidate) = candidate.toString
 
   /**
    * Generate rerank training instances for a given instance from the
    * external training data.
    *
-   * @param initial_ranker Initial ranker used to score the answer.
+   * @param initial_ranker Initial ranker used to score the candidate.
    */
   protected def get_rerank_training_instances(
-    query: Query, true_answer: Answer, initial_ranker: Ranker[Query, Answer]
+    query: Query, correct: Candidate, initial_ranker: Ranker[Query, Candidate]
   ) = {
-    val initial_answers =
-      initial_ranker.evaluate(query, Iterable(true_answer))
-    val top_answers = initial_answers.take(top_n)
-    val answers =
-      if (top_answers.find(_._1 == true_answer) != None)
-        top_answers
+    val initial_candidates =
+      initial_ranker.evaluate(query, Iterable(correct))
+    val top_candidates = initial_candidates.take(top_n)
+    val candidates =
+      if (top_candidates.find(_._1 == correct) != None)
+        top_candidates
       else
-        top_answers ++
-          Iterable(initial_answers.find(_._1 == true_answer).get)
-    for {(possible_answer, score) <- answers
-         is_correct = possible_answer == true_answer
+        top_candidates ++
+          Iterable(initial_candidates.find(_._1 == correct).get)
+    for {(possible_candidate, score) <- candidates
+         is_correct = possible_candidate == correct
         }
       yield (
-        create_rerank_training_instance(query, possible_answer, score),
+        create_rerank_training_instance(query, possible_candidate, score),
         is_correct
       )
   }
@@ -249,19 +249,19 @@ extends RerankerLike[Query, Answer] { self =>
    */
   protected def get_rerank_training_data_for_split(
       splitnum: Int, data: Iterator[ExtInst],
-      initial_ranker: Ranker[Query, Answer]) = {
-    val query_answer_pairs =
-      external_instances_to_query_answer_pairs(data, initial_ranker)
+      initial_ranker: Ranker[Query, Candidate]) = {
+    val query_candidate_pairs =
+      external_instances_to_query_candidate_pairs(data, initial_ranker)
     val task = new Meter("generating",
       "split-#%d rerank training instance" format splitnum)
     if (debug("rerank-training")) {
-      query_answer_pairs.zipWithIndex.flatMapMetered(task) {
-        case ((query, answer), index) => {
+      query_candidate_pairs.zipWithIndex.flatMapMetered(task) {
+        case ((query, candidate), index) => {
           val prefix = "#%d: " format (index + 1)
           errprint("%sTraining item: %s", prefix, display_query_item(query))
-          errprint("%sTrue answer: %s", prefix, display_answer(answer))
+          errprint("%sTrue candidate: %s", prefix, display_candidate(candidate))
           val training_insts =
-            get_rerank_training_instances(query, answer, initial_ranker)
+            get_rerank_training_instances(query, candidate, initial_ranker)
           for (((featvec, correct), instind) <- training_insts.zipWithIndex) {
             val instpref = "%s#%d: " format (prefix, instind + 1)
             val correctstr =
@@ -272,9 +272,9 @@ extends RerankerLike[Query, Answer] { self =>
         }
       }
     } else {
-      query_answer_pairs.flatMapMetered(task) {
-        case (query, answer) =>
-          get_rerank_training_instances(query, answer, initial_ranker)
+      query_candidate_pairs.flatMapMetered(task) {
+        case (query, candidate) =>
+          get_rerank_training_instances(query, candidate, initial_ranker)
       }
     }
   }
@@ -323,15 +323,15 @@ extends RerankerLike[Query, Answer] { self =>
    */
   protected def create_reranker(
     _rerank_classifier: ScoringBinaryClassifier[RerankInst],
-    _initial_ranker: Ranker[Query, Answer]
+    _initial_ranker: Ranker[Query, Candidate]
   ) = {
-    new PointwiseClassifyingReranker[Query, Answer, RerankInst] {
+    new PointwiseClassifyingReranker[Query, Candidate, RerankInst] {
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
       protected def create_rerank_evaluation_instance(query: Query,
-          answer: Answer, initial_score: Double) = {
-        self.create_rerank_evaluation_instance(query, answer, initial_score)
+          candidate: Candidate, initial_score: Double) = {
+        self.create_rerank_evaluation_instance(query, candidate, initial_score)
       }
     }
   }

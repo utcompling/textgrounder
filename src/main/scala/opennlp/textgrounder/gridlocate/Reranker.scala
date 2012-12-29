@@ -152,7 +152,7 @@ class TrivialGridReranker[Co](
         0 // FIXME: This is incorrect but doesn't matter
     )
   protected def create_rerank_evaluation_instance(item: GeoDoc[Co],
-    answer: GeoCell[Co], score: Double) = score
+    candidate: GeoCell[Co], score: Double) = score
 }
 
 /**
@@ -211,8 +211,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
       protected def create_rerank_evaluation_instance(query: GeoDoc[Co],
-          answer: GeoCell[Co], initial_score: Double) = {
-        self.create_rerank_evaluation_instance(query, answer, initial_score)
+          candidate: GeoCell[Co], initial_score: Double) = {
+        self.create_rerank_evaluation_instance(query, candidate, initial_score)
       }
     }
   }
