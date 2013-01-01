@@ -176,7 +176,7 @@ trait LinearClassifierTrainer {
   def new_zero_weights(len: Int) = {
     errprint("Length of weight vector: %s", len)
     errprint("Length if we used word-dist memoization: %s",
-      worddist.WordDist.memoizer.number_of_entries + 1)
+      worddist.WordDist.memoizer.number_of_valid_indices)
     factory.empty(len)
   }
 

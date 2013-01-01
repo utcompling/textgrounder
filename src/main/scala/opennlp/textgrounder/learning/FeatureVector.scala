@@ -375,10 +375,7 @@ class SparseFeatureVectorFactory[T](
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
     def display_feature(index: Int) =
       self.display_feature(feature_mapper.unmemoize(index))
-    def length = {
-      // +1 because of the intercept term
-      feature_mapper.number_of_entries + 1
-    }
+    def length = feature_mapper.number_of_valid_indices
   }
 
   /**
@@ -425,7 +422,7 @@ class SparseNominalInstanceFactory extends
   val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
-  def number_of_labels = label_mapper.number_of_entries
+  def number_of_labels = label_mapper.number_of_valid_indices
 
   def make_labeled_instance(features: Iterable[String], label: String,
       is_training: Boolean) = {
