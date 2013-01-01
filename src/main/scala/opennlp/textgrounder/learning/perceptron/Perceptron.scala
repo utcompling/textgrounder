@@ -20,6 +20,8 @@ package opennlp.textgrounder
 package learning.perceptron
 import learning._
 
+import gridlocate.GridLocateDriver.Debug._
+
 /**
  * A perceptron for statistical classification.
  *
@@ -425,8 +427,51 @@ trait NoCostMultiLabelPerceptronTrainer extends
   def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
       max_no_label: Int, margin: Double): Double
 
+  def debug_get_weights(data: Iterable[(FeatureVector, Int)]
+      ): (VectorAggregate, Int) = {
+    val weights = initialize(data)
+    def print_weights() {
+       errprint("Weights: length=%s,max=%s,min=%s",
+         weights.length, weights.max, weights.min)
+      // errprint("Weights: [%s]", weights.mkString(","))
+    }
+    iterate_averaged(weights, averaged, error_threshold, max_iterations) {
+        (weights, iter) =>
+      var total_error = 0.0
+      errprint("Iteration %s", iter)
+      for ((inst, label) <- data) {
+        errprint("Instance %s, label %s", inst, label)
+        def dotprod(x: Int) = {
+          val res = inst.dot_product(weights(x), x)
+          errprint("Dot product inst . weights(%s) = %s", x, res)
+          res
+        }
+        val yeslabs = yes_labels(inst, label)
+        errprint("Yes labels for correct label %s = %s", label, yeslabs)
+        val nolabs = no_labels(inst, label)
+        errprint("No labels for correct label %s = %s", label, nolabs)
+        val (r,rscore) = argandmin[Int](yeslabs, dotprod(_))
+        errprint("r,rscore = %s,%s", r, rscore)
+        val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
+        errprint("s,sscore = %s,%s", s, sscore)
+        errprint("rscore - sscore = %s", rscore, sscore)
+        val scale = get_scale_factor(inst, r, s, rscore - sscore)
+        errprint("scale = %s", scale)
+        if (scale != 0) {
+          inst.update_weights(weights(r), scale, r)
+          inst.update_weights(weights(s), -scale, s)
+          print_weights()
+          total_error += math.abs(scale)
+        }
+      }
+      total_error
+    }
+  }
+
   def get_weights(data: Iterable[(FeatureVector, Int)]
       ): (VectorAggregate, Int) = {
+    if (debug("perceptron"))
+      return debug_get_weights(data)
     val weights = initialize(data)
     iterate_averaged(weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
