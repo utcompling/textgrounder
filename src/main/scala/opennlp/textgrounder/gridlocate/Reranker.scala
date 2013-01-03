@@ -23,6 +23,14 @@ trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
     strategy.return_ranked_cells(item.dist, include)
 }
 
+case class GridRankerInst[Co](
+  doc: GeoDoc[Co],
+  candidates: IndexedSeq[GeoCell[Co]],
+  fv: AggregateFeatureVector
+) extends DataInstance {
+  final def feature_vector = fv
+}
+
 trait CandidateInstFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
@@ -146,17 +154,19 @@ extends GridRanker[Co]
  *   pointwise reranking.
  */
 abstract class LinearClassifierGridRerankerTrainer[Co](
-  val trainer: SingleWeightLinearClassifierTrainer
+  val trainer: SingleWeightLinearClassifierTrainer[GridRankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GeoDoc[Co], GeoCell[Co], DocStatus[RawDocument]
+    GeoDoc[Co], GeoCell[Co], DocStatus[RawDocument], GridRankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
-    data: Iterable[(FeatureVector, Int)]
+    data: Iterable[(GridRankerInst[Co], Int)]
   ) = {
     errprint("Training linear classifier ...")
     errprint("Number of training items: %s", data.size)
-    val num_total_feats = data.map(_._1.length.toLong).sum
-    val num_total_stored_feats = data.map(_._1.stored_entries.toLong).sum
+    val num_total_feats =
+      data.map(_._1.feature_vector.length.toLong).sum
+    val num_total_stored_feats =
+      data.map(_._1.feature_vector.stored_entries.toLong).sum
     errprint("Total number of features in all training items: %s",
       num_total_feats)
     errprint("Avg number of features per training item: %.2f",
