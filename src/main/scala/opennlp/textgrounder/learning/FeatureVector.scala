@@ -40,7 +40,9 @@ import gridlocate.GridLocateDriver.Debug._
  * Some implementations might want to evaluate the features on-the-fly
  * rather than store an actual vector of values.
  */
-trait FeatureVector {
+trait FeatureVector extends DataInstance {
+  final def feature_vector = this
+
   /** Return the length of the feature vector.  This is the number of weights
     * that need to be created -- not necessarily the actual number of items
     * stored in the vector (which will be different especially in the case

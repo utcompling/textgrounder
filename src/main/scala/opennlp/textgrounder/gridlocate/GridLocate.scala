@@ -818,15 +818,17 @@ trained on that same data. Default is %default.""")
   var rerank_classifier =
     ap.option[String]("rerank-classifier",
       default = "perceptron",
-      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron"),
+      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
+        "cost-perceptron"),
       help = """Type of classifier to use for reranking.  Possibilities are
 'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
 (perceptron using the basic algorithm, where the weights from the various
 rounds are averaged -- this usually improves results if the weights oscillate
 around a certain error rate, rather than steadily improving); 'pa-perceptron'
 (passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds).
-Default %default.
+dropping-off error rate improvements with increased number of rounds);
+'cost-perceptron' (cost-sensitive passive-aggressive perceptron, using the
+error distance as the cost).  Default %default.
 
 For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
@@ -865,6 +867,18 @@ specifies something other than 'trivial'.""")
       choices = Seq(0, 1, 2),
       help = """For passive-aggressive perceptron when reranking: variant
 (0, 1, 2; default %default).""")
+
+  var pa_cost_type =
+    ap.option[String]("pa-cost-type",
+      default = "prediction-based",
+      choices = Seq("prediction-based", "max-loss"),
+      help = """For passive-aggressive cost-sensitive perceptron when reranking:
+type of algorithm used ('prediction-based' or 'max-loss').
+Performance is generally similar, although the prediction-based algorithm
+may be faster because it only needs to evaluate the cost function at most
+once per round per training instance, where the max-loss algorithm needs
+to evaluate the cost for each possible label (in the case of reranking, this
+means as many times as the value of `--rerank-top-n`). Default %s.""")
 
   var perceptron_error_threshold =
     ap.option[Double]("perceptron-error-threshold",
@@ -1197,17 +1211,34 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   protected def create_pointwise_classifier_trainer = {
     val vec_factory = ArrayVector
     params.rerank_classifier match {
-      case "pa-perceptron" =>
-        new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer(
-          vec_factory, params.pa_variant, params.perceptron_aggressiveness,
-          error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.perceptron_rounds)
       case "perceptron" | "avg-perceptron" =>
-        new BasicSingleWeightMultiLabelPerceptronTrainer(
+        new BasicSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds,
           averaged = params.rerank_classifier == "avg-perceptron")
+      case "pa-perceptron" =>
+        new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
+          vec_factory, params.pa_variant, params.perceptron_aggressiveness,
+          error_threshold = params.perceptron_error_threshold,
+          max_iterations = params.perceptron_rounds)
+      case "cost-perceptron" =>
+        new PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
+          vec_factory, params.pa_cost_type == "prediction-based",
+          params.pa_variant, params.perceptron_aggressiveness,
+          error_threshold = params.perceptron_error_threshold,
+          max_iterations = params.perceptron_rounds) {
+            def cost(inst: GridRankerInst[Co], correct: Int, predicted: Int) = {
+              // Is this checking for correctness itself correct?  Is there a
+              // problem with always returning a non-zero cost even when we
+              // choose the "correct" cell?  This makes sense in that a candidate
+              // is often the "best available" but not necessarily the
+              // "best possible".
+              if (correct == predicted) 0.0
+              else inst.doc.distance_to_coord(
+                     inst.candidates(predicted).get_center_coord)
+            }
+        }
     }
   }
 
@@ -1246,10 +1277,24 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         ) {
           val top_n = params.rerank_top_n
           val number_of_splits = params.rerank_num_training_splits
-          protected def create_candidate_training_instance(query: GeoDoc[Co],
-              candidate: GeoCell[Co], initial_score: Double) =
-            candidate_instance_factory(query, candidate, initial_score,
-              is_training = true)
+
+          protected def query_training_data_to_rerank_training_instances(
+            data: Iterable[QueryTrainingData]
+          ): Iterable[(GridRankerInst[Co], Int)] = {
+
+            def create_candidate_featvec(query: GeoDoc[Co],
+                candidate: GeoCell[Co], initial_score: Double) =
+              candidate_instance_factory(query, candidate, initial_score,
+                is_training = true)
+
+            data.map { qtd =>
+              val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
+              val label = qtd.label
+              val candidates = qtd.cand_scores.map(_._1).toIndexedSeq
+              (GridRankerInst(qtd.query, candidates, agg_fv), label)
+            }
+          }
+
           protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
               candidate: GeoCell[Co], initial_score: Double) =
             candidate_instance_factory(query, candidate, initial_score,

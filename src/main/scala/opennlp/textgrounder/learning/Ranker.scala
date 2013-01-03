@@ -61,7 +61,9 @@ trait RerankerLike[Query, Candidate] {
  * is able to include the correct candidate near the top significantly more
  * often than actually at the top.
  */
-trait Reranker[Query, Candidate] extends Ranker[Query, Candidate] with RerankerLike[Query, Candidate] {
+trait Reranker[Query, Candidate]
+    extends Ranker[Query, Candidate]
+    with RerankerLike[Query, Candidate] {
   /** Ranker for generating initial ranking. */
   protected def initial_ranker: Ranker[Query, Candidate]
 
@@ -125,31 +127,41 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  *
  * There are various types of training data:
  * -- External training data is the data supplied externally (e.g. from a
- *    corpus), consisting of items of generic type `ExtInst`.
+ *    corpus), consisting of items of generic type `ExtInst`, encapsulating
+ *    a query object (of type `Query`) and the correct candidate (of type
+ *    `Candidate`).
  * -- Initial-ranker training data is the data used to train an initial
  *    ranker, which supplies the base ranking upon which the reranker builds.
  *    This also consists of ExtInst items and is taken directly from the
  *    external training data or a subset.
  * -- Reranker training data is the data used to train a rerank classifier,
  *    i.e. the classifier used to compute the scores that underlie the
- *    reranking. This consists of (AggregateFeatureVector, Int) pairs, i.e.
- *    pairs of aggregate feature vectors (encompassing individual feature
+ *    reranking. This consists of items of type `RTI` (standing for "Rerank
+ *    Training Instance"), encapsulating an aggregate feature vector of type
+ *    `AggregateFeatureVector` (an object encompassing individual feature
  *    vectors for each possible candidate, each one computed for a given
  *    query-candidate pair) and the label of the correct candidate.
  *
- * Generally, a data instance of type `ExtInst` in the external training
- * data will describe an object of type `Query`, along with the correct
- * candidate. However, it need not merely be a pair of `Query` and
- * `Candidate`. In particular, the `ExtInst` data may be the raw-data form
- * of an object that can only be created with respect to some particular
- * training corpus (e.g.  for doing back-off when computing word
- * distributions).  Hence, a method is provided to convert from one to the
- * other, given a trained initial ranker against which the "cooked" query
- * object will be looked up. For example, in the case of GridLocate,
- * `ExtInst` is of type `DocStatus[RawDocument]`, which directly describes
- * the data read from a corpus, while `Query` is of type `GeoDoc[Co]`,
- * which contains (among other things) a word distribution with statistics
- * computed using back-off, just as described above.
+ * The use of abstract types, rather than tuples, allows the application to
+ * choose how to encapsulate the data (e.g. whether to use a raw form or
+ * precompute the necessary object) and to encapsulate other information,
+ * if necessary.
+ *
+ * `ExtInst` in particular is handled in such a way that it can encapsulate
+ * raw-form information, where conversion to query-candidate pairs that
+ * underlie the reranker training data might depend on global properties
+ * computed from the subset of data used to create an initial ranker.
+ *
+ * `GridLocate` requires this facility, making `ExtInst` be the type
+ * `DocStatus[RawDocument]`, describing the raw-data form of a document read
+ * from an external corpus. Generating an initial ranker computes back-off
+ * statistics from the set of initial-ranker training data used to initialize
+ * the ranker, and in turn, conversion of a raw document to a query-candidate
+ * pair (using `external_instances_to_query_candidate_pairs`) makes use of
+ * these back-off statistics to generate the "cooked" query object of type
+ * `GeoDoc[Co]`. In other words, the same `ExtInst` object might generate
+ * multiple query-candidate pairs depending on which split it falls in and
+ * whether this split is used for training the initial ranker of the reranker.
  *
  * Training is as follows:
  *
@@ -172,24 +184,56 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  * @tparam Query type of a query
  * @tparam Candidate type of a possible candidate
  * @tparam ExtInst type of the instances used in external training data
+ * @tparam RTI type of the instances used in external training data
  */
-trait PointwiseClassifyingRerankerTrainer[Query, Candidate, ExtInst]
-extends RerankerLike[Query, Candidate] { self =>
+trait PointwiseClassifyingRerankerTrainer[
+  Query, Candidate, ExtInst, RTI <: DataInstance
+] extends RerankerLike[Query, Candidate] { self =>
 
   case class QueryTrainingData(query: Query, correct: Candidate,
-      candidates: Iterable[(Candidate, FeatureVector)]) {
+      cand_scores: Iterable[(Candidate, Double)]) {
     /**
      * Return the label (zero-based index) of correct candidate among the
      * candidate list.  Assertion failure if not found, since correct candidate
      * should always be in candidate list.
      */
     def label: Int = {
-      val maybe_label = candidates.zipWithIndex.find {
+      val maybe_label = cand_scores.zipWithIndex.find {
         case ((cand, featvec), index) => cand == correct
       }
       assert(maybe_label != None, "Correct candidate should be in candidate list")
       val (_, the_label) = maybe_label.get
       the_label
+    }
+
+    /**
+     * Convert the data in the object into an aggregate feature vector
+     * describing the candidates for a query.
+     *
+     * @param qtd Input object describing a query, associated candidate list,
+     *    scores from the initial ranker, and correct candidate.
+     * @param create_candidate_evaluation_instance Function converting a
+     *    query-candidate pair, plus score from the initial ranker, into a
+     *    feature vector.
+     */
+    def aggregate_featvec(
+      create_candidate_featvec: (Query, Candidate, Double) => FeatureVector
+    ) = {
+      val featvecs =
+        for ((cand, score) <- cand_scores) yield
+          create_candidate_featvec(query, cand, score)
+      new AggregateFeatureVector(featvecs.toIndexedSeq)
+    }
+
+    def debug_out(prefix: String) {
+      errprint("%sTraining item: %s", prefix, display_query_item(query))
+      errprint("%sTrue candidate: %s", prefix, display_candidate(correct))
+      for (((candidate, score), candind) <- cand_scores.zipWithIndex) {
+        val instpref = "%s#%d: " format (prefix, candind)
+        val correctstr =
+          if (correct == candidate) "CORRECT" else "INCORRECT"
+        errprint("%s%s: (score %s) %s", instpref, correctstr, score, candidate)
+      }
     }
   }
 
@@ -202,17 +246,8 @@ extends RerankerLike[Query, Candidate] { self =>
    * Create the classifier used for reranking, given a set of rerank training
    * data.
    */
-  protected def create_rerank_classifier(
-    data: Iterable[(FeatureVector, Int)]
+  protected def create_rerank_classifier(data: Iterable[(RTI, Int)]
   ): ScoringClassifier
-
-  /**
-   * Create a rerank training instance to train the classifier, given a query
-   * item, a potential candidate from the ranker, and the score from the initial
-   * ranker on this candidate.
-   */
-  protected def create_candidate_training_instance(query: Query,
-    candidate: Candidate, initial_score: Double): FeatureVector
 
   /**
    * Create a rerank instance to feed to the classifier during evaluation,
@@ -239,28 +274,13 @@ extends RerankerLike[Query, Candidate] { self =>
     inst: Iterator[ExtInst], initial_ranker: Ranker[Query, Candidate]
   ): Iterator[(Query, Candidate)]
 
-  protected def query_training_data_to_rerank_training_instance(
-    qtd: QueryTrainingData
-  ): (AggregateFeatureVector, Int) = {
-    (new AggregateFeatureVector(qtd.candidates.map(_._2).toIndexedSeq), qtd.label)
-  }
-
-  protected def default_query_training_data_to_rerank_training_instances(
-    data: Iterable[QueryTrainingData]
-  ): Iterable[(AggregateFeatureVector, Int)] = {
-    for (qtd <- data) yield
-      query_training_data_to_rerank_training_instance(qtd)
-  }
-
   /**
-   * Convert an external instance into a query-candidate pair, if possible,
-   * given the external instance and the initial ranker trained from other
-   * external instances.
+   * Convert a `QueryTrainingData` object to a type-`RTI` object,
+   * encapsulating info used to training the rerank classifier.
    */
   protected def query_training_data_to_rerank_training_instances(
     data: Iterable[QueryTrainingData]
-  ): Iterable[(AggregateFeatureVector, Int)] =
-    default_query_training_data_to_rerank_training_instances(data)
+  ): Iterable[(RTI, Int)]
 
   /**
    * Display a query item (typically for debugging purposes).
@@ -273,14 +293,28 @@ extends RerankerLike[Query, Candidate] { self =>
   def display_candidate(candidate: Candidate) = candidate.toString
 
   /**
-   * Generate rerank training instances for a given instance from the
-   * external training data.
+   * Generate an object encapsulating "query training data" information
+   * necessary to generate a rerank training instance (of type `RTI`; see
+   * above).  The generated `QueryTrainingData` object encapsulates the query,
+   * the candidate list with associated scores for each candidate when ranked
+   * using the initial ranker, and the identity of the correct candidate,
+   * which must be in the candidate list.  This function is passed only the
+   * query and correct candidate (the only info available in the training
+   * corpus) and the appropriate initial ranker, and generates the
+   * remaining info from the ranker.
+   *
+   * We don't generate the type-`RTI` object directly here because it may
+   * be necessary to use some global properties of the corpus to do this.
+   * (In particular, we don't know the length of the feature vectors until
+   * we've counted up the distinct feature types that occur anywhere in our
+   * training data.  All feature vectors must, conceptually, have the same
+   * length, even if the data itself is stored sparsely.)
    *
    * @param initial_ranker Initial ranker used to score the candidate.
    */
   protected def get_query_training_data(
     query: Query, correct: Candidate, initial_ranker: Ranker[Query, Candidate]
-  ) = {
+  ): QueryTrainingData = {
     val initial_candidates =
       initial_ranker.evaluate(query, Iterable(correct))
     val top_candidates = initial_candidates.take(top_n)
@@ -290,10 +324,8 @@ extends RerankerLike[Query, Candidate] { self =>
       else
         top_candidates ++
           Iterable(initial_candidates.find(_._1 == correct).get)
-    val cand_featvecs =
-      for ((cand, score) <- cand_scores) yield
-        (cand, create_candidate_training_instance(query, cand, score))
-    QueryTrainingData(query, correct, cand_featvecs)
+
+    QueryTrainingData(query, correct, cand_scores)
   }
 
   /**
@@ -313,18 +345,9 @@ extends RerankerLike[Query, Candidate] { self =>
       query_candidate_pairs.zipWithIndex.mapMetered(task) {
         case ((query, correct), index) => {
           val prefix = "#%d: " format (index + 1)
-          errprint("%sTraining item: %s", prefix, display_query_item(query))
-          errprint("%sTrue candidate: %s", prefix, display_candidate(correct))
           val query_training_data =
             get_query_training_data(query, correct, initial_ranker)
-          for (((candidate, featvec), candind) <-
-              query_training_data.candidates.zipWithIndex) {
-            val instpref = "%s#%d: " format (prefix, candind + 1)
-            val correctstr =
-              if (correct == candidate) "CORRECT" else "INCORRECT"
-            errprint("%s%s: (%s, %s)", instpref, correctstr,
-              candidate, featvec)
-          }
+          query_training_data.debug_out(prefix)
           query_training_data
         }
       }
