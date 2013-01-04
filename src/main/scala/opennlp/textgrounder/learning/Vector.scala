@@ -44,6 +44,8 @@ trait SimpleVector {
   def add_scaled(scale: Double, addto: SimpleVector)
 
   def *=(value: Double)
+
+  def toIterable: Iterable[Double]
 }
 
 trait SimpleVectorFactory {
@@ -97,6 +99,8 @@ class ArrayVector(array: Array[Double]) extends BasicSimpleVectorImpl {
   final def apply(index: Int) = array(index)
 
   final def update(index: Int, value: Double) { array(index) = value }
+
+  def toIterable = array.toIterable
 }
 
 object ArrayVector extends SimpleVectorFactory {

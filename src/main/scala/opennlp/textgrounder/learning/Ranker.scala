@@ -226,8 +226,8 @@ trait PointwiseClassifyingRerankerTrainer[
     }
 
     def debug_out(prefix: String) {
-      errprint("%sTraining item: %s", prefix, display_query_item(query))
-      errprint("%sTrue candidate: %s", prefix, display_candidate(correct))
+      errprint("%sTraining item: %s", prefix, format_query_item(query))
+      errprint("%sTrue candidate: %s", prefix, format_candidate(correct))
       for (((candidate, score), candind) <- cand_scores.zipWithIndex) {
         val instpref = "%s#%d: " format (prefix, candind)
         val correctstr =
@@ -285,12 +285,12 @@ trait PointwiseClassifyingRerankerTrainer[
   /**
    * Display a query item (typically for debugging purposes).
    */
-  def display_query_item(item: Query) = item.toString
+  def format_query_item(item: Query) = item.toString
 
   /**
    * Display an candidate (typically for debugging purposes).
    */
-  def display_candidate(candidate: Candidate) = candidate.toString
+  def format_candidate(candidate: Candidate) = candidate.toString
 
   /**
    * Generate an object encapsulating "query training data" information
