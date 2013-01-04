@@ -289,23 +289,31 @@ abstract class GeoDocFactory[Co : Serializer](
     if (record_in_factory)
       num_records_by_split(split) += 1
     val counts = schema.get_field(fieldvals, driver.word_count_field)
-    val dist = word_dist_factory.constructor.create_distribution(counts)
-    val maybedoc =
+
+    def catch_doc_validation[T](body: => T) = {
       if (debug("rethrow"))
-        imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
+        body
       else {
         try {
-          imp_create_and_init_document(schema, fieldvals, dist,
-            record_in_factory)
+          body
         } catch {
           case e:Exception => {
             num_error_skipped_records_by_split(split) += 1
             if (debug("stack-trace") || debug("stacktrace"))
               e.printStackTrace
-            throw new DocValidationException("Bad value for field", e)
+            throw new DocValidationException(
+              "Bad value for field: %s" format e, e)
           }
         }
       }
+    }
+
+    val dist = catch_doc_validation {
+      word_dist_factory.constructor.create_distribution(counts)
+    }
+    val maybedoc = catch_doc_validation {
+      imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
+    }
     maybedoc match {
       case None => {
         num_non_error_skipped_records_by_split(split) += 1

@@ -278,7 +278,8 @@ class DefaultUnigramWordDistConstructor(
       /* FIXME: Is this necessary? */
       if (raw_keys_set contains word)
         throw FileFormatException(
-          "Word %s seen twice in same counts list" format word)
+          "Word %s seen twice in same counts list: %s" format (word, countstr)
+        )
       raw_keys_set += word
       keys_dynarr += word
       values_dynarr += count
