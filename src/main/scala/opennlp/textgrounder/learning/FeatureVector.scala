@@ -91,6 +91,9 @@ trait FeatureVector extends DataInstance {
   /** Update a weight vector by adding a scaled version of the feature vector,
     * with class `label`. */
   def update_weights(weights: SimpleVector, scale: Double, label: Int)
+
+  /** Display the feature at the given index as a string. */
+  def format_feature(index: Int) = index.toString
 }
 
 object FeatureVector {
@@ -178,9 +181,6 @@ class ArrayFeatureVector(
 }
 
 trait SparseFeatureVectorLike extends SimpleFeatureVector {
-  /** Display the feature at the given index as a string. */
-  def display_feature(index: Int): String
-
   def include_displayed_feature: Boolean = true
 
   def compute_toString(prefix: String,
@@ -189,7 +189,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
       feature_values.toSeq.sorted.map {
           case (index, value) => {
             if (include_displayed_feature)
-              "%s(%s)=%.2f" format (display_feature(index), index, value)
+              "%s(%s)=%.2f" format (format_feature(index), index, value)
             else
               "%s=%.2f" format (index, value)
           }
@@ -294,7 +294,6 @@ abstract class CompressedSparseFeatureVector private[learning] (
 class BasicCompressedSparseFeatureVector private[learning] (
   keys: Array[Int], values: Array[Double], val length: Int
 ) extends CompressedSparseFeatureVector(keys, values) {
-  def display_feature(x: Int) = x.toString
   override val include_displayed_feature = false
 }
 
@@ -371,7 +370,7 @@ abstract class TupleArraySparseFeatureVector(
  * the intercept term.
  */
 class SparseFeatureVectorFactory[T](
-  display_feature: T => String
+  format_feature: T => String
 ) { self =>
   // Use Trove for fast, efficient hash tables.
   val hashfact = new TroveHashTableFactory
@@ -395,8 +394,8 @@ class SparseFeatureVectorFactory[T](
   })
 
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
-    def display_feature(index: Int) =
-      self.display_feature(feature_mapper.unmemoize(index))
+    override def format_feature(index: Int) =
+      self.format_feature(feature_mapper.unmemoize(index))
     def length = feature_mapper.number_of_valid_indices
   }
 
@@ -507,4 +506,7 @@ class AggregateFeatureVector(val fv: IndexedSeq[FeatureVector])
 
   def update_weights(weights: SimpleVector, scale: Double, label: Int) =
     fv(label).update_weights(weights, scale, label)
+
+  /** Display the feature at the given index as a string. */
+  override def format_feature(index: Int) = fv.head.format_feature(index)
 }

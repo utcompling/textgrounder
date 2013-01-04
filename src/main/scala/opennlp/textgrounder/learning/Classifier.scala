@@ -32,6 +32,8 @@ import util.math.argmax
 import util.metering._
 import util.print._
 
+import gridlocate.GridLocateDriver.Debug._
+
 /**
  * Mix-in for classifiers and classifier trainers.
  *
@@ -111,6 +113,30 @@ abstract class LinearClassifier(
 ) extends ScoringClassifier {
   def score_label(inst: FeatureVector, label: Int) =
     inst.dot_product(weights(label), label)
+
+  /** Convert a feature index into a user-readable string. */
+  def format_feature(index: Int) = index.toString
+
+  /** Print the weight coefficients with the largest absolute value.
+    *
+    * @param num_items Number of items to print. If &lt;= 0, print all items.
+    */
+  def debug_print_weights(num_items: Int = -1) {
+    errprint("Weights:")
+    for (depth <- 0 until weights.depth) {
+      val vec = weights(depth)
+      errprint("  Weights at depth %s: ", depth)
+      val all_sorted_items =
+        vec.toIterable.toIndexedSeq.zipWithIndex.sortWith(_._1.abs > _._1.abs)
+      val sorted_items =
+        if (num_items <= 0) all_sorted_items
+        else all_sorted_items.take(num_items)
+      for (((coeff, feat), index) <- sorted_items.zipWithIndex) {
+        errprint("#%s: %s (%s) = %s", index + 1, format_feature(feat),
+          feat, coeff)
+      }
+    }
+  }
 }
 
 /** Mix-in for a fixed-depth classifier (or trainer thereof). */
@@ -166,17 +192,23 @@ class BinaryLinearClassifier (
 }
 
 /**
- * Class for training a linear classifier given a set of training instances and
+ * Class for training a classifier given a set of training instances and
  * associated labels.
  *
- * Note that some trainers support the possibility of multiple correct labels
- * for a given training instance.  The functions `yes_labels` and
- * `no_labels` are stand-ins for this.
+ * @tparam DI Type of data instance used in training the classifier.
+ */
+trait ClassifierTrainer[DI <: DataInstance]
+    extends ClassifierLike[DI] {
+}
+
+/**
+ * Class for training a linear classifier given a set of training instances and
+ * associated labels.
  *
  * @tparam DI Type of data instance used in training the classifier.
  */
 trait LinearClassifierTrainer[DI <: DataInstance]
-    extends ClassifierLike[DI] {
+    extends ClassifierTrainer[DI] {
   val factory: VectorAggregateFactory
 
   /** Check that the arguments passed in are kosher, and return an array of
@@ -248,9 +280,36 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     }
   }
 
-  /** Train a linear classifier given a set of labeled instances. */
-  def apply(data: Iterable[(DI, Int)]): LinearClassifier
+  /** Compute the weights used to initialize a linear classifier.
+    *
+    * @return Tuple of weights and number of iterations required
+    *   to compute them. */
+  def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int)
 
+  /** Create a linear classifier given weights and a function to format
+    * feature indices into user-readable strings. */
+  def create_classifier(weights: VectorAggregate,
+      format_feature_fn: Int => String): LinearClassifier
+
+  /** Train a linear classifier given a set of labeled instances. */
+  def apply(data: Iterable[(DI, Int)]) = {
+    val (weights, _) = get_weights(data)
+    val format_feature_fn = data.head._1.feature_vector.format_feature _
+    val cfier = create_classifier(weights, format_feature_fn)
+    if (debug("weights"))
+      cfier.debug_print_weights()
+    cfier
+  }
+}
+
+/**
+ * Mix-in for training a classifier that supports the possibility of multiple
+ * multiple correct labels for a given training instance.
+ *
+ * @tparam DI Type of data instance used in training the classifier.
+ */
+trait MultiCorrectLabelClassifierTrainer[DI <: DataInstance]
+    extends ClassifierTrainer[DI] {
   /** Return set of "yes" labels associated with an instance.  Currently only
     * one yes label per instance, but this could be changed by redoing this
     * function. */
@@ -262,7 +321,6 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   def no_labels(inst: DI, label: Int) =
     (0 until label) ++ ((label + 1) until number_of_labels(inst))
 }
-
  
 /**
  * Class for training a linear classifier with a single weight vector for
@@ -294,6 +352,13 @@ trait SingleWeightLinearClassifierTrainer[DI <: DataInstance]
     with VariableDepthClassifierLike[DI] {
   val vector_factory: SimpleVectorFactory
   lazy val factory = new SingleVectorAggregateFactory(vector_factory)
+
+  def create_classifier(weights: VectorAggregate,
+      format_feature_fn: Int => String) = {
+    new VariableDepthLinearClassifier(weights) {
+      override def format_feature(index: Int) = format_feature_fn(index)
+    }
+  }
 }
 
 /**
@@ -311,17 +376,31 @@ trait MultiWeightLinearClassifierTrainer[DI <: DataInstance]
     with FixedDepthClassifierLike[DI] {
   val vector_factory: SimpleVectorFactory
   lazy val factory = new MultiVectorAggregateFactory(vector_factory, num_labels)
+
+  def create_classifier(weights: VectorAggregate,
+      format_feature_fn: Int => String) = {
+    new FixedDepthLinearClassifier(weights, num_labels) {
+      override def format_feature(index: Int) = format_feature_fn(index)
+    }
+  }
 }
 
 /**
- * Class for training a linear classifier given a set of training instances and
- * associated labels.
+ * Class for training a binary linear classifier given a set of training
+ * instances and associated labels.
  */
 trait BinaryLinearClassifierTrainer[DI <: DataInstance]
     extends LinearClassifierTrainer[DI]
     with BinaryClassifierLike[DI] {
   val vector_factory: SimpleVectorFactory
   lazy val factory = new SingleVectorAggregateFactory(vector_factory)
+
+  def create_classifier(weights: VectorAggregate,
+      format_feature_fn: Int => String) = {
+    new BinaryLinearClassifier(weights.asInstanceOf[SingleVectorAggregate]) {
+      override def format_feature(index: Int) = format_feature_fn(index)
+    }
+  }
 }
 
 /**

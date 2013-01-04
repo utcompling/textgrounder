@@ -204,7 +204,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     super.apply(training_data).
       asInstanceOf[PointwiseGridReranker[Co]]
 
-  override def display_query_item(item: GeoDoc[Co]) = {
+  override def format_query_item(item: GeoDoc[Co]) = {
     "%s, dist=%s" format (item, item.dist.debug_string)
   }
 }
