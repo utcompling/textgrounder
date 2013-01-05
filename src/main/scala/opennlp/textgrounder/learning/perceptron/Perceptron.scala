@@ -326,8 +326,54 @@ trait PassiveAggressivePerceptronTrainer {
   assert(variant >= 0 && variant <= 2)
   assert(aggressiveness_param > 0)
 
+  /** Compute the scale factor used to update weights, given the "loss"
+    * from choosing a particular label for an instance in place of the
+    * correct label, as well as the square magnitude of the difference
+    * between the feature vectors associated with the two labels.
+    * Both values cannot be negative.
+    *
+    * In the cost-sensitive variant, the loss is simply the margin
+    * between the scores of the best-scoring label and the correct label,
+    * plus the user-supplied cost of choosing the best-scoring label in
+    * place of the correct one.  If the best-scoring label *is* the
+    * correct one, the loss will be 0.
+    *
+    * In the cost-insensitive variant, however, the loss is computed
+    * based on the margin between the best-scoring *incorrect* label and
+    * the correct one.  In this case, the margin will be either positive
+    * or negative (depending on whether the correct label is the
+    * best-scoring one).  The loss is related to the margin using a
+    * "hinge-loss" function such that the loss is 0 only if the correct
+    * label is the best-scoring one *and* exceeds the best-scoring
+    * incorrect label by a given quantity.  This turns out to make the
+    * passive-aggressive algorithm search for the maximum-margin weights,
+    * similar to an SVM.
+    */
   def compute_update_factor(loss: Double, sqmag: Double) = {
-    if (variant == 0)
+    /* The situation where the square magnitude is 0 would seem to lead
+       to division-by-zero errors and imply an infinite update factor.
+       In fact, however, the vector whose scaled version is used to
+       update the weights is exactly the same vector used to compute
+       the square magnitude, and hence when this magnitude is 0, the
+       update vector is also a zero vector and no change to the weights
+       should occur.
+       
+       This occurs in the single-weight case when different labels
+       have the same feature vector associated with them.  In the
+       multiple-weight case, all labels of a given instance normally
+       have the same feature vector, but the update vector is calculated
+       differently such that it can be a zero vector only when the feature
+       vector associated with an instance is itself a zero vector. (This
+       different calculation comes from the fact that conceptually the
+       multiple-weight case is mapped to a single-weight case where the
+       (normally) unique feature vector for an instance is mapped to
+       multiple much larger label-specific vectors that have the original
+       vector occurring as a subvector starting at a label-specific
+       position, and 0's everywhere else.)
+      */
+    if (sqmag == 0)
+      0
+    else if (variant == 0)
       loss / sqmag
     else if (variant == 1)
       aggressiveness_param min (loss / sqmag)
