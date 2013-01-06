@@ -1283,9 +1283,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
           ): Iterable[(GridRankerInst[Co], Int)] = {
 
             def create_candidate_featvec(query: GeoDoc[Co],
-                candidate: GeoCell[Co], initial_score: Double) =
-              candidate_instance_factory(query, candidate, initial_score,
-                is_training = true)
+                candidate: GeoCell[Co], initial_score: Double) = {
+              val featvec =
+                candidate_instance_factory(query, candidate, initial_score,
+                  is_training = true)
+              if (debug("features"))
+                errprint("Training: For query %s, candidate %s, initial score %s, featvec %s",
+                  query, candidate, initial_score, featvec)
+              featvec
+            }
 
             data.map { qtd =>
               val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
@@ -1296,9 +1302,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
           }
 
           protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
-              candidate: GeoCell[Co], initial_score: Double) =
-            candidate_instance_factory(query, candidate, initial_score,
-              is_training = false)
+              candidate: GeoCell[Co], initial_score: Double) = {
+            val featvec =
+              candidate_instance_factory(query, candidate, initial_score,
+                is_training = false)
+            if (debug("features"))
+              errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
+                query, candidate, initial_score, featvec)
+            featvec
+          }
           protected def create_initial_ranker(
             data: Iterable[DocStatus[RawDocument]]
           ) = new { val strategy =
