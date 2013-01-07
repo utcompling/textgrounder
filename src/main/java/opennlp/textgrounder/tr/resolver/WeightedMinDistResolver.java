@@ -275,8 +275,9 @@ public class WeightedMinDistResolver extends Resolver {
             //double normalizationDenom = normalizationDenoms.get(otherToponym);
 
             double weightedDist = distanceTable.getDistance(toponym, locationIndex, otherToponym, otherLocIndex);//candidate.distance(otherLoc) /* / weights.get(otherLoc) */ ;
-            double weight = weights.get(lexicon.get(otherToponym.getForm())).get(otherLocIndex);
-            weightedDist /= weight; // weighting
+            double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIndex);
+            double otherWeight = weights.get(lexicon.get(otherToponym.getForm())).get(otherLocIndex);
+            weightedDist /= (thisWeight * otherWeight); // weighting; was just otherWeight before
             //weightedDist /= normalizationDenoms.get(otherLoc); // normalization
             if (weightedDist < min) {
               min = weightedDist;
