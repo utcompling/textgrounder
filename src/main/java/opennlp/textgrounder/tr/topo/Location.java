@@ -122,19 +122,21 @@ public class Location implements Serializable {
 
     public void recomputeThreshold() {
         if(this.getRegion().getRepresentatives().size() > 1) {
-            int count = 0;
-            double dist = 0.0;
+            //int count = 0;
+            double minDist = Double.POSITIVE_INFINITY;
             for(int i = 0; i < this.getRegion().getRepresentatives().size(); i++) {
                 for(int j = 0; j < this.getRegion().getRepresentatives().size(); j++) {
                     if(i != j) {
-                        dist += this.getRegion().getRepresentatives().get(i).distanceInKm(
-                                this.getRegion().getRepresentatives().get(j));
-                        count++;
+                        double dist = this.getRegion().getRepresentatives().get(i).distanceInKm(
+                                      this.getRegion().getRepresentatives().get(j));
+                        if(dist < minDist)
+                            minDist = dist;
+                        //count++;
                     }
                 }
             }
-            dist /= count;
-            this.setThreshold(dist / 2);
+            //dist /= count;
+            this.setThreshold(minDist / 2);
         }
     }
 
