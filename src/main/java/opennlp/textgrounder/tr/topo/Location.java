@@ -121,7 +121,8 @@ public class Location implements Serializable {
     }
 
     public void recomputeThreshold() {
-        if(this.getRegion().getRepresentatives().size() > 1) {
+        // Commented out for now since experiments with this didn't perform well
+        /*if(this.getRegion().getRepresentatives().size() > 1) {
             //int count = 0;
             double minDist = Double.POSITIVE_INFINITY;
             for(int i = 0; i < this.getRegion().getRepresentatives().size(); i++) {
@@ -137,7 +138,7 @@ public class Location implements Serializable {
             }
             //dist /= count;
             this.setThreshold(minDist / 2);
-        }
+            }*/
     }
 
     public static Location.Type convertTypeString(String typeString) {

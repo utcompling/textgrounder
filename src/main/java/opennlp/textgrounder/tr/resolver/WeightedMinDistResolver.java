@@ -20,16 +20,27 @@ public class WeightedMinDistResolver extends Resolver {
 
     private int numIterations;
     private boolean readWeightsFromFile;
+    private String logFilePath;
     private List<List<Double> > weightsFromFile = null;
     //private Map<Long, Double> distanceCache = new HashMap<Long, Double>();
     //private int maxCoeff = Integer.MAX_VALUE;
     private DistanceTable distanceTable;
     private static final int PHANTOM_COUNT = 0; // phantom/imagined counts for smoothing
 
-    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile) {
+    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile, String logFilePath) {
         super();
         this.numIterations = numIterations;
         this.readWeightsFromFile = readWeightsFromFile;
+        this.logFilePath = logFilePath;
+
+        if(readWeightsFromFile && logFilePath == null) {
+            System.err.println("Error: need logFilePath via -l for backoff to DocDist.");
+            System.exit(0);
+        }
+    }
+
+    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile) {
+        this(numIterations, readWeightsFromFile, null);
     }
 
     @Override
@@ -85,7 +96,22 @@ public class WeightedMinDistResolver extends Resolver {
         TopoUtil.addToponymsToLexicon(toponymLexicon, corpus);
         weights = expandWeightsArray(toponymLexicon, corpus, weights);
         
-        return finalDisambiguationStep(corpus, weights, toponymLexicon);
+        StoredCorpus disambiguated = finalDisambiguationStep(corpus, weights, toponymLexicon);
+
+        if(readWeightsFromFile) {
+            // Backoff to DocDist:
+            Resolver docDistResolver = new DocDistResolver(logFilePath);
+            docDistResolver.overwriteSelecteds = false;
+            disambiguated = docDistResolver.disambiguate(corpus);
+        }
+        else {
+            // Backoff to Random:
+            Resolver randResolver = new RandomResolver();
+            randResolver.overwriteSelecteds = false;
+            disambiguated = randResolver.disambiguate(corpus);
+        }
+
+        return disambiguated;
     }
 
     // adds a weight of 1.0 to candidate locations of toponyms found in lexicon but not in oldWeights

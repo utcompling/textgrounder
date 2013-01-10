@@ -98,7 +98,8 @@ public class RunResolver extends BaseApp {
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
             System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + currentRun.getNumIterations() + " iteration(s)...");
-            resolver = new WeightedMinDistResolver(currentRun.getNumIterations(), currentRun.getReadWeightsFromFile());
+            resolver = new WeightedMinDistResolver(currentRun.getNumIterations(), currentRun.getReadWeightsFromFile(),
+                                                   currentRun.getLogFilePath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.DOC_DIST) {
             System.out.println("Running DOC DIST resolver, using log file at " + currentRun.getLogFilePath() + " ...");

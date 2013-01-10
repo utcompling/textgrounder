@@ -39,6 +39,11 @@ public class BasicMinDistResolver extends Resolver {
         }
       }
     }
+
+    // Backoff to Random:
+    Resolver randResolver = new RandomResolver();
+    randResolver.overwriteSelecteds = false;
+    corpus = randResolver.disambiguate(corpus);
     
     return corpus;
   }
