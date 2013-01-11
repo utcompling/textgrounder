@@ -200,14 +200,23 @@ public class WeightedMinDistResolver extends Resolver {
                         }
                         idx++;
                     }
+
+                    if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
+                                       //   so, choose the location with the greatest weight (unless all are uniform)
+                        double maxWeight = 1.0;
+                        int locationIdx = 0;
+                        for(Location candidate : toponym) {
+                            double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIdx);
+                            if(thisWeight > maxWeight) {
+                                maxWeight = thisWeight;
+                                minIdx = locationIdx;
+                            }
+                        }
+                        locationIdx++;
+                    }
                     
                     if (minIdx > -1) {
                         int countIndex = lexicon.get(toponym.getForm());
-                        /*System.out.println(toponym.getForm());
-                          System.out.println(countIndex);
-                          System.out.println(minIdx);
-                          System.out.println(counts.get(countIndex).size());
-                          System.out.println(toponym.getAmbiguity());*/
                         int prevCount = counts.get(countIndex)
                             .get(minIdx);
                         counts.get(countIndex).set(minIdx, prevCount + 1);
@@ -215,6 +224,7 @@ public class WeightedMinDistResolver extends Resolver {
                         sums.set(countIndex, prevSum + 1);
                         
                     }
+
                 }
             }
         }
@@ -248,6 +258,20 @@ public class WeightedMinDistResolver extends Resolver {
                         minIdx = idx;
                     }
                     idx++;
+                }
+
+                if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
+                                   //   so, choose the location with the greatest weight (unless all are 1.0)
+                    double maxWeight = 1.0;
+                    int locationIdx = 0;
+                    for(Location candidate : toponym) {
+                        double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIdx);
+                        if(thisWeight > maxWeight) {
+                            maxWeight = thisWeight;
+                            minIdx = locationIdx;
+                        }
+                    }
+                    locationIdx++;
                 }
                 
                 if (minIdx > -1) {
