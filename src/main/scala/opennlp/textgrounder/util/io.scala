@@ -33,7 +33,7 @@ import java.util.NoSuchElementException
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
-import print.{errprint, warning}
+import print.{errprint, warning, unsupported}
 import text._
 import os._
 
@@ -460,7 +460,29 @@ package object io {
     }
   }
 
+  class StdFileHandler extends FileHandler {
+    def not_found(filename: String) = {
+      throw new FileNotFoundException("%s (No such file or directory)"
+        format filename)
+    }
+    def get_raw_input_stream(filename: String) =
+      if (filename == "stdin") System.in
+      else not_found(filename)
+    def get_raw_output_stream(filename: String, append: Boolean) =
+      filename match {
+        case "stdout" => System.out
+        case "stderr" => System.err
+        case _ => not_found(filename)
+      }
+    def split_filename(filename: String) = unsupported()
+    def join_filename(dir: String, file: String) = unsupported()
+    def is_directory(filename: String) = unsupported()
+    def make_directories(filename: String) = unsupported()
+    def list_files(dir: String) = unsupported()
+  }
+
   val local_file_handler = new LocalFileHandler
+  val std_file_handler = new StdFileHandler
 
   /**
    * Iterate over the given files, recursively processing the files in
