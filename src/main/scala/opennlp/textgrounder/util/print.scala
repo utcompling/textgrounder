@@ -208,6 +208,33 @@ package object print {
   }
 
   /**
+   * An exception thrown to indicate that a part of the code that
+   * isn't implemented yet, but should be.
+   */
+  case class FixmeError(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends RuntimeException(message) {
+    if (cause != None)
+      initCause(cause.get)
+
+    /**
+     * Alternate constructor.
+     *
+     * @param message  exception message
+     */
+    def this(msg: String) = this(msg, None)
+
+    /**
+     * Alternate constructor.
+     *
+     * @param message  exception message
+     * @param cause    wrapped, or nested, exception
+     */
+    def this(msg: String, cause: Throwable) = this(msg, Some(cause))
+  }
+
+  /**
    * Signal an internal error (program gets to a state it should never reach,
    * similar to an assertion failure).
    */
@@ -219,6 +246,13 @@ package object print {
    * but should be.
    */
   def fixme_error(message: String) =
+    throw new FixmeError(message)
+
+  /**
+   * Signal an error due to attempting an operation that isn't supported
+   * and will never be.
+   */
+  def unsupported(message: String = "") =
     throw new UnsupportedOperationException(message)
 
   ////////////////////////////////////////////////////////////////////////////
