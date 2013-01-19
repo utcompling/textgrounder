@@ -864,6 +864,7 @@ specifies something other than 'trivial'.""")
   var pa_variant =
     ap.option[Int]("pa-variant",
       metavar = "INT",
+      default = 1,
       choices = Seq(0, 1, 2),
       help = """For passive-aggressive perceptron when reranking: variant
 (0, 1, 2; default %default).""")
@@ -890,9 +891,20 @@ which training stops (default: %default).""")
   var perceptron_aggressiveness =
     ap.option[Double]("perceptron-aggressiveness",
       metavar = "DOUBLE",
-      default = 1.0,
-      help = """For perceptron: aggressiveness factor > 0.0
-(default: %default).""")
+      default = 0.0,
+      help = """For perceptron: aggressiveness factor > 0.0.  If 0, use
+the default value, currently 1.0 for both the the regular and PA-perceptrons,
+but that may change because the meaning is rather different for the two
+types.  For the regular perceptron, the meaning of this factor is literally
+"aggressiveness" in that weight changes are directly scaled by that factor.
+For the PA-perceptron, it should be interpreted more as non-restrictiveness
+than aggressiveness, and applies only to variants 1 and 2. For both variants,
+a setting of infinity means "completely non-restricted" and makes the
+algorithm equivalent to variant 0, which is always non-restricted.  The
+paper of Crammer et al. (2006) suggests that, at least for some applications,
+values of the parameter (called "C") at C = 100 have very little restriction,
+while C = 0.001 has a great deal of restriction and is useful with notably
+noisy training data.  We choose C = 1 as a compromise.""")
 
   var perceptron_rounds =
     ap.option[Int]("perceptron-rounds",
@@ -1163,8 +1175,13 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
 
   override def handle_parameters() {
     super.handle_parameters()
-    if (params.perceptron_aggressiveness <= 0)
+    if (params.perceptron_aggressiveness < 0)
       param_error("Perceptron aggressiveness value should be strictly greater than zero")
+    if (params.perceptron_aggressiveness == 0.0) // If default ...
+      // Currently same for both regular and pa-perceptron, despite
+      // differing interpretations.
+      params.perceptron_aggressiveness = 1.0
+
   }
 
   def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
