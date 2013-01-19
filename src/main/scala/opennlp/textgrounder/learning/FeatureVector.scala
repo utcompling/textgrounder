@@ -454,10 +454,10 @@ class SparseNominalInstanceFactory extends
     (featvec, labelind)
   }
 
-  def get_csv_labeled_instances(source: Source, is_training: Boolean) = {
-    val lines = source.getLines
+  def get_csv_labeled_instances(lines: Iterator[String],
+      is_training: Boolean) = {
     for (line <- lines) yield {
-      val atts = line.split(",")
+      val atts = line.split(",", -1)
       val label = atts.last
       val features = atts.dropRight(1)
       make_labeled_instance(features, label, is_training)
