@@ -308,9 +308,13 @@ class BasicBinaryPerceptronTrainer(
   val max_iterations: Int = 1000
 ) extends BinaryPerceptronTrainer {
   def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
-    val pred = if (score > 0) 1 else -1
-    // Map from 0/1 to -1/1
-    val symmetric_label = label*2 - 1
+    // We generate symmetric versions of the correct and predicted labels.
+    // We choose the values -0.5, +0.5 instead of -1, 1 so that the
+    // difference of the two is 1, and we end up with exactly the specified
+    // value of alpha (or its negation, or 0) rather than twice these values.
+    val pred = if (score > 0) +0.5 else -0.5
+    // Map from 0/1 to -0.5/+0.5
+    val symmetric_label = label - 0.5
     alpha*(symmetric_label - pred)
   }
 }
