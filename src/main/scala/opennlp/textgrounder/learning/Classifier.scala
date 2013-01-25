@@ -97,6 +97,7 @@ trait ScoringClassifier extends Classifier {
   /** Score a given instance for a single label. */
   def score_label(inst: FeatureVector, label: Int): Double
 
+  /** Return the best label. */
   def classify(inst: FeatureVector) =
     argmax[Int](0 until number_of_labels(inst), score_label(inst, _))
 
@@ -106,6 +107,18 @@ trait ScoringClassifier extends Classifier {
     * label if such a prediction is desired. */
   def score(inst: FeatureVector): IndexedSeq[Double] =
     (0 until number_of_labels(inst)).map(score_label(inst, _)).toIndexedSeq
+
+  /** Return a sorted sequence of pairs of `(label, score)`, sorted in
+    * descending order.  The first item is the best label, hence the label
+    * that will be returned by `classify` (except possibly when there are
+    * multiple best labels).  The difference between the score of the first
+    * and second labels is the margin between the predicted and best
+    * non-predicted label, which can be viewed as a confidence measure.
+    */
+  def sorted_scores(inst: FeatureVector) = {
+    val scores = score(inst)
+    ((0 until scores.size) zip scores).sortWith(_._2 > _._2)
+  }
 }
 
 abstract class LinearClassifier(
