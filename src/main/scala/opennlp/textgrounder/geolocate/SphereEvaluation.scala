@@ -34,7 +34,7 @@ import util.print.{errprint, warning, internal_error}
 import util.text.split_text_into_words
 
 import gridlocate._
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //

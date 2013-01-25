@@ -32,7 +32,7 @@ import util.math._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.{errprint, warning, internal_error}
 
-import GridLocateDriver.Debug._
+import util.debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //

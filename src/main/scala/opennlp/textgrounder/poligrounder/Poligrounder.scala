@@ -74,7 +74,7 @@ import util.print.errprint
 import util.time._
 
 import gridlocate._
-import GridLocateDriver.Debug._
+import util.debug._
 
 import worddist.{WordDist,WordDistFactory}
 import worddist.WordDist._

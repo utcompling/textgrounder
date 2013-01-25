@@ -36,7 +36,7 @@ import util.text.capfirst
 
 import worddist.{WordDist,WordDistFactory}
 
-import GridLocateDriver.Debug._
+import util.debug._
 
 
 /////////////////////////////////////////////////////////////////////////////

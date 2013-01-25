@@ -30,7 +30,7 @@ import io.Source
 
 import util.memoizer._
 import util.print._
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /**
  * A vector of real-valued features.  In general, features are indexed

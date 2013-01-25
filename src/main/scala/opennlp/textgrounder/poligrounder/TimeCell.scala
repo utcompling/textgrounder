@@ -31,7 +31,7 @@ import util.print.{errout, errprint}
 import util.experiment._
 
 import gridlocate._
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 import worddist._
 import worddist.WordDist._
 

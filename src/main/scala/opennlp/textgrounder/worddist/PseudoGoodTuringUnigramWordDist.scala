@@ -21,7 +21,7 @@ package worddist
 
 import util.print.errprint
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /**
  * This class implements a simple version of Good-Turing smoothing where we
