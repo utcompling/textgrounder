@@ -32,7 +32,7 @@ import util.math.argmax
 import util.metering._
 import util.print._
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /**
  * Mix-in for classifiers and classifier trainers.

@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package learning.perceptron
 import learning._
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /**
  * A perceptron for statistical classification.

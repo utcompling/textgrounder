@@ -27,7 +27,7 @@ import util.distances._
 import util.print.{errout, errprint}
 import util.experiment._
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 import gridlocate.{DocStatus, RawDocument}
 
 /////////////////////////////////////////////////////////////////////////////

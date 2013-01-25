@@ -28,7 +28,7 @@ import util.print.{errprint, warning}
 import util.Serializer._
 import util.text.capfirst
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 import worddist.{WordDist,WordDistFactory}
 

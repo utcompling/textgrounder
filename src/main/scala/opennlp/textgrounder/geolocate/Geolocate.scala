@@ -33,8 +33,8 @@ import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.print.{errprint, fixme_error}
 
+import util.debug._
 import gridlocate._
-import GridLocateDriver.Debug._
 
 import worddist.{WordDist,WordDistFactory}
 import worddist.WordDist._

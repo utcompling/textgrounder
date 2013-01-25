@@ -24,7 +24,7 @@ import util.metering._
 import util.print._
 import learning._
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 /**
  * A basic ranker.  Given a query item, return a list of ranked candidates from

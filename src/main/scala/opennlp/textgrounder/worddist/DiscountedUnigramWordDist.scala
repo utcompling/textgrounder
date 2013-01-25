@@ -24,7 +24,7 @@ import math._
 import util.collection._
 import util.print.errprint
 
-import gridlocate.GridLocateDriver.Debug._
+import util.debug._
 
 import WordDist._
 

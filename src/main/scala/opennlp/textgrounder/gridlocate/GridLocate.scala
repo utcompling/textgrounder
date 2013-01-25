@@ -32,13 +32,13 @@ import util.metering._
 import util.os.output_resource_usage
 import util.print.errprint
 import util.textdb
+import util.debug._
 
 import learning.{ArrayVector, Ranker}
 import learning.perceptron._
 import worddist._
 
 import WordDist._
-import GridLocateDriver.Debug._
 
 /*
 
@@ -914,42 +914,6 @@ noisy training data.  We choose C = 1 as a compromise.""")
 (default: %default).""")
 }
 
-class DebugSettings {
-  // Debug params.  Different params indicate different info to output.
-  // Specified using --debug.  Multiple params are separated by spaces,
-  // colons or semicolons.  Params can be boolean, if given alone, or
-  // valueful, if given as PARAM=VALUE.  Certain params are list-valued;
-  // multiple values are specified by including the parameter multiple
-  // times, or by separating values by a comma.
-  val debug = booleanmap[String]()
-  val debugval = stringmap[String]()
-  val debuglist = bufmap[String, String]()
-
-  var list_debug_params = Set[String]()
-
-  // Register a list-valued debug param.
-  def register_list_debug_param(param: String) {
-    list_debug_params += param
-  }
-
-  def parse_debug_spec(debugspec: String) {
-    val params = """[:;\s]+""".r.split(debugspec)
-    // Allow params with values, and allow lists of values to be given
-    // by repeating the param
-    for (f <- params) {
-      if (f contains '=') {
-        val Array(param, value) = f.split("=", 2)
-        if (list_debug_params contains param) {
-          val values = "[,]".split(value)
-          debuglist(param) ++= values
-        } else
-          debugval(param) = value
-      } else
-        debug(f) = true
-    }
-  }
-}
-
 /**
  * Base class for programmatic access to document/etc. geolocation.
  * Subclasses are for particular apps, e.g. GeolocateDocDriver for
@@ -991,6 +955,25 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @param options Object holding options to set
    */
   def handle_parameters() {
+    // Debug flags (from SphereGridEvaluator) -- need to set them
+    // here before we parse the command-line debug settings. (FIXME, should
+    // be a better way that introduces fewer long-range dependencies like
+    // this)
+    //
+    //  gridrank: For the given test document number (starting at 1), output
+    //            a grid of the predicted rank for cells around the true
+    //            cell.  Multiple documents can have the rank output, e.g.
+    //
+    //            --debug 'gridrank=45,58'
+    //
+    //            (This will output info for documents 45 and 58.)
+    //
+    //  gridranksize: Size of the grid, in numbers of documents on a side.
+    //                This is a single number, and the grid will be a square
+    //                centered on the true cell.
+    register_list_debug_param("gridrank")
+    debugval("gridranksize") = "11"
+
     if (params.debug != null)
       parse_debug_spec(params.debug)
 
@@ -1351,29 +1334,6 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     val grid = create_grid_from_documents(get_rawdocs)
     create_strategy(params.strategy, grid)
   }
-}
-
-object GridLocateDriver {
-  val Debug: DebugSettings = new DebugSettings
-
-  // Debug flags (from SphereGridEvaluator) -- need to set them
-  // here before we parse the command-line debug settings. (FIXME, should
-  // be a better way that introduces fewer long-range dependencies like
-  // this)
-  //
-  //  gridrank: For the given test document number (starting at 1), output
-  //            a grid of the predicted rank for cells around the true
-  //            cell.  Multiple documents can have the rank output, e.g.
-  //
-  //            --debug 'gridrank=45,58'
-  //
-  //            (This will output info for documents 45 and 58.)
-  //
-  //  gridranksize: Size of the grid, in numbers of documents on a side.
-  //                This is a single number, and the grid will be a square
-  //                centered on the true cell.
-  register_list_debug_param("gridrank")
-  debugval("gridranksize") = "11"
 }
 
 class GridLocateAbruptExit extends Throwable { }
