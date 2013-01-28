@@ -252,28 +252,48 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   def check_sequence_lengths(data: Iterable[(DI, Int)]) =
     FeatureVector.check_same_length(data.map(d => d._1.feature_vector))
 
-  /** Iterate over a function to train a linear classifier. */
+  /** Iterate over a function to train a linear classifier.
+    * @param error_threshold Maximum allowable error
+    * @param max_iterations Maximum allowable iterations
+    *
+    * @param fun Function to iterate over; Takes a int (iteration number),
+    *   returns a tuple (num_errors, num_adjustments, total_adjustment)
+    *   where `num_errors` is the number of errors made on the training
+    *   data and `total_adjustment` is the total sum of the scaling factors
+    *   used to update the weights when a mistake is made. */
   def iterate(error_threshold: Double, max_iterations: Int)(
-      fun: Int => Double) = {
+      fun: Int => (Int, Int, Double)) = {
     val task = new Meter("running", "classifier training iteration")
     task.start()
     var iter = 0
-    var total_error = 0.0
+    var total_adjustment = 0.0
     do {
       iter += 1
-      total_error = fun(iter)
-      errprint("Iteration %s, total_error %s", iter, total_error)
+      val (num_errors, num_adjustments, total_adjustment2) = fun(iter)
+      total_adjustment = total_adjustment2 // YUCK!
+      errprint("Iteration %s, num errors %s, num adjustments %s, total_adjustment %s",
+        iter, num_errors, num_adjustments, total_adjustment)
       task.item_processed()
-    } while (iter < max_iterations && total_error >= error_threshold)
+    } while (iter < max_iterations && total_adjustment >= error_threshold)
     task.finish()
     iter
   }
 
   /** Iterate over a function to train a linear classifier,
-    * optionally averaging over the weight vectors at each iteration. */
+    * optionally averaging over the weight vectors at each iteration.
+    * @param weights DOCUMENT ME
+    * @param averaged If true, average the weights at each iteration
+    * @param error_threshold Maximum allowable error
+    * @param max_iterations Maximum allowable iterations
+    *
+    * @param fun Function to iterate over; Takes a weight vector to update
+    *   and an int (iteration number), returns a tuple (num_errors,
+    *   total_adjustment) where `num_errors` is the number of errors made on
+    *   the training data and `total_adjustment` is the total sum of the
+    *   scaling factors used to update the weights when a mistake is made. */
   def iterate_averaged(weights: VectorAggregate,
         averaged: Boolean, error_threshold: Double, max_iterations: Int)(
-      fun: (VectorAggregate, Int) => Double) = {
+      fun: (VectorAggregate, Int) => (Int, Int, Double)) = {
     if (!averaged) {
       val num_iterations =
         iterate(error_threshold, max_iterations){ iter =>
@@ -284,9 +304,9 @@ trait LinearClassifierTrainer[DI <: DataInstance]
       val avg_weights = new_zero_weights(weights.length)
       val num_iterations =
         iterate(error_threshold, max_iterations){ iter =>
-          val total_error = fun(weights, iter)
+          val retval = fun(weights, iter)
           avg_weights += weights
-          total_error
+          retval
         }
       avg_weights *= 1.0 / num_iterations
       (avg_weights, num_iterations)

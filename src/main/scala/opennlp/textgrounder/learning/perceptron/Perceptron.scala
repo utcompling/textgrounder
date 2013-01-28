@@ -234,11 +234,14 @@ trait BinaryPerceptronTrainer
     * the confidence exceeds a given threshold.)
     *
     * @param inst Instance we are currently processing.
-    * @param label True label of that instance.
-    * @param score Predicted score on that instance.
+    * @param symmetric_label True label of that instance, in a symmetric
+    *   form (-1 or 1)
+    * @param margin "Margin" between correct and incorrect label.  In this
+    *   case this is the score, scaled by -1 if the correct label is -1,
+    *   so positive means correct.
     */
-  def get_scale_factor(inst: FeatureVector, label: Int, score: Double):
-    Double
+  def get_scale_factor(inst: FeatureVector, symmetric_label: Int,
+      margin: Double): Double
 
   def debug_get_weights(data: Iterable[(FeatureVector, Int)]
       ): (VectorAggregate, Int) = {
@@ -252,21 +255,30 @@ trait BinaryPerceptronTrainer
     print_weights()
     iterate_averaged(weight_aggr, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       errprint("Iteration %s", iter)
       for ((fv, label) <- data) {
         errprint("Instance %s, label %s", fv, label)
         val score = fv.dot_product(weights(0), 1)
         errprint("Score %s", score)
-        val scale = get_scale_factor(fv, label, score)
+        // Map from 0/1 to -1/1
+        val symmetric_label = label*2 - 1
+        val margin = symmetric_label*score
+        errprint("Margin %s", margin)
+        if (margin < 0)
+          num_errors += 1
+        val scale = get_scale_factor(fv, symmetric_label, margin)
         errprint("Scale %s", scale)
         if (scale != 0) {
           fv.update_weights(weights(0), scale, 1)
           print_weights()
-          total_error += math.abs(scale)
+          total_adjustment += math.abs(scale)
+          num_adjustments += 1
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 
@@ -278,16 +290,24 @@ trait BinaryPerceptronTrainer
     val weights = weight_aggr(0)
     iterate_averaged(weight_aggr, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       for ((fv, label) <- data) {
         val score = fv.dot_product(weights(0), 1)
-        val scale = get_scale_factor(fv, label, score)
+        // Map from 0/1 to -1/1
+        val symmetric_label = label*2 - 1
+        val margin = symmetric_label*score
+        if (margin < 0)
+          num_errors += 1
+        val scale = get_scale_factor(fv, symmetric_label, margin)
         if (scale != 0) {
           fv.update_weights(weights(0), scale, 1)
-          total_error += math.abs(scale)
+          total_adjustment += math.abs(scale)
+          num_adjustments += 1
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 }
@@ -307,15 +327,12 @@ class BasicBinaryPerceptronTrainer(
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends BinaryPerceptronTrainer {
-  def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
-    // We generate symmetric versions of the correct and predicted labels.
-    // We choose the values -0.5, +0.5 instead of -1, 1 so that the
-    // difference of the two is 1, and we end up with exactly the specified
-    // value of alpha (or its negation, or 0) rather than twice these values.
-    val pred = if (score > 0) +0.5 else -0.5
-    // Map from 0/1 to -0.5/+0.5
-    val symmetric_label = label - 0.5
-    alpha*(symmetric_label - pred)
+  def get_scale_factor(inst: FeatureVector, symmetric_label: Int,
+      margin: Double) = {
+    if (margin > 0)
+      0.0
+    else
+      alpha
   }
 }
 
@@ -410,10 +427,9 @@ class PassiveAggressiveBinaryPerceptronTrainer(
 ) extends { val averaged = false }
     with BinaryPerceptronTrainer
     with PassiveAggressivePerceptronTrainer {
-  def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
-    // Map from 0/1 to -1/1
-    val symmetric_label = label*2 - 1
-    val loss = 0.0 max (1.0 - symmetric_label*score)
+  def get_scale_factor(inst: FeatureVector, symmetric_label: Int,
+      margin: Double) = {
+    val loss = 0.0 max (1.0 - margin)
     val sqmag = inst.squared_magnitude(1)
     compute_update_factor(loss, sqmag)*symmetric_label
   }
@@ -490,7 +506,9 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     }
     iterate_averaged(weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       errprint("Iteration %s", iter)
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
@@ -508,17 +526,21 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
         errprint("r,rscore = %s,%s", r, rscore)
         val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
         errprint("s,sscore = %s,%s", s, sscore)
-        errprint("rscore - sscore = %s", rscore, sscore)
-        val scale = get_scale_factor(fv, r, s, rscore - sscore)
+        val margin = rscore - sscore
+        errprint("margin = %s", margin)
+        if (margin < 0)
+          num_errors += 1
+        val scale = get_scale_factor(fv, r, s, margin)
         errprint("scale = %s", scale)
         if (scale != 0) {
           fv.update_weights(weights(r), scale, r)
           fv.update_weights(weights(s), -scale, s)
           print_weights()
-          total_error += math.abs(scale)
+          total_adjustment += math.abs(scale)
+          num_adjustments += 1
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 
@@ -529,7 +551,9 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     val weights = initialize(data)
     iterate_averaged(weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
         def dotprod(x: Int) =
@@ -538,14 +562,18 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
         val nolabs = no_labels(inst, correct)
         val (r,rscore) = argandmin[Int](yeslabs, dotprod(_))
         val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
-        val scale = get_scale_factor(fv, r, s, rscore - sscore)
+        val margin = rscore - sscore
+        if (margin < 0)
+          num_errors += 1
+        val scale = get_scale_factor(fv, r, s, margin)
         if (scale != 0) {
           fv.update_weights(weights(r), scale, r)
           fv.update_weights(weights(s), -scale, s)
-          total_error += math.abs(scale)
+          total_adjustment += math.abs(scale)
+          num_adjustments += 1
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 }
@@ -752,7 +780,9 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
 
     iterate_averaged(weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       errprint("Iteration %s", iter)
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
@@ -776,6 +806,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
         errprint("Predicted label (%s): %s",
           if (prediction_based) "prediction-based" else "max-loss", predicted)
         if (predicted != correct) {
+          num_errors += 1
           val loss = dotprod(predicted) - goldscore +
             math.sqrt(get_cost(inst, correct, predicted))
           errprint("Loss: %s", loss)
@@ -785,11 +816,12 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
             fv.update_weights(weights(correct), scale, correct)
             fv.update_weights(weights(predicted), -scale, predicted)
             print_weights()
-            total_error += math.abs(scale)
+            total_adjustment += math.abs(scale)
+            num_adjustments += 1
           }
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 
@@ -799,7 +831,9 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     val weights = initialize(data)
     iterate_averaged(weights, averaged, error_threshold,
          max_iterations) { (weights, iter) =>
-      var total_error = 0.0
+      var total_adjustment = 0.0
+      var num_errors = 0
+      var num_adjustments = 0
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
         val all_labs = 0 until number_of_labels(inst)
@@ -812,17 +846,19 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
             argmax[Int](all_labs,
               x=>(dotprod(x) - goldscore + math.sqrt(cost(inst, correct, x))))
         if (predicted != correct) {
+          num_errors += 1
           val loss = dotprod(predicted) - goldscore +
             math.sqrt(cost(inst, correct, predicted))
           val scale = get_scale_factor(fv, correct, predicted, loss)
           if (scale != 0) {
             fv.update_weights(weights(correct), scale, correct)
             fv.update_weights(weights(predicted), -scale, predicted)
-            total_error += math.abs(scale)
+            total_adjustment += math.abs(scale)
+            num_adjustments += 1
           }
         }
       }
-      total_error
+      (num_errors, num_adjustments, total_adjustment)
     }
   }
 }
