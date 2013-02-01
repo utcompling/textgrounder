@@ -31,7 +31,7 @@ import util.io.{FileHandler, LocalFileHandler}
 import util.metering._
 import util.os.output_resource_usage
 import util.print.errprint
-import util.textdb
+import util.textdb._
 import util.debug._
 
 import learning.{ArrayVector, Ranker}
@@ -497,6 +497,16 @@ times.  If a directory is given, all files in the directory will be
 considered (but if an error occurs upon parsing a file, it will be ignored).
 Each file is read in and then disambiguation is performed.  Not used during
 document geolocation when --eval-format=internal (the default).""")
+
+  var results =
+    ap.option[String]("r", "results",
+      metavar = "FILE",
+      help = """If specified, prefix of file to store results into.
+Results are also normally output to stderr for debugging purposes unless
+`--no-results` is given.  Results are stored as a textdb corpus, i.e. two
+files will be written, with extensions `-data.txt` and `-schema.txt`, with
+the former storing the data as tab-separated fields and the latter naming
+the fields.""")
 
   var num_nearest_neighbors =
     ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
@@ -1345,6 +1355,25 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   ) = {
     val grid = create_grid_from_documents(get_rawdocs)
     create_strategy(params.strategy, grid)
+  }
+
+  def output_results(results: Iterator[DocEvalResult[Co]], filehand: FileHandler,
+      dir: String, base: String) {
+    val first = results.next
+    val res2 = Iterator(first) ++ results
+    val fields = first.to_row.map(_._1)
+    val fixed_fields = Map(
+        // "corpus-name" -> opts.corpus_name,
+        // "generating-app" -> progname,
+        "corpus-type" -> "textgrounder-results")
+    val schema = new Schema(fields, fixed_fields)
+    schema.output_constructed_schema_file(filehand, dir, base)
+    val outfile = TextDB.construct_data_file(filehand, dir, base)
+    val outstr = filehand.openw(outfile)
+    res2.foreach { res =>
+      outstr.println(schema.make_row(res.to_row.map(_._2.toString)))
+    }
+    outstr.close()
   }
 }
 

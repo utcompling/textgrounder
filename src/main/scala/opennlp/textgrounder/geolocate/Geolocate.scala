@@ -748,7 +748,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
     if (debug("no-evaluation"))
       Iterable()
     else {
-      val results =
+      val results_iter =
         params.eval_format match {
 //          case "pcl-travel" => {
 //            val evalobj =
@@ -768,7 +768,13 @@ found   : (String, Iterator[evalobj.TEvalRes])
             fixme_error("raw-text eval format not yet implemented")
         }
       // The call to `toIndexedSeq` forces evaluation of the Iterator
-      results.toIndexedSeq
+      val results = results_iter.toIndexedSeq
+      if (params.results != null) {
+        val filehand = get_file_handler
+        val (dir, base) = filehand.split_filename(params.results)
+        output_results(results.toIterator, filehand, dir, base)
+      }
+      results
     }
   }
 }

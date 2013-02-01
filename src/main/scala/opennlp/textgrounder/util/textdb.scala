@@ -305,16 +305,21 @@ package object textdb {
      * Locate the schema file of the appropriate suffix in the given directory.
      */
     def find_schema_file(filehand: FileHandler, dir: String,
-        suffix_re: String = "") = {
+        prefix: String = "", suffix_re: String = "") = {
       val schema_regex = make_schema_file_suffix_regex(suffix_re).r
       val all_files = filehand.list_files(dir)
       val files =
-        (for (file <- all_files
-          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
-      if (files.length == 0)
+        (for {
+           file <- all_files
+           (_, base) = filehand.split_filename(file)
+           if base.startsWith(prefix) &&
+             schema_regex.findFirstMatchIn(file) != None
+         } yield file).toSeq
+      if (files.length == 0) {
         throw new FileFormatException(
           "Found no schema files (matching %s) in directory %s"
           format (schema_regex, dir))
+      }
       if (files.length > 1)
         throw new FileFormatException(
           "Found multiple schema files (matching %s) in directory %s: %s"
@@ -363,8 +368,8 @@ package object textdb {
      * given directory.
      */
     def read_schema_from_textdb(filehand: FileHandler, dir: String,
-          suffix_re: String = "") = {
-      val schema_file = find_schema_file(filehand, dir, suffix_re)
+          prefix: String = "", suffix_re: String = "") = {
+      val schema_file = find_schema_file(filehand, dir, prefix, suffix_re)
       read_schema_file(filehand, schema_file)
     }
 
@@ -481,6 +486,15 @@ package object textdb {
     }
 
     /**
+     * List only the data files of the appropriate prefix.
+     */
+    def filter_file_by_prefix(filehand: FileHandler, file: String,
+        prefix: String) = {
+      val (_, base) = filehand.split_filename(file)
+      base.startsWith(prefix)
+    }
+
+    /**
      * Read a textdb corpus from a directory and return the schema and an
      * iterator over all data files.  This will recursively process any
      * subdirectories looking for data files.  The data files must have a suffix
@@ -490,6 +504,7 @@ package object textdb {
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
+     * @param prefix Prefix files must begin with
      * @param suffix_re Suffix regexp picking out the correct data files
      * @param with_message If true, "Processing ..." messages will be
      *   displayed as each file is processed and as each directory is visited
@@ -499,9 +514,12 @@ package object textdb {
      *   corpus and `files` is an iterator over data files.
      */
     def get_textdb_files(filehand: FileHandler, dir: String,
-        suffix_re: String = "", with_messages: Boolean = true) = {
-      val schema = Schema.read_schema_from_textdb(filehand, dir, suffix_re)
+        prefix: String = "", suffix_re: String = "",
+        with_messages: Boolean = true) = {
+      val schema =
+        Schema.read_schema_from_textdb(filehand, dir, prefix, suffix_re)
       val files = iter_files_recursively(filehand, Iterable(dir)).
+          filter(filter_file_by_prefix(filehand, _, prefix)).
           filter(filter_file_by_suffix(_, suffix_re))
       val files_with_message =
         if (with_messages)
@@ -529,9 +547,11 @@ package object textdb {
      *   if some rows were badly formatted.)
      */
     def read_textdb(filehand: FileHandler, dir: String,
-        suffix_re: String = "", with_messages: Boolean = true) = {
+        prefix: String = "", suffix_re: String = "",
+        with_messages: Boolean = true) = {
       val (schema, fields) =
-        read_textdb_with_schema(filehand, dir, suffix_re, with_messages)
+        read_textdb_with_schema(filehand, dir, prefix,
+          suffix_re, with_messages)
       fields
     }
 
@@ -553,9 +573,10 @@ package object textdb {
      *   iterator of iterators of fields.
      */
     def read_textdb_with_schema(filehand: FileHandler, dir: String,
-        suffix_re: String = "", with_messages: Boolean = true) = {
+        prefix: String = "", suffix_re: String = "",
+        with_messages: Boolean = true) = {
       val (schema, files) =
-        get_textdb_files(filehand, dir, suffix_re, with_messages)
+        get_textdb_files(filehand, dir, prefix, suffix_re, with_messages)
       val fields = files.map(read_textdb_file(filehand, _, schema))
       (schema, fields)
     }

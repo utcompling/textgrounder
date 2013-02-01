@@ -245,6 +245,19 @@ class DocEvalResult[Co](
     errprint("%s:  true cell: %s", doctag, true_cell)
   }
 
+  def to_row = Seq(
+    "document" -> document,
+    "true-coord" -> document.coord,
+    "numtypes" -> document.dist.model.num_types,
+    "numtokens" -> document.dist.model.num_tokens,
+    "true-cell" -> true_cell.describe_location,
+    "true-cell-center" -> true_center,
+    "true-cell-numdocs" -> true_cell.combined_dist.num_docs,
+    "pred-coord" -> pred_coord,
+    "oracle-dist" -> true_truedist,
+    "error-dist" -> pred_truedist
+  )
+
   /**
    * Return a "public" version of this result to be returned to callers.
    * May include less information than what is required temporarily for
@@ -751,6 +764,13 @@ class RankedDocEvalResult[Co](
     super.print_result(doctag, driver)
     errprint("%s:  true cell at rank: %s", doctag, true_rank)
   }
+
+  override def to_row = super.to_row ++ Seq(
+    "pred-cell" -> pred_cell.describe_location,
+    "pred-cell-center" -> pred_cell.get_center_coord,
+    "pred-cell-numdocs" -> pred_cell.combined_dist.num_docs,
+    "true-rank" -> true_rank
+  )
 }
 
 /**

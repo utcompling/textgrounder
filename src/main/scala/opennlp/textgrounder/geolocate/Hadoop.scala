@@ -245,7 +245,7 @@ class DocEvalMapper
     val ranker = driver.create_ranker
     context.progress
     val schema = Schema.read_schema_from_textdb(filehand,
-      corpus_dirs(0), corpus_suffix)
+      corpus_dirs(0), suffix_re = corpus_suffix)
     context.progress
 
     class HadoopIterator extends Iterator[(FileHandler, String, String, Long)] {
