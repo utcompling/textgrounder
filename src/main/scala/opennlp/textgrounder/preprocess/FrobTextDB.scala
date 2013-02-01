@@ -255,7 +255,7 @@ class FrobTextDB(
 
   def process_dir(filehand: FileHandler, dir: String) {
     val (schema, files) =
-      TextDB.get_textdb_files(filehand, dir, params.input_suffix)
+      TextDB.get_textdb_files(filehand, dir, suffix_re = params.input_suffix)
     val (_, schpref, _, _) = Schema.split_schema_file(filehand,
       schema.filename, params.input_suffix).get
     schema_prefix = schpref    

@@ -680,7 +680,7 @@ object GeoDocFactory {
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
       suffix: String = ""): Iterator[DocStatus[RawDocument]] = {
     val (schema, files) =
-      TextDB.get_textdb_files(filehand, dir, suffix)
+      TextDB.get_textdb_files(filehand, dir, suffix_re = suffix)
     files.flatMap { file =>
       filehand.openr(file).zipWithIndex.map {
         case (line, idx) =>
