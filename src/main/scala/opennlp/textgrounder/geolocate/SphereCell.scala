@@ -148,6 +148,10 @@ abstract class RectangularCell(
    */
   def get_northeast_coord: SphereCoord
 
+  def describe_location = {
+    "%s-%s" format (get_southwest_coord, get_northeast_coord)
+  }
+
   /**
    * Define the center based on the southwest and northeast points,
    * or based on the centroid of the cell.

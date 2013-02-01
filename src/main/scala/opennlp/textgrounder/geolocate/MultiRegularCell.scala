@@ -150,10 +150,6 @@ class MultiRegularCell(
 
   def get_northeast_coord = grid.multi_cell_index_to_far_corner_coord(index)
 
-  def describe_location = {
-    "%s-%s" format (get_southwest_coord, get_northeast_coord)
-  }
-
   def describe_indices = "%s,%s" format (index.latind, index.longind)
 
   /**

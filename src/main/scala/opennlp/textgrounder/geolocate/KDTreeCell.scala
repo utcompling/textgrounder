@@ -45,9 +45,6 @@ class KdTreeCell(
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
 
   def describe_indices = "Placeholder"
-
-  def describe_location =
-    get_boundary.toString + " (Center: " + get_center_coord + ")"
 }
 
 object KdTreeGrid {
