@@ -41,7 +41,7 @@ class CombinedModelGrid(
         None
       else
         Some(candidates.minBy(
-          cell => spheredist(cell.get_center_coord, doc.coord)))
+          cell => spheredist(cell.get_central_point, doc.coord)))
   }
 
   def add_training_documents_to_grid(

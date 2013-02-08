@@ -418,7 +418,7 @@ object Whitelist {
  * General class retrieving command-line arguments or storing programmatic
  * configuration parameters for a Cell-grid-based application.
  *
- * @param parser If specified, should be a parser for retrieving the
+ * @param parser Should be a parser for retrieving the
  *   value of command-line arguments from the command line.  Provided
  *   that the parser has been created and initialized by creating a
  *   previous instance of this same class with the same parser (a
@@ -429,8 +429,7 @@ object Whitelist {
  *
  */
 trait GridLocateParameters extends ArgParserParameters {
-  protected val ap =
-    if (parser == null) new ArgParser("unknown") else parser
+  protected val ap = parser
 
   var language =
     ap.option[String]("language", "lang",
@@ -682,7 +681,7 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
   var results_by_range =
     ap.flag("results-by-range",
       help = """Show results by range (of error distances and number of
-documents in true cell).  Not on by default as counters are used for this,
+documents in correct cell).  Not on by default as counters are used for this,
 and setting so many counters breaks some Hadoop installations.""")
   var oracle_results =
     ap.flag("oracle-results",
@@ -702,14 +701,14 @@ debugval("foo") for valueful params, or debuglist("foo") for list-valued
 params.) Some known debug flags:
 
 gridrank: For the given test document number (starting at 1), output
-a grid of the predicted rank for cells around the true cell.
+a grid of the predicted rank for cells around the correct cell.
 Multiple documents can have the rank output, e.g. --debug 'gridrank=45,58'
 (This will output info for documents 45 and 58.) This output can be
 postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
 
 gridranksize: Size of the grid, in numbers of documents on a side.
 This is a single number, and the grid will be a square centered on the
-true cell. (Default currently 11.)
+correct cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
@@ -980,7 +979,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     //
     //  gridranksize: Size of the grid, in numbers of documents on a side.
     //                This is a single number, and the grid will be a square
-    //                centered on the true cell.
+    //                centered on the correct cell.
     register_list_debug_param("gridrank")
     debugval("gridranksize") = "11"
 
@@ -1246,7 +1245,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
               // "best possible".
               if (correct == predicted) 0.0
               else inst.doc.distance_to_coord(
-                     inst.candidates(predicted).get_center_coord)
+                     inst.candidates(predicted).get_central_point)
             }
         }
     }

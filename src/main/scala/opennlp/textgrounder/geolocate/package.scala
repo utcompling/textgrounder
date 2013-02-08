@@ -15,9 +15,9 @@ package object geolocate {
   ) {
     /**
      * Distance in degrees between document's coordinate and central
-     * point of true cell
+     * point of correct cell
      */
-    val true_degdist = degree_dist(stats.document.coord, stats.true_center)
+    val correct_degdist = degree_dist(stats.document.coord, stats.correct_central_point)
     /**
      * Distance in degrees between doc's coordinate and predicted
      * coordinate

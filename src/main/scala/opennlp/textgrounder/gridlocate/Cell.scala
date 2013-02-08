@@ -155,13 +155,21 @@ abstract class GeoCell[Co](
   def describe_indices: String
 
   /**
-   * Return the coordinate of the "center" of the cell.  This is the
-   * coordinate used in computing distances between arbitary points and
-   * given cells, for evaluation and such.  For odd-shaped cells, the
-   * center can be more or less arbitrarily placed as long as it's somewhere
-   * central.
+   * Return the coordinate of the true center of the cell.  This is sometimes
+   * used in computing certain measures.  If this cannot clearly be defined,
+   * then make it the same as `get_central_point`.
    */
-  def get_center_coord: Co
+  def get_true_center = get_central_point
+
+  /**
+   * Return the coordinate of the central point of the cell.  This is the
+   * coordinate used in computing distances between arbitrary points and
+   * given cells, for evaluation and such.  This may be the true center,
+   * or some other measure of central tendency (e.g. the centroid). For
+   * odd-shaped cells with no clear definition of "center", the central
+   * point can be more or less arbitrarily placed as long as it's somewhere
+   * central. */
+  def get_central_point: Co
 
   /**
    * Return true if we have finished creating and populating the cell.

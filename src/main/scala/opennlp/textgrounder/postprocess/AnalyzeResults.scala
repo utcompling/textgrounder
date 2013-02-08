@@ -35,10 +35,10 @@ class AnalyzeResultsParameters(ap: ArgParser) {
     metavar = "FILE",
     help="""Output Zipfian distribution of predicted cells,
 to see the extent to which they are balanced or unbalanced.""")
-  var true_cell_distribution = ap.option[String]("true-cell-distribution",
-    "true-cell-distrib", "tcd",
+  var correct_cell_distribution = ap.option[String]("correct-cell-distribution",
+    "correct-cell-distrib", "tcd",
     metavar = "FILE",
-    help="""Output Zipfian distribution of true cells,
+    help="""Output Zipfian distribution of correct cells,
 to see the extent to which they are balanced or unbalanced.""")
   var input = ap.positional[String]("input",
     help = "Results file to analyze.")
@@ -84,7 +84,7 @@ object AnalyzeResults extends ExperimentApp("classify") {
   }
 
   def run_program() = {
-    val true_cells = intmap[String]()
+    val correct_cells = intmap[String]()
     val pred_cells = intmap[String]()
 
     val filehand = io.local_file_handler
@@ -95,15 +95,15 @@ object AnalyzeResults extends ExperimentApp("classify") {
     val (schema, field_iter) =
       TextDB.read_textdb_with_schema(filehand, dir, prefix = base)
     for (fieldvals <- field_iter.flatten) {
-      val true_cell = schema.get_field(fieldvals, "true-cell")
+      val correct_cell = schema.get_field(fieldvals, "correct-cell")
       val pred_cell = schema.get_field(fieldvals, "pred-cell")
-      true_cells(true_cell) += 1
+      correct_cells(correct_cell) += 1
       pred_cells(pred_cell) += 1
     }
     if (params.pred_cell_distribution != null)
       output_freq_of_freq(filehand, params.pred_cell_distribution, pred_cells)
-    if (params.true_cell_distribution != null)
-      output_freq_of_freq(filehand, params.true_cell_distribution, true_cells)
+    if (params.correct_cell_distribution != null)
+      output_freq_of_freq(filehand, params.correct_cell_distribution, correct_cells)
     0
   }
 }

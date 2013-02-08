@@ -64,7 +64,7 @@ class SphereDocEvalStats(
   override def record_result(res: DocEvalResult[SphereCoord]) {
     wrapped.record_result(res)
     degree_dists += res.pred_degdist
-    oracle_degree_dists += res.true_degdist
+    oracle_degree_dists += res.correct_degdist
   }
 
   val output_result_with_units: Double => String =
@@ -102,12 +102,12 @@ class GroupedSphereDocEvalStats(
     new SphereDocEvalStats(driver, wrapped)
   }
 ) {
-  val docs_by_degree_dist_to_true_center =
-    docmap("degree_dist_to_true_center")
+  val docs_by_degree_dist_to_correct_central_point =
+    docmap("degree_dist_to_correct_central_point")
 
-  val docs_by_degree_dist_to_pred_center =
+  val docs_by_degree_dist_to_pred_central_point =
     new DoubleTableByRange(dist_fractions_for_error_dist,
-      create_stats_for_range("degree_dist_to_pred_center", _))
+      create_stats_for_range("degree_dist_to_pred_central_point", _))
 
   override def record_result_by_range(
     res: DocEvalResult[SphereCoord]
@@ -122,46 +122,46 @@ class GroupedSphereDocEvalStats(
      */
     grid match {
       case multigrid: MultiRegularGrid => {
-        /* For distance to center of true cell, which will be small (no more
-           than width_of_multi_cell * size-of-tiling-cell); we convert to
-           fractions of tiling-cell size and record in ranges corresponding
+        /* For distance to central point of correct cell, which will be small
+           (no more than width_of_multi_cell * size-of-tiling-cell); we convert
+           to fractions of tiling-cell size and record in ranges corresponding
            to increments of 0.25 (see above). */
         /* True distance (in both km and degrees) as a fraction of
            cell size */
-        val frac_true_truedist = res.true_truedist / multigrid.km_per_cell
-        val frac_true_degdist = res.true_degdist / multigrid.degrees_per_cell
+        val frac_correct_truedist = res.correct_truedist / multigrid.km_per_cell
+        val frac_correct_degdist = res.correct_degdist / multigrid.degrees_per_cell
         /* Round the fractional distances to multiples of
            dist_fraction_increment */
         val fracinc = dist_fraction_increment
-        val rounded_frac_true_truedist =
-          fracinc * floor(frac_true_degdist / fracinc)
-        val rounded_frac_true_degdist =
-          fracinc * floor(frac_true_degdist / fracinc)
-        docs_by_true_dist_to_true_center(rounded_frac_true_truedist).
+        val rounded_frac_correct_truedist =
+          fracinc * floor(frac_correct_degdist / fracinc)
+        val rounded_frac_correct_degdist =
+          fracinc * floor(frac_correct_degdist / fracinc)
+        docs_by_true_dist_to_correct_central_point(rounded_frac_correct_truedist).
           record_result(res)
-        docs_by_degree_dist_to_true_center(rounded_frac_true_degdist).
+        docs_by_degree_dist_to_correct_central_point(rounded_frac_correct_degdist).
           record_result(res)
 
-        /* For distance to center of predicted cell, which may be large, since
-           predicted cell may be nowhere near the true cell.  Again we convert
-           to fractions of tiling-cell size and record in the ranges listed in
-           dist_fractions_for_error_dist (see above). */
+        /* For distance to central point of predicted cell, which may be large,
+           since predicted cell may be nowhere near the correct cell.  Again we
+           convert to fractions of tiling-cell size and record in the ranges
+           listed in dist_fractions_for_error_dist (see above). */
         /* Predicted distance (in both km and degrees) as a fraction of
            cell size */
         val frac_pred_truedist = res.pred_truedist / multigrid.km_per_cell
         val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
-        docs_by_true_dist_to_pred_center.get_collector(frac_pred_truedist).
+        docs_by_true_dist_to_pred_central_point.get_collector(frac_pred_truedist).
           record_result(res)
-        docs_by_degree_dist_to_pred_center.get_collector(frac_pred_degdist).
+        docs_by_degree_dist_to_pred_central_point.get_collector(frac_pred_degdist).
           record_result(res)
        }
 
       case kdgrid: KdTreeGrid => {
         // for kd trees, we do something similar to above,
         // but round to the nearest km...
-        docs_by_true_dist_to_true_center(round(res.true_truedist)).
+        docs_by_true_dist_to_correct_central_point(round(res.correct_truedist)).
           record_result(res)
-        docs_by_degree_dist_to_true_center(round(res.true_degdist)).
+        docs_by_degree_dist_to_correct_central_point(round(res.correct_degdist)).
           record_result(res)
       }
     }
@@ -175,28 +175,28 @@ class GroupedSphereDocEvalStats(
       case multigrid: MultiRegularGrid => {
         for (
           (frac_truedist, obj) <-
-            docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
+            docs_by_true_dist_to_correct_central_point.toSeq sortBy (_._1)
         ) {
           val lowrange = frac_truedist * multigrid.km_per_cell
           val highrange = ((frac_truedist + dist_fraction_increment) *
             multigrid.km_per_cell)
           errprint("")
-          errprint("Results for documents where distance to center")
-          errprint("  of true cell in km is in the range [%.2f,%.2f):",
+          errprint("Results for documents where distance to central point")
+          errprint("  of correct cell in km is in the range [%.2f,%.2f):",
             lowrange, highrange)
           obj.output_results()
         }
         errprint("")
         for (
           (frac_degdist, obj) <-
-            docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
+            docs_by_degree_dist_to_correct_central_point.toSeq sortBy (_._1)
         ) {
           val lowrange = frac_degdist * multigrid.degrees_per_cell
           val highrange = ((frac_degdist + dist_fraction_increment) *
             multigrid.degrees_per_cell)
           errprint("")
-          errprint("Results for documents where distance to center")
-          errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
+          errprint("Results for documents where distance to central point")
+          errprint("  of correct cell in degrees is in the range [%.2f,%.2f):",
             lowrange, highrange)
           obj.output_results()
         }
@@ -225,8 +225,8 @@ class RankedSphereGridEvaluator(
   ranker, driver, evalstats
 ) {
   override def imp_evaluate_document(document: GeoDoc[SphereCoord],
-      true_cell: GeoCell[SphereCoord]) = {
-    val result = super.imp_evaluate_document(document, true_cell)
+      correct_cell: GeoCell[SphereCoord]) = {
+    val result = super.imp_evaluate_document(document, correct_cell)
     new RankedSphereDocEvalResult(
       result.asInstanceOf[FullRankedDocEvalResult[SphereCoord]]
     )
@@ -236,7 +236,7 @@ class RankedSphereGridEvaluator(
 class RankedSphereDocEvalResult(
   wrapped: FullRankedDocEvalResult[SphereCoord]
 ) extends FullRankedDocEvalResult[SphereCoord](
-  wrapped.document, wrapped.pred_cells, wrapped.true_rank
+  wrapped.document, wrapped.pred_cells, wrapped.correct_rank
 ) {
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[SphereCoord]) {
@@ -246,7 +246,7 @@ class RankedSphereDocEvalResult(
     if (debug("gridrank") ||
       (debuglist("gridrank") contains doctag.drop(1))) {
       val grsize = debugval("gridranksize").toInt
-      wrapped.true_cell match {
+      wrapped.correct_cell match {
         case multireg: MultiRegularCell =>
           multireg.grid.
             output_ranking_grid(
