@@ -949,15 +949,35 @@ package object argparser {
     def getMultiType(arg: String) = argtype_multi(arg)
 
     /**
-     * Iterate over all defined arguments.
-     *
-     * @return an Iterable over the names of the arguments.  The argument
-     *   categories (e.g. option, multi-option, flag, etc.), argument
-     *   types (e.g. Int, Boolean, Double, String, Seq[String]), default
-     *   values and actual values can be retrieved using other functions.
+     * Return an Iterable over the names of all defined arguments.
+     * Values of the arguments can be retrieved using `apply` or `get[T]`.
+     * Properties of the arguments can be retrieved using `getType`,
+     * `specified`, `defaultValue`, `isFlag`, etc.
      */
     def argNames: Iterable[String] = {
       for ((name, argobj) <- argmap) yield name
+    }
+
+    /**
+     * Return an Iterable over pairs of arguments and values (of type Any).
+     * The values need to be cast as appropriate.
+     *
+     * @see #argNames, #get[T], #apply
+     */
+    def argValues: Iterable[(String, Any)] = {
+      for ((name, argobj) <- argmap) yield (name, argobj.value)
+    }
+
+    /**
+     * Return an Iterable over pairs of arguments and values (of type Any),
+     * only including arguments whose values were specified on the command
+     * line. The values need to be cast as appropriate.
+     *
+     * @see #argNames, #argValues, #get[T], #apply
+     */
+    def nonDefaultArgValues: Iterable[(String, Any)] = {
+      for ((name, argobj) <- argmap if argobj.specified)
+        yield (name, argobj.value)
     }
 
     protected def handle_argument[T : Manifest, U : Manifest](
