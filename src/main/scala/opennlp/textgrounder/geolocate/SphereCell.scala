@@ -59,7 +59,7 @@ abstract class PolygonalCell(
    * output easier to read.
    */
   def get_inner_boundary = {
-    val center = get_center_coord
+    val center = get_true_center
     for (coord <- get_boundary)
       yield SphereCoord((center.lat + coord.lat) / 2.0,
                   average_longitudes(center.long, coord.long))
@@ -152,6 +152,12 @@ abstract class RectangularCell(
     "%s-%s" format (get_southwest_coord, get_northeast_coord)
   }
 
+  override def get_true_center = {
+    val sw = get_southwest_coord
+    val ne = get_northeast_coord
+    SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+  }
+
   /**
    * Define the center based on the southwest and northeast points,
    * or based on the centroid of the cell.
@@ -159,15 +165,13 @@ abstract class RectangularCell(
   val centroid = new Array[Double](2)
   var num_docs: Int = 0
 
-  def get_center_coord = {
+  def get_central_point = {
     if (num_docs == 0 ||
       get_sphere_docfact(grid).driver.params.center_method == "center") {
+      get_true_center
       // use the actual cell center
       // also, if we have an empty cell, there is no such thing as
       // a centroid, so default to the center
-      val sw = get_southwest_coord
-      val ne = get_northeast_coord
-      SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
     } else {
       // use the centroid
       SphereCoord(centroid(0) / num_docs, centroid(1) / num_docs)
@@ -190,7 +194,7 @@ abstract class RectangularCell(
   def get_boundary = {
     val sw = get_southwest_coord
     val ne = get_northeast_coord
-    val center = get_center_coord
+    val center = get_true_center
     val nw = SphereCoord(ne.lat, sw.long)
     val se = SphereCoord(sw.lat, ne.long)
     Seq(sw, nw, ne, se, sw)
@@ -206,7 +210,7 @@ abstract class RectangularCell(
   def generate_kml_name_placemark(name: String) = {
     val sw = get_southwest_coord
     val ne = get_northeast_coord
-    val center = get_center_coord
+    val center = get_true_center
     // !!PY2SCALA: BEGIN_PASSTHRU
     // Because it tries to frob the # sign
     <Placemark>

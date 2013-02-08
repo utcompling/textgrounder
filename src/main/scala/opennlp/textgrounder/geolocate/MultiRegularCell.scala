@@ -487,15 +487,15 @@ class MultiRegularGrid(
    * cell, out to a certain distance.
    * 
    * @param pred_cells List of predicted cells, along with their scores.
-   * @param true_cell True cell.
+   * @param correct_cell Correct cell.
    * @param grsize Total size of the ranking grid. (For example, a total size
-   *   of 21 will result in a ranking grid with the true cell and 10
+   *   of 21 will result in a ranking grid with the correct cell and 10
    *   cells on each side shown.)
    */
   def output_ranking_grid(pred_cells: Iterable[(MultiRegularCell, Double)],
-    true_cell: MultiRegularCell, grsize: Int) {
+    correct_cell: MultiRegularCell, grsize: Int) {
     val (true_latind, true_longind) =
-      (true_cell.index.latind, true_cell.index.longind)
+      (correct_cell.index.latind, correct_cell.index.longind)
     val min_latind = true_latind - grsize / 2
     val max_latind = min_latind + grsize - 1
     val min_longind = true_longind - grsize / 2

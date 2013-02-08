@@ -258,8 +258,8 @@ Default %default.""")
     ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
       default = "centroid",
       choices = Seq("centroid", "center"),
-      help = """Chooses whether to use center or centroid for cell
-center calculation. Options are either 'centroid' or 'center'.
+      help = """Chooses whether to use true center or centroid for cell
+central-point calculation. Options are either 'centroid' or 'center'.
 Default '%default'.""")
 
   var kd_split_method =

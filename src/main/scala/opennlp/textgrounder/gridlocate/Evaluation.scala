@@ -200,22 +200,22 @@ class DocEvalResult[Co](
   val pred_coord: Co
 ) {
   /**
-   * True cell in the cell grid in which the document belongs
+   * Correct cell in the cell grid in which the document belongs
    */
-  val true_cell = grid.find_best_cell_for_document(document, true).get
+  val correct_cell = grid.find_best_cell_for_document(document, true).get
   /**
-   * Number of documents in the true cell
+   * Number of documents in the correct cell
    */
-  val num_docs_in_true_cell = true_cell.combined_dist.num_docs
+  val num_docs_in_correct_cell = correct_cell.combined_dist.num_docs
   /**
-   * Central point of the true cell
+   * Central point of the correct cell
    */
-  val true_center = true_cell.get_center_coord
+  val correct_central_point = correct_cell.get_central_point
   /**
    * "True distance" (rather than e.g. degree distance) between document's
-   * coordinate and central point of true cell
+   * coordinate and central point of correct cell
    */
-  val true_truedist = document.distance_to_coord(true_center)
+  val correct_truedist = document.distance_to_coord(correct_central_point)
   /**
    * "True distance" (rather than e.g. degree distance) between document's
    * coordinate and predicted coordinate
@@ -237,24 +237,25 @@ class DocEvalResult[Co](
     errprint("%s:  %d types, %f tokens",
       doctag, document.dist.model.num_types, document.dist.model.num_tokens)
 
-    errprint("%s:  Distance %s to true cell center at %s",
-      doctag, document.output_distance(true_truedist), true_center)
-    errprint("%s:  Distance %s to predicted cell center at %s",
+    errprint("%s:  Distance %s to correct cell central point at %s",
+      doctag, document.output_distance(correct_truedist), correct_central_point)
+    errprint("%s:  Distance %s to predicted cell central point at %s",
       doctag, document.output_distance(pred_truedist), pred_coord)
 
-    errprint("%s:  true cell: %s", doctag, true_cell)
+    errprint("%s:  correct cell: %s", doctag, correct_cell)
   }
 
   def to_row = Seq(
     "document" -> document,
-    "true-coord" -> document.coord,
+    "correct-coord" -> document.coord,
     "numtypes" -> document.dist.model.num_types,
     "numtokens" -> document.dist.model.num_tokens,
-    "true-cell" -> true_cell.describe_location,
-    "true-cell-center" -> true_center,
-    "true-cell-numdocs" -> true_cell.combined_dist.num_docs,
+    "correct-cell" -> correct_cell.describe_location,
+    "correct-cell-true-center" -> correct_cell.get_true_center,
+    "correct-cell-central-point" -> correct_central_point,
+    "correct-cell-numdocs" -> correct_cell.combined_dist.num_docs,
     "pred-coord" -> pred_coord,
-    "oracle-dist" -> true_truedist,
+    "oracle-dist" -> correct_truedist,
     "error-dist" -> pred_truedist
   )
 
@@ -279,7 +280,7 @@ trait DocEvalStats[Co] extends EvalStats {
 
   def record_result(res: DocEvalResult[Co]) {
     true_dists += res.pred_truedist
-    oracle_true_dists += res.true_truedist
+    oracle_true_dists += res.correct_truedist
   }
 
   override def output_incorrect_results() {
@@ -298,7 +299,7 @@ trait DocEvalStats[Co] extends EvalStats {
 /**
  * Class for accumulating statistics from multiple document evaluation results,
  * with separate sets of statistics for different intervals of error distances
- * and number of documents in true cell. ("Grouped" in the sense that we may be
+ * and number of documents in correct cell. ("Grouped" in the sense that we may be
  * computing not only results for the documents as a whole but also for various
  * subgroups.)
  *
@@ -320,12 +321,12 @@ class GroupedDocEvalStats[Co](
 
   val all_document = create_stats(driver_stats, "")
 
-  // naitr = "num documents in true cell"
+  // naitr = "num documents in correct cell"
   val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100),
-    create_stats_for_range("num_documents_in_true_cell", _))
+    create_stats_for_range("num_documents_in_correct_cell", _))
 
   // Results for documents where the location is at a certain distance
-  // from the center of the true statistical cell.  The key is measured in
+  // from the center of the correct statistical cell.  The key is measured in
   // fractions of a tiling cell (determined by 'dist_fraction_increment',
   // e.g. if dist_fraction_increment = 0.25 then values in the range of
   // [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
@@ -336,8 +337,8 @@ class GroupedDocEvalStats[Co](
   def docmap(prefix: String) =
     new SettingDefaultHashMap[Double, DocEvalStats[Co]](
       create_stats_for_range(prefix, _))
-  val docs_by_true_dist_to_true_center =
-    docmap("true_dist_to_true_center")
+  val docs_by_true_dist_to_correct_central_point =
+    docmap("true_dist_to_correct_central_point")
 
   // Similar, but distance between location and center of top predicted
   // cell.
@@ -346,9 +347,9 @@ class GroupedDocEvalStats[Co](
     12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
     // We're never going to see these
     384, 512, 768, 1024, 1536, 2048)
-  val docs_by_true_dist_to_pred_center =
+  val docs_by_true_dist_to_pred_central_point =
     new DoubleTableByRange(dist_fractions_for_error_dist,
-      create_stats_for_range("true_dist_to_pred_center", _))
+      create_stats_for_range("true_dist_to_pred_central_point", _))
 
   override def record_result(res: DocEvalResult[Co]) {
     all_document.record_result(res)
@@ -359,7 +360,7 @@ class GroupedDocEvalStats[Co](
   }
 
   def record_result_by_range(res: DocEvalResult[Co]) {
-    val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
+    val naitr = docs_by_naitr.get_collector(res.num_docs_in_correct_cell)
     naitr.record_result(res)
   }
 
@@ -392,7 +393,7 @@ class GroupedDocEvalStats[Co](
     for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
       errprint("")
       errprint("Results for documents where number of documents")
-      errprint("  in true cell is in the range [%s,%s]:",
+      errprint("  in correct cell is in the range [%s,%s]:",
         lower, upper - 1)
       obj.output_results()
     }
@@ -599,10 +600,10 @@ abstract class GridEvaluator[Co](
     evalstats.output_results() // all_results = isfinal)
   }
 
-  def get_true_rank(candidates: Iterable[(GeoCell[Co], Double)],
-      true_cell: GeoCell[Co]) = {
+  def get_correct_rank(candidates: Iterable[(GeoCell[Co], Double)],
+      correct_cell: GeoCell[Co]) = {
     candidates.zipWithIndex.find {
-      case ((cell, score), index) => cell == true_cell
+      case ((cell, score), index) => cell == correct_cell
     } match {
       case Some(((cell, score), index)) => index + 1
       case None => 1000000000
@@ -612,34 +613,34 @@ abstract class GridEvaluator[Co](
   /**
    * Compare the document to the pseudo-documents associated with each cell,
    * using the strategy for this evaluator.  Return a tuple
-   * (pred_cells, true_rank), where:
+   * (pred_cells, correct_rank), where:
    *
    *  pred_cells = List of predicted cells, from best to worst; each list
    *     entry is actually a tuple of (cell, score) where higher scores
    *     are better
-   *  true_rank = Rank of true cell among predicted cells
+   *  correct_rank = Rank of correct cell among predicted cells
    *
    * @param document Document to evaluate.
-   * @param true_cell Cell in the cell grid which contains the document.
+   * @param correct_cell Cell in the cell grid which contains the document.
    */
-  def return_ranked_cells(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
+  def return_ranked_cells(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
     if (driver.params.oracle_results)
-      (Iterable((true_cell, 0.0)), 1)
+      (Iterable((correct_cell, 0.0)), 1)
     else {
       val include = Iterable[GeoCell[Co]]()
       ranker match {
         case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] if debug("reranker") => {
           val (initial_ranking, reranking) =
             reranker.evaluate_with_initial_ranking(document, include)
-          errprint("True cell initial rank: %s",
-            get_true_rank(initial_ranking, true_cell))
-          val true_rank = get_true_rank(reranking, true_cell)
-          errprint("True cell new rank: %s", true_rank)
-          (reranking, true_rank)
+          errprint("Correct cell initial rank: %s",
+            get_correct_rank(initial_ranking, correct_cell))
+          val correct_rank = get_correct_rank(reranking, correct_cell)
+          errprint("Correct cell new rank: %s", correct_rank)
+          (reranking, correct_rank)
         }
         case _ => {
           val cells = ranker.evaluate(document, include)
-          (cells, get_true_rank(cells, true_cell))
+          (cells, get_correct_rank(cells, correct_cell))
         }
       }
     }
@@ -651,9 +652,9 @@ abstract class GridEvaluator[Co](
    * optionally print out information on these results.
    *
    * @param document Document to evaluate.
-   * @param true_cell Cell in the cell grid which contains the document.
+   * @param correct_cell Cell in the cell grid which contains the document.
    */
-  def imp_evaluate_document(document: GeoDoc[Co], true_cell: GeoCell[Co]
+  def imp_evaluate_document(document: GeoDoc[Co], correct_cell: GeoCell[Co]
   ): DocEvalResult[Co]
 
   override def process_document_statuses(
@@ -677,18 +678,18 @@ abstract class GridEvaluator[Co](
     val (skip, reason) = would_skip_document(document)
     assert(!skip)
     assert(document.dist.finished)
-    val maybe_true_cell =
+    val maybe_correct_cell =
       ranker.grid.find_best_cell_for_document(document, true)
-    assert(maybe_true_cell != None)
-    val true_cell = maybe_true_cell.get
+    assert(maybe_correct_cell != None)
+    val correct_cell = maybe_correct_cell.get
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.combined_dist.num_docs
-      errprint("Evaluating document %s with %s documents in true cell",
+      val naitr = correct_cell.combined_dist.num_docs
+      errprint("Evaluating document %s with %s documents in correct cell",
         document, naitr)
     }
-    val result = imp_evaluate_document(document, true_cell)
+    val result = imp_evaluate_document(document, correct_cell)
     evalstats.record_result(result)
-    if (result.num_docs_in_true_cell == 0) {
+    if (result.num_docs_in_correct_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
     result
@@ -715,22 +716,22 @@ class RankedGridEvaluator[Co](
   ranker, driver, evalstats
 ) {
   def imp_evaluate_document(document: GeoDoc[Co],
-      true_cell: GeoCell[Co]) = {
+      correct_cell: GeoCell[Co]) = {
     ranker match {
       case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] => {
         val (initial_ranking, reranking) =
           reranker.evaluate_with_initial_ranking(document,
             Iterable[GeoCell[Co]]())
-        val true_rank = get_true_rank(reranking, true_cell)
-        val initial_true_rank = get_true_rank(initial_ranking, true_cell)
-        new RerankedDocEvalResult[Co](document, reranking, true_rank,
-          initial_ranking, initial_true_rank)
+        val correct_rank = get_correct_rank(reranking, correct_cell)
+        val initial_correct_rank = get_correct_rank(initial_ranking, correct_cell)
+        new RerankedDocEvalResult[Co](document, reranking, correct_rank,
+          initial_ranking, initial_correct_rank)
       }
       case _ => {
-        val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
+        val (pred_cells, correct_rank) = return_ranked_cells(document, correct_cell)
 
         new FullRankedDocEvalResult[Co](document, pred_cells,
-          true_rank)
+          correct_rank)
       }
     }
   }
@@ -748,28 +749,29 @@ class RankedGridEvaluator[Co](
  * @param document document whose coordinate is predicted
  * @param pred_cell top-ranked predicted cell in which the document should
  *        belong
- * @param true_rank rank of the document's true cell among all of the
+ * @param correct_rank rank of the document's correct cell among all of the
  *        predicted cell
  */
 class RankedDocEvalResult[Co](
   document: GeoDoc[Co],
   val pred_cell: GeoCell[Co],
-  val true_rank: Int
+  val correct_rank: Int
 ) extends DocEvalResult[Co](
   document, pred_cell.grid,
-  pred_cell.get_center_coord
+  pred_cell.get_central_point
 ) {
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[Co]) {
     super.print_result(doctag, driver)
-    errprint("%s:  true cell at rank: %s", doctag, true_rank)
+    errprint("%s:  correct cell at rank: %s", doctag, correct_rank)
   }
 
   override def to_row = super.to_row ++ Seq(
     "pred-cell" -> pred_cell.describe_location,
-    "pred-cell-center" -> pred_cell.get_center_coord,
+    "pred-cell-true-center" -> pred_cell.get_true_center,
+    "pred-cell-central-point" -> pred_cell.get_central_point,
     "pred-cell-numdocs" -> pred_cell.combined_dist.num_docs,
-    "true-rank" -> true_rank
+    "correct-rank" -> correct_rank
   )
 }
 
@@ -783,15 +785,15 @@ class RankedDocEvalResult[Co](
  *
  * @param document document whose coordinate is predicted
  * @param pred_cells list of predicted cells with scores
- * @param true_rank rank of the document's true cell among all of the
+ * @param correct_rank rank of the document's correct cell among all of the
  *        predicted cell
  */
 class FullRankedDocEvalResult[Co](
   document: GeoDoc[Co],
   val pred_cells: Iterable[(GeoCell[Co], Double)],
-  true_rank: Int
+  correct_rank: Int
 ) extends RankedDocEvalResult[Co](
-  document, pred_cells.head._1, true_rank
+  document, pred_cells.head._1, correct_rank
 ) {
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[Co]) {
@@ -819,18 +821,18 @@ class FullRankedDocEvalResult[Co](
     val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
       case ((cell, score), i) => (cell, i + 1) }.toMap
     val closest_half_with_dists =
-      kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).
+      kNN.map(n => (n, document.distance_to_coord(n.get_central_point))).
         toIndexedSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
 
     closest_half_with_dists.foreach {
       case (cell, dist) =>
         errprint("%s:  #%s close neighbor: %s; error distance: %s",
-          doctag, kNNranks(cell), cell.get_center_coord,
+          doctag, kNNranks(cell), cell.get_central_point,
           document.output_distance(dist))
     }
 
     val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
-    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
+    errprint("%s:  Average distance from correct cell center to %s closest cells' centers from %s best matches: %s",
       doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
       document.output_distance(avg_dist_of_neighbors))
 
@@ -839,7 +841,7 @@ class FullRankedDocEvalResult[Co](
   }
 
   override def get_public_result =
-    new RankedDocEvalResult(document, pred_cells.head._1, true_rank)
+    new RankedDocEvalResult(document, pred_cells.head._1, correct_rank)
 }
 
 /**
@@ -851,23 +853,23 @@ class FullRankedDocEvalResult[Co](
  *
  * @param document document whose coordinate is predicted
  * @param pred_cells list of predicted cells with scores
- * @param true_rank rank of the document's true cell among all of the
+ * @param correct_rank rank of the document's correct cell among all of the
  *        predicted cell
  */
 class RerankedDocEvalResult[Co](
   document: GeoDoc[Co],
   pred_cells: Iterable[(GeoCell[Co], Double)],
-  true_rank: Int,
+  correct_rank: Int,
   initial_pred_cells: Iterable[(GeoCell[Co], Double)],
-  initial_true_rank: Int
+  initial_correct_rank: Int
 ) extends FullRankedDocEvalResult[Co](
-  document, pred_cells, true_rank
+  document, pred_cells, correct_rank
 ) {
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[Co]) {
     super.print_result(doctag, driver)
-    errprint("%s:  true cell at initial rank: %s (vs. new %s)", doctag,
-      initial_true_rank, true_rank)
+    errprint("%s:  correct cell at initial rank: %s (vs. new %s)", doctag,
+      initial_correct_rank, correct_rank)
     val num_cells_to_output = 5
     for (((cell, score), i) <-
         initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
@@ -878,7 +880,7 @@ class RerankedDocEvalResult[Co](
     }
 
     val initial_pred_cell = initial_pred_cells.head._1
-    val initial_pred_coord = initial_pred_cell.get_center_coord
+    val initial_pred_coord = initial_pred_cell.get_central_point
     val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
 
     errprint("%s:  Distance %s to initial predicted cell center at %s",
@@ -894,7 +896,7 @@ class RerankedDocEvalResult[Co](
 
 /**
  * A class for accumulating statistics from multiple evaluation results,
- * including statistics on the rank of the true cell.
+ * including statistics on the rank of the correct cell.
  */
 class RankedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
@@ -905,7 +907,7 @@ class RankedDocEvalStats[Co](
 ) with DocEvalStats[Co] {
   override def record_result(res: DocEvalResult[Co]) {
     super.record_result(res)
-    record_result(res.asInstanceOf[RankedDocEvalResult[Co]].true_rank)
+    record_result(res.asInstanceOf[RankedDocEvalResult[Co]].correct_rank)
   }
 }
 
@@ -926,10 +928,10 @@ abstract class CoordGridEvaluator[Co](
 ) extends GridEvaluator[Co](
   ranker, driver, evalstats
 ) {
-  def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]): Co
+  def find_best_point(document: GeoDoc[Co], correct_cell: GeoCell[Co]): Co
 
-  def imp_evaluate_document(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
-    val pred_coord = find_best_point(document, true_cell)
+  def imp_evaluate_document(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
+    val pred_coord = find_best_point(document, correct_cell)
     new CoordDocEvalResult[Co](document, ranker.grid, pred_coord)
   }
 }
@@ -996,9 +998,9 @@ class MeanShiftGridEvaluator[Co](
 ) extends CoordGridEvaluator[Co](
   ranker, driver, evalstats
 ) {
-  def find_best_point(document: GeoDoc[Co], true_cell: GeoCell[Co]) = {
-    val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
-    val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toIndexedSeq
+  def find_best_point(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
+    val (pred_cells, correct_rank) = return_ranked_cells(document, correct_cell)
+    val top_k = pred_cells.take(k_best).map(_._1.get_central_point).toIndexedSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)
     mean_shift_obj.vec_mean(shifted_values)
   }

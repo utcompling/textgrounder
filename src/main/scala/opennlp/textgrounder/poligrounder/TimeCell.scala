@@ -52,7 +52,7 @@ class TimeCell(
 
   def contains(time: TimeCoord) = from <= time.millis && time.millis < to
 
-  def get_center_coord = TimeCoord((to + from)/2)
+  def get_central_point = TimeCoord((to + from)/2)
 
   def describe_location =
     "%s - %s" format (format_time(from), format_time(to))
