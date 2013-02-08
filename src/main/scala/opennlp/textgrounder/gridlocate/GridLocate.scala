@@ -1362,10 +1362,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     val first = results.next
     val res2 = Iterator(first) ++ results
     val fields = first.to_row.map(_._1)
+    val param_values = params.parser.argValues map {
+      // Use format rather than toString to handle nulls
+      case (arg, value) => (arg, "%s" format value)
+    }
     val fixed_fields = Map(
         // "corpus-name" -> opts.corpus_name,
         // "generating-app" -> progname,
-        "corpus-type" -> "textgrounder-results")
+        "corpus-type" -> "textgrounder-results"
+    ) ++ param_values.toMap
     val schema = new Schema(fields, fixed_fields)
     schema.output_constructed_schema_file(filehand, dir, base)
     val outfile = TextDB.construct_data_file(filehand, dir, base)
