@@ -132,12 +132,17 @@ public class RunResolver extends BaseApp {
         else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
             System.out.println("Running PROBABILISTIC resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
 
-            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
+            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath(), currentRun.getPopComponentCoefficient());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.BAYES_RULE) {
             System.out.println("Running BAYES RULE resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
 
             resolver = new BayesRuleResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
+        }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.HEURISTIC_TPP) {
+            System.out.println("Running HEURISTIC TPP resolver...");
+
+            resolver = new HeuristicTPPResolver();
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

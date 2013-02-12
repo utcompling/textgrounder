@@ -14,7 +14,8 @@ import opennlp.model._
 import scala.collection.JavaConversions._
 
 class ProbabilisticResolver(val logFilePath:String,
-                            val modelDirPath:String) extends Resolver {
+                            val modelDirPath:String,
+                            val popComponentCoefficient:Double) extends Resolver {
 
   val KNN = -1
   val DPC = 1.0
@@ -106,6 +107,7 @@ class ProbabilisticResolver(val logFilePath:String,
         var candIndex = 0
 
         val totalPopulation = toponym.getCandidates.map(_.getPopulation).sum
+        val maxPopulation = toponym.getCandidates.map(_.getPopulation).max
 
         var candDist = weightsForWMD.get(toponymLexicon.get(toponym.getForm))
         if(candDist == null) {
@@ -146,11 +148,14 @@ class ProbabilisticResolver(val logFilePath:String,
           val probComponent = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
 
           val probOfLocation =
-          /*if(totalPopulation > 0) {
-            val popComponent = cand.getPopulation / totalPopulation
-            .5 * popComponent + .5 * probComponent
+          if(totalPopulation > 0) {
+            val popComponent = cand.getPopulation.toDouble / totalPopulation
+            popComponentCoefficient * popComponent + (1 - popComponentCoefficient) * probComponent
           }
-          else */probComponent
+          else probComponent
+          /*if(totalPopulation > 0 && maxPopulation.toDouble / totalPopulation > .89)
+            cand.getPopulation.toDouble / totalPopulation
+          else probComponent*/
 
           candDist.set(candIndex, candDist.get(candIndex) + probOfLocation)
 

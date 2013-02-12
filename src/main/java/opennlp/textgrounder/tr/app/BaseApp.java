@@ -28,6 +28,7 @@ public class BaseApp {
     private String serializedCorpusInputPath = null;
     private String serializedCorpusOutputPath = null;
     private String maxentModelDirInputPath = null;
+    private double popComponentCoefficient = 0.0;
 
     private int sentsPerDocument = -1;
 
@@ -60,7 +61,8 @@ public class BaseApp {
         LABEL_PROP_COMPLEX,
         MAXENT,
         PROB,
-        BAYES_RULE
+        BAYES_RULE,
+        HEURISTIC_TPP
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -98,6 +100,8 @@ public class BaseApp {
         options.addOption("cf", "corpus-format", true, "corpus format (Plain, TrCoNLL, GeoText) [default = Plain]");
 
         options.addOption("spd", "sentences-per-document", true, "sentences per document (-1 for unlimited) [default = -1]");
+
+        options.addOption("pc", "pop-comp-coeff", true, "population component coefficient (for PROBABILISTIC resolver)");
 
         options.addOption("minlat", "minimum-latitude", true,
                 "minimum latitude for bounding box");
@@ -203,6 +207,8 @@ public class BaseApp {
                             resolverType = RESOLVER_TYPE.POPULATION;
                         else if(value.toLowerCase().startsWith("bayes"))
                             resolverType = RESOLVER_TYPE.BAYES_RULE;
+                        else if(value.toLowerCase().startsWith("h"))
+                            resolverType = RESOLVER_TYPE.HEURISTIC_TPP;
                         else
                             resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     }
@@ -266,6 +272,8 @@ public class BaseApp {
                 case 'd':
                     doKMeans = true;
                     break;
+                case 'p':
+                    popComponentCoefficient = Double.parseDouble(value);
             }
         }
 
@@ -396,6 +404,10 @@ public class BaseApp {
 
     public Region getBoundingBox() {
         return boundingBox;
+    }
+
+    public double getPopComponentCoefficient() {
+        return popComponentCoefficient;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {

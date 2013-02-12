@@ -12,6 +12,9 @@ public class SignatureEvaluator extends Evaluator {
 
     private static final int CONTEXT_WINDOW_SIZE = 20;
 
+    private static final double FP_PENALTY = 20037.5;
+    private static final double FN_PENALTY = 20037.5;
+
     private Map<String, List<Location> > predCandidates = new HashMap<String, List<Location> >();
 
     public SignatureEvaluator(Corpus goldCorpus) {
@@ -102,12 +105,15 @@ public class SignatureEvaluator extends Evaluator {
             else {
                 //System.out.println("FN: " + context + "| not found in pred");
                 report.incrementFN();
+                dreport.addDistance(FN_PENALTY);
+                
             }
         }
         for(String context : predLocs.keySet()) {
             if(!goldLocs.containsKey(context)) {
                 //System.out.println("FP: " + context + "| not found in gold");
                 report.incrementFP();
+                dreport.addDistance(FP_PENALTY);
             }
         }
 
