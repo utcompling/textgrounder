@@ -21,6 +21,8 @@ class ProbabilisticResolver(val logFilePath:String,
   val DPC = 1.0
   val WINDOW_SIZE = 20
 
+  val C = 1.0E-4 // used in f(t)/(f(t)+C)
+
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
 
   val toponymLexicon:Lexicon[String] = TopoUtil.buildLexicon(corpus)
@@ -48,8 +50,19 @@ class ProbabilisticResolver(val logFilePath:String,
     (file.getName.dropRight(4).replaceAll("_", " "), model)
   }).toMap
 
-  var toponymsToCounts = new scala.collection.mutable.HashMap[String, Int]
   var total = 0
+  var toponymsToCounts = //new scala.collection.mutable.HashMap[String, Int]
+  (for(file <- modelDir.listFiles.filter(_.getName.endsWith(".txt"))) yield {
+    val count = scala.io.Source.fromFile(file).getLines.toList.size
+    total += count
+
+    //println(file.getName.dropRight(4).replaceAll("_", " ") + " " + count)
+
+    (file.getName.dropRight(4).replaceAll("_", " "), count)
+  }).toMap
+
+  //println(total)
+  /*var total = 0
   for(doc <- corpus) {
     for(sent <- doc) {
       for(token <- sent) {
@@ -60,10 +73,10 @@ class ProbabilisticResolver(val logFilePath:String,
         total += 1
       }
     }
-  }
+  }*/
 
   val toponymsToFrequencies = toponymsToCounts.map(p => (p._1, p._2.toDouble / total)).toMap
-  toponymsToCounts.clear // trying to free up some memory
+  //toponymsToCounts.clear // trying to free up some memory
   toponymsToCounts = null
   //toponymsToFrequencies.foreach(p => println(p._1+": "+p._2))
 
@@ -99,8 +112,8 @@ class ProbabilisticResolver(val logFilePath:String,
           println("-----")
         }*/
 
-        val topFreq = toponymsToFrequencies(toponym.getForm)
-        val lambda = topFreq / (topFreq + 1.0E-4)//0.7
+        val topFreq = toponymsToFrequencies.getOrElse(toponym.getForm, 0.0)
+        val lambda = topFreq / (topFreq + C)//0.7
 
         var indexToSelect = -1
         var maxProb = 0.0

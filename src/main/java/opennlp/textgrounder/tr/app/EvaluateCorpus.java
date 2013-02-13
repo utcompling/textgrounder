@@ -69,12 +69,12 @@ public class EvaluateCorpus extends BaseApp {
             DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
             DistanceReport dreport = evaluator.evaluate();
 
+            System.out.println("\nMinimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
-            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
-            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
-            System.out.println("Total documents evaluated: " + dreport.getNumDistances());
+            System.out.println("\nTotal documents evaluated: " + dreport.getNumDistances());
         }
 
         else {
@@ -87,12 +87,12 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("F: " + report.getFScore());
             //System.out.println("A: " + report.getAccuracy());
 
+            System.out.println("\nMinimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
-            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
-            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
-            System.out.println("Total toponyms evaluated: " + dreport.getNumDistances());
+            System.out.println("\nTotal toponyms evaluated: " + dreport.getNumDistances());
         }
     }
 
