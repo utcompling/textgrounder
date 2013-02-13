@@ -29,22 +29,24 @@ public class SignatureEvaluator extends Evaluator {
         Map<String, Location> locs = new HashMap<String, Location>();
 
         for(Document<Token> doc : corpus) {
+            //System.out.println("Document id: " + doc.getId());
             for(Sentence<Token> sent : doc) {
                 StringBuffer sb = new StringBuffer();
                 List<Integer> toponymStarts = new ArrayList<Integer>();
                 List<Location> curLocations = new ArrayList<Location>();
                 List<List<Location> > curCandidates = new ArrayList<List<Location> >();
                 for(Token token : sent) {
+                    //System.out.println(token.getForm());
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
                         if((getGoldLocations && toponym.hasGold()) ||
                            (!getGoldLocations && (toponym.hasSelected() || toponym.getAmbiguity() == 0))) {
                             toponymStarts.add(sb.length());
                             if(getGoldLocations) {
-				if(toponym.getGoldIdx() == 801) {
+				/*if(toponym.getGoldIdx() == 801) {
 				    System.out.println(toponym.getForm()+": "+toponym.getGoldIdx()+"/"+toponym.getCandidates().size());
-				}
-                                curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()));
+                                    }*/
+                                curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()<toponym.getCandidates().size()?toponym.getGoldIdx():toponym.getCandidates().size()-1));
 			    }
                             else {
                                 if(toponym.getAmbiguity() > 0)
