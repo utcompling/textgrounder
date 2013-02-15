@@ -107,7 +107,7 @@ public class SignatureEvaluator extends Evaluator {
             else {
                 //System.out.println("FN: " + context + "| not found in pred");
                 report.incrementFN();
-                dreport.addDistance(FN_PENALTY);
+                //dreport.addDistance(FN_PENALTY);
                 
             }
         }
@@ -115,7 +115,7 @@ public class SignatureEvaluator extends Evaluator {
             if(!goldLocs.containsKey(context)) {
                 //System.out.println("FP: " + context + "| not found in gold");
                 report.incrementFP();
-                dreport.addDistance(FP_PENALTY);
+                //dreport.addDistance(FP_PENALTY);
             }
         }
 
