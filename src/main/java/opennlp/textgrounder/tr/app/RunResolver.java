@@ -132,7 +132,7 @@ public class RunResolver extends BaseApp {
         else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
             System.out.println("Running PROBABILISTIC resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
 
-            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath(), currentRun.getPopComponentCoefficient());
+            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath(), currentRun.getPopComponentCoefficient(), currentRun.getDGProbOnly());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.BAYES_RULE) {
             System.out.println("Running BAYES RULE resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());

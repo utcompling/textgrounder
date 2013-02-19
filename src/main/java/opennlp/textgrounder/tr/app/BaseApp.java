@@ -29,6 +29,7 @@ public class BaseApp {
     private String serializedCorpusOutputPath = null;
     private String maxentModelDirInputPath = null;
     private double popComponentCoefficient = 0.0;
+    private boolean dgProbOnly = false;
 
     private int sentsPerDocument = -1;
 
@@ -102,6 +103,7 @@ public class BaseApp {
         options.addOption("spd", "sentences-per-document", true, "sentences per document (-1 for unlimited) [default = -1]");
 
         options.addOption("pc", "pop-comp-coeff", true, "population component coefficient (for PROBABILISTIC resolver)");
+        options.addOption("pdg", "prob-doc-geo", false, "use probability from document geolocator only (for PROBABILISTIC resolver)");
 
         options.addOption("minlat", "minimum-latitude", true,
                 "minimum latitude for bounding box");
@@ -273,7 +275,10 @@ public class BaseApp {
                     doKMeans = true;
                     break;
                 case 'p':
-                    popComponentCoefficient = Double.parseDouble(value);
+                    if(option.getOpt().equals("pc"))
+                        popComponentCoefficient = Double.parseDouble(value);
+                    else
+                        dgProbOnly = true;
             }
         }
 
@@ -408,6 +413,10 @@ public class BaseApp {
 
     public double getPopComponentCoefficient() {
         return popComponentCoefficient;
+    }
+
+    public boolean getDGProbOnly() {
+        return dgProbOnly;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {
