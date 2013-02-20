@@ -573,6 +573,8 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
           num_adjustments += 1
         }
       }
+      errprint("Pct error: %s/%s = %.2f", num_errors, data.size,
+        num_errors.toDouble / data.size * 100)
       (num_errors, num_adjustments, total_adjustment)
     }
   }
