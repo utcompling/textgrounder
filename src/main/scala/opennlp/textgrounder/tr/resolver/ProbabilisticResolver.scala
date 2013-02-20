@@ -16,7 +16,8 @@ import scala.collection.JavaConversions._
 class ProbabilisticResolver(val logFilePath:String,
                             val modelDirPath:String,
                             val popComponentCoefficient:Double,
-                            val dgProbOnly:Boolean) extends Resolver {
+                            val dgProbOnly:Boolean,
+                            val meProbOnly:Boolean) extends Resolver {
 
   val KNN = -1
   val DPC = 1.0
@@ -162,7 +163,9 @@ class ProbabilisticResolver(val logFilePath:String,
           val probComponent = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
 
           val probOfLocation =
-          if(dgProbOnly)
+          if(meProbOnly)
+            localContextComponent
+          else if(dgProbOnly)
             documentComponent
           else if(totalPopulation > 0) {
             val popComponent = cand.getPopulation.toDouble / totalPopulation
