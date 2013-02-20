@@ -136,7 +136,7 @@ public class SignatureEvaluator extends Evaluator {
             for(double error : errorList) {
                 sum += error;
             }
-            errOut.write(toponym+" "+sum+" "+errorList.size()+"\n");
+            errOut.write(toponym+" & "+errorList.size()+" & "+sum+"\\\\\n");
         }
 
         errOut.close();
