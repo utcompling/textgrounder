@@ -7,6 +7,7 @@ package opennlp.textgrounder.tr.eval;
 import opennlp.textgrounder.tr.text.*;
 import opennlp.textgrounder.tr.topo.*;
 import java.util.*;
+import java.io.*;
 
 public class SignatureEvaluator extends Evaluator {
 
@@ -85,13 +86,20 @@ public class SignatureEvaluator extends Evaluator {
         Map<String, Location> goldLocs = populateSigsAndLocations(corpus, true);
         Map<String, Location> predLocs = populateSigsAndLocations(pred, false);
 
+        Map<String, List<Double> > errors = new HashMap<String, List<Double> >();
+
         for(String context : goldLocs.keySet()) {
             if(predLocs.containsKey(context)) {
                 Location goldLoc = goldLocs.get(context);
                 Location predLoc = predLocs.get(context);
 
-                if(predLoc != null)
-                    dreport.addDistance(goldLoc.distanceInKm(predLoc));
+                if(predLoc != null) {
+                    double dist = goldLoc.distanceInKm(predLoc);
+                    dreport.addDistance(dist);
+                    if(!errors.containsKey(goldLoc.getName().toLowerCase()))
+                        errors.put(goldLoc.getName().toLowerCase(), new ArrayList<Double>());
+                    errors.get(goldLoc.getName().toLowerCase()).add(dist);
+                }
 
                 if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
                     //System.out.println("TP: " + context + "|" + goldLocs.get(context));
@@ -117,6 +125,25 @@ public class SignatureEvaluator extends Evaluator {
                 report.incrementFP();
                 //dreport.addDistance(FP_PENALTY);
             }
+        }
+
+        try {
+        BufferedWriter errOut = new BufferedWriter(new FileWriter("errors.txt"));
+
+        for(String toponym : errors.keySet()) {
+            List<Double> errorList = errors.get(toponym);
+            double sum = 0.0;
+            for(double error : errorList) {
+                sum += error;
+            }
+            errOut.write(toponym+" "+sum+" "+errorList.size()+"\n");
+        }
+
+        errOut.close();
+
+        } catch(Exception e) {
+            e.printStackTrace();
+            System.exit(1);
         }
 
         return report;
