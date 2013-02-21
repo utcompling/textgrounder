@@ -105,6 +105,7 @@ public class CorpusXMLWriter {
     out.writeEndElement();
   }
 
+  // BUGGY!!! Won't output multiword toponyms as such!!!
   protected void writeSentence(XMLStreamWriter out, Sentence<Token> sentence) throws XMLStreamException {
     out.writeStartElement("s");
     if (sentence.getId() != null) {

@@ -96,9 +96,10 @@ public class SignatureEvaluator extends Evaluator {
                 if(predLoc != null) {
                     double dist = goldLoc.distanceInKm(predLoc);
                     dreport.addDistance(dist);
-                    if(!errors.containsKey(goldLoc.getName().toLowerCase()))
-                        errors.put(goldLoc.getName().toLowerCase(), new ArrayList<Double>());
-                    errors.get(goldLoc.getName().toLowerCase()).add(dist);
+                    String key = goldLoc.getName().toLowerCase();
+                    if(!errors.containsKey(key))
+                        errors.put(key, new ArrayList<Double>());
+                    errors.get(key).add(dist);
                 }
 
                 if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
@@ -136,7 +137,7 @@ public class SignatureEvaluator extends Evaluator {
             for(double error : errorList) {
                 sum += error;
             }
-            errOut.write(toponym+" & "+errorList.size()+" & "+sum+"\\\\\n");
+            errOut.write(toponym+" & "+errorList.size()+" & "+(sum/errorList.size())+" & "+sum+"\\\\\n");
         }
 
         errOut.close();
