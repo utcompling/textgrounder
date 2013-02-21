@@ -297,13 +297,13 @@ class BasicCompressedSparseFeatureVector private[learning] (
   override val include_displayed_feature = false
 }
 
-object SparseFeatureVector {
-  def apply(len: Int, fvs: (Int, Double)*) = {
-    val (keys, values) =
-      fvs.toIndexedSeq.sortWith(_._1 < _._1).unzip
-    new BasicCompressedSparseFeatureVector(keys.toArray, values.toArray, len)
-  }
-}
+//object SparseFeatureVector {
+//  def apply(len: Int, fvs: (Int, Double)*) = {
+//    val (keys, values) =
+//      fvs.toIndexedSeq.sortWith(_._1 < _._1).unzip
+//    new BasicCompressedSparseFeatureVector(keys.toArray, values.toArray, len)
+//  }
+//}
 
 /**
  * A feature vector in which the features are stored sparsely, i.e. only
