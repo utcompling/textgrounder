@@ -76,6 +76,9 @@ class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
   var allow_missing_coord = ap.flag("allow-missing-coord",
     help="""Allow for records with missing coordinates; otherwise, they will be
 skipped.""")
+  var no_bulk_filter = ap.flag("no-bulk-filter",
+    help="""Don't apply bulk filtering to remove multiple photos from the
+same user with the same tags.""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
     must = be_>(0),
@@ -86,11 +89,15 @@ skipped.""")
 /**
  * Data for a particular CoPHiR image.
  *
+ * @param rawtags Concatenated raw tags, for bulk filtering
  * @param owner_id ID of photo owner, for training/dev/test splitting
+ * @param photo_id ID of photo
  * @param props List of pairs of properties (including the raw tags and ID's)
  */
 case class CophirImage(
+  rawtags: String,
   owner_id: Int,
+  photo_id: Int,
   props: Iterable[(String, String)]
 )
 
@@ -266,7 +273,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
               List(("rawtags", rawtags_str),
                    ("unigram-counts", emit_ngrams(rawtags)))
             val filenameprops = List(("orig-filename", Encoder.string(filename)))
-            Some(CophirImage(owner_id,
+            Some(CophirImage(rawtags_str, owner_id, photo_id,
               idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
               locprops1 ++ locprops2 ++ otherprops ++ filenameprops ++ tagprops))
           }
@@ -284,7 +291,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
   def row_fields = {
     apply("foo.xml",
       """<root><MediaUri>0</MediaUri><location latitude="50" longitude="50"/><owner nsid="0@N00"/><tags><tag id="666" raw="cat" machine_tag="0">cat</tag></tags></root>""").get match {
-      case CophirImage(_, props) => props.map(_._1)
+      case CophirImage(_, _, _, props) => props.map(_._1)
     }
   }
 }
@@ -333,13 +340,16 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
 
 /**
  * Convert the CoPHiR corpus into a textdb corpus;
- * split into training/dev/test and extract tags according to the algorithm
- * described in O'Hare and Murdock (2012).
+ * split into training/dev/test and apply bulk-upload filtering and such,
+ * according to the algorithm described in O'Hare and Murdock (2012).
  */
 object ConvertCophir
     extends ScoobiProcessFilesApp[ConvertCophirParams]
        with ConvertCophirAction {
   def create_params(ap: ArgParser) = new ConvertCophirParams(ap)
+
+  def bulk_upload_combine(x: CophirImage, y: CophirImage) =
+    if (x.photo_id < y.photo_id) x else y
 
   def run() {
     ////// Initialize
@@ -362,8 +372,20 @@ object ConvertCophir
     val id_props_lines =
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
-    val outlines = id_props_lines.
-      map { im => (im.owner_id % 100, schema.make_line(im.props map (_._2))) }
+    val outlines =
+      if (opts.no_bulk_filter) {
+        id_props_lines.map { im =>
+          (im.owner_id % 100, schema.make_line(im.props map (_._2)))
+        }
+      } else {
+        id_props_lines.
+          groupBy { im => (im.rawtags, im.owner_id) }.
+          combine(bulk_upload_combine).
+          map { case (_, im) =>
+            (im.owner_id % 100, schema.make_line(im.props map (_._2)))
+          }
+      }
+      
     val training =
       outlines.filter { case (modid, row) => modid < 80 }.
                map    { case (modid, row) => row }
