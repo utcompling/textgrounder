@@ -151,7 +151,6 @@ class PoligrounderDriver extends
   type TParam = PoligrounderParameters
   type TRunRes = Unit
 
-  var degrees_per_cell = 0.0
   var from_chunk: (Long, Long) = _
   var to_chunk: (Long, Long) = _
 
