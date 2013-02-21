@@ -17,13 +17,14 @@ while true; do
     --sort | --sort-average | --sort-avg ) sort=yes ; avgsort=yes; shift ;;
     --sort-mean ) sort=yes ; meansort=yes; shift ;;
     --sort-median ) sort=yes ; mediansort=yes; shift ;;
+    --sort-accuracy | --sort-acc ) sort=yes ; accsort=yes; shift ;;
     --verbose ) verbose=yes ; shift ;;
     * ) break ;;
   esac
 done
 
 if [ "$verbose" != yes ]; then
-  echo "Mean	Median	Average File"
+  echo "%Accur.	Mean	Median	Average	File"
 fi
 
 function output() {
@@ -36,8 +37,10 @@ for x in ${1+"$@"}; do
   results="`sed -n '/^Final results/,/^Ending final results/p' $x`"
   mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
   median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
+  acc=$(echo "$results" | egrep 'Percent correct =' | perl -pe 's/.*= (.*?)%.*/$1/')
   #echo "Mean: $mean"
   #echo "Median: $median"
+  #echo "%Accuracy: $acc"
   avg=
   if [ -n "$mean" -a -n "$median" ]; then
     avg=`echo "2k $mean $median + 2/p" | dc`
@@ -48,19 +51,21 @@ for x in ${1+"$@"}; do
       echo "$args   Avg-mean-median true error distance = $avg km"
     fi
   else
-    if [ -n "$mean" -o -n "$median" -o -n "$avg" ]; then
-      echo "$mean	$median	$avg	$args"
+    if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
+      echo "$acc	$mean	$median	$avg	$args"
     fi
   fi
 done
 }
 
 if [ "$avgsort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 3
+  output ${1+"$@"} | sort -n -k 4
 elif [ "$meansort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 1
-elif [ "$mediansort" = yes ]; then
   output ${1+"$@"} | sort -n -k 2
+elif [ "$mediansort" = yes ]; then
+  output ${1+"$@"} | sort -n -k 3
+elif [ "$accsort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k 1
 else
   output ${1+"$@"}
 fi
