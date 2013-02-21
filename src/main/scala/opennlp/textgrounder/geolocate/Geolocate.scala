@@ -32,6 +32,7 @@ import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.print.{errprint, fixme_error}
+import util.text.format_float
 
 import util.debug._
 import gridlocate._
@@ -218,9 +219,9 @@ trait GeolocateParameters extends GridLocateParameters {
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
     ap.option[Double]("degrees-per-cell", "dpc", metavar = "DEGREES",
-      default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
-cells that cover the Earth.  Default %default. """)
+cells that cover the Earth.  Default is 1.0 if neither --miles-per-cell
+nor --km-per-cell is given. """)
   var miles_per_cell =
     ap.option[Double]("miles-per-cell", "mpc", metavar = "MILES",
       help = """Size (in miles, a floating-point number) of the tiling
@@ -290,27 +291,53 @@ uniform grid cell models?""")
 
 trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   override type TParam <: GeolocateParameters
-  var degrees_per_cell = 0.0
-
   override def handle_parameters() {
     super.handle_parameters()
-    if (params.miles_per_cell < 0)
-      param_error("Miles per cell must be positive if specified")
-    if (params.km_per_cell < 0)
-      param_error("Kilometers per cell must be positive if specified")
-    if (params.degrees_per_cell < 0)
-      param_error("Degrees per cell must be positive if specified")
-    if (params.miles_per_cell > 0 && params.km_per_cell > 0)
-      param_error("Only one of --miles-per-cell and --km-per-cell can be given")
-    degrees_per_cell =
-      if (params.miles_per_cell > 0)
-        params.miles_per_cell / miles_per_degree
-      else if (params.km_per_cell > 0)
-        params.km_per_cell / km_per_degree
-      else
-        params.degrees_per_cell
+
     if (params.width_of_multi_cell <= 0)
       param_error("Width of multi cell must be positive")
+
+    // Handle different ways of specifying grid size
+
+    def check_set(value: Double, desc: String) = {
+      if (value < 0)
+        param_error(desc + " must be positive if specified")
+      if (value > 0)
+        1
+      else 
+        0
+    }
+    val num_set =
+      check_set(params.miles_per_cell, "Miles per cell") +
+      check_set(params.km_per_cell, "Kilometers per cell") +
+      check_set(params.degrees_per_cell, "Degrees per cell")
+    if (num_set == 0)
+      params.degrees_per_cell = 1.0
+    else if (num_set > 1)
+      param_error("Only one of --miles-per-cell, --km-per-cell, --degrees-per-cell may be given")
+    val (computed_dpc, computed_mpc, computed_kpc) =
+      (params.degrees_per_cell, params.miles_per_cell, params.km_per_cell) match {
+        case (deg, miles, km) if deg > 0 =>
+          (deg, deg * miles_per_degree, deg * km_per_degree)
+        case (deg, miles, km) if miles > 0 =>
+          (miles / miles_per_degree, miles, miles * km_per_mile)
+        case (deg, miles, km) if km > 0 =>
+          (km / km_per_degree, km / km_per_mile, km)
+      }
+
+    // NOTE! Setting this will NOT change the values returned using the
+    // argparser programmatic interface onto iterating through params or
+    // retrieving them by name. That requires reflection and is difficult
+    // or impossible (given current Scala limitations) to implement in a way
+    // that works cleanly, interfaces with the desired way of retrieving/
+    // setting parameters as variables (so that type-checking works, etc.)
+    // and doesn't require needless extra boilerplate.
+    params.degrees_per_cell = computed_dpc
+
+    // Output computed values
+    errprint("Computed degrees per cell: %s", format_float(computed_dpc))
+    errprint("Computed kilometers per cell: %s", format_float(computed_kpc))
+    errprint("Computed miles per cell: %s", format_float(computed_mpc))
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory) =
@@ -323,14 +350,14 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
         KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
           params.kd_use_backoff, params.kd_interpolate_weight)
       val mrcg =
-        new MultiRegularGrid(degrees_per_cell,
+        new MultiRegularGrid(params.degrees_per_cell,
           params.width_of_multi_cell, sphere_docfact)
       new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
       KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
     } else {
-      new MultiRegularGrid(degrees_per_cell,
+      new MultiRegularGrid(params.degrees_per_cell,
         params.width_of_multi_cell, sphere_docfact)
     }
   }
