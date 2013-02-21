@@ -10,6 +10,44 @@ import util.io.FileHandler
 import util.print._
 import util.textdb._
 
+/*
+Comment Feb 21, 2013 by Ben:
+
+To implement user frequency rather than term frequency, we need to be
+able to exclude different instances of terms used by the same user in a given
+grid cell. Because this depends on the size and layout of grid cells, it might
+make the most sense to do this when creating the language model rather than
+during pre-processing. We have to do something like this:
+
+1. Rather than using a count map to count term instances in a given grid cell,
+   we use a set to record (term, user) pairs.
+2. Then at the end, we iterate through the set, creating a count map of the
+   term instances seen.
+
+What about for KD trees? Since the KD-tree cells are created based on the
+distribution of documents, rather than terms, this won't affect things, other
+than the fact that we can't do the creation of the language-model
+distributions until we've computed the KD tree grid.
+
+Conceivably we could run out of memory creatng the distributions, since we
+have to record term-user pairs rather than just terms, especially if there
+are a lot of users and each has relatively few documents. In such a case we'd
+have to run a Scoobi process. The above steps could be implemented as follows:
+
+1. For each term token in the corpus, generate a (term, user, cell) triple.
+2. Group by the triple and combine, throwing out duplicates.
+3. Group by (term, cell) and combine, counting instances seen.
+
+This requires that we have the grid cell structure available, which requires
+some work in the case of KD trees.
+
+One potential way of reducing memory is to memoize both terms and users
+down to 32-bit integers (might not be necessary for users, which may already
+have a 32-bit ID) and then combine them into a 64-bit long rather than
+using a tuple or similar object to record the pair, which adds a lot of
+overhead.
+*/
+
 class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
@@ -29,15 +67,11 @@ skipped.""")
 /**
  * Data for a particular CoPHiR image.
  *
- * @param rawtags Concatenated raw tags, for bulk filtering
- * @param owner_id ID of photo owner
- * @param photo_id ID of photo
+ * @param owner_id ID of photo owner, for training/dev/test splitting
  * @param props List of pairs of properties (including the raw tags and ID's)
  */
 case class CophirImage(
-  rawtags: String,
   owner_id: Int,
-  photo_id: Int,
   props: Iterable[(String, String)]
 )
 
@@ -205,13 +239,18 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
             }
           } map { _.trim } filter { _.length > 0 } // Filter out blank tags
           val rawtags_str = Encoder.seq_string(rawtags)
-          val tagprops =
-            List(("rawtags", rawtags_str),
-                 ("unigram-counts", emit_ngrams(rawtags)))
-          val filenameprops = List(("orig-filename", Encoder.string(filename)))
-          Some(CophirImage(rawtags_str, owner_id, photo_id,
-            idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
-            locprops1 ++ locprops2 ++ otherprops ++ filenameprops ++ tagprops))
+          // Filter photos without user-added tags (needs to be done after
+          // filtering machine-added tags)
+          if (rawtags_str.size == 0) None
+          else {
+            val tagprops =
+              List(("rawtags", rawtags_str),
+                   ("unigram-counts", emit_ngrams(rawtags)))
+            val filenameprops = List(("orig-filename", Encoder.string(filename)))
+            Some(CophirImage(owner_id,
+              idprops ++ photoprops ++ dateprops ++ ownerprops ++ coordprop ++
+              locprops1 ++ locprops2 ++ otherprops ++ filenameprops ++ tagprops))
+          }
         }
       }
     }
@@ -225,8 +264,8 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
    */
   def row_fields = {
     apply("foo.xml",
-      """<root><MediaUri>0</MediaUri><location latitude="50" longitude="50"/><owner nsid="0@N00"/></root>""").get match {
-      case CophirImage(_, _, _, props) => props.map(_._1)
+      """<root><MediaUri>0</MediaUri><location latitude="50" longitude="50"/><owner nsid="0@N00"/><tags><tag id="666" raw="cat" machine_tag="0">cat</tag></tags></root>""").get match {
+      case CophirImage(_, props) => props.map(_._1)
     }
   }
 }
@@ -274,17 +313,13 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
 
 /**
  * Convert the CoPHiR corpus into a textdb corpus;
- * split into training/dev/test and apply bulk-upload filtering and such,
- * according to the algorithm described in O'Hare and Murdock (2012).
+ * split into training/dev/test and extract tags according to the algorithm
+ * described in O'Hare and Murdock (2012).
  */
 object ConvertCophir
     extends ScoobiProcessFilesApp[ConvertCophirParams]
        with ConvertCophirAction {
   def create_params(ap: ArgParser) = new ConvertCophirParams(ap)
-
-  def bulk_upload_combine(x: CophirImage, y: CophirImage) =
-    if (x.photo_id < y.photo_id) x else y
-
 
   def run() {
     ////// Initialize
@@ -308,12 +343,7 @@ object ConvertCophir
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
     val outlines = id_props_lines.
-      filter { _.rawtags.size > 0 }.
-      groupBy { im => (im.rawtags, im.owner_id) }.
-      combine(bulk_upload_combine).
-      map { case (_, im) =>
-        (im.owner_id % 100, schema.make_row(im.props map (_._2)))
-      }
+      map { im => (im.owner_id % 100, schema.make_row(im.props map (_._2))) }
     val training =
       outlines.filter { case (modid, row) => modid < 80 }.
                map    { case (modid, row) => row }
