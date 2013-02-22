@@ -210,7 +210,7 @@ package object textdb {
      * @return Name of constructed schema file.
      */
     def output_constructed_schema_file(filehand: FileHandler, base: String) = {
-      val schema_file = Schema.construct_schema_file(filehand, base)
+      val schema_file = Schema.construct_schema_file(base)
       output_schema_file(filehand, schema_file)
       schema_file
     }
@@ -278,11 +278,11 @@ package object textdb {
       TextDB.make_textdb_file_suffix_regex(suffix_re, schema_ending_re)
 
     /**
-     * Construct the name of a schema file, based on the given file handler
-     * and base.  The file will end with ".schema.txt".
+     * Construct the name of a schema file from the base name.
+     * The file will end with ".schema.txt".
      */
-    def construct_schema_file(filehand: FileHandler, base: String) =
-      TextDB.construct_textdb_file(filehand, base, schema_ending_text)
+    def construct_schema_file(base: String) =
+      TextDB.construct_textdb_file(base, schema_ending_text)
 
     /**
      * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
@@ -408,12 +408,11 @@ package object textdb {
 
     /**
      * Construct the name of a file (either schema or data file), based
-     * on the given file handler, base name and file ending.
+     * on the base name and file ending.
      * For example, if the file ending is ".schema.txt", the file will be
      * named `BASE.schema.txt`.
      */
-    def construct_textdb_file(filehand: FileHandler, base: String,
-        file_ending: String) = {
+    def construct_textdb_file(base: String, file_ending: String) = {
       base + file_ending
     }
 
@@ -426,11 +425,11 @@ package object textdb {
       make_textdb_file_suffix_regex(suffix_re, data_ending_re)
 
     /**
-     * Construct the name of a data file, based on the given file handler
-     * and base name.  The file will be named `BASE.data.txt`.
+     * Construct the name of a data file from the base name.
+     * The file will be named `BASE.data.txt`.
      */
-    def construct_data_file(filehand: FileHandler, base: String) =
-      construct_textdb_file(filehand, base, data_ending_text)
+    def construct_data_file(base: String) =
+      construct_textdb_file(base, data_ending_text)
 
     /**
      * Split the name of a textdb file into (DIR, PREFIX, SUFFIX, ENDING).
@@ -637,7 +636,7 @@ package object textdb {
      */
     def open_data_file(filehand: FileHandler, base: String,
         compression: String = "none") = {
-      val file = TextDB.construct_data_file(filehand, base)
+      val file = TextDB.construct_data_file(base)
       filehand.openw(file, compression = compression)
     }
 

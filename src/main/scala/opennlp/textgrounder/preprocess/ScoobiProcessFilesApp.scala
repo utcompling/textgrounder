@@ -300,7 +300,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     // output data file
     filehand.make_directories(outdir)
     val base = outdir + "/" + prefix
-    val outfile = TextDB.construct_data_file(filehand, base)
+    val outfile = TextDB.construct_data_file(base)
     val outstr = filehand.openw(outfile)
     lines.map(outstr.println(_))
     outstr.close()
@@ -330,7 +330,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
       val path = file.getPath
       val orig_basename = path.getName
       val base = "%s/%s-%s%s" format (destdir, prefix, orig_basename, suffix)
-      val newname = TextDB.construct_data_file(filehand, base)
+      val newname = TextDB.construct_data_file(base)
       errprint("Moving %s to %s" format (path, newname))
       fs.rename(path, new Path(newname))
     }

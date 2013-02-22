@@ -1372,7 +1372,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     ) ++ param_values.toMap
     val schema = new Schema(fields, fixed_fields)
     schema.output_constructed_schema_file(filehand, base)
-    val outfile = TextDB.construct_data_file(filehand, base)
+    val outfile = TextDB.construct_data_file(base)
     val outstr = filehand.openw(outfile)
     res2.foreach { res =>
       outstr.println(schema.make_row(res.to_row.map(_._2.toString)))
