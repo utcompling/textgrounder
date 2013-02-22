@@ -38,9 +38,9 @@ import io._
  *     "fixed" fields that have the same value for all rows (one per
  *     line, with the name, a TAB, and the value).
  * (3) The data and schema files are identified by ending.
- *     The document files are named `DIR/NAME-data.txt` (or
- *     `DIR/NAME-data.txt.bz2` or similar, for compressed files),
- *     while the schema file is named `DIR/NAME-schema.txt`. NAME is
+ *     The document files are named `DIR/NAME.data.txt` (or
+ *     `DIR/NAME.data.txt.bz2` or similar, for compressed files),
+ *     while the schema file is named `DIR/NAME.schema.txt`. NAME is
  *     arbitrary, and may not necessarily be the same across the various
  *     files in a single database.
  * (4) Commonly, NAME is structured so that in data files, it has the form
@@ -58,11 +58,11 @@ import io._
  *     (no-SUFFIX) scheme to be processed by code expecting a SUFFIX by
  *     supplying a blank SUFFIX.  When both the BASE/SUFFIX and PREFIX-ID
  *     schemes are in use, the data files will have a name of the form
- *     "PREFIX-IDSUFFIX-data.txt(.bz2)" and the schema file will have a name
- *     of the form "PREFIXSUFFIX-schema.txt", e.g.
- *     -- schema: "twitter-infochimps-dev-schema.txt"
- *     -- data file #1: "twitter-infochimps-1-dev-data.txt.bz2"
- *     -- data file #2: "twitter-infochimps-2-dev-data.txt.bz2"
+ *     "PREFIX-IDSUFFIX.data.txt(.bz2)" and the schema file will have a name
+ *     of the form "PREFIXSUFFIX.schema.txt", e.g.
+ *     -- schema: "twitter-infochimps-dev.schema.txt"
+ *     -- data file #1: "twitter-infochimps-1-dev.data.txt.bz2"
+ *     -- data file #2: "twitter-infochimps-2-dev.data.txt.bz2"
  *     etc.
  * 
  * The most common setup is to have the schema file and any data files
@@ -205,7 +205,7 @@ package object textdb {
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIXSUFFIX-schema.txt`.
+     * `DIR/PREFIXSUFFIX.schema.txt`.
      *
      * @return Name of constructed schema file.
      */
@@ -268,8 +268,8 @@ package object textdb {
   }
 
   object Schema {
-    val schema_ending_re = """-schema\.txt"""
-    val schema_ending_text = "-schema.txt"
+    val schema_ending_re = """.schema\.txt"""
+    val schema_ending_text = ".schema.txt"
 
     /**
      * For a given suffix, create a regular expression
@@ -281,7 +281,7 @@ package object textdb {
 
     /**
      * Construct the name of a schema file, based on the given file handler,
-     * directory, prefix and suffix.  The file will end with "-schema.txt".
+     * directory, prefix and suffix.  The file will end with ".schema.txt".
      */
     def construct_schema_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String = "") =
@@ -292,8 +292,8 @@ package object textdb {
      * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
      * ENDING). A regular expression matching the suffix may be given; else
      * a blank string will be substituted. For example, if the suffix is
-     * "-dev" and the file is named "foo/tweets-1-dev-schema.txt", the return
-     * value will be ("foo", "tweets-1", "-dev", "-schema.txt"). By
+     * "-dev" and the file is named "foo/tweets-1-dev.schema.txt", the return
+     * value will be ("foo", "tweets-1", "-dev", ".schema.txt"). By
      * contatenating all parts of the basename together (all but the
      * directory), the original basename is retrieved.
      */
@@ -397,8 +397,8 @@ package object textdb {
     val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
     val possible_compression_re = """(?:%s)?""" format (
       possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
-    val data_ending_re = """-data\.txt"""
-    val data_ending_text = "-data.txt"
+    val data_ending_re = """.data\.txt"""
+    val data_ending_text = ".data.txt"
 
     /**
      * For a given suffix and file ending, create a regular expression
@@ -413,8 +413,8 @@ package object textdb {
     /**
      * Construct the name of a file (either schema or data file), based
      * on the given file handler, directory, prefix, suffix and file ending.
-     * For example, if the file ending is "-schema.txt", the file will be
-     * named `DIR/PREFIXSUFFIX-schema.txt`.
+     * For example, if the file ending is ".schema.txt", the file will be
+     * named `DIR/PREFIXSUFFIX.schema.txt`.
      */
     def construct_textdb_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String, file_ending: String) = {
@@ -433,7 +433,7 @@ package object textdb {
     /**
      * Construct the name of a data file, based on the given file handler,
      * directory, prefix, and suffix.  The file will be named
-     * `DIR/PREFIXSUFFIX-data.txt`.
+     * `DIR/PREFIXSUFFIX.data.txt`.
      */
     def construct_data_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String = "") =
@@ -444,9 +444,9 @@ package object textdb {
      * Regular expressions matching the suffix and file ending need to be
      * given, although the resulting regexp will be extended to allow for any
      * compression ending (e.g. ".gz"). For example, if the suffix is "-dev"
-     * and the file ending is "-data.txt", and the file is named
-     * "foo/tweets-1-dev-data.txt.gz", the return value will be
-     * ("foo", "tweets-1", "-dev", "-data.txt.gz"). By contatenating all parts
+     * and the file ending is ".data.txt", and the file is named
+     * "foo/tweets-1-dev.data.txt.gz", the return value will be
+     * ("foo", "tweets-1", "-dev", ".data.txt.gz"). By contatenating all parts
      * of the basename together (all but the directory), the original basename
      * is retrieved.
      */
@@ -468,8 +468,8 @@ package object textdb {
      * Split the name of a textdb data file into (DIR, PREFIX, SUFFIX,
      * ENDING). A regular expression matching the suffix may be given; else
      * a blank string will be substituted. For example, if the suffix is
-     * "-dev" and the file is named "foo/tweets-1-dev-data.txt.gz", the return
-     * value will be ("foo", "tweets-1", "-dev", "-data.txt.gz"). By
+     * "-dev" and the file is named "foo/tweets-1-dev.data.txt.gz", the return
+     * value will be ("foo", "tweets-1", "-dev", ".data.txt.gz"). By
      * contatenating all parts of the basename together (all but the
      * directory), the original basename is retrieved.
      */
@@ -640,7 +640,7 @@ package object textdb {
   ) {
     /**
      * Open a data file and return an output stream.  The file will be
-     * named `DIR/PREFIXSUFFIX-data.txt`, possibly with an additional suffix
+     * named `DIR/PREFIXSUFFIX.data.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
      * to no compression).  Call `output_row` to output a row describing
      * a document.
@@ -653,7 +653,7 @@ package object textdb {
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIXSUFFIX-schema.txt`.
+     * `DIR/PREFIXSUFFIX.schema.txt`.
      *
      * @return Name of schema file.
      */
