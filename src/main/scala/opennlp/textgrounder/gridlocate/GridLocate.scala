@@ -503,7 +503,7 @@ document geolocation when --eval-format=internal (the default).""")
       help = """If specified, prefix of file to store results into.
 Results are also normally output to stderr for debugging purposes unless
 `--no-results` is given.  Results are stored as a textdb corpus, i.e. two
-files will be written, with extensions `-data.txt` and `-schema.txt`, with
+files will be written, with extensions `.data.txt` and `.schema.txt`, with
 the former storing the data as tab-separated fields and the latter naming
 the fields.""")
 
