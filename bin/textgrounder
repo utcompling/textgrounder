@@ -377,7 +377,7 @@ else
     ASSEMBLY_DIR="$TEXTGROUNDER_DIR/target"
     ASSEMBLY_GLOB="$ASSEMBLY_DIR/TextGrounder-*.jar"
     if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
-      echo "No assembly file!  Unable to execute in Hadoop distribute mode."
+      echo "No assembly file!  Unable to execute in Hadoop distributed mode."
       exit 1
     else
       NUM_ASSEMBLY_FILES=`ls -1 $ASSEMBLY_GLOB | wc -l`
