@@ -38,13 +38,13 @@ import io._
  *     "fixed" fields that have the same value for all rows (one per
  *     line, with the name, a TAB, and the value).
  * (3) The data and schema files are identified by ending.
- *     The document files are named `DIR/NAME.data.txt` (or
- *     `DIR/NAME.data.txt.bz2` or similar, for compressed files),
- *     while the schema file is named `DIR/NAME.schema.txt`. NAME is
+ *     The document files are named `BASE.data.txt` (or
+ *     `BASE.data.txt.bz2` or similar, for compressed files),
+ *     while the schema file is named `BASE.schema.txt`. BASE is
  *     arbitrary, and may not necessarily be the same across the various
  *     files in a single database.
- * (4) Commonly, NAME is structured so that in data files, it has the form
- *     "PREFIX-ID", where PREFIX is common to all the data files while "ID"
+ * (4) Commonly, BASE is structured so that in data files, it has the form
+ *     "DIR/PREFIX-ID", where PREFIX is common to all the data files while "ID"
  *     is different for each individual file.
  * (5) Another way to structure the NAME of a data or schema file is through
  *     the use of a SUFFIX.  The SUFFIX part is used when multiple textdb
@@ -205,14 +205,12 @@ package object textdb {
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIXSUFFIX.schema.txt`.
+     * `BASE.schema.txt`.
      *
      * @return Name of constructed schema file.
      */
-    def output_constructed_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String = "") = {
-      val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
-        suffix)
+    def output_constructed_schema_file(filehand: FileHandler, base: String) = {
+      val schema_file = Schema.construct_schema_file(filehand, base)
       output_schema_file(filehand, schema_file)
       schema_file
     }
@@ -280,13 +278,11 @@ package object textdb {
       TextDB.make_textdb_file_suffix_regex(suffix_re, schema_ending_re)
 
     /**
-     * Construct the name of a schema file, based on the given file handler,
-     * directory, prefix and suffix.  The file will end with ".schema.txt".
+     * Construct the name of a schema file, based on the given file handler
+     * and base.  The file will end with ".schema.txt".
      */
-    def construct_schema_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String = "") =
-      TextDB.construct_textdb_file(filehand, dir, prefix,
-        suffix, schema_ending_text)
+    def construct_schema_file(filehand: FileHandler, base: String) =
+      TextDB.construct_textdb_file(filehand, base, schema_ending_text)
 
     /**
      * Split the name of a textdb schema file into (DIR, PREFIX, SUFFIX,
@@ -412,14 +408,13 @@ package object textdb {
 
     /**
      * Construct the name of a file (either schema or data file), based
-     * on the given file handler, directory, prefix, suffix and file ending.
+     * on the given file handler, base name and file ending.
      * For example, if the file ending is ".schema.txt", the file will be
-     * named `DIR/PREFIXSUFFIX.schema.txt`.
+     * named `BASE.schema.txt`.
      */
-    def construct_textdb_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String, file_ending: String) = {
-      val new_base = prefix + suffix + file_ending
-      filehand.join_filename(dir, new_base)
+    def construct_textdb_file(filehand: FileHandler, base: String,
+        file_ending: String) = {
+      base + file_ending
     }
 
     /**
@@ -431,13 +426,11 @@ package object textdb {
       make_textdb_file_suffix_regex(suffix_re, data_ending_re)
 
     /**
-     * Construct the name of a data file, based on the given file handler,
-     * directory, prefix, and suffix.  The file will be named
-     * `DIR/PREFIXSUFFIX.data.txt`.
+     * Construct the name of a data file, based on the given file handler
+     * and base name.  The file will be named `BASE.data.txt`.
      */
-    def construct_data_file(filehand: FileHandler, dir: String,
-        prefix: String, suffix: String = "") =
-      construct_textdb_file(filehand, dir, prefix, suffix, data_ending_text)
+    def construct_data_file(filehand: FileHandler, base: String) =
+      construct_textdb_file(filehand, base, data_ending_text)
 
     /**
      * Split the name of a textdb file into (DIR, PREFIX, SUFFIX, ENDING).
@@ -446,7 +439,7 @@ package object textdb {
      * compression ending (e.g. ".gz"). For example, if the suffix is "-dev"
      * and the file ending is ".data.txt", and the file is named
      * "foo/tweets-1-dev.data.txt.gz", the return value will be
-     * ("foo", "tweets-1", "-dev", ".data.txt.gz"). By contatenating all parts
+     * ("foo", "tweets-1", "-dev", ".data.txt.gz"). By concatenating all parts
      * of the basename together (all but the directory), the original basename
      * is retrieved.
      */
@@ -631,35 +624,31 @@ package object textdb {
    * Class for writing a textdb database.
    *
    * @param schema the schema describing the fields in the data file
-   * @param suffix the suffix of the data files, as described in the
-   *   `textdb` package
    */
   class TextDBWriter(
-    val schema: Schema,
-    val suffix: String = ""
+    val schema: Schema
   ) {
     /**
      * Open a data file and return an output stream.  The file will be
-     * named `DIR/PREFIXSUFFIX.data.txt`, possibly with an additional suffix
+     * named `BASE.data.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
      * to no compression).  Call `output_row` to output a row describing
      * a document.
      */
-    def open_data_file(filehand: FileHandler, dir: String,
-        prefix: String, compression: String = "none") = {
-      val file = TextDB.construct_data_file(filehand, dir, prefix, suffix)
+    def open_data_file(filehand: FileHandler, base: String,
+        compression: String = "none") = {
+      val file = TextDB.construct_data_file(filehand, base)
       filehand.openw(file, compression = compression)
     }
 
     /**
      * Output the schema to a file.  The file will be named
-     * `DIR/PREFIXSUFFIX.schema.txt`.
+     * `BASESUFFIX.schema.txt`.
      *
      * @return Name of schema file.
      */
-    def output_schema_file(filehand: FileHandler, dir: String,
-        prefix: String) =
-      schema.output_constructed_schema_file(filehand, dir, prefix, suffix)
+    def output_schema_file(filehand: FileHandler, base: String) =
+      schema.output_constructed_schema_file(filehand, base)
   }
 
   class EncodeDecode(val chars_to_encode: Iterable[Char]) {

@@ -135,10 +135,10 @@ class MMCUnigramWordDistHandler(
 ) extends SimpleUnigramWordDistConstructor {
   val new_schema = new Schema(schema.fieldnames ++ Seq("unigram-counts"),
     schema.fixed_values)
-  val writer = new TextDBWriter(new_schema, "")
-  writer.output_schema_file(filehand, output_dir, output_file_prefix)
-  val outstream = writer.open_data_file(filehand, output_dir,
-    output_file_prefix, compression = "bzip2")
+  val writer = new TextDBWriter(new_schema)
+  writer.output_schema_file(filehand, output_dir + "/" + output_file_prefix)
+  val outstream = writer.open_data_file(filehand,
+    output_dir + "/" + output_file_prefix, compression = "bzip2")
  
   def handle_document(title: String, keys: Array[String], values: Array[Int],
       num_words: Int) = {
