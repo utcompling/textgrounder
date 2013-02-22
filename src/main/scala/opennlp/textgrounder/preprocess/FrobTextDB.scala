@@ -176,13 +176,14 @@ class FrobTextDB(
        */
       val new_schema =
         new Schema(fieldnames, modify_fixed_values(schema.fixed_values))
-      unsplit_writer = new TextDBWriter(new_schema, params.output_suffix)
-      unsplit_writer.output_schema_file(output_filehand, params.output_dir,
-        schema_prefix)
+      unsplit_writer = new TextDBWriter(new_schema)
+      unsplit_writer.output_schema_file(output_filehand,
+        params.output_dir + "/" + schema_prefix + params.output_suffix)
     }
     if (unsplit_outstream == null)
       unsplit_outstream = unsplit_writer.open_data_file(output_filehand,
-        params.output_dir, current_document_prefix)
+        params.output_dir + "/" + current_document_prefix +
+        params.output_suffix)
     (unsplit_writer, unsplit_outstream)
   }
 
@@ -210,16 +211,18 @@ class FrobTextDB(
               schema.fixed_values + (params.split_by_field -> split)
             val new_schema =
               new Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
-            val writer = new TextDBWriter(new_schema, params.output_suffix)
-            writer.output_schema_file(output_filehand, params.output_dir,
-              schema_prefix + "-" + split)
+            val writer = new TextDBWriter(new_schema)
+            writer.output_schema_file(output_filehand,
+              params.output_dir + "/" + schema_prefix +
+              "-" + split + params.output_suffix)
             split_value_to_writer(split) = writer
           }
           if (!(split_value_to_outstream contains split)) {
             val writer = split_value_to_writer(split)
             split_value_to_outstream(split) =
-              writer.open_data_file(output_filehand, params.output_dir,
-                current_document_prefix + "-" + split)
+              writer.open_data_file(output_filehand,
+                params.output_dir + "/" + current_document_prefix +
+                "-" + split + params.output_suffix)
           }
           (split_value_to_writer(split), split_value_to_outstream(split))
         }

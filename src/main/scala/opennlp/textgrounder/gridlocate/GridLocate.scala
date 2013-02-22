@@ -1357,7 +1357,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   }
 
   def output_results(results: Iterator[DocEvalResult[Co]], filehand: FileHandler,
-      dir: String, base: String) {
+      base: String) {
     val first = results.next
     val res2 = Iterator(first) ++ results
     val fields = first.to_row.map(_._1)
@@ -1371,8 +1371,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
         "corpus-type" -> "textgrounder-results"
     ) ++ param_values.toMap
     val schema = new Schema(fields, fixed_fields)
-    schema.output_constructed_schema_file(filehand, dir, base)
-    val outfile = TextDB.construct_data_file(filehand, dir, base)
+    schema.output_constructed_schema_file(filehand, base)
+    val outfile = TextDB.construct_data_file(filehand, base)
     val outstr = filehand.openw(outfile)
     res2.foreach { res =>
       outstr.println(schema.make_row(res.to_row.map(_._2.toString)))

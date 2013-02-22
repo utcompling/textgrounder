@@ -798,8 +798,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
       val results = results_iter.toIndexedSeq
       if (params.results != null) {
         val filehand = get_file_handler
-        val (dir, base) = filehand.split_filename(params.results)
-        output_results(results.toIterator, filehand, dir, base)
+        output_results(results.toIterator, filehand, params.results)
       }
       results
     }

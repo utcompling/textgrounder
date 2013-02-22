@@ -848,13 +848,10 @@ abstract class GeoDoc[Co : Serializer](
  * A writer class for writing GeoDocs out to a corpus.
  *
  * @param schema schema describing the fields in the document files
- * @param suffix suffix used for identifying the particular corpus in a
- *  directory
  */
 class GeoDocWriter[Co : Serializer](
-  schema: Schema,
-  suffix: String = ""
-) extends TextDBWriter(schema, suffix) {
+  schema: Schema
+) extends TextDBWriter(schema) {
   def output_document(outstream: PrintStream, doc: GeoDoc[Co]) {
     outstream.println(schema.make_row(doc.get_fields(schema.fieldnames)))
   }

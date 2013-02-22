@@ -546,8 +546,8 @@ object FindPolitical extends
           "political-feature-type" -> "%s".format(opts.political_feature_type)
         )
       val out_schema = new Schema(fields, fixed_fields)
-      out_schema.output_constructed_schema_file(filehand, outdir,
-        opts.corpus_name)
+      out_schema.output_constructed_schema_file(filehand,
+        "%s/%s" format (outdir, opts.corpus_name))
     }
 
     var ideo_users: DList[IdeologicalUser] = null

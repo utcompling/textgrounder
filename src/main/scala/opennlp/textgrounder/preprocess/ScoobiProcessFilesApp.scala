@@ -270,20 +270,17 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    *   (tab-separated, etc.).
    * @param filehand File handler of output directory.
    * @param outdir Directory to output corpus in.
-   * @param corpus_name Name of corpus; used to form the filenames.
-   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   * @param prefix Prefix to use for files in directory.
    */
   def dlist_output_textdb(schema: Schema, lines: DList[String],
-      filehand: FileHandler, outdir: String,
-      corpus_name: String, corpus_suffix: String = "") {
+      filehand: FileHandler, outdir: String, prefix: String) {
     // output data file
     persist(TextOutput.toTextFile(lines, outdir))
-    rename_output_files(filehand, outdir, corpus_name, corpus_suffix)
+    rename_output_files(filehand, outdir, prefix)
 
     // output schema file
     val schema_filename =
-      schema.output_constructed_schema_file(filehand, outdir,
-        corpus_name, corpus_suffix)
+      schema.output_constructed_schema_file(filehand, outdir + "/" + prefix)
     logger.info("Schema file output to %s" format schema_filename)
   }
 
@@ -296,24 +293,21 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    *   (tab-separated, etc.).
    * @param filehand File handler of output directory.
    * @param outdir Directory to output corpus in.
-   * @param corpus_name Name of corpus; used to form the filenames.
-   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   * @param prefix Prefix to use for files in directory.
    */
   def local_output_textdb(schema: Schema, lines: Iterable[String],
-      filehand: FileHandler, outdir: String,
-      corpus_name: String, corpus_suffix: String = "") {
+      filehand: FileHandler, outdir: String, prefix: String) {
     // output data file
     filehand.make_directories(outdir)
-    val outfile = TextDB.construct_data_file(filehand, outdir,
-      corpus_name, corpus_suffix)
+    val base = outdir + "/" + prefix
+    val outfile = TextDB.construct_data_file(filehand, base)
     val outstr = filehand.openw(outfile)
     lines.map(outstr.println(_))
     outstr.close()
 
     // output schema file
     val schema_filename =
-      schema.output_constructed_schema_file(filehand, outdir,
-        corpus_name, corpus_suffix)
+      schema.output_constructed_schema_file(filehand, base)
     logger.info("Schema file output to %s" format schema_filename)
   }
 
@@ -324,19 +318,19 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    *
    * @param srcdir Directory containing persisted files.
    * @param destdir Directory to contain results.
-   * @param corpus_name Name of corpus; used to form the filenames.
-   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   * @param prefix Prefix to use for files in directory.
+   * @param suffix Suffix to use for files in directory.
    */ 
   def move_output_files(filehand: FileHandler, srcdir: String, destdir: String,
-      corpus_name: String, corpus_suffix: String = "") {
+      prefix: String, suffix: String = "") {
     errprint("Moving/renaming output files ...")
     val globpat = "%s/*-r-*" format srcdir
     val fs = configuration.fs
     for (file <- fs.globStatus(new Path(globpat))) {
       val path = file.getPath
-      val basename = path.getName
-      val newname = TextDB.construct_data_file(filehand, destdir,
-        "%s-%s" format (corpus_name, basename), corpus_suffix)
+      val orig_basename = path.getName
+      val base = "%s/%s-%s%s" format (destdir, prefix, orig_basename, suffix)
+      val newname = TextDB.construct_data_file(filehand, base)
       errprint("Moving %s to %s" format (path, newname))
       fs.rename(path, new Path(newname))
     }
@@ -347,11 +341,11 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * same directory.
    *
    * @param dir Directory containing persisted files.
-   * @param corpus_name Name of corpus; used to form the filenames.
-   * @param corpus_suffix Suffix of corpus; used to form the filenames.
+   * @param prefix Prefix to use for files in directory.
+   * @param suffix Suffix to use for files in directory.
    */ 
   def rename_output_files(filehand: FileHandler, dir: String,
-      corpus_name: String, corpus_suffix: String = "") =
-    move_output_files(filehand, dir, dir, corpus_name, corpus_suffix)
+      prefix: String, suffix: String = "") =
+    move_output_files(filehand, dir, dir, prefix, suffix)
 }
 

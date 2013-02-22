@@ -371,14 +371,10 @@ object ConvertCophir
       opts.corpus_name, "-test")
 
     // output schema files
-    schema.clone_with_changes(Map("split"->"training")).
-      output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-training")
-    schema.clone_with_changes(Map("split"->"dev")).
-      output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-dev")
-    schema.clone_with_changes(Map("split"->"test")).
-      output_constructed_schema_file(filehand, opts.output,
-        opts.corpus_name, "-test")
+    val base = "%s/%s" format (opts.output, opts.corpus_name)
+    for (split <- List("training", "dev", "test")) {
+    schema.clone_with_changes(Map("split"->split)).
+      output_constructed_schema_file(filehand, base + "-" + split)
+    }
   }
 }
