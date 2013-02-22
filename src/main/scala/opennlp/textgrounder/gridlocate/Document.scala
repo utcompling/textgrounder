@@ -838,21 +838,3 @@ abstract class GeoDoc[Co : Serializer](
    */
   def output_distance(dist: Double): String
 }
-
-
-/////////////////////////////////////////////////////////////////////////////
-//                               GeoDocWriter                              //
-/////////////////////////////////////////////////////////////////////////////
-
-/**
- * A writer class for writing GeoDocs out to a corpus.
- *
- * @param schema schema describing the fields in the document files
- */
-class GeoDocWriter[Co : Serializer](
-  schema: Schema
-) extends TextDBWriter(schema) {
-  def output_document(outstream: PrintStream, doc: GeoDoc[Co]) {
-    outstream.println(schema.make_row(doc.get_fields(schema.fieldnames)))
-  }
-}
