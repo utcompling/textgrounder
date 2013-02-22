@@ -172,7 +172,7 @@ class ConvertTwitterInfochimpsFileProcessor(
         if (this.schema == null) {
           // Output the schema file, first time we see a line
           val schema_file_name =
-            Schema.construct_schema_file(filehand,
+            Schema.construct_schema_file(
               "%s/twitter-infochimps" format params.output_dir)
           val schema_stream = filehand.openw(schema_file_name)
           errprint("Schema file is %s..." format schema_file_name)
