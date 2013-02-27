@@ -292,8 +292,7 @@ abstract class DiscountedUnigramWordDist(
     kldiv
   }
 
-  def lookup_word(word: Word) = {
-    assert(finished)
+  protected def imp_lookup_word(word: Word) = {
     if (factory.interpolate) {
       val wordcount = if (model contains word) model.get_item(word) else 0.0
       // if (debug("some")) {
@@ -308,6 +307,14 @@ abstract class DiscountedUnigramWordDist(
       if (debug("lots"))
         errprint("Word %s, seen in document, wordprob = %s",
                  memoizer.unmemoize(word), wordprob)
+      // DO NOT simplify following expr, or it will fail on NaN
+      if (! (wordprob >= 0)) {
+        errprint("wordcount = %s, owprob = %s", wordcount, owprob)
+        errprint("mle_wordprob = %s, normalization_factor = %s, unseen_mass = %s",
+          mle_wordprob, normalization_factor, unseen_mass)
+      }
+      // Info on word and probability printed in wrapper lookup_word()
+      // for bad probability, and assert(false) occurs there
       wordprob
     } else {
       val retval =
@@ -329,13 +336,15 @@ abstract class DiscountedUnigramWordDist(
             }
             case Some(owprob) => {
               val wordprob = unseen_mass * owprob / overall_unseen_mass
-              //if (wordprob <= 0)
-              //  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s",
-              //    unseen_mass, factory.overall_word_probs[word],
-              //    factory.overall_unseen_mass)
+              // DO NOT simplify following expr, or it will fail on NaN
+              if (! (wordprob >= 0)) {
+                errprint("Bad values section #2; unseen_mass = %s, owprob = %s, overall_unseen_mass = %s",
+                  unseen_mass, owprob, overall_unseen_mass)
+              }
               if (debug("lots"))
                 errprint("Word %s, seen but not in document, wordprob = %s",
                          memoizer.unmemoize(word), wordprob)
+
               wordprob
             }
           }
@@ -347,11 +356,18 @@ abstract class DiscountedUnigramWordDist(
           //  for ((word, count) <- self.counts)
           //    errprint("%s: %s", word, count)
           val wordprob = wordcount.toDouble/normalization_factor*(1.0 - unseen_mass)
+          // DO NOT simplify following expr, or it will fail on NaN
+          if (! (wordprob >= 0)) {
+            errprint("Bad values section #3; wordcount = %s, normalization_factor = %s, unseen_mass = %s",
+              wordcount, normalization_factor, unseen_mass)
+          }
           if (debug("lots"))
             errprint("Word %s, seen in document, wordprob = %s",
                      memoizer.unmemoize(word), wordprob)
           wordprob
         }
+      // Info on word and probability printed in wrapper lookup_word()
+      // for bad probability, and assert(false) occurs there
       retval
     }
   }

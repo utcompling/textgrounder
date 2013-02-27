@@ -24,7 +24,7 @@ import collection.mutable
 
 import util.collection._
 import util.io.FileHandler
-import util.print.{errprint, warning}
+import util.print._
 import util.Serializer
 import util.memoizer._
 
@@ -34,9 +34,13 @@ import WordDist._
 
 // val use_sorted_list = false
 
-//////////////////////////////////////////////////////////////////////////////
-//                             Word distributions                           //
-//////////////////////////////////////////////////////////////////////////////
+/**
+ * An exception thrown to indicate an error during distribution creation
+ */
+case class DistributionCreationException(
+  message: String,
+  cause: Option[Throwable] = None
+) extends RethrowableRuntimeException(message)
 
 /**
  * A trait that adds an implementation of `#kl_divergence` in terms of
@@ -189,6 +193,9 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
     assert(!dist.finished)
     assert(!dist.finished_before_global)
     imp_finish_before_global(dist)
+    if (dist.empty)
+      throw new DistributionCreationException(
+        "Attempt to create an empty distribution: %s" format dist)
     dist.finished_before_global = true
   }
 
@@ -357,6 +364,11 @@ trait ItemStorage[Item] {
    * stored.
    */
   def num_types: Int
+
+  /**
+   * True if this model is empty, containing no items.
+   */
+  def empty = num_types == 0
 }
 
 /**
@@ -377,6 +389,9 @@ abstract class WordDist(factory: WordDistFactory) {
    * means we can't modify the distribution any more.
    */
   var finished_before_global = false
+
+  /** Is this distribution empty? */
+  def empty = model.empty
 
   /**
    * Incorporate a document into the distribution.
