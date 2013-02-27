@@ -201,7 +201,7 @@ public class WeightedMinDistResolver extends Resolver {
                         idx++;
                     }
 
-                    /*
+                    
                     if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
                                        //   so, choose the location with the greatest weight (unless all are uniform)
                         double maxWeight = 1.0;
@@ -212,10 +212,10 @@ public class WeightedMinDistResolver extends Resolver {
                                 maxWeight = thisWeight;
                                 minIdx = locationIdx;
                             }
+                            locationIdx++;
                         }
-                        locationIdx++;
                     }
-                    */
+                    
                     
                     if (minIdx > -1) {
                         int countIndex = lexicon.get(toponym.getForm());
@@ -262,7 +262,6 @@ public class WeightedMinDistResolver extends Resolver {
                     idx++;
                 }
 
-                /*
                 if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
                                    //   so, choose the location with the greatest weight (unless all are 1.0)
                     double maxWeight = 1.0;
@@ -273,10 +272,9 @@ public class WeightedMinDistResolver extends Resolver {
                             maxWeight = thisWeight;
                             minIdx = locationIdx;
                         }
+                        locationIdx++;
                     }
-                    locationIdx++;
                 }
-                */
                 
                 if (minIdx > -1) {
                     toponym.setSelectedIdx(minIdx);
