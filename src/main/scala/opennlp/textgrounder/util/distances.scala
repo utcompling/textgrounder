@@ -96,7 +96,8 @@ package object distances {
   case class SphereCoord(lat: Double, long: Double) {
     // Not sure why this code was implemented with coerce_within_bounds,
     // but either always coerce, or check the bounds ...
-    require(SphereCoord.valid(lat, long))
+    require(SphereCoord.valid(lat, long),
+      "Coordinates out of bounds: %s" format toString)
     override def toString = "(%.2f,%.2f)".format(lat, long)
   }
 

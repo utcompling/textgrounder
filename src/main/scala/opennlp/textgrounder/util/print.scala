@@ -180,11 +180,7 @@ package object print {
     writer.toString
   }
 
-  /**
-   * An exception thrown to indicate an internal error (program gets to a
-   * state it should never reach, similar to an assertion failure).
-   */
-  case class InternalError(
+  class RethrowableRuntimeException(
     message: String,
     cause: Option[Throwable] = None
   ) extends RuntimeException(message) {
@@ -206,6 +202,15 @@ package object print {
      */
     def this(msg: String, cause: Throwable) = this(msg, Some(cause))
   }
+
+  /**
+   * An exception thrown to indicate an internal error (program gets to a
+   * state it should never reach, similar to an assertion failure).
+   */
+  case class InternalError(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends RethrowableRuntimeException(message, cause)
 
   /**
    * An exception thrown to indicate that a part of the code that
@@ -214,25 +219,7 @@ package object print {
   case class FixmeError(
     message: String,
     cause: Option[Throwable] = None
-  ) extends RuntimeException(message) {
-    if (cause != None)
-      initCause(cause.get)
-
-    /**
-     * Alternate constructor.
-     *
-     * @param message  exception message
-     */
-    def this(msg: String) = this(msg, None)
-
-    /**
-     * Alternate constructor.
-     *
-     * @param message  exception message
-     * @param cause    wrapped, or nested, exception
-     */
-    def this(msg: String, cause: Throwable) = this(msg, Some(cause))
-  }
+  ) extends RethrowableRuntimeException(message, cause)
 
   /**
    * Signal an internal error (program gets to a state it should never reach,

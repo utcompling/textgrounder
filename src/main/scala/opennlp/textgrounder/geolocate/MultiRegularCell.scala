@@ -93,7 +93,9 @@ object RegularCellIndex {
      */
   def apply(grid: MultiRegularGrid, latind: Int, longind: Int):
       RegularCellIndex = {
-    require(valid(grid, latind, longind))
+    require(valid(grid, latind, longind),
+      "Coordinate indices (%s,%s) invalid for grid %s"
+        format (latind, longind, grid))
     new RegularCellIndex(latind, longind)
   }
 

@@ -33,7 +33,7 @@ import java.util.NoSuchElementException
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
-import print.{errprint, warning, unsupported}
+import print._
 import text._
 import os._
 
@@ -52,8 +52,9 @@ package object io {
   //////////////////////////////////////////////////////////////////////////////
   
   case class FileFormatException(
-    message: String
-  ) extends Exception(message) { }
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends RethrowableRuntimeException(message, cause)
 
   /**
    * Iterator that yields lines in a given encoding (by default, UTF-8) from

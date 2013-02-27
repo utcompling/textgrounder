@@ -30,11 +30,11 @@ import util.textdb._
 import util.distances._
 import util.experiment._
 import util.io._
-import util.print.{errprint, warning, internal_error}
+import util.print._
 import util.Serializer
 import util.text.capfirst
 
-import worddist.{WordDist,WordDistFactory}
+import worddist.{WordDist,WordDistFactory,DistributionCreationException}
 
 import util.debug._
 
@@ -302,7 +302,7 @@ abstract class GeoDocFactory[Co : Serializer](
             if (debug("stack-trace") || debug("stacktrace"))
               e.printStackTrace
             throw new DocValidationException(
-              "Bad value for field: %s" format e, e)
+              "Bad value for field: %s" format e, Some(e))
           }
         }
       }
@@ -395,6 +395,14 @@ abstract class GeoDocFactory[Co : Serializer](
         case e:DocValidationException => {
           warning("Line %s: %s", rawdoc.lineno, e.message)
           (None, "bad", "error validating document field", "")
+        }
+        case e:DistributionCreationException => {
+          val rd = rawdoc.maybedoc.get
+          warning("Line %s: %s, word-counts field: %s",
+            rawdoc.lineno, e.message,
+            rd.schema.get_field_or_else(rd.fields,
+              driver.word_count_field, "(missing word-counts field)"))
+          (None, "bad", "error creating document distribution", "")
         }
       }
     }
@@ -701,25 +709,7 @@ object GeoDocFactory {
 case class DocValidationException(
   message: String,
   cause: Option[Throwable] = None
-) extends Exception(message) {
-  if (cause != None)
-    initCause(cause.get)
-
-  /**
-   * Alternate constructor.
-   *
-   * @param message  exception message
-   */
-  def this(msg: String) = this(msg, None)
-
-  /**
-   * Alternate constructor.
-   *
-   * @param message  exception message
-   * @param cause    wrapped, or nested, exception
-   */
-  def this(msg: String, cause: Throwable) = this(msg, Some(cause))
-}
+) extends RethrowableRuntimeException(message)
 
 /**
  * A document with an associated coordinate placing it in a grid, with a word

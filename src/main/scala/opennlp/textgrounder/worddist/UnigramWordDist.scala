@@ -206,12 +206,11 @@ abstract class UnigramWordDist(
     var logprob = 0.0
     for ((word, count) <- worddist.model.iter_items) {
       val value = lookup_word(word)
-      if (value <= 0) {
-        // FIXME: Need to figure out why this happens (perhaps the word was
-        // never seen anywhere in the training data? But I thought we have
-        // a case to handle that) and what to do instead.
-        errprint("Warning! For word %s, prob %s out of range", word, value)
-      } else
+      assert(value >= 0)
+      // The probability returned will be 0 for words never seen in the
+      // training data at all, i.e. we don't even have any global values to
+      // back off to. General practice is to ignore such words.
+      if (value > 0)
         logprob += log(value)
     }
     // FIXME: Also use baseline (prior probability)
@@ -221,7 +220,25 @@ abstract class UnigramWordDist(
   /**
    * Return the probabilitiy of a given word in the distribution.
    */
-  def lookup_word(word: Word): Double
+  protected def imp_lookup_word(word: Word): Double
+
+  def lookup_word(word: Word): Double = {
+    assert(finished)
+    if (empty)
+      throw new IllegalStateException("Attempt to lookup word %s in empty distribution %s"
+        format (memoizer.unmemoize(word), this))
+    val wordprob = imp_lookup_word(word)
+    // Write this way because if negated as an attempt to catch bad values,
+    // it won't catch NaN, which fails all comparisons.
+    if (wordprob >= 0 && wordprob <= 1)
+      ()
+    else {
+      errprint("Out-of-bounds prob %s for word %s",
+        wordprob, memoizer.unmemoize(word))
+      assert(false)
+    }
+    wordprob
+  }
   
   /**
    * Look for the most common word matching a given predicate.
