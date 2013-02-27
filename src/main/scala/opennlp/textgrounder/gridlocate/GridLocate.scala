@@ -313,9 +313,9 @@ Used only when --strategy=average-cell-probability.""")
       default = 0.0,
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
-  var no_individual_results =
-    ap.flag("no-individual-results", "no-results",
-      help = """Don't show individual results for each test document.""")
+  var print_results =
+    ap.flag("print-results", "show-results",
+      help = """Show individual results for each test document.""")
   var results_by_range =
     ap.flag("results-by-range",
       help = """Show results by range (of error distances and number of
