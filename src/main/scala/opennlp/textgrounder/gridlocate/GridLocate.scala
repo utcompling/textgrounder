@@ -255,9 +255,9 @@ distribution vis-a-vis the document-specific distribution.  Default
 match against document distributions.  Note that in toponym resolution,
 this applies only to words in documents (currently used only in Naive Bayes
 matching), not to toponyms, which are always matched case-insensitively.""")
-  var include_stopwords_in_document_dists =
-    ap.flag("include-stopwords-in-document-dists",
-      help = """Include stopwords when computing word distributions.""")
+  var no_stopwords =
+    ap.flag("no-stopwords",
+      help = """Don't remove any stopwords from word distributions.""")
   var minimum_word_count =
     ap.option[Int]("minimum-word-count", "mwc", metavar = "NUM",
       default = 1,
@@ -673,7 +673,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   lazy protected val the_stopwords = {
-    if (params.include_stopwords_in_document_dists) Set[String]()
+    if (params.no_stopwords) Set[String]()
     else read_stopwords()
   }
 
