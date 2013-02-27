@@ -586,7 +586,7 @@ abstract class GridEvaluator[Co](
     override def create_tracker(shortname: String) =
       new DocCounterTracker[TEvalRes](shortname, driver) {
         val want_indiv_results = !driver.params.oracle_results &&
-          !driver.params.no_individual_results
+          driver.params.print_results
         override def print_status(status: DocStatus[TEvalRes]) {
           (status.status, status.maybedoc) match {
             case ("processed", Some(res)) => {
