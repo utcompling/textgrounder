@@ -760,35 +760,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
-  /**
-   * Read the training documents.  This uses the values of the parameters
-   * to determine where to read the documents from and how many documents to
-   * read.
-   *
-   * @param docfact Document factory used to create documents.
-   * @param operation Name of logical operation, to be displayed in progress
-   *   messages.
-   * @param record_in_subfactory Whether to record documents in any
-   *   subfactories. (FIXME: This should be an add-on to the iterator.)
-   * @param note_globally Whether to add each document's words to the global
-   *   (e.g. back-off) distribution statistics.  Normally false, but may be
-   *   true during bootstrapping of those statistics.
-   * @param finish_globally Whether to compute statistics of the documents'
-   *   distributions that depend on global (e.g. back-off) distribution
-   *   statistics.  Normally true, but may be false during bootstrapping of
-   *   those statistics.
-   * @return Iterator over documents.
-   */
-  def read_training_documents(docfact: GeoDocFactory[Co],
-      operation: String = "reading",
-      record_in_subfactory: Boolean = false,
-      note_globally: Boolean = false,
-      finish_globally: Boolean = true): Iterator[GeoDoc[Co]] = {
-    docfact.raw_documents_to_documents(
-      read_raw_training_documents(operation),
-      record_in_subfactory, note_globally, finish_globally)
-  }
-
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
