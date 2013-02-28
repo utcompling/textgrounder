@@ -54,17 +54,32 @@ over the Earth's surface (two-dimensional).
 
 /**
  * General class retrieving command-line arguments or storing programmatic
- * configuration parameters for a Cell-grid-based application.
+ * configuration parameters for a cell-grid-based application. The
+ * parameters in here are those necessary for initializing a cell grid
+ * from training documents, but not those used for geolocating test
+ * documents or other applications (e.g. creating KML maps of the
+ * distribution of the training docs).
  *
- * @param parser Should be a parser for retrieving the
- *   value of command-line arguments from the command line.  Provided
- *   that the parser has been created and initialized by creating a
- *   previous instance of this same class with the same parser (a
- *   "shadow field" class), the variables below will be initialized with
- *   the values given by the user on the command line.  Otherwise, they
- *   will be initialized with the default values for the parameters.
- *   Because they are vars, they can be freely set to other values.
+ * This uses an ArgParser object (stored in the `parser` field) to set
+ * the parameters appropriately, e.g. from the command line. The parameters
+ * themselves are stored in field variables, initialized from the ArgParser
+ * object. In order to make this work, the following steps are necessary:
  *
+ * <ol>
+ * <li>Create an empty ArgParser.
+ * <li>Create a parameter object, passing in the parser. As the
+ *     "shadow fields" in this object get initialized, the parser records
+ *     the valid parameters and their properties, and initializes the
+ *     fields to their default values.
+ * <li>Tell the parser to parse a command line.
+ * <li>Create a second parameter object the same way the first one was
+ *     created. This time, the fields will be initialized to the values
+ *     stored in the command line.
+ * </ol>
+ *
+ * If programmatic access is desired and the parameters are to be set
+ * in some other way, just  do the first two steps, and then change any
+ * parameters that should not have their default values.
  */
 trait GridLocateParameters extends ArgParserParameters {
   protected val ap = parser
@@ -366,6 +381,11 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 
 }
 
+/**
+ * Subclass of GridLocateParameters used specifically for assigning cells
+ * to test documents based on language-model similarity (e.g. for
+ * geolocation).
+ */
 trait GridLocateDocParameters extends GridLocateParameters {
   protected def strategy_default = "partial-kl-divergence"
   protected def strategy_choices = Seq(
@@ -562,34 +582,16 @@ noisy training data.  We choose C = 1 as a compromise.""")
 }
 
 /**
- * Base class for programmatic access to document/etc. geolocation.
- * Subclasses are for particular apps, e.g. GeolocateDocDriver for
+ * Driver class for creating cell grids over some coordinate space, with a
+ * language model associated with each cell and initialized from a corpus
+ * of documents by concatenating all documents located within the cell.
+ * Subclasses are for particular apps, e.g. GridLocateDocDriver for
  * document-level geolocation.
  *
- * NOTE: Currently the code has some values stored in singleton objects,
- * and no clear provided interface for resetting them.  This basically
- * means that there can be only one geolocation instance per JVM.
- * By now, most of the singleton objects have been removed, and it should
- * not be difficult to remove the final limitations so that multiple
- * drivers per JVM (possibly not at the same time) can be done.
- *
- * Basic operation:
- *
- * 1. Create an instance of the appropriate subclass of GeolocateParameters
- * (e.g. GeolocateDocParameters for document geolocation) and populate
- * it with the appropriate parameters.  Don't pass in any ArgParser instance,
- * as is the default; that way, the parameters will get initialized to their
- * default values, and you only have to change the ones you want to be
- * non-default.
- * 2. Call run(), passing in the instance you just created.
- *
- * NOTE: Currently, some of the fields of the GeolocateParameters-subclass
- * are changed to more canonical values.  If this is a problem, let me
- * know and I'll fix it.
- *
- * Evaluation output is currently written to standard error, and info is
- * also returned by the run() function.  There are some scripts to parse the
- * console output.  See below.
+ * Driver classes like this have `handle_parameters` to check the
+ * passed-in parameter values and `run` to do the main operation.
+ * A subclass of GridLocateApp is often used to wrap the driver and
+ * initialize parameters from the command line.
  */
 trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   override type TParam <: GridLocateParameters
@@ -688,7 +690,21 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   lazy protected val the_whitelist = read_whitelist()
 
-  protected def get_create_word_dist_constructor =
+  /** Return a function that will create a WordDistConstructor object,
+   * given a WordDistFactory.
+   *
+   * Currently there are two factory-type objects for word distributions
+   * (language models): WordDistFactory (a lower-level factory to directly
+   * create WordDist objects and handle details of initializing smoothing
+   * models and such) and WordDistConstructor (a high-level factory that
+   * knows how to create and initialize WordDists from source data,
+   * handling issues like stopwords, vocabulary filtering, etc.). The two
+   * factory objects need pointers to each other, and to handle this
+   * needing mutable vars, one needs to create the other in its constructor
+   * function. So, rather than creating a WordDistConstructor ourselves, we
+   * pass in a function to create one when creating a WordDistFactory.
+   */
+  protected def get_word_dist_constructor_creator =
     (factory: WordDistFactory) => {
       if (word_dist_type == "ngram")
         new DefaultNgramWordDistConstructor(
@@ -707,8 +723,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           minimum_word_count = params.minimum_word_count)
     }
 
+  /**
+   * Create a WordDistFactory object of the appropriate kind given
+   * command-line parameters. This is a factory for creating word
+   * distributions, i.e. language models.
+   */
   protected def create_word_dist_factory = {
-    val create_constructor = get_create_word_dist_constructor
+    val create_constructor = get_word_dist_constructor_creator
     if (params.word_dist == "unsmoothed-ngram")
       new UnsmoothedNgramWordDistFactory(create_constructor)
     else if (params.word_dist == "dirichlet")
@@ -722,9 +743,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         params.interpolate, params.tf_idf)
   }
 
+  /**
+   * Create a document factory (GeoDocFactory) for creating documents
+   * (GeoDoc), given factory for creating the word distributions (language
+   * models) associated with the documents.
+   */
   protected def create_document_factory(word_dist_factory: WordDistFactory):
     GeoDocFactory[Co]
 
+  /**
+   * Create an empty cell grid (GeoGrid) given a document factory.
+   */
   protected def create_grid(docfact: GeoDocFactory[Co]): GeoGrid[Co]
 
   /**
@@ -760,6 +789,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
+  /**
+   * Create a cell grid that's populated with the specified training data.
+   * The resulting grid will have a word distribution (language model)
+   * associated with each cell.
+   *
+   * @param get_rawdocs Function to return an iterator over raw training
+   *   documents. This is needed in this form because it may be necessary
+   *   to iterate over the documents multiple times. (For example, when
+   *   creating a Kd tree, the documents need to be processed in order
+   *   to determine the shape of the grid, and then read again to fill in
+   *   the grid cells.)
+   */
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
@@ -791,9 +832,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     grid
   }
 
+  /**
+   * Create a cell grid that's populated with training data, as read from
+   * the corpus (or corpora) specified in the command-line parameters.
+   */
   def initialize_grid = create_grid_from_documents(read_raw_training_documents)
 }
 
+/**
+ * Subclass of GridLocateDriver used specifically for assigning cells
+ * to test documents based on language-model similarity (e.g. for
+ * geolocation). This is essentially an information-retrieval approach,
+ * using language models to model document similarity.
+ */
 trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
   override type TParam <: GridLocateDocParameters
 
@@ -808,6 +859,13 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
 
   }
 
+  /**
+   * Create a strategy object, which returns a ranking over potential
+   * grid cells, given a test document. This is used to locate a test
+   * document in the grid (e.g. for geolocation), generally by comparing
+   * the test document's word distribution (language model) to the
+   * word distribution of each grid cell.
+   */
   def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
     stratname match {
       case "random" =>
@@ -849,6 +907,27 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
+  /**
+   * Create a factory object that will train a scoring classifier
+   * given appropriate training data. The resulting classifier is
+   * typically a linear classifier, which returns a score for a given
+   * feature vector by taking a dot product of the feature vector with
+   * some learned weights. This is used during reranking: The feature
+   * vector describes the compatibility of a test document (a "query")
+   * with a given cell (a "candidate"), where the candidate cells are
+   * the top N cells taken from some initial ranking (as determined
+   * using a strategy object -- see create_strategy). The classifier
+   * is trained using a single-weight multi-label training algorithm,
+   * where the possible "labels" are in fact a set of candidates for
+   * a given training instance, and the algorithm generally tries to
+   * find a set of weights that chooses the correct "label" (candidate)
+   * for all training documents (i.e. a separating hyperplane).
+   * Different algorithms can be used, and the passive-aggressive
+   * algorithms attempt to find not only a separating hyperplace but
+   * one that maximizes the various scoring margins, for each training
+   * document, between the correct candidate for that document and the
+   * top-scoring incorrect ones.
+   */
   protected def create_pointwise_classifier_trainer = {
     val vec_factory = ArrayVector
     params.rerank_classifier match {
@@ -883,6 +962,12 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
+  /**
+   * Used in conjunction with the reranker. Create a candidate-instance
+   * factory that constructs candidate feature vectors for the reranker,
+   * i.e. feature vectors measuring the compatibility between a given
+   * document and a given cell.
+   */
   protected def create_candidate_instance_factory = {
     params.rerank_instance match {
       case "trivial" =>
@@ -904,6 +989,11 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
+  /**
+   * Create a ranker object for ranking test documents. This is currently
+   * the top-level entry point for training a model based on training
+   * documents.
+   */
   def create_ranker: GridRanker[Co] = {
     def basic_ranker =
       new { val strategy =
@@ -981,6 +1071,11 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     }
   }
 
+  /**
+   * Create a grid populated from the specified training documents
+   * (`create_grid_from_documents`), then create a strategy object that
+   * references this grid.
+   */
   def create_strategy_from_documents(
     get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
@@ -988,6 +1083,10 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     create_strategy(params.strategy, grid)
   }
 
+  /**
+   * Output, to a textdb corpus, the results of locating the best cell
+   * for each document in a set of test documents.
+   */
   def output_results(results: Iterator[DocEvalResult[Co]], filehand: FileHandler,
       base: String) {
     val first = results.next

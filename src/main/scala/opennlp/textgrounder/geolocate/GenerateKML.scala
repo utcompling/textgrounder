@@ -145,7 +145,7 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override protected def get_create_word_dist_constructor = {
+  override protected def get_word_dist_constructor_creator = {
     if (word_dist_type != "unigram")
       param_error("Only unigram word distributions supported with GenerateKML")
     (factory: WordDistFactory) =>
