@@ -89,6 +89,8 @@ class ProbabilisticResolver(val logFilePath:String,
       if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0) {
         val toponym = token.asInstanceOf[Toponym]
 
+        //print("\n" + toponym.getForm + " ")
+
         // P(l|t,d_c(t))
         val cellDistGivenLocalContext =
         if(toponymsToModels.containsKey(toponym.getForm)) {
@@ -130,14 +132,20 @@ class ProbabilisticResolver(val logFilePath:String,
           for(i <- 0 until toponym.getAmbiguity) candDist.add(0.0)
         }
 
+        //print("\n"+toponym.getForm+" ")
+
         for(cand <- toponym.getCandidates) {
           val curCellNum = TopoUtil.getCellNumber(cand.getRegion.getCenter, DPC)
+
+          //print(" " + curCellNum)
 
           val localContextComponent =
           if(cellDistGivenLocalContext != null)
             cellDistGivenLocalContext.getOrElse(curCellNum, 0.0)
           else
             0.0
+
+          //print(localContextComponent + " ")
 
           val documentComponent =
           if(cellDistGivenDocument != null && cellDistGivenDocument.size > 0)
@@ -177,6 +185,8 @@ class ProbabilisticResolver(val logFilePath:String,
           else probComponent*/
 
           candDist.set(candIndex, candDist.get(candIndex) + probOfLocation)
+
+          //print(" " + probOfLocation)
 
           if(probOfLocation > maxProb) {
             indexToSelect = candIndex

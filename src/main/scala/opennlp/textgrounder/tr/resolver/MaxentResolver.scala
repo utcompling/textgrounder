@@ -30,7 +30,7 @@ class MaxentResolver(val logFilePath:String,
 
       //println("Found model for "+file.getName.dropRight(4))
 
-      (file.getName.dropRight(4), model)
+      (file.getName.dropRight(4).replaceAll("_", " "), model)
     }).toMap
 
     for(doc <- corpus) {
@@ -39,12 +39,17 @@ class MaxentResolver(val logFilePath:String,
       for(token <- docAsArray) {
         if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0
            && toponymsToModels.containsKey(token.getForm)) {
+          val toponym = token.asInstanceOf[Toponym]
           val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, windowSize, Set[String]())
           //print("Features for "+token.getForm+": ")
           //contextFeatures.foreach(f => print(f+","))
           //println
+          //print("\n" + token.getForm+" ")
           val bestIndex = MaxentResolver.getBestIndex(toponymsToModels(token.getForm), contextFeatures,
-                                           token.asInstanceOf[Toponym].getCandidates.toList, dpc)
+          //                                 token.asInstanceOf[Toponym].getCandidates.toList, dpc)
+          
+          //val bestIndex = MaxentResolver.getCellDist(toponymsToModels(toponym.getForm), contextFeatures,
+                                     toponym.getCandidates.toList, dpc)
           //println("best index for "+token.getForm+": "+bestIndex)
           if(bestIndex != -1)
             token.asInstanceOf[Toponym].setSelectedIdx(bestIndex)
@@ -64,6 +69,7 @@ class MaxentResolver(val logFilePath:String,
 
 object MaxentResolver {
   def getBestIndex(model:AbstractModel, features:Array[String], candidates:List[Location], dpc:Double): Int = {
+    //print(candidates.map(c => TopoUtil.getCellNumber(c.getRegion.getCenter, dpc)) + " ")
     val candCellNums = candidates.map(c => TopoUtil.getCellNumber(c.getRegion.getCenter, dpc)).toSet
     //candCellNums.foreach(println)
     val cellNumToCandIndex = candidates.zipWithIndex
@@ -75,8 +81,12 @@ object MaxentResolver {
     val result = model.eval(features)
     //result.foreach(r => print(r+","))
     //println
+    //features.foreach(f => print(f+","))
+    //result.foreach(r => print(r+" "))
+    //println
     val sortedResult = result.zipWithIndex.sortWith((x, y) => x._1 > y._1)
-    for(i <- 0 until sortedResult.size) {
+    //sortedResult.foreach(r => print(r+" "))
+    for(i <- 0 until sortedResult.size) { // i should never make it past 0
       val label = labels(sortedResult(i)._2).toInt
       if(candCellNums contains label)
         return cellNumToCandIndex(label)
@@ -103,5 +113,6 @@ object MaxentResolver {
     //toReturn.foreach(r => print(r+","))
     //println
     //toReturn
+    
   }
 }
