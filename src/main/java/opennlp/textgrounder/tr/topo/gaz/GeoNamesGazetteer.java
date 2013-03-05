@@ -26,6 +26,7 @@ import opennlp.textgrounder.tr.topo.Region;
 import opennlp.textgrounder.tr.topo.SphericalGeometry;
 import opennlp.textgrounder.tr.util.cluster.Clusterer;
 import opennlp.textgrounder.tr.util.cluster.KMeans;
+import opennlp.textgrounder.tr.util.TopoUtil;
 
 public class GeoNamesGazetteer implements Gazetteer, Serializable {
   /**
@@ -42,15 +43,15 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
   private final Map<String, List<Location>> names;
   private final Map<String, Integer> ipes;
   private final Map<String, Integer> adms;
-  private Map<String, List<Coordinate>> ipePoints; // made mutable so can assign to null when done for faster GC
+  private final Map<String, List<Coordinate>> ipePoints;
   private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
-    this(reader, true, 0.005);
+    this(reader, true, -1.0);
   }
 
   public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions) throws IOException {
-    this(reader, expandRegions, 0.005);
+    this(reader, expandRegions, -1.0);
   }
 
   public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, int kPoints)
@@ -65,7 +66,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
 
   public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints)
     throws IOException {
-    this(reader, expandRegions, pointRatio, minPoints, maxPoints, 2000);
+    this(reader, expandRegions, pointRatio, minPoints, maxPoints, 3000);
   }
 
   public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints, int maxConsidered)
@@ -85,8 +86,8 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
 
     this.load(reader);
     if (this.expandRegions) {
-      this.expandIPE();
-      this.expandADM();
+        this.expandRegionsHelper(this.ipes, this.ipePoints);//this.expandIPE();
+        this.expandRegionsHelper(this.adms, this.admPoints);//this.expandADM();
     }
   }
 
@@ -99,7 +100,51 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     return true;
   }
 
-  private void expandIPE() {
+    private void expandRegionsHelper(Map<String, Integer> regions, Map<String, List<Coordinate>> regionPoints) {
+        Clusterer clusterer = new KMeans();
+
+        System.out.println("Selecting points for " + regions.size() + " regions.");
+        for (String region : regions.keySet()) {
+            Location location = this.locations.get(regions.get(region));
+            List<Coordinate> contained = regionPoints.get(region);// ALL points in e.g. USA
+            
+            int k = 0;
+            
+            if(this.pointRatio > 0) {
+                k = (int) Math.floor(contained.size() * this.pointRatio);
+                if (k < this.minPoints) {
+                    k = this.minPoints;
+                }
+                if (k > this.maxPoints) {
+                    k = this.maxPoints;
+                }
+            }
+
+            if(contained.size() > this.maxConsidered) {
+                Collections.shuffle(contained);
+                contained = contained.subList(0, this.maxConsidered);
+            }
+
+            if(this.pointRatio <= 0) {
+                Set<Integer> cellsOverlapped = new HashSet<Integer>();
+                for(Coordinate coord : contained)
+                    cellsOverlapped.add(TopoUtil.getCellNumber(coord, 1.0));
+                k = cellsOverlapped.size() / 4;
+                if(k < 1) k = 1;
+                System.out.println(location.getName() + " " + k);
+            }
+            
+            if (contained.size() > 0) {
+                List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+                representatives = Coordinate.removeNaNs(representatives);
+                location.setRegion(new PointSetRegion(representatives));
+                location.recomputeThreshold();
+            }
+        }
+    }
+
+
+    /*private void expandIPE() {
     Clusterer clusterer = new KMeans();
 
     System.out.println("Selecting points for " + this.ipes.size() + " independent political entities.");
@@ -107,12 +152,22 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
       Location location = this.locations.get(this.ipes.get(ipe));
       List<Coordinate> contained = this.ipePoints.get(ipe);// ALL points in e.g. USA
 
-      int k = (int) Math.floor(contained.size() * this.pointRatio);
-      if (k < this.minPoints) {
-        k = this.minPoints;
+      int k = 0;
+
+      if(this.pointRatio > 0) {
+          k = (int) Math.floor(contained.size() * this.pointRatio);
+          if (k < this.minPoints) {
+              k = this.minPoints;
+          }
+          if (k > this.maxPoints) {
+              k = this.maxPoints;
+          }
       }
-      if (k > this.maxPoints) {
-        k = this.maxPoints;
+      else {
+          Set<Integer> cellsOverlapped = new HashSet<Integer>();
+          for(Coordinate coord : contained)
+              cellsOverlapped.add(TopoUtil.getCellNumber(coord, 1.0));
+          k = cellsOverlapped.size();
       }
 
       //System.err.format("Clustering: %d points for %s.\n", k, location.getName());
@@ -168,7 +223,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
         }
       }
     }
-  }
+    }*/
 
   private String standardize(String name) {
     return name.toLowerCase().replace("’", "'");

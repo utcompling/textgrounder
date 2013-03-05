@@ -46,10 +46,10 @@ class MaxentResolver(val logFilePath:String,
           //println
           //print("\n" + token.getForm+" ")
           val bestIndex = MaxentResolver.getBestIndex(toponymsToModels(token.getForm), contextFeatures,
-          //                                 token.asInstanceOf[Toponym].getCandidates.toList, dpc)
+                                             toponym.getCandidates.toList, dpc)
           
           //val bestIndex = MaxentResolver.getCellDist(toponymsToModels(toponym.getForm), contextFeatures,
-                                     toponym.getCandidates.toList, dpc)
+          //                           toponym.getCandidates.toList, dpc)
           //println("best index for "+token.getForm+": "+bestIndex)
           if(bestIndex != -1)
             token.asInstanceOf[Toponym].setSelectedIdx(bestIndex)
