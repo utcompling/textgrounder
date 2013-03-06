@@ -16,10 +16,17 @@ public class SignatureEvaluator extends Evaluator {
     private static final double FP_PENALTY = 20037.5;
     private static final double FN_PENALTY = 20037.5;
 
+    private boolean doOracleEval;
+
     private Map<String, List<Location> > predCandidates = new HashMap<String, List<Location> >();
 
-    public SignatureEvaluator(Corpus goldCorpus) {
+    public SignatureEvaluator(Corpus goldCorpus, boolean doOracleEval) {
         super(goldCorpus);
+        this.doOracleEval = doOracleEval;
+    }
+
+    public SignatureEvaluator(Corpus goldCorpus) {
+        this(goldCorpus, false);
     }
 
     public Report evaluate() {
@@ -93,7 +100,7 @@ public class SignatureEvaluator extends Evaluator {
                 Location goldLoc = goldLocs.get(context);
                 Location predLoc = predLocs.get(context);
 
-                if(predLoc != null) {
+                if(predLoc != null && !doOracleEval) {
                     double dist = goldLoc.distanceInKm(predLoc);
                     dreport.addDistance(dist);
                     String key = goldLoc.getName().toLowerCase();
@@ -102,15 +109,24 @@ public class SignatureEvaluator extends Evaluator {
                     errors.get(key).add(dist);
                 }
 
-                if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
-                    //System.out.println("TP: " + context + "|" + goldLocs.get(context));
-                    report.incrementTP();
+                if(doOracleEval) {
+                    if(predCandidates.get(context).size() > 0) {
+                        Location closestMatch = getClosestMatch(goldLoc, predCandidates.get(context));
+                        dreport.addDistance(goldLoc.distanceInKm(closestMatch));
+                        report.incrementTP();
+                    }
                 }
                 else {
-                    //System.out.println("FP and FN: " + context + "|" + goldLocs.get(context) + " vs. " + predLocs.get(context));
-                    //report.incrementFP();
-                    //report.incrementFN();
-                    report.incrementFPandFN();
+                    if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
+                        //System.out.println("TP: " + context + "|" + goldLocs.get(context));
+                        report.incrementTP();
+                    }
+                    else {
+                        //System.out.println("FP and FN: " + context + "|" + goldLocs.get(context) + " vs. " + predLocs.get(context));
+                        //report.incrementFP();
+                        //report.incrementFN();
+                        report.incrementFPandFN();
+                    }
                 }
             }
             else {
@@ -161,6 +177,21 @@ public class SignatureEvaluator extends Evaluator {
                 return false;
         }
         return true;
+    }
+
+    private Location getClosestMatch(Location goldLoc, List<Location> curPredCandidates) {
+        double minDist = Double.POSITIVE_INFINITY;
+        Location toReturn = null;
+
+        for(Location otherLoc : curPredCandidates) {
+            double dist = otherLoc.distance(goldLoc);
+            if(dist < minDist) {
+                minDist = dist;
+                toReturn = otherLoc;
+            }
+        }
+
+        return toReturn;
     }
 
     private String getSignature(StringBuffer wholeContext, int centerIndex, int windowSize) {

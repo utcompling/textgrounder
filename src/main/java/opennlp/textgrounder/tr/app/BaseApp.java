@@ -33,6 +33,8 @@ public class BaseApp {
     private boolean dgProbOnly = false;
     private boolean meProbOnly = false;
 
+    private boolean doOracleEval = false;
+
     private int sentsPerDocument = -1;
 
     private boolean highRecallNER = false;
@@ -101,6 +103,8 @@ public class BaseApp {
         options.addOption("sco", "serialized-corpus-output-path", true, "path to serialized corpus for output");
         //options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
         options.addOption("cf", "corpus-format", true, "corpus format (Plain, TrCoNLL, GeoText) [default = Plain]");
+
+        options.addOption("oracle", "oracle", false, "use oracle evaluation");
 
         options.addOption("spd", "sentences-per-document", true, "sentences per document (-1 for unlimited) [default = -1]");
 
@@ -185,6 +189,8 @@ public class BaseApp {
                         dKmlOutputPath = value;
                     else if(option.getOpt().equals("os"))
                         seedOutputPath = value;
+                    else if(option.getOpt().equals("oracle"))
+                        doOracleEval = true;
                     break;
                 case 'r':
                     if(option.getOpt().equals("r")) {
@@ -426,6 +432,10 @@ public class BaseApp {
 
     public boolean getMEProbOnly() {
         return meProbOnly;
+    }
+
+    public boolean getDoOracleEval() {
+        return doOracleEval;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {
