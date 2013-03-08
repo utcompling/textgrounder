@@ -108,7 +108,7 @@ public class WeightedMinDistResolver extends Resolver {
             // Backoff to Random:
             Resolver randResolver = new RandomResolver();
             randResolver.overwriteSelecteds = false;
-            //disambiguated = randResolver.disambiguate(corpus);
+            disambiguated = randResolver.disambiguate(corpus);
         }
 
         return disambiguated;
