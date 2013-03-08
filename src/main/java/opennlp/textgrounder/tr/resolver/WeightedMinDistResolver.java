@@ -46,7 +46,7 @@ public class WeightedMinDistResolver extends Resolver {
     @Override
     public void train(StoredCorpus corpus) {
 
-        distanceTable = new DistanceTable(corpus.getToponymTypeCount());
+        distanceTable = new DistanceTable();//corpus.getToponymTypeCount());
 
         toponymLexicon = TopoUtil.buildLexicon(corpus);
         List<List<Integer> > counts = new ArrayList<List<Integer> >(toponymLexicon.size());
@@ -108,7 +108,7 @@ public class WeightedMinDistResolver extends Resolver {
             // Backoff to Random:
             Resolver randResolver = new RandomResolver();
             randResolver.overwriteSelecteds = false;
-            disambiguated = randResolver.disambiguate(corpus);
+            //disambiguated = randResolver.disambiguate(corpus);
         }
 
         return disambiguated;
@@ -326,7 +326,9 @@ public class WeightedMinDistResolver extends Resolver {
             */
             //double normalizationDenom = normalizationDenoms.get(otherToponym);
 
-            double weightedDist = distanceTable.getDistance(toponym, locationIndex, otherToponym, otherLocIndex);//candidate.distance(otherLoc) /* / weights.get(otherLoc) */ ;
+            //double weightedDist = distanceTable.getDistance(toponym, locationIndex, otherToponym, otherLocIndex);//candidate.distance(otherLoc) /* / weights.get(otherLoc) */ ;
+            //double weightedDist = candidate.distance(otherLoc);
+            double weightedDist = distanceTable.distance(candidate, otherLoc);
             double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIndex);
             double otherWeight = weights.get(lexicon.get(otherToponym.getForm())).get(otherLocIndex);
             weightedDist /= (thisWeight * otherWeight); // weighting; was just otherWeight before
@@ -373,7 +375,7 @@ public class WeightedMinDistResolver extends Resolver {
         return dist;
     }*/
 
-    private class DistanceTable {
+    /*private class DistanceTable {
         //private double[][][][] allDistances;
 
         public DistanceTable(int numToponymTypes) {
@@ -384,7 +386,7 @@ public class WeightedMinDistResolver extends Resolver {
 
             return t1.getCandidates().get(i1).distance(t2.getCandidates().get(i2));
             
-            /*int t1idx = t1.getIdx();
+            /* int t1idx = t1.getIdx();
             int t2idx = t2.getIdx();
 
             double[][] distanceMatrix = allDistances[t1idx][t2idx];
@@ -395,16 +397,16 @@ public class WeightedMinDistResolver extends Resolver {
                         distanceMatrix[i][j] = t1.getCandidates().get(i).distance(t2.getCandidates().get(j));
                     }
                 }
-            }*/
+            }*SLASH
             /*double distance = distanceMatrix[i1][i2];
             if(distance == 0.0) {
                 distance = t1.getCandidates().get(i1).distance(t2.getCandidates().get(i2));
                 distanceMatrix[i1][i2] = distance;
-            }*/
+            }*SLASH
             //return distanceMatrix[i1][i2];
             
         }
 
         //public
-    }
+    }*/
 }
