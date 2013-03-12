@@ -129,7 +129,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
                 Set<Integer> cellsOverlapped = new HashSet<Integer>();
                 for(Coordinate coord : contained)
                     cellsOverlapped.add(TopoUtil.getCellNumber(coord, 1.0));
-                k = cellsOverlapped.size() / 4;
+                k = cellsOverlapped.size();// / 4;
                 if(k < 1) k = 1;
                 System.out.println(location.getName() + " " + k);
             }

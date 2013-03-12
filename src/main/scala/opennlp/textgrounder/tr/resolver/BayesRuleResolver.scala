@@ -19,7 +19,7 @@ class BayesRuleResolver(val logFilePath:String,
   val WINDOW_SIZE = 20
 
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
-
+/*
     val modelDir = new File(modelDirPath)
 
     val toponymsToModels:Map[String, AbstractModel] =
@@ -107,7 +107,7 @@ class BayesRuleResolver(val logFilePath:String,
     val docDistResolver = new DocDistResolver(logFilePath)
     docDistResolver.overwriteSelecteds = false
     docDistResolver.disambiguate(corpus)
-
+*/
     corpus
   }
 }

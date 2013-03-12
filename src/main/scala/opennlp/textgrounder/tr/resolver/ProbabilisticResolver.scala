@@ -92,17 +92,20 @@ class ProbabilisticResolver(val logFilePath:String,
         //print("\n" + toponym.getForm + " ")
 
         // P(l|t,d_c(t))
-        val cellDistGivenLocalContext =
+        val candDistGivenLocalContext =
         if(toponymsToModels.containsKey(toponym.getForm)) {
           val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, WINDOW_SIZE, Set[String]())
 
+          MaxentResolver.getIndexToWeightMap(toponymsToModels(toponym.getForm), contextFeatures)
+
           //println("getting a cell dist for "+toponym.getForm)
 
-          /*val d = */MaxentResolver.getCellDist(toponymsToModels(toponym.getForm), contextFeatures,
-                                     toponym.getCandidates.toList, DPC)
+          /*val d = */ //MaxentResolver.getIndexToWeightMap(toponymsToModels(toponym.getForm), contextFeatures)
           //println(d.size)
           //d.foreach(println)
           //d
+
+          
         }
         else
           null
@@ -140,8 +143,8 @@ class ProbabilisticResolver(val logFilePath:String,
           //print(" " + curCellNum)
 
           val localContextComponent =
-          if(cellDistGivenLocalContext != null)
-            cellDistGivenLocalContext.getOrElse(curCellNum, 0.0)
+          if(candDistGivenLocalContext != null)
+            candDistGivenLocalContext.getOrElse(candIndex, 0.0)
           else
             0.0
 
