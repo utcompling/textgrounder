@@ -95,7 +95,7 @@ object MaxentResolver {
     }
     -1*/
 
-    getIndexToWeightMap(model, features).toList.sortBy(_._2).get(0)._1
+    getIndexToWeightMap(model, features).maxBy(_._2)._1//.toList.sortBy(_._2).get(0)._1
   }
 
   def getIndexToWeightMap(model:AbstractModel, features:Array[String]): Map[Int, Double] = {

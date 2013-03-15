@@ -126,7 +126,7 @@ public class RunResolver extends BaseApp {
             resolver = new LabelPropComplexResolver(currentRun.getGraphInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.MAXENT) {
-            System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath() + " ...");
+            System.out.println("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath() + " ...");
             resolver = new MaxentResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
@@ -143,6 +143,11 @@ public class RunResolver extends BaseApp {
             System.out.println("Running HEURISTIC TPP resolver...");
 
             resolver = new HeuristicTPPResolver();
+        }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.SIMPLE_GRID_TPP) {
+            System.out.println("Running SIMPLE GRID TPP resolver with " + currentRun.getDPC() + " degrees per cell...");
+
+            resolver = new SimpleGridTPPResolver(currentRun.getDPC());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

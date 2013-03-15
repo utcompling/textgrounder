@@ -56,7 +56,7 @@ public class TopoUtil {
             /*int x = (int) ((coord.getLng() + 180.0) / dpc);
               int y = (int) ((coord.getLat() + 90.0) / dpc);*/
 
-            cellNumbers.add(getCellNumber(coord.getLat(), coord.getLng(), dpc)/*x * 1000 + y*/);
+            cellNumbers.add(getCellNumber(coord.getLatDegrees(), coord.getLngDegrees(), dpc)/*x * 1000 + y*/);
         }
 
         return cellNumbers;

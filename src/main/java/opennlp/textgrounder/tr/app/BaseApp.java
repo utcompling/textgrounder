@@ -53,6 +53,8 @@ public class BaseApp {
 
     private int knnForLP = -1;
 
+    private double dpc = 1;
+
     public static enum RESOLVER_TYPE {
         RANDOM,
         POPULATION,
@@ -67,6 +69,7 @@ public class BaseApp {
         MAXENT,
         PROB,
         BAYES_RULE,
+        SIMPLE_GRID_TPP,
         HEURISTIC_TPP
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
@@ -133,8 +136,10 @@ public class BaseApp {
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
-        options.addOption("l", "log file input", true, "log file input, from document geolocation");
+        options.addOption("l", "log-file-input", true, "log file input, from document geolocation");
         options.addOption("knn", "knn", true, "k nearest neighbors to consider from document geolocation log file");
+
+        options.addOption("dpc", "degrees-per-cell", true, "degrees per cell for grid-based TPP resolvers");
 
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
@@ -220,6 +225,8 @@ public class BaseApp {
                             resolverType = RESOLVER_TYPE.BAYES_RULE;
                         else if(value.toLowerCase().startsWith("h"))
                             resolverType = RESOLVER_TYPE.HEURISTIC_TPP;
+                        else if(value.toLowerCase().startsWith("s"))
+                            resolverType = RESOLVER_TYPE.SIMPLE_GRID_TPP;
                         else
                             resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     }
@@ -281,7 +288,10 @@ public class BaseApp {
                         setHighRecallNER(new Integer(value)!=0);
                     break;
                 case 'd':
-                    doKMeans = true;
+                    if(option.getOpt().equals("dkm"))
+                        doKMeans = true;
+                    else if(option.getOpt().equals("dpc"))
+                        dpc = Double.parseDouble(value);
                     break;
                 case 'p':
                     if(option.getOpt().equals("pc"))
@@ -436,6 +446,10 @@ public class BaseApp {
 
     public boolean getDoOracleEval() {
         return doOracleEval;
+    }
+
+    public double getDPC() {
+        return dpc;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {
