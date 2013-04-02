@@ -26,6 +26,14 @@ object TextUtil {
     }).flatten.toArray
   }
 
+  def getDocAsArrayNoFilter(doc:Document[StoredToken]): Array[StoredToken] = {
+    (for(sent <- doc) yield {
+      (for(token <- sent/*.filter(t => alphanumRE.findFirstIn(t.getForm) != None)*/) yield {
+        token
+      })
+    }).flatten.toArray
+  }
+
   def getContextFeatures(docAsArray:Array[Token], tokIndex:Int, windowSize:Int, stoplist:Set[String]): Array[String] = {
     val startIndex = math.max(0, tokIndex - windowSize)
     val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)

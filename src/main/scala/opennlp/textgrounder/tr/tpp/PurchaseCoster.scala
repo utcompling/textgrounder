@@ -2,5 +2,5 @@ package opennlp.textgrounder.tr.tpp
 
 abstract class PurchaseCoster {
 
-  def apply(m:Market, tm:PotentialLocation): Double
+  def apply(m:Market, potLoc:PotentialLocation): Double
 }

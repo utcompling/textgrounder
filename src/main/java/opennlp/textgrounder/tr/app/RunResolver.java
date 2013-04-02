@@ -144,10 +144,10 @@ public class RunResolver extends BaseApp {
 
             resolver = new HeuristicTPPResolver();
         }
-        else if(currentRun.getResolverType() == RESOLVER_TYPE.SIMPLE_GRID_TPP) {
-            System.out.println("Running SIMPLE GRID TPP resolver with " + currentRun.getDPC() + " degrees per cell...");
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.CONSTRUCTION_TPP) {
+            System.out.println("Running CONSTRUCTION TPP resolver with " + currentRun.getDPC() + " degrees per cell...");
 
-            resolver = new SimpleGridTPPResolver(currentRun.getDPC());
+            resolver = new ConstructionTPPResolver(currentRun.getDPC(), testCorpus, currentRun.getMaxentModelDirInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

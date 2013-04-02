@@ -9,7 +9,7 @@ class TPPInstance(val purchaseCoster:PurchaseCoster,
 }
 
 class Market(val id:Int,
-             val locations:Set[PotentialLocation]) {
+             val locations:Map[ToponymMention, PotentialLocation]) {
 
   def size = locations.size
 }

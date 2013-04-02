@@ -69,7 +69,7 @@ public class BaseApp {
         MAXENT,
         PROB,
         BAYES_RULE,
-        SIMPLE_GRID_TPP,
+        CONSTRUCTION_TPP,
         HEURISTIC_TPP
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
@@ -225,8 +225,8 @@ public class BaseApp {
                             resolverType = RESOLVER_TYPE.BAYES_RULE;
                         else if(value.toLowerCase().startsWith("h"))
                             resolverType = RESOLVER_TYPE.HEURISTIC_TPP;
-                        else if(value.toLowerCase().startsWith("s"))
-                            resolverType = RESOLVER_TYPE.SIMPLE_GRID_TPP;
+                        else if(value.toLowerCase().startsWith("c"))
+                            resolverType = RESOLVER_TYPE.CONSTRUCTION_TPP;
                         else
                             resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     }

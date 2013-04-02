@@ -115,6 +115,15 @@ public class KMLUtil {
     w.writeEndElement(); // Style
 
     w.writeStartElement("Style");
+    w.writeAttribute("id", "white");
+    w.writeStartElement("IconStyle");
+    w.writeStartElement("Icon");
+    KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/wht-blank-lv.png");
+    w.writeEndElement(); // Icon
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
     w.writeAttribute("id", "downArrowIcon");
     w.writeStartElement("IconStyle");
     w.writeStartElement("Icon");
@@ -243,7 +252,7 @@ public class KMLUtil {
     public static void writePinPlacemark(XMLStreamWriter w, String name,
                                          Coordinate coord, String styleUrl) throws XMLStreamException {
         w.writeStartElement("Placemark");
-        //KMLUtil.writeWithCharacters(w, "name", name);
+        KMLUtil.writeWithCharacters(w, "name", name);
         //KMLUtil.writeRegion(w, coord, radius);
         if(styleUrl != null && styleUrl.length() > 0)
             KMLUtil.writeWithCharacters(w, "styleUrl", "#"+styleUrl);

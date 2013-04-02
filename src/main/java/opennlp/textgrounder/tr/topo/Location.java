@@ -196,5 +196,10 @@ public class Location implements Serializable {
            other.getClass() == this.getClass() &&
            ((Location) other).id == this.id;
   }
+
+  @Override
+  public int hashCode() {
+    return this.id;
+  }
 }
 
