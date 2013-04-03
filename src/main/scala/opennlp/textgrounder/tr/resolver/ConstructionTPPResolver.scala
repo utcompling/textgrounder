@@ -9,13 +9,14 @@ import java.util._
 
 import scala.collection.JavaConversions._
 
-class ConstructionTPPResolver(val dpc:Double, val corpus:StoredCorpus, val modelDirPath:String) extends TPPResolver(new TPPInstance(/*new SimpleContainmentPurchaseCoster*/new MaxentPurchaseCoster(corpus, modelDirPath), new SimpleDistanceTravelCoster)) {
+class ConstructionTPPResolver(val dpc:Double, val threshold:Double, val corpus:StoredCorpus, val modelDirPath:String) extends TPPResolver(new TPPInstance(/*new SimpleContainmentPurchaseCoster*/new MaxentPurchaseCoster(corpus, modelDirPath), new SimpleDistanceTravelCoster)) {
 
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
 
     for(doc <- corpus) {
 
-      tppInstance.markets = (new GridMarketCreator(doc, dpc)).apply
+      //tppInstance.markets = (new GridMarketCreator(doc, dpc)).apply
+      tppInstance.markets = (new ClusterMarketCreator(doc, threshold)).apply
 
       // Apply a TPPSolver
       val solver = new ConstructionTPPSolver

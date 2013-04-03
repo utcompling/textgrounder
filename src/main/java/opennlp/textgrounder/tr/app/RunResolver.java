@@ -145,9 +145,9 @@ public class RunResolver extends BaseApp {
             resolver = new HeuristicTPPResolver();
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.CONSTRUCTION_TPP) {
-            System.out.println("Running CONSTRUCTION TPP resolver with " + currentRun.getDPC() + " degrees per cell...");
+            System.out.println("Running CONSTRUCTION TPP resolver...");
 
-            resolver = new ConstructionTPPResolver(currentRun.getDPC(), testCorpus, currentRun.getMaxentModelDirInputPath());
+            resolver = new ConstructionTPPResolver(currentRun.getDPC(), currentRun.getThreshold(), testCorpus, currentRun.getMaxentModelDirInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

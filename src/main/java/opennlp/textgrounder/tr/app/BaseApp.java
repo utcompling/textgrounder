@@ -54,6 +54,7 @@ public class BaseApp {
     private int knnForLP = -1;
 
     private double dpc = 1;
+    private double threshold = 2000.0;
 
     public static enum RESOLVER_TYPE {
         RANDOM,
@@ -140,6 +141,7 @@ public class BaseApp {
         options.addOption("knn", "knn", true, "k nearest neighbors to consider from document geolocation log file");
 
         options.addOption("dpc", "degrees-per-cell", true, "degrees per cell for grid-based TPP resolvers");
+        options.addOption("t", "threshold", true, "threshold in kilometers for agglomerative clustering");
 
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
@@ -292,6 +294,9 @@ public class BaseApp {
                         doKMeans = true;
                     else if(option.getOpt().equals("dpc"))
                         dpc = Double.parseDouble(value);
+                    break;
+                case 't':
+                    threshold = Double.parseDouble(value);
                     break;
                 case 'p':
                     if(option.getOpt().equals("pc"))
@@ -450,6 +455,10 @@ public class BaseApp {
 
     public double getDPC() {
         return dpc;
+    }
+
+    public double getThreshold() {
+        return threshold;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {
