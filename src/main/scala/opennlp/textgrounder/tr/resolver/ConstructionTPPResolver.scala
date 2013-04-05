@@ -5,18 +5,28 @@ import opennlp.textgrounder.tr.text._
 import opennlp.textgrounder.tr.topo._
 import opennlp.textgrounder.tr.util._
 
-import java.util._
+import java.util.ArrayList
 
 import scala.collection.JavaConversions._
 
-class ConstructionTPPResolver(val dpc:Double, val threshold:Double, val corpus:StoredCorpus, val modelDirPath:String) extends TPPResolver(new TPPInstance(/*new SimpleContainmentPurchaseCoster*/new MaxentPurchaseCoster(corpus, modelDirPath), new SimpleDistanceTravelCoster)) {
+class ConstructionTPPResolver(val dpc:Double,
+                              val threshold:Double,
+                              val corpus:StoredCorpus,
+                              val modelDirPath:String)
+  extends TPPResolver(new TPPInstance(
+    //new MaxentPurchaseCoster(corpus, modelDirPath),
+    new MultiPurchaseCoster(List(new GaussianPurchaseCoster,//new SimpleContainmentPurchaseCoster,
+                                 new MaxentPurchaseCoster(corpus, modelDirPath))),
+    new SimpleDistanceTravelCoster)) {
 
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
 
     for(doc <- corpus) {
 
-      //tppInstance.markets = (new GridMarketCreator(doc, dpc)).apply
-      tppInstance.markets = (new ClusterMarketCreator(doc, threshold)).apply
+      if(threshold < 0)
+        tppInstance.markets = (new GridMarketCreator(doc, dpc)).apply
+      else
+        tppInstance.markets = (new ClusterMarketCreator(doc, threshold)).apply
 
       // Apply a TPPSolver
       val solver = new ConstructionTPPSolver

@@ -12,6 +12,12 @@ class Market(val id:Int,
              val locations:Map[ToponymMention, PotentialLocation]) {
 
   def size = locations.size
+
+  lazy val centroid: Coordinate = {
+    val lat:Double = locations.map(_._2.loc.getRegion.getCenter.getLat).sum/locations.size
+    val lng:Double = locations.map(_._2.loc.getRegion.getCenter.getLng).sum/locations.size
+    Coordinate.fromRadians(lat, lng)
+  }
 }
 
 class PotentialLocation(val docId:String,

@@ -42,8 +42,8 @@ class MaxentPurchaseCoster(corpus:StoredCorpus, modelDirPath:String) extends Pur
           for((gazIndex, weight) <- indexToWeightMap.toList.sortBy(_._1)) {
             val loc = toponym.getCandidates.get(gazIndex)
             val potLoc = new PotentialLocation(doc.getId, tokIndex, gazIndex, loc)
-            //println(" "+gazIndex+": "+(1/weight))
-            potLocsToCosts.put(potLoc, 1/weight) // Here's where the cost is defined in terms of the probability mass
+            //println(" "+gazIndex+": "+(1.0-weight))
+            potLocsToCosts.put(potLoc, 1.0-weight) // Here's where the cost is defined in terms of the probability mass
           }
           
         }
@@ -52,10 +52,10 @@ class MaxentPurchaseCoster(corpus:StoredCorpus, modelDirPath:String) extends Pur
   }
   
   def apply(m:Market, potLoc:PotentialLocation): Double = {
-    if(m.locations.map(_._2).toSet.contains(potLoc)) {
-      potLocsToCosts.getOrElse(potLoc, 10.0) // Not sure what the default cost should be
-    }
-    else
-      Double.PositiveInfinity
+    //if(m.locations.map(_._2).toSet.contains(potLoc)) {
+      potLocsToCosts.getOrElse(potLoc, 1.0) // Not sure what the default cost should be
+    //}
+    //else
+    //  Double.PositiveInfinity
   }
 }

@@ -53,8 +53,8 @@ public class BaseApp {
 
     private int knnForLP = -1;
 
-    private double dpc = 1;
-    private double threshold = 2000.0;
+    private double dpc = 10;
+    private double threshold = -1.0; // sentinel value indicating NOT to use threshold, not real default
 
     public static enum RESOLVER_TYPE {
         RANDOM,
