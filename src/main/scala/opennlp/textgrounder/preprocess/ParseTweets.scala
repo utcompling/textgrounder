@@ -207,8 +207,8 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     2. A field set, meaning to include those fields; currently the recognized
        sets are 'big-fields' (fields that may become arbitrarily large,
-       including 'user-mentions', 'retweets', 'hashtags', 'urls', 'text',
-       'count') and 'small-fields' (all remaining fields).
+       including 'positions', 'user-mentions', 'retweets', 'hashtags', 'urls',
+       'text', 'count') and 'small-fields' (all remaining fields).
 
     3. A field name or field set with a preceding + sign, same as if the
        + sign were omitted.
@@ -250,6 +250,11 @@ Look for any tweets containing the word "clinton" as well as either the words
     'lang': Language used
 
     'numtweets': Number of tweets merged
+
+    'positions': List of all lat/long positions of users, along with
+      timestamps
+
+    'num-positions': Number of items listed in 'positions'
 
     'user-mentions': List of @-mentions of users, along with counts
 
@@ -421,6 +426,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    * @param following Max following
    * @param lang Language used
    * @param numtweets Number of tweets merged
+   * @param positions Map of timestamps and positions
    * @param user_mentions Item-count map of all @-mentions
    * @param retweets Like `user_mentions` but only for retweet mentions
    * @param hashtags Item-count map of hashtags
@@ -441,6 +447,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     following: Int,
     lang: String,
     numtweets: Int,
+    positions: Map[Timestamp, String],
     user_mentions: Map[String, Int],
     retweets: Map[String, Int],
     hashtags: Map[String, Int],
@@ -476,6 +483,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "following" => int(following)
           case "lang" => string(lang)
           case "numtweets" => int(numtweets)
+          case "positions" => {
+            val strmap =
+              positions.toSeq sortWith (_._1 < _._1) map {
+                case (timestamp, coord) => (timestamp.toString, coord)
+              }
+            string_map_seq(strmap)
+          }
+          case "num-positions" => int(positions.size)
           case "user-mentions" => count_map(user_mentions)
           case "retweets" => count_map(retweets)
           case "hashtags" => count_map(hashtags)
@@ -494,10 +509,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val small_fields =
       Seq("user", "id", "path", "min-timestamp", "max-timestamp",
         "geo-timestamp", "coord", "followers", "following", "lang",
-        "numtweets")
+        "numtweets", "num-positions")
 
     val big_fields =
-      Seq("user-mentions", "retweets", "hashtags", "urls", "text", "counts")
+      Seq("positions", "user-mentions", "retweets", "hashtags", "urls",
+        "text", "counts")
 
     val all_fields = small_fields ++ big_fields
 
@@ -529,6 +545,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var following = 0
       var lang = ""
       var numtweets = 1
+      var positions = Map[Timestamp, String]()
       var user_mentions = empty_map
       var retweets = empty_map
       var hashtags = empty_map
@@ -559,6 +576,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "following"     => following = int(x)
           case "lang"          => lang = string(x)
           case "numtweets"     => numtweets = int(x)
+          case "positions"     => {
+            val strmap = string_map(x)
+            strmap map {
+              case (ts, coord) => (timestamp(x), coord)
+            }
+          }
+          case "num-positions" =>
+            { } // We don't record as it duplicates info in 'positions'
           case "user-mentions" => user_mentions = count_map(x)
           case "retweets"      => retweets = count_map(x)
           case "hashtags"      => hashtags = count_map(x)
@@ -572,12 +597,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
       Tweet(json, path, text, user, id, min_timestamp, max_timestamp,
         geo_timestamp, lat, long, followers, following, lang, numtweets,
-        user_mentions, retweets, hashtags, urls)
+        positions, user_mentions, retweets, hashtags, urls)
     }
 
     def from_raw_text(path: String, text: String) = {
       Tweet("", path, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
-        1, empty_map, empty_map,
+        1, Map[Timestamp, String](), empty_map, empty_map,
         empty_map, empty_map)
     }
   }
@@ -845,7 +870,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val tweet =
         Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
           timestamp, NaN, NaN, 0, 0, "unknown", 1,
-          empty_map, empty_map, empty_map, empty_map)
+          Map[Timestamp, String](), empty_map, empty_map, empty_map, empty_map)
       test(args(0), tweet)
     }
   }
@@ -1053,6 +1078,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
               (latlong(1).doubleValue, latlong(0).doubleValue)
             }
 
+          val positions = if (lat.isNaN || long.isNaN)
+            Map[Timestamp, String]()
+          else
+            Map(timestamp -> ("%s,%s" format (lat, long)))
+
           /////////////// HANDLE ENTITIES
 
           /* Entity types:
@@ -1139,7 +1169,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
             Tweet(if (opts.output_format == "json") line else "",
               path, Seq(text), user, tweet_id.toLong, timestamp,
               timestamp, timestamp, lat, long, followers, following, lang, 1,
-              user_mentions, retweets, hashtags, urls))
+              positions, user_mentions, retweets, hashtags, urls))
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -1376,6 +1406,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         if (opts.included_fields contains "text")
           t1.text ++ t2.text
         else Seq[String]()
+      val positions =
+        if (opts.included_fields contains "positions")
+          t1.positions ++ t2.positions
+        else Map[Timestamp,String]()
       val user_mentions =
         if (opts.included_fields contains "user-mentions")
           combine_maps(t1.user_mentions, t2.user_mentions)
@@ -1412,7 +1446,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val tweet =
         Tweet("", path, text, t1.user, id, min_timestamp, max_timestamp,
           geo_timestamp, lat, long, followers, following, lang, numtweets,
-          user_mentions, retweets, hashtags, urls)
+          positions, user_mentions, retweets, hashtags, urls)
       Record(tw1.output_key, "", tw1.matches || tw2.matches, tweet)
     }
 
