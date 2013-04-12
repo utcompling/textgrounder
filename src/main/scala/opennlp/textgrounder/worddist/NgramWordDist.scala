@@ -400,7 +400,7 @@ class DefaultNgramWordDistConstructor(
     var addedTokens = 0
     var totalTokens = 0
     for ((egram, count) <- grams) {
-      val ngram = textdb.decode_ngram_for_count_map_field(egram)
+      val ngram = textdb.decode_ngram_for_map_field(egram)
       if (add_ngram_with_count(dist, ngram, count)) {
         addedTypes += 1
         addedTokens += count

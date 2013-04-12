@@ -666,7 +666,7 @@ package object textdb {
       decode_chars_regex.replaceAllIn(str, m => decode_chars_map(m.matched))
   }
 
-  private val endec_string_for_count_map_field =
+  private val endec_string_for_map_field =
     new EncodeDecode(Seq('%', ':', ' ', '\t', '\n', '\r', '\f'))
   private val endec_string_for_sequence_field =
     new EncodeDecode(Seq('%', '>', '\t', '\n', '\r', '\f'))
@@ -688,31 +688,31 @@ package object textdb {
    * unnecessary and would make the raw files harder to read.  In the case of
    * HTML-style encoding, : isn't even escaped, so that wouldn't work at all.
    */
-  def encode_string_for_count_map_field(word: String) =
-    endec_string_for_count_map_field.encode(word)
+  def encode_string_for_map_field(word: String) =
+    endec_string_for_map_field.encode(word)
 
   /**
    * Encode an n-gram into text suitable for an n-gram-counts field.
    The
    * individual words are separated by colons, and each word is encoded
-   * using `encode_string_for_count_map_field`.  We need to encode '\n'
+   * using `encode_string_for_map_field`.  We need to encode '\n'
    * (record separator), '\t' (field separator), ' ' (separator between
    * word/count pairs), ':' (separator between word and count),
    * '%' (encoding indicator).
    */
-  def encode_ngram_for_count_map_field(ngram: Iterable[String]) = {
-    ngram.map(encode_string_for_count_map_field) mkString ":"
+  def encode_ngram_for_map_field(ngram: Iterable[String]) = {
+    ngram.map(encode_string_for_map_field) mkString ":"
   }
 
   /**
-   * Decode a word encoded using `encode_string_for_count_map_field`.
+   * Decode a word encoded using `encode_string_for_map_field`.
    */
-  def decode_string_for_count_map_field(word: String) =
-    endec_string_for_count_map_field.decode(word)
+  def decode_string_for_map_field(word: String) =
+    endec_string_for_map_field.decode(word)
 
   /**
    * Encode a string for placement in a field consisting of a sequence
-   * of strings.  This is similar to `encode_string_for_count_map_field` except
+   * of strings.  This is similar to `encode_string_for_map_field` except
    * that we don't encode spaces.  We encode '&gt;' for use as a separator
    * inside of a field (since it's almost certain not to occur, because
    * we generally get HTML-encoded text; and even if not, it's fairly
@@ -742,10 +742,10 @@ package object textdb {
     endec_string_for_whole_field.decode(word)
 
   /**
-   * Decode an n-gram encoded using `encode_ngram_for_count_map_field`.
+   * Decode an n-gram encoded using `encode_ngram_for_map_field`.
    */
-  def decode_ngram_for_count_map_field(ngram: String) = {
-    ngram.split(":", -1).map(decode_string_for_count_map_field)
+  def decode_ngram_for_map_field(ngram: String) = {
+    ngram.split(":", -1).map(decode_string_for_map_field)
   }
 
   /**
@@ -766,13 +766,13 @@ package object textdb {
    */
   def deep_split_count_map_field(field: String) = {
     val (encoded_ngram, count) = shallow_split_count_map_field(field)
-    (decode_ngram_for_count_map_field(encoded_ngram), count)
+    (decode_ngram_for_map_field(encoded_ngram), count)
   }
 
   /**
    * Serialize a sequence of (encoded-word, count) pairs into the format used
    * in a corpus.  The word or ngram must already have been encoded using
-   * `encode_string_for_count_map_field` or `encode_ngram_for_count_map_field`.
+   * `encode_string_for_map_field` or `encode_ngram_for_map_field`.
    */
   def shallow_encode_count_map(seq: Iterable[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
@@ -782,12 +782,35 @@ package object textdb {
   }
 
   /**
+   * Serialize a sequence of (string, string) pairs into the format used
+   * in a corpus.  The strings must already have been encoded using
+   * `encode_string_for_map_field`.
+   */
+  def shallow_encode_string_map(seq: Iterable[(String, String)]) = {
+    (for ((str1, str2) <- seq) yield
+      ("%s:%s" format (str1, str2))) mkString " "
+  }
+
+  /**
    * Serialize a sequence of (word, count) pairs into the format used
    * in a corpus.
    */
   def encode_count_map(seq: Iterable[(String, Int)]) = {
     shallow_encode_count_map(seq map {
-      case (word, count) => (encode_string_for_count_map_field(word), count)
+      case (word, count) => (encode_string_for_map_field(word), count)
+    })
+  }
+
+  /**
+   * Serialize a sequence of (string, string) pairs into the format used
+   * in a corpus.
+   */
+  def encode_string_map(seq: Iterable[(String, String)]) = {
+    shallow_encode_string_map(seq map {
+      case (str1, str2) => (
+        encode_string_for_map_field(str1),
+        encode_string_for_map_field(str2)
+      )
     })
   }
 
@@ -813,8 +836,31 @@ package object textdb {
             "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
             format wordcount)
         val count = strcount.toInt
-        val decoded_word = decode_string_for_count_map_field(word)
+        val decoded_word = decode_string_for_map_field(word)
         (decoded_word, count)
+      }
+    }
+  }
+
+  /**
+   * Deserialize an encoded map into a sequence of (string, string) pairs.
+   */
+  def decode_string_map(encoded: String) = {
+    if (encoded.length == 0)
+      Array[(String, String)]()
+    else
+      {
+      val items = encoded.split(" ")
+      for (item <- items) yield {
+        val split_item = item.split(":", -1)
+        if (split_item.length != 2)
+          throw FileFormatException(
+            "Items must be of the form STRING:STRING, but %s seen"
+            format item)
+        val Array(str1, str2) = split_item
+        val decoded_str1 = decode_string_for_map_field(str1)
+        val decoded_str2 = decode_string_for_map_field(str2)
+        (decoded_str1, decoded_str2)
       }
     }
   }
@@ -824,6 +870,10 @@ package object textdb {
       encode_count_map(x.toSeq)
     def count_map_seq(x: Iterable[(String, Int)]) =
       encode_count_map(x)
+    def string_map(x: scala.collection.Map[String, String]) =
+      encode_string_map(x.toSeq)
+    def string_map_seq(x: Iterable[(String, String)]) =
+      encode_string_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
     def seq_string(x: Iterable[String]) =
@@ -837,6 +887,8 @@ package object textdb {
   object Decoder {
     def count_map(x: String) = decode_count_map(x).toMap
     def count_map_seq(x: String) = decode_count_map(x)
+    def string_map(x: String) = decode_string_map(x).toMap
+    def string_map_seq(x: String) = decode_string_map(x)
     def string(x: String) = decode_string_for_whole_field(x)
     def seq_string(x: String) =
       x.split(">>", -1).map(decode_string_for_sequence_field)

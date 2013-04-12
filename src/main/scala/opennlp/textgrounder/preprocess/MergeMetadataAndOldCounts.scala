@@ -150,7 +150,7 @@ class MMCUnigramWordDistHandler(
       val counts =
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
-          ("%s:%s" format (encode_string_for_count_map_field(keys(i)),
+          ("%s:%s" format (encode_string_for_map_field(keys(i)),
             values(i)))
         }). mkString(" ")
       val new_params = params ++ Seq(counts)

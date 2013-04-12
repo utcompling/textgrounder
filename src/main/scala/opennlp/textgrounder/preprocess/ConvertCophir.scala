@@ -132,7 +132,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
   def emit_ngrams(text: Iterable[String]): String = {
     val ngrams =
       text.flatMap(break_text_into_ngrams(_)).toSeq.
-        map(encode_ngram_for_count_map_field)
+        map(encode_ngram_for_map_field)
     shallow_encode_count_map(list_to_item_count_map(ngrams).toSeq)
   }
 
