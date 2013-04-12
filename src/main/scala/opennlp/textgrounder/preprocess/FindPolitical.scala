@@ -150,7 +150,7 @@ object FindPolitical extends
   def encode_ideo_refs_map(seq: Iterable[(String, Double, Int)]) =
     (for ((account, ideology, count) <- seq.toSeq sortWith (_._3 > _._3)) yield
       ("%s:%.2f:%s" format (
-        encode_string_for_count_map_field(account), ideology, count))
+        encode_string_for_map_field(account), ideology, count))
     ) mkString " "
 
   def empty_ideo_refs_map = Seq[(String, Double, Int)]()

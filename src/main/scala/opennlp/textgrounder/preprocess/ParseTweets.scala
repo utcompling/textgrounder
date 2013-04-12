@@ -1678,7 +1678,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def emit_ngrams(tweet_text: Iterable[String], max_ngram: Int): String = {
       val ngrams =
         tweet_text.flatMap(break_tweet_into_ngrams(_, max_ngram)).toSeq.
-          map(encode_ngram_for_count_map_field)
+          map(encode_ngram_for_map_field)
       shallow_encode_count_map(list_to_item_count_map(ngrams).toSeq)
     }
 
