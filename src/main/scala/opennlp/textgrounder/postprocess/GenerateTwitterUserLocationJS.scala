@@ -45,8 +45,9 @@ multiple times, or by separating values by a comma.
 }
 
 /**
- * An application to generate a JavaScript file showing the "locations"
- * (location of first tweet) of users in a file as output by ParseTweets.
+ * An application to generate a HTML file with embedded JavaScript,
+ * showing (using Google Maps) the "locations" (location of first tweet)
+ * of users in a file as output by ParseTweets.
  */
 object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserLocationJS") {
 
