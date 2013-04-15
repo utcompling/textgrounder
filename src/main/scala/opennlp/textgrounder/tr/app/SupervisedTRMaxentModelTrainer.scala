@@ -152,10 +152,6 @@ object SupervisedTRFeatureExtractor extends App {
       out.write(label+"\n")
     }
     out.close
-    /*val model = GIS.trainModel(MaxentEventStreamFactory(trainingSet.toIterator), iterations, cutoff)
-    val modelWriter = new BinaryGISModelWriter(model, new File(dir + toponym.replaceAll(" ", "_")+".mxm"))
-    modelWriter.persist()
-    modelWriter.close()*/
   }
 
   println("All done.")

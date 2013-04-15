@@ -17,7 +17,8 @@ class ConstructionTPPResolver(val dpc:Double,
     //new MaxentPurchaseCoster(corpus, modelDirPath),
     new MultiPurchaseCoster(List(new GaussianPurchaseCoster,//new SimpleContainmentPurchaseCoster,
                                  new MaxentPurchaseCoster(corpus, modelDirPath))),
-    new SimpleDistanceTravelCoster)) {
+    new GaussianTravelCoster)) {
+    //new SimpleDistanceTravelCoster)) {
 
   def disambiguate(corpus:StoredCorpus): StoredCorpus = {
 
