@@ -191,6 +191,19 @@ object ExtractLinksFromWikiDump {
         }
       }
 
+      if(lineCount % 10001 == 10000) {
+        println("------------------")
+        println("Line number: "+lineCount)
+        println("Current article: "+pageTitle+" ("+id+")")
+        println("line.size: "+line.size)
+        println("tokArray.size: "+tokArray.size)
+        println("toponymsToTrainingSets.size: "+toponymsToTrainingSets.size)
+        println("toponymsToTrainingSets biggest training set: "+toponymsToTrainingSets.map(p => p._2.size).max)
+        println("links.size: "+links.size)
+        //println("storedDistances.size: "+storedDistances.size)
+        println("------------------")
+      }
+
       
       line = in.readLine
       lineCount += 1
@@ -234,7 +247,7 @@ object ExtractLinksFromWikiDump {
   }
 
   // (loc.id, article.id) -> distance
-  val storedDistances = new scala.collection.mutable.HashMap[(Int, Int), Double]
+  //val storedDistances = new scala.collection.mutable.HashMap[(Int, Int), Double]
 
   // Returns string that matched in gazetteer and index of closest entry in gazetteer, and any context that was stripped off
   def getClosestGazIndex(gnGaz:GeoNamesGazetteer, name:String, coord:Coordinate, articleID:Int): (String, Int, String) = {
@@ -246,14 +259,14 @@ object ExtractLinksFromWikiDump {
 
       for(index <- 0 until candidates.size) {
         val loc = candidates(index)
-        val key = (loc.getId, articleID)
+        //val key = (loc.getId, articleID)
         val dist = 
-          if(storedDistances.contains(key)) storedDistances(key)
-          else {
-            val distComputed = loc.getRegion.distance(coord)
-            storedDistances.put(key, distComputed)
-            distComputed
-          }
+          //if(storedDistances.contains(key)) storedDistances(key)
+          //else {
+            /*val distComputed = */loc.getRegion.distance(coord)
+            //storedDistances.put(key, distComputed)
+            //distComputed
+          //}
         if(dist < THRESHOLD && dist < minDist) {
           minDist = dist
           bestIndex = index
