@@ -182,7 +182,7 @@ object ExtractLinksFromWikiDump {
                     
                     val contextAndLabelArray = Array.concat(context, tokenRE.findAllIn(strippedContext).toArray)
                     //val contextAndLabel:List[String] = (context.toList ::: tokenRE.findAllIn(strippedContext).toList) ::: (closestGazIndex.toString :: Nil)
-                    val contextAndLabelString = contextAndLabelArray.mkString(",")+closestGazIndex.toString
+                    val contextAndLabelString = contextAndLabelArray.mkString(",")+","+closestGazIndex.toString
                     print(matchingToponym+": ")
                     println(contextAndLabelString)
                     
