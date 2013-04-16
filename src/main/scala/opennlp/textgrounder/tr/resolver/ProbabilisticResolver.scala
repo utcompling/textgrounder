@@ -121,6 +121,7 @@ class ProbabilisticResolver(val logFilePath:String,
 
         val topFreq = toponymsToFrequencies.getOrElse(toponym.getForm, 0.0)
         val lambda = topFreq / (topFreq + C)//0.7
+        //println(toponym.getForm+" "+lambda)
 
         var indexToSelect = -1
         var maxProb = 0.0

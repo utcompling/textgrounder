@@ -25,6 +25,7 @@ import opennlp.textgrounder.tr.topo.gaz._
 
 import java.io._
 //import java.util._
+import java.util.ArrayList
 import java.util.zip._
 import org.apache.commons.compress.compressors.bzip2._
 
@@ -89,7 +90,7 @@ object ExtractLinksFromWikiDump {
     val toponyms:Set[String] = CorpusInfo.getCorpusInfo(trInputFile.value.get).map(_._1).toSet
 
     val links = new scala.collection.mutable.HashMap[(Int, Int), Int] // (location1.id, location2.id) => count
-    val toponymsToTrainingSets = new scala.collection.mutable.HashMap[String, List[String]]
+    val toponymsToTrainingSets = new scala.collection.mutable.HashMap[String, ArrayList[String]]
 
     println("Reading serialized gazetteer from " + gazInputFile.value.get + " ...")
     val gis = new GZIPInputStream(new FileInputStream(gazInputFile.value.get))
@@ -162,46 +163,55 @@ object ExtractLinksFromWikiDump {
               }
 
               // Extract and write context:
-              val closestGazIndexResult = getClosestGazIndex(gnGaz, titleLower, idAndCoord._2, idAndCoord._1)
-              val matchingToponym = closestGazIndexResult._1
-              if(toponyms(matchingToponym)) {
-                val closestGazIndex = closestGazIndexResult._2
+              val looseLookupResult = looseLookup(gnGaz, titleLower)
+              val matchingToponym = looseLookupResult._1
+              if(matchingToponym != null && toponyms(matchingToponym)) {
+
+                val closestGazIndex = getClosestGazIndex(gnGaz, titleLower, idAndCoord._2, idAndCoord._1, looseLookupResult._2)
+                //val matchingToponym = closestGazIndexResult._1
+                //if(toponyms(matchingToponym)) {
+                //val closestGazIndex = closestGazIndexResult._2
                 if(closestGazIndex != -1) {
                   val context = getContextFeatures(tokArray, tokIndex, windowSize, stoplist)
                   if(context.size > 0) {
-                    val strippedContext = closestGazIndexResult._3
+                    val strippedContext = looseLookupResult._3
                     //print(matchingToponym+": ")
                     //context.foreach(f => print(f+","))
                     //tokenRE.findAllIn(strippedContext).foreach(f => print(f+","))
                     //println(closestGazIndex)
-
-                    val contextAndLabel:List[String] = (context.toList ::: tokenRE.findAllIn(strippedContext).toList) ::: (closestGazIndex.toString :: Nil)
-                    val contextAndLabelString = contextAndLabel.mkString(",")
+                    
+                    val contextAndLabelArray = Array.concat(context, tokenRE.findAllIn(strippedContext).toArray)
+                    //val contextAndLabel:List[String] = (context.toList ::: tokenRE.findAllIn(strippedContext).toList) ::: (closestGazIndex.toString :: Nil)
+                    val contextAndLabelString = contextAndLabelArray.mkString(",")+closestGazIndex.toString
                     print(matchingToponym+": ")
                     println(contextAndLabelString)
-
-                    val prevSet = toponymsToTrainingSets.getOrElse(matchingToponym, Nil)
-                    toponymsToTrainingSets.put(matchingToponym, contextAndLabelString :: prevSet)
+                    
+                    val prevAL = toponymsToTrainingSets.getOrElse(matchingToponym, new ArrayList[String])
+                    prevAL.add(contextAndLabelString)
+                    toponymsToTrainingSets.put(matchingToponym, prevAL)
                   }
                 }
+                //}
+                
               }
+
             }
           }
           case _ => //println(token)
         }
       }
 
-      if(lineCount % 10001 == 10000) {
-        println("------------------")
-        println("Line number: "+lineCount)
-        println("Current article: "+pageTitle+" ("+id+")")
-        println("line.size: "+line.size)
-        println("tokArray.size: "+tokArray.size)
-        println("toponymsToTrainingSets.size: "+toponymsToTrainingSets.size)
-        println("toponymsToTrainingSets biggest training set: "+toponymsToTrainingSets.map(p => p._2.size).max)
-        println("links.size: "+links.size)
-        //println("storedDistances.size: "+storedDistances.size)
-        println("------------------")
+      if(lineCount % 100001 == 100000) {
+        println("*------------------")
+        println("*Line number - "+lineCount)
+        println("*Current article - "+pageTitle+" ("+id+")")
+        println("*line.size - "+line.size)
+        println("*tokArray.size - "+tokArray.size)
+        println("*toponymsToTrainingSets.size - "+toponymsToTrainingSets.size)
+        println("*toponymsToTrainingSets biggest training set - "+toponymsToTrainingSets.map(p => p._2.size).max)
+        println("*links.size - "+links.size)
+        println("*storedDistances.size - "+storedDistances.size)
+        println("*------------------")
       }
 
       
@@ -246,37 +256,47 @@ object ExtractLinksFromWikiDump {
     println("All done.")
   }
 
-  // (loc.id, article.id) -> distance
-  //val storedDistances = new scala.collection.mutable.HashMap[(Int, Int), Double]
+  /*def findMatchingToponym(gnGaz:GeoNamesGazetteer, titleLower:String): String = {
+    
+  }*/
 
-  // Returns string that matched in gazetteer and index of closest entry in gazetteer, and any context that was stripped off
-  def getClosestGazIndex(gnGaz:GeoNamesGazetteer, name:String, coord:Coordinate, articleID:Int): (String, Int, String) = {
-    val looseLookupResult = looseLookup(gnGaz, name)
-    val candidates = looseLookupResult._2
+  // (loc.id, article.id) -> distance
+  val storedDistances = new scala.collection.mutable.HashMap[(Int, Int), Double]
+
+  // Returns index of closest entry in gazetteer
+  def getClosestGazIndex(gnGaz:GeoNamesGazetteer, name:String, coord:Coordinate, articleID:Int, candidates:java.util.List[Location]): Int = {
+    //val looseLookupResult = looseLookup(gnGaz, name)
+    //val candidates = looseLookupResult._2
+    //val candidates = gnGaz.lookup(
     if(candidates != null) {
       var minDist = Double.PositiveInfinity
       var bestIndex = -1
 
       for(index <- 0 until candidates.size) {
         val loc = candidates(index)
-        //val key = (loc.getId, articleID)
+        val key = (loc.getId, articleID)
         val dist = 
-          //if(storedDistances.contains(key)) storedDistances(key)
-          //else {
-            /*val distComputed = */loc.getRegion.distance(coord)
-            //storedDistances.put(key, distComputed)
-            //distComputed
-          //}
+          if(loc.getRegion.getRepresentatives.size > 1) { // Only use distance table for multipoint locations
+            if(storedDistances.contains(key)) storedDistances(key)
+            else {
+              val distComputed = loc.getRegion.distance(coord)
+              storedDistances.put(key, distComputed)
+              distComputed
+            }
+          }
+          else {
+            loc.getRegion.distance(coord)
+          }
         if(dist < THRESHOLD && dist < minDist) {
           minDist = dist
           bestIndex = index
         }
       }
 
-      (looseLookupResult._1, bestIndex, looseLookupResult._3)
+      bestIndex
     }
     else
-      (null, -1, "")
+      -1
   }
 
   // Returns string that matched in gazetteer and list of candidates, and any context that was stripped off
