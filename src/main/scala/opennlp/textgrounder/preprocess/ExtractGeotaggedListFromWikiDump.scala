@@ -25,11 +25,12 @@ import org.apache.commons.compress.compressors.bzip2._
 
 object ExtractGeotaggedListFromWikiDump {
 
-  var MAX_COUNT = 0
+  var MAX_COUNT = 100000
   //val NEW_PAGE = "    <title>"
   //val coordRE = """\|\s*latd|\|\s*lat_deg|\|\s*latG|\|\s*latitude|\{\{\s*Coord?|\|\s*Breitengrad|\{\{\s*Coordinate\s""".r
 
   val titleRE = """^\s{4}<title>(.*)</title>\s*$""".r
+  val redirectRE = """^\s{4}<redirect title=\"(.*)\" />\s*$""".r
   val idRE = """^\s{4}<id>(.*)</id>\s*$""".r
 
   val coordRE = """^.*\{\{\s*(?:[Cc]oord|[Cc]oordinate)\s*\|.*$""".r
@@ -51,11 +52,14 @@ object ExtractGeotaggedListFromWikiDump {
     val cbzip2InputStream = new BZip2CompressorInputStream(fileInputStream)
     val in = new BufferedReader(new InputStreamReader(cbzip2InputStream))
 
+    val redirectsOut = new BufferedWriter(new FileWriter("redirects.txt"))
+
     var totalPageCount = 0
     var geotaggedPageCount = 0
     var lookingForCoord = false
     var lineCount = 0
     var title = ""
+    //var redirectTitle = ""
     var id = ""
     var line = in.readLine
     while(line != null && (MAX_COUNT <= 0 || lineCount < MAX_COUNT)) {
@@ -67,6 +71,12 @@ object ExtractGeotaggedListFromWikiDump {
         /*if(totalPageCount % 10000 == 0)
           println(line+" "+geotaggedPageCount+"/"+totalPageCount)*/
         lookingForCoord = true
+        //redirectTitle = null
+      }
+
+      if(redirectRE.findFirstIn(line) != None) {
+        val redirectRE(r) = line
+        redirectsOut.write(title+"\t"+r+"\n")
       }
 
       if(idRE.findFirstIn(line) != None) {
@@ -136,6 +146,7 @@ object ExtractGeotaggedListFromWikiDump {
     //println("Geotagged page count: "+geotaggedPageCount)
     //println("Total page count: "+totalPageCount)
 
+    redirectsOut.close
     in.close
   }
 }
