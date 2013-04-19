@@ -25,7 +25,7 @@ import org.apache.commons.compress.compressors.bzip2._
 
 object ExtractGeotaggedListFromWikiDump {
 
-  var MAX_COUNT = 100000
+  var MAX_COUNT = 0
   //val NEW_PAGE = "    <title>"
   //val coordRE = """\|\s*latd|\|\s*lat_deg|\|\s*latG|\|\s*latitude|\{\{\s*Coord?|\|\s*Breitengrad|\{\{\s*Coordinate\s""".r
 
