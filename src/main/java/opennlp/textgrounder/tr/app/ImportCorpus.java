@@ -79,11 +79,11 @@ public class ImportCorpus extends BaseApp {
             else {
                 if(corpusInputFile.isDirectory())
                     corpus.addSource(new ToponymAnnotator(
-                           new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
+                                                          new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer, sentsPerDocument)),
                            recognizer, gnGaz, null));
                 else
                     corpus.addSource(new ToponymAnnotator(
-                           new ToponymRemover(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer)),
+                                                          new ToponymRemover(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer, sentsPerDocument)),
                            recognizer, gnGaz, null));
             }
         }

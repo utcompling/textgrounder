@@ -92,9 +92,14 @@ public class RunResolver extends BaseApp {
             System.out.print("Running RANDOM resolver...");
             resolver = new RandomResolver();
         }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.POPULATION) {
+            System.out.print("Running POPULATION resolver...");
+            resolver = new PopulationResolver();
+        }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
             System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + currentRun.getNumIterations() + " iteration(s)...");
-            resolver = new WeightedMinDistResolver(currentRun.getNumIterations());
+            resolver = new WeightedMinDistResolver(currentRun.getNumIterations(), currentRun.getReadWeightsFromFile(),
+                                                   currentRun.getLogFilePath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.DOC_DIST) {
             System.out.println("Running DOC DIST resolver, using log file at " + currentRun.getLogFilePath() + " ...");
@@ -121,18 +126,28 @@ public class RunResolver extends BaseApp {
             resolver = new LabelPropComplexResolver(currentRun.getGraphInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.MAXENT) {
-            System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
+            System.out.println("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath() + " ...");
             resolver = new MaxentResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
             System.out.println("Running PROBABILISTIC resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
 
-            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
+            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath(), currentRun.getPopComponentCoefficient(), currentRun.getDGProbOnly(), currentRun.getMEProbOnly());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.BAYES_RULE) {
             System.out.println("Running BAYES RULE resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
 
             resolver = new BayesRuleResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
+        }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.HEURISTIC_TPP) {
+            System.out.println("Running HEURISTIC TPP resolver...");
+
+            resolver = new HeuristicTPPResolver();
+        }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.CONSTRUCTION_TPP) {
+            System.out.println("Running CONSTRUCTION TPP resolver...");
+
+            resolver = new ConstructionTPPResolver(currentRun.getDPC(), currentRun.getThreshold(), testCorpus, currentRun.getMaxentModelDirInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");
@@ -154,7 +169,7 @@ public class RunResolver extends BaseApp {
 
         if(goldCorpus != null || currentRun.getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
             EvaluateCorpus evaluateCorpus = new EvaluateCorpus();
-            evaluateCorpus.doEval(disambiguated, goldCorpus, currentRun.getCorpusFormat(), true);
+            evaluateCorpus.doEval(disambiguated, goldCorpus, currentRun.getCorpusFormat(), true, currentRun.getDoOracleEval());
         }
 
         if(currentRun.getSerializedCorpusOutputPath() != null) {

@@ -60,25 +60,29 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("done.");
         }
 
-        currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
+        currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms(), currentRun.getDoOracleEval());
     }
 
     public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<BaseApp.CORPUS_FORMAT> corpusFormat, boolean useGoldToponyms) throws Exception {
+        this.doEval(systemCorpus, goldCorpus, corpusFormat, useGoldToponyms, false);
+    }
+
+    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<BaseApp.CORPUS_FORMAT> corpusFormat, boolean useGoldToponyms, boolean doOracleEval) throws Exception {
         System.out.print("\nEvaluating...");
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
             DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
             DistanceReport dreport = evaluator.evaluate();
 
+            System.out.println("\nMinimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
-            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
-            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
-            System.out.println("Total documents evaluated: " + dreport.getNumDistances());
+            System.out.println("\nTotal documents evaluated: " + dreport.getNumDistances());
         }
 
         else {
-            SignatureEvaluator evaluator = new SignatureEvaluator(goldCorpus);
+            SignatureEvaluator evaluator = new SignatureEvaluator(goldCorpus, doOracleEval);
             Report report = evaluator.evaluate(systemCorpus, false);
             DistanceReport dreport = evaluator.getDistanceReport();
 
@@ -87,12 +91,12 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("F: " + report.getFScore());
             //System.out.println("A: " + report.getAccuracy());
 
+            System.out.println("\nMinimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
-            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
-            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
-            System.out.println("Total toponyms evaluated: " + dreport.getNumDistances());
+            System.out.println("\nTotal toponyms evaluated: " + dreport.getNumDistances());
         }
     }
 

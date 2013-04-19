@@ -9,6 +9,7 @@ import opennlp.textgrounder.tr.text.*;
 import opennlp.textgrounder.tr.topo.*;
 import opennlp.textgrounder.tr.util.*;
 import java.util.*;
+import java.io.*;
 
 public class WeightedMinDistResolver extends Resolver {
 
@@ -18,20 +19,34 @@ public class WeightedMinDistResolver extends Resolver {
     Lexicon<String> toponymLexicon = null;
 
     private int numIterations;
+    private boolean readWeightsFromFile;
+    private String logFilePath;
+    private List<List<Double> > weightsFromFile = null;
     //private Map<Long, Double> distanceCache = new HashMap<Long, Double>();
     //private int maxCoeff = Integer.MAX_VALUE;
     private DistanceTable distanceTable;
     private static final int PHANTOM_COUNT = 0; // phantom/imagined counts for smoothing
 
-    public WeightedMinDistResolver(int numIterations) {
+    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile, String logFilePath) {
         super();
         this.numIterations = numIterations;
+        this.readWeightsFromFile = readWeightsFromFile;
+        this.logFilePath = logFilePath;
+
+        if(readWeightsFromFile && logFilePath == null) {
+            System.err.println("Error: need logFilePath via -l for backoff to DocDist.");
+            System.exit(0);
+        }
+    }
+
+    public WeightedMinDistResolver(int numIterations, boolean readWeightsFromFile) {
+        this(numIterations, readWeightsFromFile, null);
     }
 
     @Override
     public void train(StoredCorpus corpus) {
 
-        distanceTable = new DistanceTable(corpus.getToponymTypeCount());
+        distanceTable = new DistanceTable();//corpus.getToponymTypeCount());
 
         toponymLexicon = TopoUtil.buildLexicon(corpus);
         List<List<Integer> > counts = new ArrayList<List<Integer> >(toponymLexicon.size());
@@ -39,7 +54,32 @@ public class WeightedMinDistResolver extends Resolver {
         weights = new ArrayList<List<Double> >(toponymLexicon.size());
         for(int i = 0; i < toponymLexicon.size(); i++) weights.add(null);
 
-        initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT);
+        if(readWeightsFromFile) {
+            weightsFromFile = new ArrayList<List<Double> >(toponymLexicon.size());
+            try {
+                DataInputStream in = new DataInputStream(new FileInputStream("probToWMD.dat"));
+                for(int i = 0; i < toponymLexicon.size(); i++) {
+                    int ambiguity = in.readInt();
+                    weightsFromFile.add(new ArrayList<Double>(ambiguity));
+                    for(int j = 0; j < ambiguity; j++) {
+                        weightsFromFile.get(i).add(in.readDouble());
+                    }
+                }
+                in.close();
+            } catch(Exception e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
+
+            /*for(int i = 0; i < weightsFromFile.size(); i++) {
+                for(int j = 0; j < weightsFromFile.get(i).size(); j++) {
+                    System.out.println(weightsFromFile.get(i).get(j));
+                }
+                System.out.println();
+                }*/
+        }
+
+        initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT, weightsFromFile);
 
         for(int i = 0; i < numIterations; i++) {
             System.out.println("Iteration: " + (i+1));
@@ -56,7 +96,22 @@ public class WeightedMinDistResolver extends Resolver {
         TopoUtil.addToponymsToLexicon(toponymLexicon, corpus);
         weights = expandWeightsArray(toponymLexicon, corpus, weights);
         
-        return finalDisambiguationStep(corpus, weights, toponymLexicon);
+        StoredCorpus disambiguated = finalDisambiguationStep(corpus, weights, toponymLexicon);
+
+        if(readWeightsFromFile) {
+            // Backoff to DocDist:
+            Resolver docDistResolver = new DocDistResolver(logFilePath);
+            docDistResolver.overwriteSelecteds = false;
+            disambiguated = docDistResolver.disambiguate(corpus);
+        }
+        else {
+            // Backoff to Random:
+            Resolver randResolver = new RandomResolver();
+            randResolver.overwriteSelecteds = false;
+            disambiguated = randResolver.disambiguate(corpus);
+        }
+
+        return disambiguated;
     }
 
     // adds a weight of 1.0 to candidate locations of toponyms found in lexicon but not in oldWeights
@@ -77,7 +132,8 @@ public class WeightedMinDistResolver extends Resolver {
     }
 
     private void initializeCountsAndWeights(List<List<Integer> > counts, List<List<Double> > weights,
-            StoredCorpus corpus, Lexicon<String> lexicon, int initialCount) {
+                                            StoredCorpus corpus, Lexicon<String> lexicon, int initialCount,
+                                            List<List<Double> > weightsFromFile) {
 
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
@@ -89,7 +145,11 @@ public class WeightedMinDistResolver extends Resolver {
                             weights.set(index, new ArrayList<Double>(toponym.getAmbiguity()));
                             for(int i = 0; i < toponym.getAmbiguity(); i++) {
                                 counts.get(index).add(initialCount);
-                                weights.get(index).add(1.0);
+                                if(weightsFromFile != null
+                                   && weightsFromFile.get(index).size() > 0)
+                                    weights.get(index).add(weightsFromFile.get(index).get(i));
+                                else
+                                    weights.get(index).add(1.0);
                             }
                         }
                     }
@@ -140,14 +200,25 @@ public class WeightedMinDistResolver extends Resolver {
                         }
                         idx++;
                     }
+
+                    
+                    if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
+                                       //   so, choose the location with the greatest weight (unless all are uniform)
+                        double maxWeight = 1.0;
+                        int locationIdx = 0;
+                        for(Location candidate : toponym) {
+                            double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIdx);
+                            if(thisWeight > maxWeight) {
+                                maxWeight = thisWeight;
+                                minIdx = locationIdx;
+                            }
+                            locationIdx++;
+                        }
+                    }
+                    
                     
                     if (minIdx > -1) {
                         int countIndex = lexicon.get(toponym.getForm());
-                        /*System.out.println(toponym.getForm());
-                          System.out.println(countIndex);
-                          System.out.println(minIdx);
-                          System.out.println(counts.get(countIndex).size());
-                          System.out.println(toponym.getAmbiguity());*/
                         int prevCount = counts.get(countIndex)
                             .get(minIdx);
                         counts.get(countIndex).set(minIdx, prevCount + 1);
@@ -155,6 +226,7 @@ public class WeightedMinDistResolver extends Resolver {
                         sums.set(countIndex, prevSum + 1);
                         
                     }
+
                 }
             }
         }
@@ -188,6 +260,20 @@ public class WeightedMinDistResolver extends Resolver {
                         minIdx = idx;
                     }
                     idx++;
+                }
+
+                if(minIdx == -1) { // Most likely happens when there was only one toponym in the document;
+                                   //   so, choose the location with the greatest weight (unless all are 1.0)
+                    double maxWeight = 1.0;
+                    int locationIdx = 0;
+                    for(Location candidate : toponym) {
+                        double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIdx);
+                        if(thisWeight > maxWeight) {
+                            maxWeight = thisWeight;
+                            minIdx = locationIdx;
+                        }
+                        locationIdx++;
+                    }
                 }
                 
                 if (minIdx > -1) {
@@ -240,9 +326,12 @@ public class WeightedMinDistResolver extends Resolver {
             */
             //double normalizationDenom = normalizationDenoms.get(otherToponym);
 
-            double weightedDist = distanceTable.getDistance(toponym, locationIndex, otherToponym, otherLocIndex);//candidate.distance(otherLoc) /* / weights.get(otherLoc) */ ;
-            double weight = weights.get(lexicon.get(otherToponym.getForm())).get(otherLocIndex);
-            weightedDist /= weight; // weighting
+            //double weightedDist = distanceTable.getDistance(toponym, locationIndex, otherToponym, otherLocIndex);//candidate.distance(otherLoc) /* / weights.get(otherLoc) */ ;
+            //double weightedDist = candidate.distance(otherLoc);
+            double weightedDist = distanceTable.distance(candidate, otherLoc);
+            double thisWeight = weights.get(lexicon.get(toponym.getForm())).get(locationIndex);
+            double otherWeight = weights.get(lexicon.get(otherToponym.getForm())).get(otherLocIndex);
+            weightedDist /= (thisWeight * otherWeight); // weighting; was just otherWeight before
             //weightedDist /= normalizationDenoms.get(otherLoc); // normalization
             if (weightedDist < min) {
               min = weightedDist;
@@ -286,18 +375,18 @@ public class WeightedMinDistResolver extends Resolver {
         return dist;
     }*/
 
-    private class DistanceTable {
-        private double[][][][] allDistances;
+    /*private class DistanceTable {
+        //private double[][][][] allDistances;
 
         public DistanceTable(int numToponymTypes) {
-            allDistances = new double[numToponymTypes][numToponymTypes][][];
+            //allDistances = new double[numToponymTypes][numToponymTypes][][];
         }
 
         public double getDistance(StoredToponym t1, int i1, StoredToponym t2, int i2) {
 
             return t1.getCandidates().get(i1).distance(t2.getCandidates().get(i2));
             
-            /*int t1idx = t1.getIdx();
+            /* int t1idx = t1.getIdx();
             int t2idx = t2.getIdx();
 
             double[][] distanceMatrix = allDistances[t1idx][t2idx];
@@ -308,16 +397,16 @@ public class WeightedMinDistResolver extends Resolver {
                         distanceMatrix[i][j] = t1.getCandidates().get(i).distance(t2.getCandidates().get(j));
                     }
                 }
-            }*/
+            }*SLASH
             /*double distance = distanceMatrix[i1][i2];
             if(distance == 0.0) {
                 distance = t1.getCandidates().get(i1).distance(t2.getCandidates().get(i2));
                 distanceMatrix[i1][i2] = distance;
-            }*/
+            }*SLASH
             //return distanceMatrix[i1][i2];
             
         }
 
         //public
-    }
+    }*/
 }

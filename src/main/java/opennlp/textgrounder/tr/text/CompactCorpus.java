@@ -326,7 +326,8 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         if (this.goldIdx == -1) {
           return null;
         } else {
-          return CompactCorpus.this.candidateLists.get(this.idx).get(this.goldIdx);
+          List<Location> candList = CompactCorpus.this.candidateLists.get(this.idx);
+          return CompactCorpus.this.candidateLists.get(this.idx).get(this.goldIdx<candList.size()?this.goldIdx:candList.size()-1);
         }
       }
       public int getGoldIdx() { return this.goldIdx; }

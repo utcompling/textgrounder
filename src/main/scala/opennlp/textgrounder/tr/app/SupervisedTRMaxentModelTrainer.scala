@@ -29,11 +29,13 @@ object SupervisedTRFeatureExtractor extends App {
   val gazInputFile = parser.option[String](List("g", "gaz"), "gaz", "serialized gazetteer input file")
   val stoplistInputFile = parser.option[String](List("s", "stoplist"), "stoplist", "stopwords input file")
   val modelsOutputDir = parser.option[String](List("d", "models-dir"), "models-dir", "models output directory")
-  val thresholdParam = parser.option[Double](List("t", "threshold"), "threshold", "maximum distance threshold")
+  //val thresholdParam = parser.option[Double](List("t", "threshold"), "threshold", "maximum distance threshold")
 
   val windowSize = 20
   val dpc = 1.0
-  val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
+  //val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
+
+  val distanceTable = new DistanceTable
 
   try {
     parser.parse(args)
@@ -50,7 +52,7 @@ object SupervisedTRFeatureExtractor extends App {
   println("Reading Wikipedia geotags from " + wikiCorpusInputFile.value.get + "...")
   val idsToCoords = new collection.mutable.HashMap[String, Coordinate]
   val fis = new FileInputStream(wikiCorpusInputFile.value.get)
-  fis.read; fis.read
+  //fis.read; fis.read
   val cbzis = new BZip2CompressorInputStream(fis)
   val in = new BufferedReader(new InputStreamReader(cbzis))
   var curLine = in.readLine
@@ -106,15 +108,16 @@ object SupervisedTRFeatureExtractor extends App {
         }
         if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0 && toponyms(token.getForm)) {
           val toponym = token.asInstanceOf[Toponym]
-          val bestCellNum = getBestCellNum(toponym, docCoord, threshold, dpc)
-          if(bestCellNum != -1) {
+          //val bestCellNum = getBestCellNum(toponym, docCoord, dpc)
+          val bestCandIndex = getBestCandIndex(toponym, docCoord)
+          if(bestCandIndex != -1) {
             val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, windowSize, stoplist)
             val prevSet = toponymsToTrainingSets.getOrElse(token.getForm, Nil)
             print(toponym+": ")
             contextFeatures.foreach(f => print(f+","))
-            println(bestCellNum)
+            println(bestCandIndex)
             
-            toponymsToTrainingSets.put(token.getForm, (contextFeatures, bestCellNum.toString) :: prevSet)
+            toponymsToTrainingSets.put(token.getForm, (contextFeatures, bestCandIndex.toString) :: prevSet)
           }
         }
         tokIndex += 1
@@ -149,22 +152,34 @@ object SupervisedTRFeatureExtractor extends App {
       out.write(label+"\n")
     }
     out.close
-    /*val model = GIS.trainModel(MaxentEventStreamFactory(trainingSet.toIterator), iterations, cutoff)
-    val modelWriter = new BinaryGISModelWriter(model, new File(dir + toponym.replaceAll(" ", "_")+".mxm"))
-    modelWriter.persist()
-    modelWriter.close()*/
   }
 
   println("All done.")
 
-  def getBestCellNum(toponym:Toponym, docCoord:Coordinate, threshold:Double, dpc:Double): Int = {
+  def getBestCandIndex(toponym:Toponym, docCoord:Coordinate): Int = {
+    var index = 0
+    var minDist = Double.PositiveInfinity
+    var bestIndex = -1
+    val docRegion = new PointRegion(docCoord)
     for(loc <- toponym.getCandidates) {
-      if(loc.getRegion.distanceInKm(new PointRegion(docCoord)) < threshold) {
+      val dist = loc.getRegion.distanceInKm(docRegion)
+      if(dist < loc.getThreshold && dist < minDist) {
+        minDist = dist
+        bestIndex = index
+      }
+      index += 1
+    }
+    bestIndex
+  }
+
+  /*def getBestCellNum(toponym:Toponym, docCoord:Coordinate, dpc:Double): Int = {
+    for(loc <- toponym.getCandidates) {
+      if(loc.getRegion.distanceInKm(new PointRegion(docCoord)) < loc.getThreshold) {
         return TopoUtil.getCellNumber(loc.getRegion.getCenter, dpc)
       }
     }
     -1
-  }
+  }*/
   
 }
 

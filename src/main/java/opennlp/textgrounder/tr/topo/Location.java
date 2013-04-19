@@ -32,27 +32,29 @@ public class Location implements Serializable {
   private Location.Type type;
   private int population;
   private String admin1code;
+  private double threshold;
 
     public Location(int id, String name, Region region, String typeString, Integer population, String admin1code) {
         this(id, name, region, Location.convertTypeString(typeString),
-             population==null?0:population, admin1code==null?"00":admin1code);
+             population==null?0:population, admin1code==null?"00":admin1code, 10.0);
     }
 
     public Location(String idWithC, String name, Region region, String typeString, Integer population, String admin1code) {
         this(Integer.parseInt(idWithC.substring(1)), name, region, typeString, population, admin1code);
     }
 
-  public Location(int id, String name, Region region, Location.Type type, int population, String admin1code) {
+    public Location(int id, String name, Region region, Location.Type type, int population, String admin1code, double threshold) {
     this.id = id;
     this.name = name;
     this.region = region;
     this.type = type;
     this.population = population;
     this.admin1code = admin1code;
+    this.threshold = threshold;
   }
 
   public Location(int id, String name, Region region, Location.Type type, int population) {
-    this(id, name, region, type, population, "00");
+      this(id, name, region, type, population, "00", 10.0);
   }
 
   public Location(int id, String name, Region region, Location.Type type) {
@@ -110,6 +112,35 @@ public class Location implements Serializable {
     return this.type;
   }
 
+    public void setThreshold(double threshold) {
+        this.threshold = threshold;
+    }
+
+    public double getThreshold() {
+        return this.threshold;
+    }
+
+    public void recomputeThreshold() {
+        // Commented out for now since experiments with this didn't perform well
+        /*if(this.getRegion().getRepresentatives().size() > 1) {
+            //int count = 0;
+            double minDist = Double.POSITIVE_INFINITY;
+            for(int i = 0; i < this.getRegion().getRepresentatives().size(); i++) {
+                for(int j = 0; j < this.getRegion().getRepresentatives().size(); j++) {
+                    if(i != j) {
+                        double dist = this.getRegion().getRepresentatives().get(i).distanceInKm(
+                                      this.getRegion().getRepresentatives().get(j));
+                        if(dist < minDist)
+                            minDist = dist;
+                        //count++;
+                    }
+                }
+            }
+            //dist /= count;
+            this.setThreshold(minDist / 2);
+            }*/
+    }
+
     public static Location.Type convertTypeString(String typeString) {
         typeString = typeString.toUpperCase();
         if(typeString.equals("STATE"))
@@ -164,6 +195,11 @@ public class Location implements Serializable {
     return other != null &&
            other.getClass() == this.getClass() &&
            ((Location) other).id == this.id;
+  }
+
+  @Override
+  public int hashCode() {
+    return this.id;
   }
 }
 

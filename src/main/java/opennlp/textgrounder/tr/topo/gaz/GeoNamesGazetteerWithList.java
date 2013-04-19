@@ -257,7 +257,8 @@ public class GeoNamesGazetteerWithList implements Gazetteer, Serializable {
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
-            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population, admin1code);
+            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population, admin1code,
+                                             10.0);
             this.locations.add(location);
 
             for (String name : nameSet) {

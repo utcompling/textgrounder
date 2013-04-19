@@ -18,7 +18,7 @@ public class RandomResolver extends Resolver {
             for(Sentence<StoredToken> sent : doc) {
                 for(Toponym toponym : sent.getToponyms()) {
                     int ambiguity = toponym.getAmbiguity();
-                    if (ambiguity > 0) {
+                    if (ambiguity > 0 && (overwriteSelecteds || !toponym.hasSelected())) {
                         toponym.setSelectedIdx(rand.nextInt(ambiguity));
                     }
                 }

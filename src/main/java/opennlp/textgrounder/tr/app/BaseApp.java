@@ -29,6 +29,12 @@ public class BaseApp {
     private String serializedCorpusOutputPath = null;
     private String maxentModelDirInputPath = null;
 
+    private double popComponentCoefficient = 0.0;
+    private boolean dgProbOnly = false;
+    private boolean meProbOnly = false;
+
+    private boolean doOracleEval = false;
+
     private int sentsPerDocument = -1;
 
     private boolean highRecallNER = false;
@@ -43,11 +49,16 @@ public class BaseApp {
     private String stoplistInputPath = null;
     
     private int numIterations = 1;
+    private boolean readWeightsFromFile = false;
 
     private int knnForLP = -1;
 
+    private double dpc = 10;
+    private double threshold = -1.0; // sentinel value indicating NOT to use threshold, not real default
+
     public static enum RESOLVER_TYPE {
         RANDOM,
+        POPULATION,
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
         DOC_DIST,
@@ -58,7 +69,9 @@ public class BaseApp {
         LABEL_PROP_COMPLEX,
         MAXENT,
         PROB,
-        BAYES_RULE
+        BAYES_RULE,
+        CONSTRUCTION_TPP,
+        HEURISTIC_TPP
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -80,6 +93,7 @@ public class BaseApp {
         options.addOption("ig", "input-graph", true, "path to input graph for label propagation resolvers");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver, LabelPropComplexResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
+        options.addOption("rwf", "read-weights-file", false, "read initial weights from probToWMD.dat");
         options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("okd", "output-kml-dynamic", true, "dynamic kml output path");
@@ -94,7 +108,13 @@ public class BaseApp {
         //options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
         options.addOption("cf", "corpus-format", true, "corpus format (Plain, TrCoNLL, GeoText) [default = Plain]");
 
+        options.addOption("oracle", "oracle", false, "use oracle evaluation");
+
         options.addOption("spd", "sentences-per-document", true, "sentences per document (-1 for unlimited) [default = -1]");
+
+        options.addOption("pc", "pop-comp-coeff", true, "population component coefficient (for PROBABILISTIC resolver)");
+        options.addOption("pdg", "prob-doc-geo", false, "use probability from document geolocator only (for PROBABILISTIC resolver)");
+        options.addOption("pme", "prob-maxent", false, "use probability from MaxEnt local context component only (for PROBABILISTIC resolver)");
 
         options.addOption("minlat", "minimum-latitude", true,
                 "minimum latitude for bounding box");
@@ -117,8 +137,11 @@ public class BaseApp {
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
-        options.addOption("l", "log file input", true, "log file input, from document geolocation");
+        options.addOption("l", "log-file-input", true, "log file input, from document geolocation");
         options.addOption("knn", "knn", true, "k nearest neighbors to consider from document geolocation log file");
+
+        options.addOption("dpc", "degrees-per-cell", true, "degrees per cell for grid-based TPP resolvers");
+        options.addOption("t", "threshold", true, "threshold in kilometers for agglomerative clustering");
 
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
@@ -173,32 +196,45 @@ public class BaseApp {
                         dKmlOutputPath = value;
                     else if(option.getOpt().equals("os"))
                         seedOutputPath = value;
+                    else if(option.getOpt().equals("oracle"))
+                        doOracleEval = true;
                     break;
                 case 'r':
-                    if(value.toLowerCase().startsWith("r"))
-                        resolverType = RESOLVER_TYPE.RANDOM;
-                    else if(value.toLowerCase().startsWith("w"))
-                        resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
-                    else if(value.toLowerCase().startsWith("d"))
-                        resolverType = RESOLVER_TYPE.DOC_DIST;
-                    else if(value.toLowerCase().startsWith("t"))
-                        resolverType = RESOLVER_TYPE.TOPO_AS_DOC_DIST;
-                    else if(value.equalsIgnoreCase("labelprop"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP;
-                    else if(value.toLowerCase().startsWith("labelpropd"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
-                    else if(value.toLowerCase().startsWith("labelpropcontext"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
-                    else if(value.toLowerCase().startsWith("labelpropcomplex"))
-                        resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
-                    else if(value.toLowerCase().startsWith("m"))
-                        resolverType = RESOLVER_TYPE.MAXENT;
-                    else if(value.toLowerCase().startsWith("p"))
-                        resolverType = RESOLVER_TYPE.PROB;
-                    else if(value.toLowerCase().startsWith("bayes"))
-                        resolverType = RESOLVER_TYPE.BAYES_RULE;
-                    else
-                        resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+                    if(option.getOpt().equals("r")) {
+                        if(value.toLowerCase().startsWith("r"))
+                            resolverType = RESOLVER_TYPE.RANDOM;
+                        else if(value.toLowerCase().startsWith("w"))
+                            resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
+                        else if(value.toLowerCase().startsWith("d"))
+                            resolverType = RESOLVER_TYPE.DOC_DIST;
+                        else if(value.toLowerCase().startsWith("t"))
+                            resolverType = RESOLVER_TYPE.TOPO_AS_DOC_DIST;
+                        else if(value.equalsIgnoreCase("labelprop"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP;
+                        else if(value.toLowerCase().startsWith("labelpropd"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
+                        else if(value.toLowerCase().startsWith("labelpropcontext"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
+                        else if(value.toLowerCase().startsWith("labelpropcomplex"))
+                            resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
+                        else if(value.toLowerCase().startsWith("m"))
+                            resolverType = RESOLVER_TYPE.MAXENT;
+                        else if(value.toLowerCase().startsWith("pr"))
+                            resolverType = RESOLVER_TYPE.PROB;
+                        else if(value.toLowerCase().startsWith("po"))
+                            resolverType = RESOLVER_TYPE.POPULATION;
+                        else if(value.toLowerCase().startsWith("bayes"))
+                            resolverType = RESOLVER_TYPE.BAYES_RULE;
+                        else if(value.toLowerCase().startsWith("h"))
+                            resolverType = RESOLVER_TYPE.HEURISTIC_TPP;
+                        else if(value.toLowerCase().startsWith("c"))
+                            resolverType = RESOLVER_TYPE.CONSTRUCTION_TPP;
+                        else
+                            resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+                    }
+                    else if(option.getOpt().equals("rwf")) {
+                        readWeightsFromFile = true;
+                    }
                     break; 
                 case 'g':
                     if(option.getOpt().equals("g"))
@@ -254,8 +290,21 @@ public class BaseApp {
                         setHighRecallNER(new Integer(value)!=0);
                     break;
                 case 'd':
-                    doKMeans = true;
+                    if(option.getOpt().equals("dkm"))
+                        doKMeans = true;
+                    else if(option.getOpt().equals("dpc"))
+                        dpc = Double.parseDouble(value);
                     break;
+                case 't':
+                    threshold = Double.parseDouble(value);
+                    break;
+                case 'p':
+                    if(option.getOpt().equals("pc"))
+                        popComponentCoefficient = Double.parseDouble(value);
+                    else if(option.getOpt().equals("pme"))
+                        meProbOnly = true;
+                    else
+                        dgProbOnly = true;
             }
         }
 
@@ -301,6 +350,10 @@ public class BaseApp {
 
     public int getNumIterations() {
         return numIterations;
+    }
+
+    public boolean getReadWeightsFromFile() {
+        return readWeightsFromFile;
     }
 
     public String getOutputPath() {
@@ -382,6 +435,30 @@ public class BaseApp {
 
     public Region getBoundingBox() {
         return boundingBox;
+    }
+
+    public double getPopComponentCoefficient() {
+        return popComponentCoefficient;
+    }
+
+    public boolean getDGProbOnly() {
+        return dgProbOnly;
+    }
+
+    public boolean getMEProbOnly() {
+        return meProbOnly;
+    }
+
+    public boolean getDoOracleEval() {
+        return doOracleEval;
+    }
+
+    public double getDPC() {
+        return dpc;
+    }
+
+    public double getThreshold() {
+        return threshold;
     }
 
 	public void setHighRecallNER(boolean highRecallNER) {

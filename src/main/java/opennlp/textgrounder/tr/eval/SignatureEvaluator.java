@@ -7,15 +7,26 @@ package opennlp.textgrounder.tr.eval;
 import opennlp.textgrounder.tr.text.*;
 import opennlp.textgrounder.tr.topo.*;
 import java.util.*;
+import java.io.*;
 
 public class SignatureEvaluator extends Evaluator {
 
     private static final int CONTEXT_WINDOW_SIZE = 20;
 
+    private static final double FP_PENALTY = 20037.5;
+    private static final double FN_PENALTY = 20037.5;
+
+    private boolean doOracleEval;
+
     private Map<String, List<Location> > predCandidates = new HashMap<String, List<Location> >();
 
-    public SignatureEvaluator(Corpus goldCorpus) {
+    public SignatureEvaluator(Corpus goldCorpus, boolean doOracleEval) {
         super(goldCorpus);
+        this.doOracleEval = doOracleEval;
+    }
+
+    public SignatureEvaluator(Corpus goldCorpus) {
+        this(goldCorpus, false);
     }
 
     public Report evaluate() {
@@ -26,22 +37,24 @@ public class SignatureEvaluator extends Evaluator {
         Map<String, Location> locs = new HashMap<String, Location>();
 
         for(Document<Token> doc : corpus) {
+            //System.out.println("Document id: " + doc.getId());
             for(Sentence<Token> sent : doc) {
                 StringBuffer sb = new StringBuffer();
                 List<Integer> toponymStarts = new ArrayList<Integer>();
                 List<Location> curLocations = new ArrayList<Location>();
                 List<List<Location> > curCandidates = new ArrayList<List<Location> >();
                 for(Token token : sent) {
+                    //System.out.println(token.getForm());
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
                         if((getGoldLocations && toponym.hasGold()) ||
                            (!getGoldLocations && (toponym.hasSelected() || toponym.getAmbiguity() == 0))) {
                             toponymStarts.add(sb.length());
                             if(getGoldLocations) {
-				if(toponym.getGoldIdx() == 801) {
+				/*if(toponym.getGoldIdx() == 801) {
 				    System.out.println(toponym.getForm()+": "+toponym.getGoldIdx()+"/"+toponym.getCandidates().size());
-				}
-                                curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()));
+                                    }*/
+                                curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()<toponym.getCandidates().size()?toponym.getGoldIdx():toponym.getCandidates().size()-1));
 			    }
                             else {
                                 if(toponym.getAmbiguity() > 0)
@@ -80,35 +93,74 @@ public class SignatureEvaluator extends Evaluator {
         Map<String, Location> goldLocs = populateSigsAndLocations(corpus, true);
         Map<String, Location> predLocs = populateSigsAndLocations(pred, false);
 
+        Map<String, List<Double> > errors = new HashMap<String, List<Double> >();
+
         for(String context : goldLocs.keySet()) {
             if(predLocs.containsKey(context)) {
                 Location goldLoc = goldLocs.get(context);
                 Location predLoc = predLocs.get(context);
 
-                if(predLoc != null)
-                    dreport.addDistance(goldLoc.distanceInKm(predLoc));
+                if(predLoc != null && !doOracleEval) {
+                    double dist = goldLoc.distanceInKm(predLoc);
+                    dreport.addDistance(dist);
+                    String key = goldLoc.getName().toLowerCase();
+                    if(!errors.containsKey(key))
+                        errors.put(key, new ArrayList<Double>());
+                    errors.get(key).add(dist);
+                }
 
-                if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
-                    //System.out.println("TP: " + context + "|" + goldLocs.get(context));
-                    report.incrementTP();
+                if(doOracleEval) {
+                    if(predCandidates.get(context).size() > 0) {
+                        Location closestMatch = getClosestMatch(goldLoc, predCandidates.get(context));
+                        dreport.addDistance(goldLoc.distanceInKm(closestMatch));
+                        report.incrementTP();
+                    }
                 }
                 else {
-                    //System.out.println("FP and FN: " + context + "|" + goldLocs.get(context) + " vs. " + predLocs.get(context));
-                    //report.incrementFP();
-                    //report.incrementFN();
-                    report.incrementFPandFN();
+                    if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
+                        //System.out.println("TP: " + context + "|" + goldLocs.get(context));
+                        report.incrementTP();
+                    }
+                    else {
+                        //System.out.println("FP and FN: " + context + "|" + goldLocs.get(context) + " vs. " + predLocs.get(context));
+                        //report.incrementFP();
+                        //report.incrementFN();
+                        report.incrementFPandFN();
+                    }
                 }
             }
             else {
                 //System.out.println("FN: " + context + "| not found in pred");
                 report.incrementFN();
+                //dreport.addDistance(FN_PENALTY);
+                
             }
         }
         for(String context : predLocs.keySet()) {
             if(!goldLocs.containsKey(context)) {
                 //System.out.println("FP: " + context + "| not found in gold");
                 report.incrementFP();
+                //dreport.addDistance(FP_PENALTY);
             }
+        }
+
+        try {
+        BufferedWriter errOut = new BufferedWriter(new FileWriter("errors.txt"));
+
+        for(String toponym : errors.keySet()) {
+            List<Double> errorList = errors.get(toponym);
+            double sum = 0.0;
+            for(double error : errorList) {
+                sum += error;
+            }
+            errOut.write(toponym+" & "+errorList.size()+" & "+(sum/errorList.size())+" & "+sum+"\\\\\n");
+        }
+
+        errOut.close();
+
+        } catch(Exception e) {
+            e.printStackTrace();
+            System.exit(1);
         }
 
         return report;
@@ -125,6 +177,21 @@ public class SignatureEvaluator extends Evaluator {
                 return false;
         }
         return true;
+    }
+
+    private Location getClosestMatch(Location goldLoc, List<Location> curPredCandidates) {
+        double minDist = Double.POSITIVE_INFINITY;
+        Location toReturn = null;
+
+        for(Location otherLoc : curPredCandidates) {
+            double dist = otherLoc.distance(goldLoc);
+            if(dist < minDist) {
+                minDist = dist;
+                toReturn = otherLoc;
+            }
+        }
+
+        return toReturn;
     }
 
     private String getSignature(StringBuffer wholeContext, int centerIndex, int windowSize) {
