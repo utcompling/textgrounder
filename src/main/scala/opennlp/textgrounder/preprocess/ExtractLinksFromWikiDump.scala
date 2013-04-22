@@ -47,6 +47,7 @@ object ExtractLinksFromWikiDump {
   val trInputFile = parser.option[String](List("i", "tr-input"), "tr-input", "toponym resolution corpus input path")
   val gazInputFile = parser.option[String](List("g", "gaz"), "gaz", "serialized gazetteer input file")
   val stoplistInputFile = parser.option[String](List("s", "stoplist"), "stoplist", "stopwords input file")
+  val redirectsInputFile = parser.option[String](List("r", "redirects"), "redirects", "redirects input file")
   val linksOutputFile = parser.option[String](List("l", "links"), "links", "geotagged->geotagged link count output file")
   val trainingInstanceOutputDir = parser.option[String](List("d", "training-dir"), "training-dir", "training instance output directory")
   val maxCountOption = parser.option[Int](List("n", "max-count"), "max-count", "maximum number of lines to read (if unspecified, all will be read)")
@@ -57,9 +58,11 @@ object ExtractLinksFromWikiDump {
   val idRE = """^\s{4}<id>(.*)</id>\s*$""".r
 
   val listRE = """^(\d+)\t([^\t]+)\t(-?\d+\.?\d*),(-?\d+\.?\d*)$""".r
+  val redirectRE = """^(.+)\t(.+)$""".r
 
   //val linkAndContextRE = """((?:\S+\s*){0,20})?(\[\[[^\|\]]+)(\|?[^\|\]]+)?\]\]((?:\s*\S+){0,20})?""".r
   val tokenRE = """(?:\[\[(?:[^\|\]]+)?\|?(?:[^\|\]]+)\]\])|(?:\w[^ :&=;{}\|<>]*\w)""".r
+  val tokenOnlyRE = """\w[^ :&=;{}\|<>]*\w""".r
   //val tokenRE = """(?:\[\[(?:[^\|\]]+)?\|?(?:[^\|\]]+)\]\])|\w+""".r
   //val linkRE = """^\[\[([^\|\]]+)?\|?([^\|\]]+)\]\]$""".r
   val linkRE = """^\[\[([^\|]+)(?:\|(.+))?\]\]$""".r
@@ -77,11 +80,20 @@ object ExtractLinksFromWikiDump {
 
     //println(rawWikiInputFile.value.get)
 
-    println("Reading output from ExtractGeotaggedListFromWikiDump from " + articleNamesIDsCoordsFile.value.get + " ...");
+    println("Reading output from ExtractGeotaggedListFromWikiDump from " + articleNamesIDsCoordsFile.value.get + " ...")
     val articleNamesToIDsAndCoords =
     (for(line <- scala.io.Source.fromFile(articleNamesIDsCoordsFile.value.get).getLines) yield {
       line match {
-        case listRE(id, name, lat, lon) => { Some((name, (id.toInt, Coordinate.fromDegrees(lat.toDouble, lon.toDouble)))) }
+        case listRE(id, name, lat, lon) => Some((name, (id.toInt, Coordinate.fromDegrees(lat.toDouble, lon.toDouble))))
+        case _ => None
+      }
+    }).flatten.toMap
+
+    println("Reading redirects from ExtractGeotaggedListFromWikiDump from " + redirectsInputFile.value.get + " ...")
+    val redirects =
+    (for(line <- scala.io.Source.fromFile(redirectsInputFile.value.get).getLines) yield {
+      line match {
+        case redirectRE(title1, title2) => Some((title1, title2))
         case _ => None
       }
     }).flatten.toMap
@@ -146,9 +158,10 @@ object ExtractLinksFromWikiDump {
       for(tokIndex <- 0 until tokArray.size) {
         val token = tokArray(tokIndex)
         token match {
-          case linkRE(title,a) => {
+          case linkRE(titleRaw,a) => {
+
+            val title = redirects.getOrElse(titleRaw, titleRaw)
             val titleLower = title.toLowerCase
-            val anchor = if(a == null || a.trim.size == 0) title else a.trim
 
             val idAndCoord = articleNamesToIDsAndCoords.getOrElse(title, null)
 
@@ -345,9 +358,9 @@ object ExtractLinksFromWikiDump {
     linksIncluded.map(t => t match {
       case linkRE(title, a) => {
         val anchor = if(a == null || a.trim.size == 0) title else a.trim
-        anchor.split(" ")
+        tokenOnlyRE.findAllIn(anchor).toArray//.split(" ")
       }
-      case _ => t.split(" ")
+      case _ => tokenOnlyRE.findAllIn(t).toArray//.split(" ")
     }).flatten.map(_.toLowerCase).filterNot(stoplist(_))
   }
 
