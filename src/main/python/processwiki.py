@@ -1712,6 +1712,8 @@ class ArticleHandler(object):
       u'redirección',
       # Portuguese (PT)
       'redirecionamento',
+      # Asturian (AN)
+      'endrecera',
       # German (DE)
       'weiterleitung',
       # Russian (RU)
@@ -1719,8 +1721,11 @@ class ArticleHandler(object):
     ])
  
   global redirect_re
-  redirect_re = re.compile(ur'(?i)#(?:%s)\s*:?\s*\[\[(.*?)\]\]' %
-      redirect_commands)
+  #redirect_re = re.compile(ur'(?iu)#(?:%s)\s*:?\s*\[\[(.*?)\]\]' %
+  #    redirect_commands)
+  # To hell with it, no point in keeping a list of all the ways to say
+  # "redirect" in all languages; just allow any word(s)
+  redirect_re = re.compile(ur'(?iu)#(?:[\w ]+)\s*:?\s*\[\[(.*?)\]\]')
 
   # Process the text of article TITLE, with text TEXT.  The default
   # implementation does the following:
