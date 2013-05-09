@@ -28,6 +28,7 @@ import metering._
 import os._
 import print.{errprint, set_stdout_stderr_utf_8}
 import text._
+import textdb.Encoder
 import time.format_minutes_seconds
 
 package object experiment {
@@ -381,6 +382,41 @@ package object experiment {
     def countermap(prefix: String) =
       new SettingDefaultHashMap[String, TaskCounterWrapper](
         create_counter_wrapper(prefix, _))
+
+    var results_to_output = Map[String, String]()
+    var field_description = Map[String, String]()
+
+    /******************* Stuff for results file **************/
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results), where the result has already been encoded for
+     * storage in a textdb field (requires special handling e.g. of
+     * newlines and tab characters).
+     */
+    def note_raw_result(field: String, desc: String, value: String) {
+      results_to_output += (field -> value)
+      if (desc != "")
+        field_description += (field -> desc)
+    }
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results).
+     */
+    def note_result(field: String, desc: String, value: Any) {
+      val str = Encoder.string(value.toString)
+      note_raw_result(field, desc, str)
+    }
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results), and also print it to stderr.
+     */
+    def note_print_result(field: String, desc: String, value: Any) {
+      note_result(field, desc, value)
+      errprint("%s: %s", desc, value)
+    }
 
     /******************* Override/implement below this line **************/
 

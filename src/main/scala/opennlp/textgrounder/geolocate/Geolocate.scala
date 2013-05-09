@@ -335,9 +335,18 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     params.degrees_per_cell = computed_dpc
 
     // Output computed values
-    errprint("Computed degrees per cell: %s", format_float(computed_dpc))
-    errprint("Computed kilometers per cell: %s", format_float(computed_kpc))
-    errprint("Computed miles per cell: %s", format_float(computed_mpc))
+    val results = Seq(
+      ("computed-degrees-per-cell", "Computed degrees per cell",
+        computed_dpc),
+      ("computed-km-per-cell", "Computed kilometers per cell",
+        computed_kpc),
+      ("computed-miles-per-cell", "Computed miles per cell",
+        computed_mpc)
+    )
+    for ((field, english, value) <- results) {
+      note_result(field, english, value)
+      errprint("%s: %s", english, format_float(value))
+    }
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory) =

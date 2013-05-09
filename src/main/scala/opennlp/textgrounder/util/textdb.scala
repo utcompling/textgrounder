@@ -94,6 +94,8 @@ package object textdb {
    *   same value for every row.  This is optional, but usually at least
    *   the "corpus-name" field should be given, with the name of the corpus
    *   (currently used purely for identification purposes).
+   * @param field_description Map giving English description of field names,
+   *   for display purposes.
    * @param split_text Text used for separating field values in a row;
    *   normally a tab character. (FIXME: There may be dependencies elsewhere
    *   on the separator being a tab, e.g. in EncodeDecode.)
@@ -101,13 +103,14 @@ package object textdb {
   class Schema(
     val fieldnames: Iterable[String],
     val fixed_values: Map[String, String] = Map[String, String](),
+    val field_description: Map[String, String] = Map[String, String](),
     val split_text: String = "\t"
   ) {
     import Serializer._
 
     override def toString =
-      "Schema(%s, %s, %s)" format (
-        fieldnames, fixed_values, split_text)
+      "Schema(%s, %s, %s, %s)" format (
+        fieldnames, fixed_values, field_description, split_text)
 
     val split_re = "\\Q" + split_text + "\\E"
     val field_indices = fieldnames.zipWithIndex.toMap
@@ -198,8 +201,13 @@ package object textdb {
     def output_schema_file(filehand: FileHandler, schema_file: String) {
       val schema_outstream = filehand.openw(schema_file)
       schema_outstream.println(make_row(fieldnames))
-      for ((field, value) <- fixed_values)
-        schema_outstream.println(Seq(field, value) mkString split_text)
+      for ((field, value) <- fixed_values) {
+        if (field_description.contains(field))
+          schema_outstream.println(
+            Seq(field, value, field_description(field)) mkString split_text)
+        else
+          schema_outstream.println(Seq(field, value) mkString split_text)
+      }
       schema_outstream.close()
     }
 
@@ -221,7 +229,8 @@ package object textdb {
      * the same name.
      */
     def clone_with_changes(new_fixed_values: Map[String, String]) =
-      new Schema(fieldnames, fixed_values ++ new_fixed_values, split_text)
+      new Schema(fieldnames, fixed_values ++ new_fixed_values,
+        field_description, split_text)
   }
 
   class SchemaFromFile(
@@ -229,11 +238,13 @@ package object textdb {
     val filename: String,
     fieldnames: Iterable[String],
     fixed_values: Map[String, String] = Map[String, String](),
+    field_description: Map[String, String] = Map[String, String](),
     split_text: String = "\t"
-  ) extends Schema(fieldnames, fixed_values, split_text) {
+  ) extends Schema(fieldnames, fixed_values, field_description, split_text) {
     override def toString =
-      "SchemaFromFile(%s, %s, %s, %s, %s)" format (
-        filehand, filename, fieldnames, fixed_values, split_text)
+      "SchemaFromFile(%s, %s, %s, %s, %s, %s)" format (
+        filehand, filename, fieldnames, fixed_values, field_description,
+        split_text)
   }
 
   /**
@@ -341,14 +352,22 @@ package object textdb {
         throw new FileFormatException(
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, fieldnames))
-      var fixed_fields = Map[String,String]()
+      var fixed_fields = Map[String, String]()
+      var field_description = Map[String, String]()
       for (line <- lines) {
         val fixed = line.split(split_re, -1)
-        if (fixed.length != 2)
-          throw new FileFormatException(
-            "For fixed fields (i.e. lines other than first) in schema file %s, should have two values (FIELD and VALUE), instead of %s".
-            format(schema_file, line))
-        val Array(from, to) = fixed
+        val Array(from, to) =
+          if (fixed.length == 3) {
+            val Array(f, t, desc) = fixed
+            field_description += (f -> desc)
+            Array(f, t)
+          } else {
+            if (fixed.length != 2)
+              throw new FileFormatException(
+                "For fixed fields (i.e. lines other than first) in schema file %s, should have two values (FIELD and VALUE), or three values (FIELD, VALUE, DESC), instead of %s".
+                format(schema_file, line))
+            fixed
+          }
         if (from.length == 0)
           throw new FileFormatException(
             "Blank field name in fixed-value part of schema file %s: line is %s".
@@ -356,7 +375,7 @@ package object textdb {
         fixed_fields += (from -> to)
       }
       new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields,
-        split_text)
+        field_description, split_text)
     }
 
     /**
