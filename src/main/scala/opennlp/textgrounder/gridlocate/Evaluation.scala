@@ -41,7 +41,7 @@ import util.debug._
 // incorrect_reasons is a map from ID's for reasons to strings describing
 // them.
 class EvalStats(
-  driver_stats: ExperimentDriverStats,
+  val driver_stats: ExperimentDriverStats,
   prefix: String,
   incorrect_reasons: Map[String, String]
 ) {
@@ -106,6 +106,7 @@ class EvalStats(
   def output_other_stats() {
     for (ty <- driver_stats.list_local_counters("", true)) {
       val count = driver_stats.get_local_counter(ty)
+      driver_stats.note_result(ty, "", count)
       errprint("%s = %s", ty, count)
     }
   }
@@ -285,14 +286,24 @@ trait DocEvalStats[Co] extends EvalStats {
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
-    errprint("  Mean true error distance = %s",
-      output_result_with_units(mean(true_dists)))
-    errprint("  Median true error distance = %s",
-      output_result_with_units(median(true_dists)))
-    errprint("  Mean oracle true error distance = %s",
-      output_result_with_units(mean(oracle_true_dists)))
-    errprint("  Median oracle true error distance = %s",
-      output_result_with_units(median(oracle_true_dists)))
+    val results = Seq(
+      ("mean-true-error-distance",
+       "Mean true error distance",
+       mean(true_dists)),
+      ("median-true-error-distance",
+       "Median true error distance",
+       median(true_dists)),
+      ("mean-oracle-true-error-distance",
+       "Mean oracle true error distance",
+       mean(oracle_true_dists)),
+      ("median-oracle-true-error-distance",
+       "Median oracle true error distance",
+       median(oracle_true_dists))
+    )
+    for ((field, desc, value) <- results) {
+      errprint("  %s = %s", desc, output_result_with_units(value))
+      driver_stats.note_result(field, desc, value)
+    }
   }
 }
 

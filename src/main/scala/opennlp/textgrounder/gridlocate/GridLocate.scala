@@ -1026,12 +1026,19 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
       // Use format rather than toString to handle nulls
       case (arg, value) => (arg, "%s" format value)
     }
+    note_raw_result("parameters", "Parameters",
+      Encoder.string_map_seq(param_values))
+    note_raw_result("non-default-parameters", "Non-default parameters",
+      Encoder.string_map_seq(
+        param_values filter {
+          case (arg, value) => params.parser.specified(arg)
+        }))
     val fixed_fields = Map(
         // "corpus-name" -> opts.corpus_name,
         // "generating-app" -> progname,
         "corpus-type" -> "textgrounder-results"
-    ) ++ param_values.toMap
-    val schema = new Schema(fields, fixed_fields)
+    ) ++ results_to_output
+    val schema = new Schema(fields, fixed_fields, field_description)
     schema.output_constructed_schema_file(filehand, base)
     val outfile = TextDB.construct_data_file(base)
     val outstr = filehand.openw(outfile)
