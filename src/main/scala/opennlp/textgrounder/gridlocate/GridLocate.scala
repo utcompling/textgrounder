@@ -1092,23 +1092,10 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     val first = results.next
     val res2 = Iterator(first) ++ results
     val fields = first.to_row.map(_._1)
-    val param_values = params.parser.argValues map {
-      // Use format rather than toString to handle nulls
-      case (arg, value) => (arg, "%s" format value)
-    }
-    note_raw_result("parameters", "Parameters",
-      Encoder.string_map_seq(param_values))
-    note_raw_result("non-default-parameters", "Non-default parameters",
-      Encoder.string_map_seq(
-        param_values filter {
-          case (arg, value) => params.parser.specified(arg)
-        }))
-    val fixed_fields = Map(
-        // "corpus-name" -> opts.corpus_name,
-        // "generating-app" -> progname,
-        "corpus-type" -> "textgrounder-results"
-    ) ++ results_to_output
-    val schema = new Schema(fields, fixed_fields, field_description)
+    note_result("corpus-type", "textgrounder-results")
+    // note_result("corpus-name", opts.corpus_name)
+    // note_result("generating-app", progname)
+    val schema = new Schema(fields, results_to_output, field_description)
     schema.output_constructed_schema_file(filehand, base)
     val outfile = TextDB.construct_data_file(base)
     val outstr = filehand.openw(outfile)
@@ -1125,9 +1112,9 @@ abstract class GridLocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
   type TDriver <: GridLocateDriver[_]
 
-  override def run_program() = {
+  override def run_program(args: Array[String]) = {
     try {
-      super.run_program()
+      super.run_program(args)
     } catch {
       case e:GridLocateAbruptExit => {
         errprint("Caught abrupt exit throw, exiting")

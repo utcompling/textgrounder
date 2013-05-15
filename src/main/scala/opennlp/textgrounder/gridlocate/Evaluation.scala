@@ -104,10 +104,10 @@ class EvalStats(
   }
 
   def output_other_stats() {
-    for (ty <- driver_stats.list_local_counters("", true)) {
-      val count = driver_stats.get_local_counter(ty)
-      driver_stats.note_result(ty, "", count)
-      errprint("%s = %s", ty, count)
+    for (field <- driver_stats.list_local_counters("", true)) {
+      val count = driver_stats.get_local_counter(field)
+      driver_stats.note_result(field, count)
+      errprint("%s = %s", field, count)
     }
   }
 
@@ -302,7 +302,7 @@ trait DocEvalStats[Co] extends EvalStats {
     )
     for ((field, desc, value) <- results) {
       errprint("  %s = %s", desc, output_result_with_units(value))
-      driver_stats.note_result(field, desc, value)
+      driver_stats.note_result(field, value, desc)
     }
   }
 }

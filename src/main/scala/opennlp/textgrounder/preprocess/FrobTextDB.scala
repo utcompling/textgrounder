@@ -148,18 +148,19 @@ class FrobTextDB(
     }
   }
 
-  def modify_fixed_values(fixed_values: Map[String, String]) = {
-    var (names, values) = fixed_values.toSeq.unzip
-    var new_fixed_values = (rename_fields(names) zip values).toMap
-    for (field <- params.remove_field)
-      new_fixed_values -= field
-    val new_fields =
-      for (add_field <- params.add_field) yield {
-        val Array(field, value) = add_field.split("=", 2)
-        (field -> value)
-      }
-    new_fixed_values ++= new_fields
-    new_fixed_values
+  def parse_field_param(param: Seq[String]) = {
+    for (fieldspec <- param) yield {
+      val Array(field, value) = fieldspec.split("=", 2)
+      (field -> value)
+    }
+  }
+
+  def modify_fixed_values(fixed_values: scala.collection.Map[String, String]
+      ) = {
+    val fields_to_rename = parse_field_param(params.rename_field).toMap
+    fixed_values.map {
+      case (key, value) => (fields_to_rename(key), value)
+    } -- params.remove_field ++ parse_field_param(params.add_field)
   }
 
   /**

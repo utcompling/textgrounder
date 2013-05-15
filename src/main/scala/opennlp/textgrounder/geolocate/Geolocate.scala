@@ -31,8 +31,11 @@ import util.collection._
 import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
+import util.os._
 import util.print.{errprint, fixme_error}
 import util.text.format_float
+import util.textdb.Encoder
+import util.time.format_minutes_seconds
 
 import util.debug._
 import gridlocate._
@@ -344,7 +347,7 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
         computed_mpc)
     )
     for ((field, english, value) <- results) {
-      note_result(field, english, value)
+      note_result(field, value, english)
       errprint("%s: %s", english, format_float(value))
     }
   }
@@ -805,6 +808,16 @@ found   : (String, Iterator[evalobj.TEvalRes])
         }
       // The call to `toIndexedSeq` forces evaluation of the Iterator
       val results = results_iter.toIndexedSeq
+      note_result("time.begin", beginning_time)
+      note_result("time.begin.human", humandate_full(beginning_time))
+      note_raw_result("arguments", Encoder.string_seq(original_args))
+      ending_time = curtimesecs
+      note_result("time.end", ending_time)
+      note_result("time.end.human", humandate_full(ending_time))
+      val elapsed = ending_time - beginning_time
+      note_result("time.running", elapsed)
+      note_result("time.running.human", format_minutes_seconds(elapsed))
+
       if (params.results != null) {
         val filehand = get_file_handler
         output_results(results.toIterator, filehand, params.results)

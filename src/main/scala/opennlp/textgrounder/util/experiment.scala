@@ -60,7 +60,11 @@ package object experiment {
   trait ExperimentDriver {
     type TParam
     type TRunRes
+    var original_args: Array[String] = _
     var params: TParam = _
+
+    val beginning_time = curtimesecs
+    var ending_time = 0.0
 
     /**
      * Signal a parameter error.
@@ -96,9 +100,17 @@ package object experiment {
       handle_parameters()
     }
 
-    def run_program(params: TParam) = {
-      set_parameters(params)
-      run()
+    def run_program(args: Array[String]) = {
+      original_args = args
+      errprint("Beginning operation at %s" format humandate_full(beginning_time))
+      errprint("Arguments: %s" format (args mkString " "))
+      val retval = run()
+      if (ending_time == 0)
+        ending_time = curtimesecs
+      errprint("Ending operation at %s" format humandate_full(ending_time))
+      errprint("Program running time: %s",
+        format_minutes_seconds(ending_time - beginning_time))
+      retval
     }
 
     def show_progress(verb: String, item_name: String,
@@ -129,6 +141,42 @@ package object experiment {
     def heartbeat() {
     }
 
+    /******************* Stuff for results file **************/
+
+    val results_to_output = mutable.LinkedHashMap[String, String]()
+    var field_description = Map[String, String]()
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results), where the result has already been encoded for
+     * storage in a textdb field (requires special handling e.g. of
+     * newlines and tab characters).
+     */
+    def note_raw_result(field: String, value: String, desc: String = "") {
+      results_to_output += (field -> value)
+      if (desc != "")
+        field_description += (field -> desc)
+    }
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results).
+     */
+    def note_result(field: String, value: Any, desc: String = "") {
+      // Not .toString because that can't handle null
+      val str = Encoder.string("%s" format value)
+      note_raw_result(field, str, desc)
+    }
+
+    /**
+     * Note a result to be stored in the schema of the results file
+     * (--results), and also print it to stderr.
+     */
+    def note_print_result(field: String, value: Any, desc: String) {
+      note_result(field, value, desc)
+      errprint("%s: %s", desc, value)
+    }
+
     /********************************************************************/
     /*                 Function to override below this line             */
     /********************************************************************/
@@ -157,7 +205,7 @@ package object experiment {
    * may be run in parallel of different machines to completely a global
    * job.  Counters can be tracked both globally and per-task.
    */
-  trait ExperimentDriverStats {
+  trait ExperimentDriverStats extends ExperimentDriver {
     /** Set of counters under the given group, using fully-qualified names. */
     protected val counters_by_group = setmap[String,String]()
     /** Set of counter groups under the given group, using fully-qualified
@@ -383,41 +431,6 @@ package object experiment {
       new SettingDefaultHashMap[String, TaskCounterWrapper](
         create_counter_wrapper(prefix, _))
 
-    var results_to_output = Map[String, String]()
-    var field_description = Map[String, String]()
-
-    /******************* Stuff for results file **************/
-
-    /**
-     * Note a result to be stored in the schema of the results file
-     * (--results), where the result has already been encoded for
-     * storage in a textdb field (requires special handling e.g. of
-     * newlines and tab characters).
-     */
-    def note_raw_result(field: String, desc: String, value: String) {
-      results_to_output += (field -> value)
-      if (desc != "")
-        field_description += (field -> desc)
-    }
-
-    /**
-     * Note a result to be stored in the schema of the results file
-     * (--results).
-     */
-    def note_result(field: String, desc: String, value: Any) {
-      val str = Encoder.string(value.toString)
-      note_raw_result(field, desc, str)
-    }
-
-    /**
-     * Note a result to be stored in the schema of the results file
-     * (--results), and also print it to stderr.
-     */
-    def note_print_result(field: String, desc: String, value: Any) {
-      note_result(field, desc, value)
-      errprint("%s: %s", desc, value)
-    }
-
     /******************* Override/implement below this line **************/
 
     /**
@@ -519,8 +532,6 @@ package object experiment {
      below on the line creating ArgParser when trying to access progname,
      saying "no such field". */
   abstract class ExperimentApp(val progname: String) {
-    val beginning_time = curtimesecs
-
     // Things that must be implemented
 
     /**
@@ -546,7 +557,7 @@ package object experiment {
      * @return Exit code of program (0 for successful completion, > 0 for
      *  an error
      */
-    def run_program(): Int
+    def run_program(args: Array[String]): Int
 
     // Things that may be overridden
 
@@ -570,8 +581,9 @@ package object experiment {
       errprint("")
       errprint("Non-default parameter values:")
       for (name <- arg_parser.argNames) {
-        if (arg_parser.specified(name))
+        if (arg_parser.specified(name)) {
           errprint("%30s: %s", name, arg_parser(name))
+        }
       }
       errprint("")
       errprint("Parameter values:")
@@ -610,20 +622,13 @@ package object experiment {
     def implement_main(args: Array[String]) = {
       initialize_osutil()
       set_stdout_stderr_utf_8()
-      errprint("Beginning operation at %s" format humandate_full(beginning_time))
-      errprint("Arguments: %s" format (args mkString " "))
       val shadow_fields = create_param_object(arg_parser)
       arg_parser.parse(args)
       params = create_param_object(arg_parser)
       initialize_parameters()
       output_command_line_parameters()
       output_ancillary_parameters()
-      val retval = run_program()
-      val ending_time = curtimesecs
-      errprint("Ending operation at %s" format humandate_full(ending_time))
-      errprint("Program running time: %s",
-        format_minutes_seconds(ending_time - beginning_time))
-      retval
+      run_program(args)
     }
 
     /**
@@ -725,12 +730,40 @@ package object experiment {
       driver.output_ancillary_parameters()
     }
 
+    override def output_command_line_parameters() {
+      super.output_command_line_parameters()
+      for (name <- arg_parser.argNames) {
+        if (arg_parser.specified(name)) {
+          driver.note_result("parameters.non-default.%s" format name,
+            arg_parser(name))
+        }
+      }
+      for (name <- arg_parser.argNames) {
+        driver.note_result("parameters.%s" format name,
+          arg_parser(name))
+      }
+
+      val param_values = params.parser.argValues map {
+        // Use format rather than toString to handle nulls
+        case (arg, value) => (arg, "%s" format value)
+      }
+      driver.note_raw_result("parameters-combined",
+        Encoder.string_map_seq(param_values),
+        "Parameters")
+      driver.note_raw_result("parameters-non-default-combined",
+        Encoder.string_map_seq(
+          param_values filter {
+            case (arg, value) => params.parser.specified(arg)
+          }),
+        "Non-default parameters")
+    }
+
     def initialize_parameters() {
       driver.set_parameters(params)
     }
 
-    def run_program() = {
-      driver.run()
+    def run_program(args: Array[String]) = {
+      driver.run_program(args)
       0
     }
   }

@@ -495,7 +495,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "retweets" => count_map(retweets)
           case "hashtags" => count_map(hashtags)
           case "urls" => count_map(urls)
-          case "text" => seq_string(text)
+          case "text" => string_seq(text)
           case "unigram-counts" => tokenize_act.emit_unigrams(text)
           case "ngram-counts" => tokenize_act.emit_ngrams(text)
         }
@@ -557,7 +557,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         name match {
           case "json"          => json = string(x)
           case "path"          => path = string(x)
-          case "text"          => text = seq_string(x)
+          case "text"          => text = string_seq(x)
           case "user"          => user = string(x)
           case "id"            => id = dlong(x)
           case "min-timestamp" => min_timestamp = dlong(x)
