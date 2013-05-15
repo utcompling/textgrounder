@@ -406,20 +406,20 @@ abstract class GeoGrid[Co](
         cell.combined_dist.num_docs
     }
 
-    driver.note_print_result("number-of-non-empty-cells",
-      "Number of non-empty cells", num_non_empty_cells)
-    driver.note_print_result("total-number-of-cells",
-      "Total number of cells", total_num_cells)
+    driver.note_print_result("number-of-non-empty-cells", num_non_empty_cells,
+      "Number of non-empty cells")
+    driver.note_print_result("total-number-of-cells", total_num_cells,
+      "Total number of cells")
     driver.note_print_result("percent-non-empty-cells",
-      "Percent non-empty cells",
-      "%g" format (num_non_empty_cells.toDouble / total_num_cells)
+      "%g" format (num_non_empty_cells.toDouble / total_num_cells),
+      "Percent non-empty cells"
     )
     val recorded_training_docs_with_coordinates =
       docfact.num_recorded_documents_with_coordinates_by_split("training").value
     driver.note_print_result("training-documents-per-non-empty-cell",
-      "Training documents per non-empty cell",
       "%g" format (recorded_training_docs_with_coordinates.toDouble /
-        num_non_empty_cells))
+        num_non_empty_cells),
+      "Training documents per non-empty cell")
     driver.heartbeat
   }
 }

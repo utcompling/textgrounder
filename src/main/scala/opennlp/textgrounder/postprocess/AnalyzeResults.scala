@@ -83,7 +83,7 @@ object AnalyzeResults extends ExperimentApp("classify") {
     outf.close()
   }
 
-  def run_program() = {
+  def run_program(args: Array[String]) = {
     val correct_cells = intmap[String]()
     val pred_cells = intmap[String]()
 

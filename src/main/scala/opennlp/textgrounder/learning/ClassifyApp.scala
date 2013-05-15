@@ -134,7 +134,7 @@ object ClassifyApp extends ExperimentApp("classify") {
       parse_debug_spec(params.debug)
   }
 
-  def run_program() = {
+  def run_program(args: Array[String]) = {
     val local = io.local_file_handler
     val std = io.std_file_handler
     val trainSource = local.openr(params.trainSource)

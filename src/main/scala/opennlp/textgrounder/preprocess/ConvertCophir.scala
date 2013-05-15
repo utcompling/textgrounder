@@ -238,7 +238,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
               case _ => Some((tag \ "@raw").text)
             }
           } map { _.trim } filter { _.length > 0 } // Filter out blank tags
-          val rawtags_str = Encoder.seq_string(rawtags)
+          val rawtags_str = Encoder.string_seq(rawtags)
           // Filter photos without user-added tags (needs to be done after
           // filtering machine-added tags)
           if (rawtags_str.size == 0) None

@@ -73,7 +73,7 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
     outf.close()
   }
 
-  def run_program() = {
+  def run_program(args: Array[String]) = {
     val filehand = io.local_file_handler
     val input_file =
       if (params.input contains "/") params.input

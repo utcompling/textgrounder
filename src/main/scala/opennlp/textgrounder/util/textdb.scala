@@ -20,6 +20,7 @@ package opennlp.textgrounder
 package util
 
 import scala.collection.mutable
+import scala.collection.{Map => BaseMap}
 import scala.util.control.Breaks._
 
 import java.io.PrintStream
@@ -102,8 +103,8 @@ package object textdb {
    */
   class Schema(
     val fieldnames: Iterable[String],
-    val fixed_values: Map[String, String] = Map[String, String](),
-    val field_description: Map[String, String] = Map[String, String](),
+    val fixed_values: BaseMap[String, String] = Map[String, String](),
+    val field_description: BaseMap[String, String] = Map[String, String](),
     val split_text: String = "\t"
   ) {
     import Serializer._
@@ -228,7 +229,7 @@ package object textdb {
      * These will augment any existing fixed values, overwriting those of
      * the same name.
      */
-    def clone_with_changes(new_fixed_values: Map[String, String]) =
+    def clone_with_changes(new_fixed_values: BaseMap[String, String]) =
       new Schema(fieldnames, fixed_values ++ new_fixed_values,
         field_description, split_text)
   }
@@ -237,8 +238,8 @@ package object textdb {
     val filehand: FileHandler,
     val filename: String,
     fieldnames: Iterable[String],
-    fixed_values: Map[String, String] = Map[String, String](),
-    field_description: Map[String, String] = Map[String, String](),
+    fixed_values: BaseMap[String, String] = Map[String, String](),
+    field_description: BaseMap[String, String] = Map[String, String](),
     split_text: String = "\t"
   ) extends Schema(fieldnames, fixed_values, field_description, split_text) {
     override def toString =
@@ -257,7 +258,7 @@ package object textdb {
    */
   class SubSchema(
     fieldnames: Iterable[String],
-    fixed_values: Map[String, String] = Map[String, String](),
+    fixed_values: BaseMap[String, String] = Map[String, String](),
     val orig_schema: Schema
   ) extends Schema(fieldnames, fixed_values) {
     val orig_field_indices = {
@@ -403,7 +404,7 @@ package object textdb {
     /**
      * Convert from a map back to a tuple of lists of field names and values.
      */
-    def from_map(map: scala.collection.Map[String, String]) =
+    def from_map(map: BaseMap[String, String]) =
       map.toSeq.unzip
 
   }
@@ -885,17 +886,17 @@ package object textdb {
   }
 
   object Encoder {
-    def count_map(x: scala.collection.Map[String, Int]) =
+    def count_map(x: BaseMap[String, Int]) =
       encode_count_map(x.toSeq)
     def count_map_seq(x: Iterable[(String, Int)]) =
       encode_count_map(x)
-    def string_map(x: scala.collection.Map[String, String]) =
+    def string_map(x: BaseMap[String, String]) =
       encode_string_map(x.toSeq)
     def string_map_seq(x: Iterable[(String, String)]) =
       encode_string_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
-    def seq_string(x: Iterable[String]) =
+    def string_seq(x: Iterable[String]) =
       x.map(encode_string_for_sequence_field) mkString ">>"
     def timestamp(x: Long) = x.toString
     def long(x: Long) = x.toString
@@ -909,7 +910,7 @@ package object textdb {
     def string_map(x: String) = decode_string_map(x).toMap
     def string_map_seq(x: String) = decode_string_map(x)
     def string(x: String) = decode_string_for_whole_field(x)
-    def seq_string(x: String) =
+    def string_seq(x: String) =
       x.split(">>", -1).map(decode_string_for_sequence_field)
     def timestamp(x: String) = x.toLong
     def long(x: String) = x.toLong

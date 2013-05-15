@@ -198,7 +198,7 @@ package object hadoop {
        initialize_hadoop_classes(), set the input and output files, and
        actually run the job.
      */
-    override def run_program() = {
+    override def run_program(args: Array[String]) = {
       import HadoopExperimentConfiguration._
       convert_parameters_to_hadoop_conf(hadoop_conf_prefix, arg_parser,
         hadoop_conf)
