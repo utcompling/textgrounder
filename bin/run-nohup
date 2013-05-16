@@ -38,39 +38,56 @@ if [ -z "$1" ]; then
   help; exit 1
 fi
 
-shiftedcmds=""
+id=
+full_id=
+origargs="$0 $*"
 quiet=no
+output_full_id=no
 
 # Handle command-line args for us.
 while true ; do
   case "$1" in
-    -i | --id ) id=".$2"; shiftedcmds="$shiftedcmds $1 $2"; shift 2 ;;
-    -q | --quiet ) quiet=yes; shiftedcmds="$shiftedcmds $1"; shift 1 ;;
+    -i | --id ) id="$2"; shift 2 ;;
+    --full-id ) id="$2"; full_id=yes; shift 2 ;;
+    -q | --quiet ) quiet=yes; shift 1 ;;
+    --output-full-id ) output_full_id=yes; shift 1 ;;
     * ) break ;;
   esac
 done
 
-runprog="$1"; shiftedcmds="$shiftedcmds $1"; shift 1
+runprog="$1"; shift 1
 shortprog=`basename $runprog`
-
-if [ "`uname`" = "Darwin" ]; then
-  # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
-  # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
-  # real logical, huh?)
-  outfile="$shortprog.out$id.`date '+%F.%H%M%p'`"
-else
-  outfile="$shortprog.out$id.`date '+%F.%H%M%P'`"
+outprefix="$shortprog.out"
+if [ -n "$id" ]; then
+  outprefix="$outprefix."
 fi
-if [ -e "$outfile" ]; then
-  num=1
-  outfile_base="$outfile"
-  while true ; do
-    outfile="$outfile_base.$num"
-    if [ ! -e "$outfile" ]; then
-      break
-    fi
-    num=`expr $num + 1`
-  done
+
+if [ "$full_id" = yes ]; then
+  tag="$id"
+  outfile="$outprefix$tag"
+else
+  if [ "`uname`" = "Darwin" ]; then
+    # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
+    # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
+    # real logical, huh?)
+    tag="$id.`date '+%F.%H%M%p'`"
+  else
+    tag="$id.`date '+%F.%H%M%P'`"
+  fi
+  outfile="$outprefix$tag"
+  if [ -e "$outfile" ]; then
+    num=1
+    outfile_base="$outfile"
+    tagbase="$tag"
+    while true ; do
+      tag="$tagbase.$num"
+      outfile="$outfile_base.$num"
+      if [ ! -e "$outfile" ]; then
+        break
+      fi
+      num=`expr $num + 1`
+    done
+  fi
 fi
 
 # Make a file name absolute.
@@ -102,14 +119,18 @@ function make_absolute() {
 #  esac
 #}
 
-if [ "$quiet" != "yes" ]; then
-  absout=`make_absolute "$outfile"`
-  (
-  echo "Nohup wrapper running on `hostname` at time `date`"
-  echo "Output file: $absout"
-  echo "Nohup script invoked as: $0$shiftedcmds" ${1+"$@"}
-  echo "Invoking: $runprog" ${1+"$@"}
-  echo "(all above info also sent to output file)"
-  ) | tee "$outfile"
+if [ "$output_full_id" = yes ]; then
+  echo $tag
+else
+  if [ "$quiet" != "yes" ]; then
+    absout=`make_absolute "$outfile"`
+    (
+    echo "Nohup wrapper running on `hostname` at time `date`"
+    echo "Output file: $absout"
+    echo "Nohup script invoked as: $origargs"
+    echo "Invoking: $runprog" ${1+"$@"}
+    echo "(all above info also sent to output file)"
+    ) | tee "$outfile"
+  fi
+  nohup "$runprog" ${1+"$@"} >> "$outfile" 2>&1
 fi
-nohup "$runprog" ${1+"$@"} >> "$outfile" 2>&1
