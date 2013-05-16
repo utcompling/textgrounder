@@ -6,12 +6,14 @@
 tgopts=
 default_tgapp=geolocate-document
 tgapp=
+quiet=
 hadoop_arg=
 
 while true ; do
   case "$1" in
     --help ) help; exit 1 ;;
     --app ) tgapp="$2"; shift 2 ;;
+    --quiet ) quiet=yes; shift ;;
     --hadoop )
       hadoop_arg="--hadoop"; tgopts="$tgopts --hadoop"; shift ;;
     --hadoop-nondist )

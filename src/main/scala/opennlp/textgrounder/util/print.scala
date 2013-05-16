@@ -128,6 +128,14 @@ package object print {
     errout_stream.flush()
   }
 
+  def outprint(format: String, args: Any*) {
+    uniprint(format_outtext(format, args: _*))
+  }
+
+  def outout(format: String, args: Any*) {
+    uniout(format_outtext(format, args: _*))
+  }
+
   /**
     * Output a warning, formatting into UTF-8 as necessary.
     */

@@ -32,7 +32,7 @@ import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.os._
-import util.print.{errprint, fixme_error}
+import util.print.{errprint, outprint, fixme_error}
 import util.text.format_float
 import util.textdb.Encoder
 import util.time.format_minutes_seconds
@@ -336,20 +336,8 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     // setting parameters as variables (so that type-checking works, etc.)
     // and doesn't require needless extra boilerplate.
     params.degrees_per_cell = computed_dpc
-
-    // Output computed values
-    val results = Seq(
-      ("computed-degrees-per-cell", "Computed degrees per cell",
-        computed_dpc),
-      ("computed-km-per-cell", "Computed kilometers per cell",
-        computed_kpc),
-      ("computed-miles-per-cell", "Computed miles per cell",
-        computed_mpc)
-    )
-    for ((field, english, value) <- results) {
-      note_result(field, value, english)
-      errprint("%s: %s", english, format_float(value))
-    }
+    params.km_per_cell = computed_kpc
+    params.miles_per_cell = computed_mpc
   }
 
   protected def create_document_factory(word_dist_factory: WordDistFactory) =
@@ -820,7 +808,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
 
       if (params.results != null) {
         val filehand = get_file_handler
-        output_results(results.toIterator, filehand, params.results)
+        write_results_file(results.toIterator, filehand, params.results)
       }
       results
     }
@@ -837,10 +825,178 @@ abstract class GeolocateApp(appname: String) extends
   override type TDriver <: GeolocateDriver
 }
 
-object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
+abstract class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document") {
   type TDriver = GeolocateDocDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
+
+  override def output_command_line_parameters() {
+    super.output_command_line_parameters()
+
+    // Output computed values
+    val results = Seq(
+      ("computed-degrees-per-cell", "Computed degrees per cell",
+        params.degrees_per_cell),
+      ("computed-km-per-cell", "Computed kilometers per cell",
+        params.km_per_cell),
+      ("computed-miles-per-cell", "Computed miles per cell",
+        params.miles_per_cell)
+    )
+    for ((field, english, value) <- results) {
+      driver.note_result(field, value, english)
+      errprint("%s: %s", english, format_float(value))
+    }
+  }
+
+}
+
+/**
+ * The normal application for geolocating a document.
+ */
+object GeolocateDocumentApp extends GeolocateDocumentTypeApp
+
+/**
+ * An application for generating a tag describing the command-line
+ * parameters, for use as part of a filename. The only output is the tag
+ * itself.
+ */
+object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
+  // Suppress normal output of command-line params
+  override def output_command_line_parameters() { }
+
+  override def run_program(args: Array[String]) = {
+    /////// Various ways of handling params
+
+    /**
+     * Output the value only. Typical for choice options.
+     */
+    def valonly = (value: Any) => value match {
+      case null => ""
+      case d:Double => {
+        if (d == d.toLong) "%s" format d.toLong
+        else format_float(d)
+      }
+      case _ => "%s" format value
+    }
+
+    /**
+     * Output 'name=value' for a specified name (usually a shortened
+     * version of the param's name). Normally used for options with
+     * string values.
+     */
+    def full(name: String, noequals: Boolean = false) =
+      (value: Any) => value match {
+        // If the value somehow is null or false, no output at all
+        case null | false => ""
+        // If true (a flag), only the flag's name
+        case true => "%s" format name
+        case _ => "%s%s%s" format (
+          name,
+          if (noequals) "" else "=",
+          valonly(value)
+        )
+      }
+
+    /**
+     * Output 'namevalue' -- same as full() but omitting the = sign.
+     * Typical for options with numeric values.
+     */
+    def short(name: String) = full(name, noequals = true)
+    /**
+     * Echo the given string. Used for flags or choice options that
+     * effectively function like flags.
+     */
+    def echo(name: String) = (_: Any) => name
+    /**
+     * Ignore this param.
+     */
+    def omit = echo("")
+
+    /////// How to handle params.
+    
+    /**
+     * The order in the list is the order in which the params are output.
+     * Any params not given here are put after all listed params, in the
+     * order listed in the original specification of the params,
+     * formatted as 'name=value'.
+     */
+    val param_handling = Seq[(String, Any => String)](
+      ("input-corpus", xs => xs.asInstanceOf[Seq[String]] map { x =>
+        val (dir, base) = util.io.local_file_handler.split_filename(x)
+        if (dir.endsWith("twitter-geotext"))
+          "geotext-" + base.replace("docthresh-", "thresh")
+        else
+          base
+      } mkString "+"
+      ),
+      ("strategy", valonly),
+      ("word-dist", valonly),
+      ("interpolate", x => x match {
+        case "yes" => "interpolate"
+        case "no" => "backoff"
+        case _ => ""
+      }),
+      ("jelinek-factor", valonly),
+      ("dirichlet-factor", valonly),
+      ("tf-idf", echo("tfidf")),
+      ("rerank", x => x match {
+        case "pointwise" => "rerank"
+        case _ => "no-rerank"
+      }),
+      ("rerank-top-n", short("top")),
+      ("rerank-instance", valonly),
+      ("rerank-classifier", valonly),
+      ("pa-variant", short("var")),
+      ("perceptron-aggressiveness", short("aggr")),
+      ("perceptron-error-threshold", short("errthresh")),
+      ("perceptron-rounds", short("rounds")),
+      ("degrees-per-cell", short("deg")),
+      ("miles-per-cell", short("miles")),
+      ("km-per-cell", short("km")),
+      ("kd-tree", echo("kdtree")),
+      ("kd-split-method", valonly),
+      ("kd-backoff", echo("kdbackoff")),
+      ("kd-bucket-size", short("bucketsize")),
+      ("center-method", valonly),
+      ("language", full("lang")),
+      ("num-nearest-neighbors", short("knn")),
+      ("eval-set", valonly),
+      ("num-training-docs", short("ntrain")),
+      ("num-test-docs", short("ntest")),
+      ("verbose", omit),
+      ("results", omit),
+      ("no-parallel", omit),
+      ("print-results", omit)
+    )
+
+    // Map listing how to handle params.
+    val handling_map = param_handling.toMap
+
+    // Map listing ordering of params (mapping param to a number).
+    val ordering_map = param_handling.map { _._1}.zipWithIndex.toMap
+
+    // Get non-default params as a list of (name, value) tuples,
+    // sort properly.
+    val params =
+      (for (name <- arg_parser.argNames if arg_parser.specified(name))
+        yield (name, arg_parser(name))).toSeq.sortBy {
+          case (name, value) =>
+            ordering_map.getOrElse(name, ordering_map.size)
+        }
+
+    // Generate tag. Note that any tag parts that end up blank are
+    // omitted entirely.
+    val tag =
+      (for ((name, value) <- params) yield {
+        if (handling_map.contains(name))
+          handling_map(name)(value)
+        else
+          full(name)(value)
+      }) filter { _ != "" } mkString "."
+
+    outprint("%s", tag)
+    0
+  }
 }
 
