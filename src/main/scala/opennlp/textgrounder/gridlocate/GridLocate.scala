@@ -1087,8 +1087,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
    * Output, to a textdb corpus, the results of locating the best cell
    * for each document in a set of test documents.
    */
-  def output_results(results: Iterator[DocEvalResult[Co]], filehand: FileHandler,
-      base: String) {
+  def write_results_file(results: Iterator[DocEvalResult[Co]],
+      filehand: FileHandler, base: String) {
     val first = results.next
     val res2 = Iterator(first) ++ results
     val fields = first.to_row.map(_._1)

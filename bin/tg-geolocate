@@ -3,7 +3,7 @@
 help()
 {
   cat <<FOO
-Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
+Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [--quiet] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
 
 Run 'textgrounder geolocate-document' (or another related app), passing it
 the appropriate arguments for running on the specific corpus specified by
@@ -35,6 +35,9 @@ The option '--app' specifies the application to run; by default it does
 document-level geotagging.  Normally, the default application is
 'geolocate-document'.
 
+The option '--quiet' suppresses the messages normally output by this
+script showing its operation.
+
 See also 'run-nohup', which can be used to wrap an invocation of this script
 in a way that it will not be killed by session exit when run in the background,
 and output will get sent to a unique, time-stamped file.
@@ -62,14 +65,20 @@ if [ -z "$1" -o "$1" = "help" ]; then
 fi
 
 tgapp=${tgapp:-$default_tgapp}
-echo "Running the following to get the corpus dir: tg-get-corpus-args $hadoop_arg"
+if [ "$quiet" != yes ]; then
+  echo "Running the following to get the corpus dir: tg-get-corpus-args $hadoop_arg"
+fi
 corpusargs=`tg-get-corpus-args $hadoop_arg $1`
-echo "Output is: $corpusargs"
+if [ "$quiet" != yes ]; then
+  echo "Output is: $corpusargs"
+fi
 shift
 
 # __TG_EXTRA_ARGS is for other scripts calling us; see above.
 # LOCAL_ARGS comes from config-geolocate and allows for system-supplied args.
 geolocate="$TEXTGROUNDER_DIR/bin/textgrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
 
-echo Executing: $geolocate ${1+"$@"}
+if [ "$quiet" != yes ]; then
+  echo Executing: $geolocate ${1+"$@"}
+fi
 $geolocate ${1+"$@"}
