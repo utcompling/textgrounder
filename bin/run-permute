@@ -12,7 +12,7 @@
 ### (Almost) standard boilerplate to get config ###
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -23,7 +23,7 @@ USE_PERMUTED=no
 ### End boilerplate to get config ###
 
 if [ -z "$*" ]; then
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 [STEPS ...]
        $0 all
 

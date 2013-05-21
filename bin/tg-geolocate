@@ -2,7 +2,7 @@
 
 help()
 {
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [--quiet] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
 
 Run 'textgrounder geolocate-document' (or another related app), passing it
@@ -50,7 +50,7 @@ FOO
 # user-supplied options, so that the latter override the former.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 

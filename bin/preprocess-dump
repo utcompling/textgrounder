@@ -25,7 +25,7 @@ while true; do
 done
 
 if [ -z "$*" ]; then
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 [--no-permute] WIKITAG
 
 Generate a set of preprocessed data files from a raw Wikipedia dump, as

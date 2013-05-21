@@ -2,7 +2,7 @@
 
 help()
 {
-cat <<EOF
+cat >&2 <<EOF
 Usage:
   $0 [-i ID | --id ID | -q | --quiet ...] PROGRAM [ARGS ...]
 
@@ -34,10 +34,6 @@ output file, can be suppressed using the -q or --quiet option.
 EOF
 }
 
-if [ -z "$1" ]; then
-  help; exit 1
-fi
-
 id=
 full_id=
 origargs="$0 $*"
@@ -54,6 +50,10 @@ while true ; do
     * ) break ;;
   esac
 done
+
+if [ -z "$1" ]; then
+  help; exit 1
+fi
 
 runprog="$1"; shift 1
 shortprog=`basename $runprog`

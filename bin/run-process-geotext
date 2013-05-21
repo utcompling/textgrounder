@@ -7,7 +7,7 @@
 DEBUG="--debug 0"
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 

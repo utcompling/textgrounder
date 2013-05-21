@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -26,7 +26,7 @@ fi
 # chmod -R go+rX .
 
 help() {
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 --steps "STEPS ..." [--output-dir-prefix PREFIX] [--add-dir-prefix] DIR ...
 
 Convert corpora using various steps (e.g. from old-style to new-style,

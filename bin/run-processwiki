@@ -5,7 +5,7 @@
 # in README.preprocess.
 
 if [ -z "$*" ]; then
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 [STEPS ...]
 
 This is a driver file used to generate various sorts of preprocessed files
@@ -91,7 +91,7 @@ FOO
 fi
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -310,7 +310,7 @@ else
   while [ "$i" -lt "$NUM_SPLITS" ]; do
     SPLITFILE="$SPLIT_PREFIX.$i"
     if [ ! -e "$SPLITFILE" ]; then
-      echo "Error: Can't find split file $SPLITFILE" >&2
+      echo >&2 "Error: Can't find split file $SPLITFILE"
       exit 1
     fi
     SPLITARTS="$SPLITFILE.articles"
