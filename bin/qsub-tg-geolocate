@@ -79,7 +79,7 @@ export ORIGARGS="$*"
 . $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
 
 if [ -z "$1" ]; then
-  echo "No dataset specified."
+  echo >&2 "No dataset specified."
   exit 1
 fi
 

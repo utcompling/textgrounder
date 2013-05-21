@@ -33,5 +33,5 @@ case "$MEMUNITS" in
   [mM][bB] ) echo "$MEMNUM" ;;
   [gG][bB] ) expr "$MEMNUM" \* 1024 ;;
   [tT][bB] ) expr "$MEMNUM" \* 1048576 ;;
-  * ) echo "Unparsable memory: $MEMORY" >&2; echo "unknown"; exit 1 ;;
+  * ) echo >&2 "Unparsable memory: $MEMORY"; echo "unknown"; exit 1 ;;
 esac

@@ -4,6 +4,7 @@
 # a file with a tag describing the args to tg-geolocate, and results saved
 # to a results file containing the same tag in its name.
 
+set -e
 tag=`tg-geolocate --quiet --app 'run opennlp.textgrounder.geolocate.GeolocateDocumentTagApp' "$@"`
 dated_tag=`run-nohup -i "$tag" --output-full-id tg-geolocate`
 run-nohup --full-id "$dated_tag" tg-geolocate "$@" --results "results.$dated_tag"

@@ -9,7 +9,7 @@ echo_and_hadoop()
 
 help()
 {
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 CORPUS ...
 
 Copy corpus or TextGrounder data into the Hadoop File System (HDFS).  Not
@@ -49,7 +49,7 @@ if [ -z "$*" ]; then
 fi
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 

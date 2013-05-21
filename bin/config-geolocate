@@ -66,8 +66,12 @@
 #                preprocessed -- currently 'enwiki-20100905', the version
 #                used in Wing and Baldridge 2011.
 
+dbg() {
+  echo >&2 "$@"
+}
+
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  dbg "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -96,7 +100,7 @@ if [ -n "$TG_GROUPS_DIR" ]; then
 fi
 
 if [ -z "$TG_CORPUS_DIR" ]; then
-  echo "Must set TG_CORPUS_DIR to location of TextGrounder corpus files"
+  dbg "Must set TG_CORPUS_DIR to location of TextGrounder corpus files"
   exit 1
 fi
 
@@ -153,7 +157,7 @@ set_wp_version() {
     if [ -e "$permuted_file" ]; then
       :
     else
-      echo "WARNING: Permuted file $permuted_file does not appear to exist, but using anyway."
+      dbg "WARNING: Permuted file $permuted_file does not appear to exist, but using anyway."
     fi
     DUMP_PREFIX="$1-permuted"
   fi

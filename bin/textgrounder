@@ -8,8 +8,12 @@ TEXTGROUNDER_VERSION=0.1.0
 
 HADOOP_FAILURE_OK_ARGS="-Dmapred.max.map.failures.percent=20 -Dmapred.max.reduce.failures.percent=20"
 
+dbg() {
+  echo >&2 "$@"
+}
+
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  dbg "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -75,7 +79,7 @@ if [ -n "$MEMORY" ]; then
 elif [ -n "$TG_SET_JVM_MEMORY" ]; then
   MEMMB=`$TEXTGROUNDER_DIR/bin/textgrounder-memory`
   if [ "$VERBOSE" = yes ]; then
-    echo "Output from textgrounder-memory is: $MEMMB"
+    dbg "Output from textgrounder-memory is: $MEMMB"
   fi
   if [ "$MEMMB" = unknown ]; then
     # The old way we set the heap size, to a very high virtual size.
@@ -99,7 +103,7 @@ elif [ -n "$TG_SET_JVM_MEMORY" ]; then
 fi
 
 if [ "$VERBOSE" = yes -a -n "$JAVA_MEMORY_OPT" ]; then
-  echo "Setting maximum JVM heap size to $MEMORY"
+  dbg "Setting maximum JVM heap size to $MEMORY"
 fi
 
 JAVA_DEBUG_OPT=
@@ -126,7 +130,7 @@ shift
 
 help()
 {
-cat <<EOF
+cat >&2 <<EOF
 TextGrounder $TEXTGROUNDER_VERSION usage:
   textgrounder [OPTIONS ...] COMMAND [ARGS ...]
 
@@ -265,9 +269,9 @@ execute()
   RUNCMD="$1"; shift
   if [ "$VERBOSE" = yes ]; then
     if [ "$CD" = yes ]; then
-      echo Executing: cd $TEXTGROUNDER_DIR
+      dbg Executing: cd $TEXTGROUNDER_DIR
     fi
-    echo Executing: $RUNCMD ${1+"$@"}
+    dbg Executing: $RUNCMD ${1+"$@"}
   fi
   if [ "$CD" = yes ]; then
     cd $TEXTGROUNDER_DIR
@@ -365,7 +369,7 @@ else
       HADOOP_ARGS="$HADOOP_FAILURE_OK_ARGS $HADOOP_ARGS"
       ;;
     help) help; exit 1;;
-    *) echo "Unrecognized command: $CMD"; help; exit 1;;
+    *) dbg "Unrecognized command: $CMD"; help; exit 1;;
   esac
 
   # We need to *not* cd to the top-level TextGrounder dir, otherwise if
@@ -377,15 +381,15 @@ else
     ASSEMBLY_DIR="$TEXTGROUNDER_DIR/target"
     ASSEMBLY_GLOB="$ASSEMBLY_DIR/TextGrounder-*.jar"
     if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
-      echo "No assembly file!  Unable to execute in Hadoop distributed mode."
+      dbg "No assembly file!  Unable to execute in Hadoop distributed mode."
       exit 1
     else
       NUM_ASSEMBLY_FILES=`ls -1 $ASSEMBLY_GLOB | wc -l`
       ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
       if [ "$NUM_ASSEMBLY_FILES" -ne 1 ]; then
-        echo "Warning!  More than one assembly file found:"
+        dbg "Warning!  More than one assembly file found:"
         ls -1 $ASSEMBLY_GLOB
-        echo "Choosing $ASSEMBLY_FILE"
+        dbg "Choosing $ASSEMBLY_FILE"
       fi
     fi       
             

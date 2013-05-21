@@ -9,7 +9,7 @@ DEBUG="--debug 0"
 ### Standard boilerplate to get config ###
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  echo >&2 "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -19,9 +19,11 @@ fi
 
 TWITTER_LDA="$TG_PYTHON_DIR/twitter_to_lda.py"
 
-echo The input and output dir need to be set better, as this code is
-echo copied from run-twitter-process and GEOTEXT_INPUT_DIR and
-echo GEOTEXT_OUTPUT_DIR are designed for that program, not this one.
+cat >&2 <<FOO
+The input and output dir need to be set better, as this code is
+copied from run-twitter-process and GEOTEXT_INPUT_DIR and
+GEOTEXT_OUTPUT_DIR are designed for that program, not this one.
+FOO
 exit 1
 
 mkdir -p $GEOTEXT_OUTPUT_DIR

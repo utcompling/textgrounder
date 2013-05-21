@@ -48,7 +48,7 @@ add_compression_extension() {
   elif [ "$comp" = "gzip" ]; then
     echo "$file.gz"
   else
-    echo "Unrecognized compression: $comp" >&2
+    echo >&2 "Unrecognized compression: $comp"
     exit 1
   fi
 }
@@ -66,7 +66,7 @@ uncompressfile() {
   elif [ "$comp" = "gzip" ]; then
     gunzip < ${1+"$@"}
   else
-    echo "Unrecognized compression: $comp" >&2
+    echo >&2 "Unrecognized compression: $comp"
     exit 1
   fi
 }
@@ -84,7 +84,7 @@ compressfile() {
   elif [ "$comp" = "gzip" ]; then
     gzip ${1+"$@"}
   else
-    echo "Unrecognized compression: $comp" >&2
+    echo >&2 "Unrecognized compression: $comp"
     exit 1
   fi
 }
@@ -107,14 +107,14 @@ EOF
       exit 1
     fi
     if [ "$numfiles" -eq 1 -a -e "$file" ]; then
-      echo "Input file is $file" >&2
+      echo >&2 "Input file is $file"
       echo "$file"
       foundgood=yes
       break
     fi
   done
   if [ "$foundgood" != "yes" ]; then
-    echo "Can't find a suitable input file for global '$glob'." >&2
+    echo >&2 "Can't find a suitable input file for global '$glob'."
     exit 1
   fi
   

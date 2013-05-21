@@ -20,7 +20,7 @@ while true; do
 done
 
 if [ -z "$*" ]; then
-  cat <<FOO
+  cat >&2 <<FOO
 Usage: $0 [--no-download] [--no-permute] WIKITAG
 
 Download a Wikipedia dump from http://dumps.wikipedia.org and preprocess it
@@ -74,7 +74,7 @@ for step in $steps; do
       echo "Settings permissions on $wikitag ... done."
     ;;
     * )
-      echo "Unknown step: $step"
+      echo >&2 "Unknown step: $step"
       exit 1
     ;;
   esac
