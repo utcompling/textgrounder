@@ -735,7 +735,7 @@ class RankedGridEvaluator[Co](
             Iterable[GeoCell[Co]]())
         val correct_rank = get_correct_rank(reranking, correct_cell)
         val initial_correct_rank = get_correct_rank(initial_ranking, correct_cell)
-        new RerankedDocEvalResult[Co](document, reranking, correct_rank,
+        new FullRerankedDocEvalResult[Co](document, reranking, correct_rank,
           initial_ranking, initial_correct_rank)
       }
       case _ => {
@@ -783,6 +783,31 @@ class RankedDocEvalResult[Co](
     "pred-cell-central-point" -> pred_cell.get_central_point,
     "pred-cell-numdocs" -> pred_cell.combined_dist.num_docs,
     "correct-rank" -> correct_rank
+  )
+}
+
+class RerankedDocEvalResult[Co](
+  document: GeoDoc[Co],
+  pred_cell: GeoCell[Co],
+  correct_rank: Int,
+  val initial_pred_cell: GeoCell[Co],
+  val initial_correct_rank: Int
+) extends RankedDocEvalResult[Co](
+  document, pred_cell, correct_rank
+) {
+  override def print_result(doctag: String,
+      driver: GridLocateDocDriver[Co]) {
+    super.print_result(doctag, driver)
+    errprint("%s:  correct cell at initial rank: %s (vs. new %s)", doctag,
+      initial_correct_rank, correct_rank)
+  }
+
+  override def to_row = super.to_row ++ Seq(
+    "initial-pred-cell" -> initial_pred_cell.describe_location,
+    "initial-pred-cell-true-center" -> initial_pred_cell.get_true_center,
+    "initial-pred-cell-central-point" -> initial_pred_cell.get_central_point,
+    "initial-pred-cell-numdocs" -> initial_pred_cell.combined_dist.num_docs,
+    "initial-correct-rank" -> initial_correct_rank
   )
 }
 
@@ -867,7 +892,7 @@ class FullRankedDocEvalResult[Co](
  * @param correct_rank rank of the document's correct cell among all of the
  *        predicted cell
  */
-class RerankedDocEvalResult[Co](
+class FullRerankedDocEvalResult[Co](
   document: GeoDoc[Co],
   pred_cells: Iterable[(GeoCell[Co], Double)],
   correct_rank: Int,
@@ -879,8 +904,6 @@ class RerankedDocEvalResult[Co](
   override def print_result(doctag: String,
       driver: GridLocateDocDriver[Co]) {
     super.print_result(doctag, driver)
-    errprint("%s:  correct cell at initial rank: %s (vs. new %s)", doctag,
-      initial_correct_rank, correct_rank)
     val num_cells_to_output = 5
     for (((cell, score), i) <-
         initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
@@ -903,6 +926,10 @@ class RerankedDocEvalResult[Co](
       document.output_distance(pred_truedist - initial_pred_truedist)
     )
   }
+
+  override def get_public_result =
+    new RerankedDocEvalResult(document, pred_cells.head._1, correct_rank,
+      initial_pred_cells.head._1, initial_correct_rank)
 }
 
 /**
