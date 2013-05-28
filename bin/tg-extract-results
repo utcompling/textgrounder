@@ -7,13 +7,14 @@
 # a line giving the errors along with relevant parameters for that particular
 # run.
 
-sort=no
-avgsort=no
-meansort=no
-mediansort=no
-verbose=no
+sort=
+avgsort=
+meansort=
+mediansort=
+verbose=
 while true; do
   case "$1" in
+    --no-sort ) sort=no; shift ;;
     --sort | --sort-average | --sort-avg ) sort=yes ; avgsort=yes; shift ;;
     --sort-mean ) sort=yes ; meansort=yes; shift ;;
     --sort-median ) sort=yes ; mediansort=yes; shift ;;
@@ -22,6 +23,11 @@ while true; do
     * ) break ;;
   esac
 done
+
+if [ -z "$sort" ]; then
+  sort=yes
+  avgsort=yes
+fi
 
 if [ "$verbose" != yes ]; then
   echo "%Accur.	Mean	Median	Average	File"
