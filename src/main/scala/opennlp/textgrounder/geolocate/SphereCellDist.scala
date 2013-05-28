@@ -113,6 +113,6 @@ object SphereWordCellDist {
         </Document>
       </kml>
 
-    xml.XML.save(filename, kml)
+    xml.XML.save(filename, kml, enc = "UTF-8")
   }
 }
