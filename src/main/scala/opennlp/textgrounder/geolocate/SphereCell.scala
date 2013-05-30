@@ -48,10 +48,15 @@ abstract class PolygonalCell(
 ) extends KMLSphereCell(grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
-   * out the boundary vertex by vertex.  The last coordinate should be the
-   * same as the first, as befits a closed shape.
+   * out the boundary vertex by vertex.  There is no need to duplicate the
+   * first coordinate as the last one.
    */
   def get_boundary: Iterable[SphereCoord]
+
+  /**
+   * Specify the boundary of the polygon as a string.
+   */
+  def describe_boundary = get_boundary.map(_.toString).mkString(":")
 
   /**
    * Return the "inner boundary" -- something echoing the actual boundary of the
@@ -78,11 +83,13 @@ abstract class PolygonalCell(
       params: KMLParameters) = {
     val offprob = xfprob - xf_minprob
     val fracprob = offprob / (xf_maxprob - xf_minprob)
-    var coordtext = "\n"
-    for (coord <- get_inner_boundary) {
-      coordtext += "%s,%s,%s\n" format (
-        coord.long, coord.lat, fracprob * params.kml_max_height)
-    }
+    val boundary = get_inner_boundary
+    val first = boundary.head
+    val coordtext = "\n" + (
+      for (coord <- boundary ++ Iterable(first)) yield (
+        "%s,%s,%s" format (
+          coord.long, coord.lat, fracprob * params.kml_max_height)
+        )).mkString("\n") + "\n"
     val name =
       if (most_popular_document != null) most_popular_document.title
       else ""
@@ -152,7 +159,7 @@ abstract class RectangularCell(
   def get_northeast_coord: SphereCoord
 
   def describe_location = {
-    "%s-%s" format (get_southwest_coord, get_northeast_coord)
+    "%s:%s" format (get_southwest_coord, get_northeast_coord)
   }
 
   override def get_true_center = {
@@ -200,7 +207,7 @@ abstract class RectangularCell(
     val center = get_true_center
     val nw = SphereCoord(ne.lat, sw.long)
     val se = SphereCoord(sw.lat, ne.long)
-    Seq(sw, nw, ne, se, sw)
+    Seq(sw, nw, ne, se)
   }
 
   /**
