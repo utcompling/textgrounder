@@ -159,7 +159,12 @@ class FrobTextDB(
       ) = {
     val fields_to_rename = parse_field_param(params.rename_field).toMap
     fixed_values.map {
-      case (key, value) => (fields_to_rename(key), value)
+      case (key, value) => {
+        fields_to_rename.get(key) match {
+          case Some(newname) => (newname, value)
+          case None => (key, value)
+        }
+      }
     } -- params.remove_field ++ parse_field_param(params.add_field)
   }
 
