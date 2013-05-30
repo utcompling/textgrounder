@@ -127,7 +127,10 @@ abstract class PolygonalCell(
         </Polygon>
       </Placemark>
     // !!PY2SCALA: END_PASSTHRU
-    Seq(name_placemark, cylinder_placemark)
+    if (params.kml_include_cell_names)
+      Seq(name_placemark, cylinder_placemark)
+    else
+      Seq(cylinder_placemark)
   }
 }
 

@@ -42,6 +42,8 @@ class KMLParameters {
   var kml_max_height: Double = _
 
   var kml_transform: String = _
+
+  var kml_include_cell_names: Boolean = _
 }
 
 class GenerateKMLParameters(
@@ -75,6 +77,10 @@ low values more visible.  Possibilities are 'none' (no transformation),
     ap.option[Double]("kml-max-height", "kmh",
       default = 2000000.0,
       help = """Height of highest bar, in meters.  Default %default.""")
+  var kml_include_cell_names =
+    ap.flag("kml-include-cell-names", "kicn", "kml-names",
+      help = """Include name of each cell in KML. Name comes from
+"most popular document" within cell.""")
 }
 
 
@@ -175,6 +181,7 @@ Not generating an empty KML file.""", word)
         val kmlparams = new KMLParameters()
         kmlparams.kml_max_height = params.kml_max_height
         kmlparams.kml_transform = params.kml_transform
+        kmlparams.kml_include_cell_names = params.kml_include_cell_names
         SphereWordCellDist.generate_kml_file(celldist,
           "%s%s.kml" format (params.kml_prefix, word),
           kmlparams)
