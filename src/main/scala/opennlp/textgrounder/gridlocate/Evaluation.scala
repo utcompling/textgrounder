@@ -253,7 +253,8 @@ class DocEvalResult[Co](
     "numtokens" -> document.dist.model.num_tokens,
     "correct-cell" -> correct_cell.describe_location,
     "correct-cell-true-center" -> correct_cell.get_true_center,
-    "correct-cell-central-point" -> correct_central_point,
+    "correct-cell-centroid" -> correct_cell.get_centroid,
+    "correct-cell-central-point" -> correct_cell.get_central_point,
     "correct-cell-numdocs" -> correct_cell.combined_dist.num_docs,
     "pred-coord" -> pred_coord,
     "oracle-dist" -> correct_truedist,
@@ -780,6 +781,7 @@ class RankedDocEvalResult[Co](
   override def to_row = super.to_row ++ Seq(
     "pred-cell" -> pred_cell.describe_location,
     "pred-cell-true-center" -> pred_cell.get_true_center,
+    "pred-cell-centroid" -> pred_cell.get_centroid,
     "pred-cell-central-point" -> pred_cell.get_central_point,
     "pred-cell-numdocs" -> pred_cell.combined_dist.num_docs,
     "correct-rank" -> correct_rank
