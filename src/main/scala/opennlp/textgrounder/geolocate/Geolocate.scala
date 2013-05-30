@@ -258,14 +258,6 @@ grid cell.""")
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
 
-  var center_method =
-    ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
-      default = "centroid",
-      choices = Seq("centroid", "center"),
-      help = """Chooses whether to use true center or centroid for cell
-central-point calculation. Options are either 'centroid' or 'center'.
-Default '%default'.""")
-
   var kd_split_method =
     ap.option[String]("kd-split-method", "kdsm", metavar = "SPLIT_METHOD",
       default = "halfway",

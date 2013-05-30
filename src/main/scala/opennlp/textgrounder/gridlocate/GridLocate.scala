@@ -289,6 +289,15 @@ has already been parsed into n-grams (as is usually the case).""")
       help = """Adjust word counts according to TF-IDF weighting (i.e.
 downweight words that occur in many documents).""")
 
+  //// Options relating to cells
+  var center_method =
+    ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
+      default = "centroid",
+      choices = Seq("centroid", "center"),
+      help = """Chooses whether to use true center or centroid for cell
+central-point calculation. Options are either 'centroid' or 'center'.
+Default '%default'.""")
+
   //// Options used when doing Naive Bayes geolocation
   var naive_bayes_weighting =
     ap.option[String]("naive-bayes-weighting", "nbw", metavar = "STRATEGY",
