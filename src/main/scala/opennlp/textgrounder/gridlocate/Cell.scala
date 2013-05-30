@@ -24,6 +24,7 @@ import collection.mutable
 
 import util.print.{errprint, warning}
 import util.experiment._
+import util.textdb.Encoder
 
 import worddist.WordDistFactory
 
@@ -208,6 +209,22 @@ abstract class GeoCell[Co](
   // def __repr__() = {
   //   toString.encode("utf-8")
   // }
+
+  def to_row = Seq(
+    "location" -> describe_location,
+    "true-center" -> get_true_center,
+    "centroid" -> get_centroid,
+    "central-point" -> get_central_point,
+    "num-documents" -> combined_dist.num_docs,
+    "num-word-types" -> combined_dist.word_dist.model.num_types,
+    "num-word-tokens" -> combined_dist.word_dist.model.num_tokens,
+    "incoming-links" -> combined_dist.incoming_links,
+    "most-popular-document" -> (
+      if (most_popular_document != null)
+        Encoder.string(most_popular_document.title)
+      else ""),
+    "most-popular-document-incoming-links" -> mostpopdoc_links
+  )
 
   /**
    * Return a shorter string representation of the cell, for
