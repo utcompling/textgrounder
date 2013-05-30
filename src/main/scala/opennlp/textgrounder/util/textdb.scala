@@ -619,6 +619,46 @@ package object textdb {
     def data_file_matching_patterns(filehand: FileHandler, dir: String,
         suffix: String = "") =
       textdb_file_matching_patterns(filehand, dir, suffix, data_ending_text)
+
+    /**
+     * Output a textdb corpus. (If you want more control over the output,
+     * e.g. to output multiple data files, use `TextDBWriter`.)
+     *
+     * @param filehand File handler object of the file system to write to
+     * @param base Prefix of schema and data files
+     * @param data Data to write out. Each item is a sequence of (name,value)
+     *   pairs. The field names must be the same for all data points, and in
+     *   the same order. The values can be of arbitrary type (including null),
+     *   and will be converted to strings using "%s".format(_). The resulting
+     *   strings must not fall afoul of the restrictions on characters (i.e.
+     *   no tabs or newlines). If necessary, pre-convert the object to a
+     *   string and encode it properly.
+     * @param fixed_values Optional map specifying additional fields
+     *   possessing the same value for every row.
+     * @param field_description Optional map giving English description of
+     *   field names, for display purposes.
+     * @param split_text Text used for separating field values in a row;
+     *   normally a tab character. (FIXME: There may be dependencies elsewhere
+     *   on the separator being a tab, e.g. in EncodeDecode.)
+     */
+    def write_textdb(filehand: FileHandler, base: String,
+      data: Iterator[Iterable[(String, Any)]],
+      fixed_values: BaseMap[String, String] = Map[String, String](),
+      field_description: BaseMap[String, String] = Map[String, String](),
+      split_text: String = "\t"
+    ) {
+      val first = data.next
+      val res2 = Iterator(first) ++ data
+      val fields = first.map(_._1)
+      val schema = new Schema(fields, fixed_values, field_description)
+      schema.output_constructed_schema_file(filehand, base)
+      val outfile = TextDB.construct_data_file(base)
+      val outstr = filehand.openw(outfile)
+      res2.foreach { res =>
+        outstr.println(schema.make_row(res.map("%s" format _._2)))
+      }
+      outstr.close()
+    }
   }
 
   /**
