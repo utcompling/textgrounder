@@ -83,63 +83,6 @@ low values more visible.  Possibilities are 'none' (no transformation),
 "most popular document" within cell.""")
 }
 
-
-/* A constructor that filters the distributions to contain only the words we
-   care about, to save memory and time. */
-class FilterUnigramWordDistConstructor(
-    factory: WordDistFactory,
-    filter_words: Seq[String],
-    ignore_case: Boolean,
-    stopwords: Set[String],
-    whitelist: Set[String],
-    minimum_word_count: Int = 1
-  ) extends DefaultUnigramWordDistConstructor(
-    factory, ignore_case, stopwords, whitelist, minimum_word_count
-  ) {
-
-  override def finish_before_global(dist: WordDist) {
-    super.finish_before_global(dist)
-
-    val model = dist.asInstanceOf[UnigramWordDist].model
-    val oov = memoizer.memoize("-OOV-")
-
-    // Filter the words we don't care about, to save memory and time.
-    for ((word, count) <- model.iter_items
-         if !(filter_words contains memoizer.unmemoize(word))) {
-      model.remove_item(word)
-      model.add_item(oov, count)
-    }
-  }
-}
-
-class WordCellTupleWritable extends
-    WritableComparable[WordCellTupleWritable] {
-  var word: String = _
-  var index: RegularCellIndex = _
-
-  def set(word: String, index: RegularCellIndex) {
-    this.word = word
-    this.index = index
-  }
-
-  def write(out: DataOutput) {
-    out.writeUTF(word)
-    out.writeInt(index.latind)
-    out.writeInt(index.longind)
-  }
-
-  def readFields(in: DataInput) {
-    word = in.readUTF()
-    val latind = in.readInt()
-    val longind = in.readInt()
-    index = RegularCellIndex(latind, longind)
-  }
-
-  // It hardly matters how we compare the cell indices.
-  def compareTo(other: WordCellTupleWritable) =
-    word.compareTo(other.word)
-}
-
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GenerateKMLParameters
