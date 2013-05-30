@@ -98,10 +98,13 @@ package object distances {
     // but either always coerce, or check the bounds ...
     require(SphereCoord.valid(lat, long),
       "Coordinates out of bounds: %s" format toString)
-    override def toString = "(%.2f,%.2f)".format(lat, long)
+    override def toString = SphereCoord.format_lat_long(lat, long)
   }
 
   implicit object SphereCoord extends Serializer[SphereCoord] {
+    def format_lat_long(lat: Double, long: Double) =
+      "(%.2f,%.2f)".format(lat, long)
+
     // Create a coord, with METHOD defining how to handle coordinates
     // out of bounds.  If METHOD =  "validate", check within bounds,
     // and abort if not.  If "coerce", coerce within bounds (latitudes
@@ -113,7 +116,8 @@ package object distances {
         method match {
           case "coerce-warn" => {
             if (!valid(lat, long))
-              warning("Coordinates out of bounds: (%.2f,%.2f)", lat, long)
+              warning("Coordinates out of bounds: %s",
+                format_lat_long(lat, long))
             coerce(lat, long)
           }
           case "coerce" => coerce(lat, long)
