@@ -173,23 +173,20 @@ abstract class RectangularCell(
    * or based on the centroid of the cell.
    */
   val centroid = new Array[Double](2)
-  var num_docs: Int = 0
 
-  def get_central_point = {
-    if (num_docs == 0 ||
-      get_sphere_docfact(grid).driver.params.center_method == "center") {
-      get_true_center
-      // use the actual cell center
-      // also, if we have an empty cell, there is no such thing as
+  def get_centroid = {
+    val nd = combined_dist.num_docs
+    if (nd == 0) {
+      // if we have an empty cell, there is no such thing as
       // a centroid, so default to the center
+      get_true_center
     } else {
       // use the centroid
-      SphereCoord(centroid(0) / num_docs, centroid(1) / num_docs)
+      SphereCoord(centroid(0) / nd, centroid(1) / nd)
     }
   }
 
   override def add_document(document: SphereDoc) {
-    num_docs += 1
     centroid(0) += document.coord.lat
     centroid(1) += document.coord.long
     super.add_document(document)

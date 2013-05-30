@@ -157,19 +157,29 @@ abstract class GeoCell[Co](
   /**
    * Return the coordinate of the true center of the cell.  This is sometimes
    * used in computing certain measures.  If this cannot clearly be defined,
-   * then make it the same as `get_central_point`.
+   * then a more or less arbitrarily-placed location can be used as long as
+   * it's somewhere central.
    */
-  def get_true_center = get_central_point
+  def get_true_center: Co
+
+  /**
+   * Return the coordinate of the centroid of the cell. If the cell has no
+   * documents in it, return the true center.
+   */
+  def get_centroid: Co
 
   /**
    * Return the coordinate of the central point of the cell.  This is the
    * coordinate used in computing distances between arbitrary points and
    * given cells, for evaluation and such.  This may be the true center,
-   * or some other measure of central tendency (e.g. the centroid). For
-   * odd-shaped cells with no clear definition of "center", the central
-   * point can be more or less arbitrarily placed as long as it's somewhere
-   * central. */
-  def get_central_point: Co
+   * or some other measure of central tendency (e.g. the centroid).
+   */
+  def get_central_point = {
+    if (grid.docfact.driver.params.center_method == "center")
+      get_true_center
+    else
+      get_centroid
+  }
 
   /**
    * Return true if we have finished creating and populating the cell.
