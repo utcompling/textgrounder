@@ -63,19 +63,14 @@ trait CandidateInstFactory[Co] extends (
   val scoreword = memoizer.memoize("-SCORE-")
 
   /**
-   * Create a feature vector.
+   * Return a set of feature-value pairs for a document-cell pair, describing
+   * similarities between the document and cell's distributions.
+   * Meant to be supplied by subclasses.
    *
-   * @param feats Sequence of (name, value) pairs naming features and giving
-   *   their values, specifying the primary data of the feature vector.
-   * @param score Score of cell as candidate for document, as produced by
-   *   the initial ranker.
-   * @param is_training Whether we are in training or evaluation.
+   * @param doc Document of document-cell pair.
+   * @param cell Cell of document-cell pair.
    */
-  protected def make_feature_vector(feats: Iterable[(Word, Double)],
-      score: Double, is_training: Boolean) = {
-    val feats_with_score = feats ++ Iterable(scoreword -> score)
-    featvec_factory.make_feature_vector(feats_with_score, is_training)
-  }
+  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]): Iterable[(Word, Double)]
 
   /**
    * Generate a feature vector from a query-candidate (document-cell) pair.
@@ -87,17 +82,46 @@ trait CandidateInstFactory[Co] extends (
    *   (see above)
    */
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
-    is_training: Boolean): FeatureVector
+    is_training: Boolean) = {
+    val feats_with_score =
+      get_features(doc, cell) ++ Iterable(scoreword -> score)
+    featvec_factory.make_feature_vector(feats_with_score, is_training)
+  }
 }
 
 /**
  * A simple factory for generating candidate instances for a document, using
  * nothing but the score passed in.
  */
-class TrivialCandidateInstFactory[Co] extends
-    CandidateInstFactory[Co] {
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
-    is_training: Boolean) = make_feature_vector(Iterable(), score, is_training)
+class TrivialCandidateInstFactory[Co] extends CandidateInstFactory[Co] {
+  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = Iterable()
+}
+
+/**
+ * A factory that combines the features of a set of subsidiary factories.
+ */
+class CombiningCandidateInstFactory[Co](
+  val subsidiary_facts: Iterable[CandidateInstFactory[Co]]
+) extends CandidateInstFactory[Co] {
+  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+    // For each subsidiary factory, retrieve its features, then add the
+    // index of the factory to the feature's name to disambiguate, and
+    // concatenate all features.
+    subsidiary_facts.zipWithIndex flatMap { case (fact, index) =>
+      fact.get_features(doc, cell) map { case (word, count) =>
+        // FIXME! May not be necessary to memoize like this. I don't think we
+        // need to unmemoize the feature names (except for debugging
+        // purposes), so it's enough just to OR the index onto the top bits
+        // of the word, which is already a low integer due to memoization
+        // (or if we change the memoization strategy in a way that generates
+        // spread-out integers, we can just XOR the index onto the top bits
+        // or hash the two numbers together; occasional feature clashes
+        // aren't a big deal).
+        (memoizer.memoize("%s$%s" format (memoizer.unmemoize(word), index)),
+          count)
+      }
+    }
+  }
 }
 
 /**
@@ -109,23 +133,20 @@ abstract class WordByWordCandidateInstFactory[Co] extends
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
     celldist: UnigramWordDist): Option[Double]
 
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
-      is_training: Boolean) = {
-    val indiv_features =
-      doc.dist match {
-        case docdist: UnigramWordDist => {
-         val celldist =
-           UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-         for ((word, count) <- docdist.model.iter_items;
-              featval = get_word_feature(word, count, docdist, celldist);
-              if featval != None)
-           yield (word, featval.get)
-        }
-        case _ =>
-          fixme_error(
-            "Don't know how to rerank when not using a unigram distribution")
+  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+    doc.dist match {
+      case docdist: UnigramWordDist => {
+       val celldist =
+         UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
+       for ((word, count) <- docdist.model.iter_items;
+            featval = get_word_feature(word, count, docdist, celldist);
+            if featval != None)
+         yield (word, featval.get)
       }
-    make_feature_vector(indiv_features, score, is_training)
+      case _ =>
+        fixme_error(
+          "Don't know how to rerank when not using a unigram distribution")
+    }
   }
 }
 
@@ -142,7 +163,7 @@ class KLDivCandidateInstFactory[Co] extends
     if (q == 0.0)
       None
     else
-      Some(p*(log(p) - log(q)))
+      Some(p*(log(p/q)))
   }
 }
 
@@ -151,9 +172,14 @@ class KLDivCandidateInstFactory[Co] extends
  * the presence of matching words between document and cell.
  *
  * @param value How to compute the value assigned to the words that are
- *   shared.  If "binary", always assign 1.  If "count", assign the word
- *   count.  If "probability", assign the probability (essentially, word
- *   count normalized by the number of words in the document).
+ *   shared:
+ *
+ * - `matching-word-binary`: always assign 1
+ * - `matching-word-count`: use document word count
+ * - `matching-word-count-product`: use product of document and cell word count
+ * - `matching-word-probability`: use document word probability
+ * - `matching-word-prob-product`: use product of document and cell word prob
+ * - `matching-word-kl`: use KL-divergence component for document/cell probs
  */
 class WordMatchingCandidateInstFactory[Co](value: String) extends
     WordByWordCandidateInstFactory[Co] {
@@ -164,13 +190,13 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
       None
     else {
       val wordval = value match {
-        case "binary" => 1
-        case "count" => count
-        case "count-product" => count * qcount
-        case "prob-product" =>
+        case "matching-word-binary" => 1
+        case "matching-word-count" => count
+        case "matching-word-count-product" => count * qcount
+        case "matching-word-prob-product" =>
           docdist.lookup_word(word) * celldist.lookup_word(word)
-        case "probability" => docdist.lookup_word(word)
-        case "kl" => {
+        case "matching-word-probability" => docdist.lookup_word(word)
+        case "matching-word-kl" => {
           val p = docdist.lookup_word(word)
           val q = celldist.lookup_word(word)
           p*(log(p/q))

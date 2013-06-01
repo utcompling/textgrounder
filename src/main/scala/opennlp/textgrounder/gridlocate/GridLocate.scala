@@ -510,29 +510,34 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
-  var rerank_instance =
-    ap.option[String]("rerank-instance",
-      default = "matching-word-binary",
+  val rerank_features_matching_word_choices =
+    Seq("binary", "count", "count-product", "probability", "prob-product",
+        "kl").map("matching-word-" + _)
+
+  var rerank_features =
+    ap.option[String]("rerank-features",
+      default = "combined",
       aliasedChoices = Seq(
         Seq("kl-div", "kldiv"),
-        Seq("matching-word-binary"),
-        Seq("matching-word-count"),
-        Seq("matching-word-count-product"),
-        Seq("matching-word-probability"),
-        Seq("matching-word-prob-product"),
-        Seq("matching-word-kl"),
-        Seq("trivial")),
-      help = """How to generate rerank instances for the reranker, based on
-a combination of a document, a given cell as possible location of the
-document and the original ranking score. The original ranking score
-always serves as one of the features.  Possibilities are 'trivial' (just
-use the score as a feature, for testing purposes); 'matching-word-binary'
+        Seq("combined"),
+        Seq("trivial")
+      ) ++ rerank_features_matching_word_choices.map(Seq(_))
+      ,
+      help = """Which features to use in the reranker, to characterize the
+similarity between a document and candidate cell (largely based on the
+respective language models). The original ranking score for the cell always
+serves as one of the features.  Possibilities are 'trivial' (no features
+beyond the original score, for testing purposes); 'matching-word-binary'
 (use the value 1 when a word exists in both document and cell, 0 otherwise);
 'matching-word-count' (use the document word count when a word exists in both
-document and cell); 'matching-word-probability' (use the document probability
-when a word exists in both document and cell); 'kl-div' (use the individual
-word components of the KL-divergence between document and cell).
-Default %default.
+document and cell); 'matching-word-count-product' (use the product of the
+document and cell word count when a word exists in both document and cell);
+'matching-word-probability' (use the document probability when a word exists
+in both document and cell); 'matching-word-prob-product' (use the product of
+both the document and cell probability when a word exists in both document
+and cell); 'kl-div' (use the individual word components of the KL-divergence
+between document and cell); 'combined' (use all of the features of all
+the previous methods).  Default %default.
 
 Note that this only is used when --rerank=pointwise and --rerank-classifier
 specifies something other than 'trivial'.""")
@@ -636,7 +641,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       parse_debug_spec(params.debug)
 
     need_seq(params.input_corpus, "input-corpus")
-  
+
     if (params.jelinek_factor < 0.0 || params.jelinek_factor > 1.0) {
       param_error("Value for --jelinek-factor must be between 0.0 and 1.0, but is %g" format params.jelinek_factor)
     }
@@ -835,7 +840,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       for(cell <- grid.iter_nonempty_cells) {
         print(cell.shortstr+"\t")
         val word_dist = cell.combined_dist.word_dist
-        println(word_dist.toString)        
+        println(word_dist.toString)
       }
     }
     grid
@@ -980,24 +985,22 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
    * @see CandidateInstFactory
    */
   protected def create_candidate_instance_factory = {
-    params.rerank_instance match {
-      case "trivial" =>
-        new TrivialCandidateInstFactory[Co]
-      case "kl-div" =>
-        new KLDivCandidateInstFactory[Co]
-      case "matching-word-binary" =>
-        new WordMatchingCandidateInstFactory[Co]("binary")
-      case "matching-word-count" =>
-        new WordMatchingCandidateInstFactory[Co]("count")
-      case "matching-word-count-product" =>
-        new WordMatchingCandidateInstFactory[Co]("count-product")
-      case "matching-word-probability" =>
-        new WordMatchingCandidateInstFactory[Co]("probability")
-      case "matching-word-prob-product" =>
-        new WordMatchingCandidateInstFactory[Co]("prob-product")
-      case "matching-word-kl" =>
-        new WordMatchingCandidateInstFactory[Co]("kl")
+    def create_fact(ty: String): CandidateInstFactory[Co] = {
+      if (params.rerank_features_matching_word_choices contains ty)
+        new WordMatchingCandidateInstFactory[Co](ty)
+      else ty match {
+        case "trivial" =>
+          new TrivialCandidateInstFactory[Co]
+        case "kl-div" =>
+          new KLDivCandidateInstFactory[Co]
+        case "combined" =>
+          new CombiningCandidateInstFactory[Co](
+            params.rerank_features_matching_word_choices.map(
+              create_fact(_)))
+      }
     }
+
+    create_fact(params.rerank_features)
   }
 
   /**
