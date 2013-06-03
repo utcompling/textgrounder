@@ -27,9 +27,28 @@ import learning._
 import util.debug._
 
 /**
- * A basic ranker.  Given a query item, return a list of ranked candidates from
- * best to worst, with a score for each.  The score must not increase from
- * any candidate to the next one.
+ * A basic ranker. This is a machine-learning object that is given a query
+ * item and a set of possible candidates and ranks the candidates by
+ * determining a score for each one (on an arbitrary scale). The terminology
+ * of queries and candidates from the "learning to rank" field within the
+ * larger field of information retrieval. A paradigmatic example is a search
+ * engine, where the query is the string typed into the search engine, the
+ * candidates are a set of possibly relevant documents, and the result of
+ * ranking should be an ordered list of the documents, from most to least
+ * relevant.
+ *
+ * For the GridLocate application, a query is a document, a candidate is a
+ * cell, and the ranker determines which cells are most likely to be the
+ * correct ones.
+ *
+ * The objective function used for typical search-engine ranking is rather
+ * different from what is used in GridLocate. In the former case we care
+ * about all the candidates (potentially relevant documents) near the top of
+ * the ranked list, where in the latter case we only really care about the
+ * top-ranked candidate, i.e. cell (and moreover, we normally score an
+ * erroneous top-ranked cell not simply by the fact that it is wrong but
+ * how wrong it is, i.e. the distance between the cell's centroid location
+ * and the document's actual location).
  */
 trait Ranker[Query, Candidate] {
   /**
@@ -89,10 +108,23 @@ trait Reranker[Query, Candidate]
 }
 
 /**
- * A pointwise reranker that uses a scoring classifier to assign a score
- * to each possible candidate to be reranked.  The idea is that, for each
- * possible candidate, we create test instances based on a combination of the
- * query item and candidate and score the instances to determine the ranking.
+ * A pointwise classifying reranker. This is a "reranker" in that it uses
+ * an initial ranker to construct a ranking over the entire set of candidates,
+ * using a fairly basic mechanism, then takes the top N candidates for some N
+ * (e.g. 10 or 50), and uses a more expensive but hopefully more accurate
+ * mechanism to rescore them. It is "pointwise" in that each candidate is
+ * scored independently of the others (rather than, e.g., scoring pairs of
+ * candidates against each other), and it is a "classifying reranker" in that
+ * it uses the mechanism of a scoring classifier to assign a score to each
+ * possible candidate to be reranked.
+ *
+ * For each possible candidate, we construct a "query-candidate pair" (simply a
+ * grouping of the query and particular candidate) and from it we create
+ * a "candidate instance" consisting of a feature vector, where individual
+ * features describe the compatibility between query and candidate.  The
+ * feature vectors for all N candidates get grouped into an "aggregate feature
+ * vector" (of type `AggregateFeatureVector`), which is then passed to the
+ * classifier to be scored.
  *
  * @tparam Query type of a query
  * @tparam Candidate type of a possible candidate
@@ -103,13 +135,18 @@ trait PointwiseClassifyingReranker[Query, Candidate]
   protected def rerank_classifier: ScoringClassifier
 
   /**
-   * Create a rerank instance to feed to the classifier during evaluation,
-   * given a query item, a potential candidate from the ranker, and the score
-   * from the initial ranker on this candidate.
+   * Create a candidate instance (in the form of a feature vector) to feed to
+   * the classifier during evaluation, given a query item, a potential
+   * candidate from the ranker, and the score from the initial ranker on
+   * this candidate.
    */
   protected def create_candidate_evaluation_instance(query: Query,
     candidate: Candidate, initial_score: Double): FeatureVector
 
+  /**
+   * Rerank a set of top candidates, given the query and the initial score
+   * for each candidate.
+   */
   protected def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)]) = {
     val cand_featvecs =
@@ -136,11 +173,14 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  *    external training data or a subset.
  * -- Reranker training data is the data used to train a rerank classifier,
  *    i.e. the classifier used to compute the scores that underlie the
- *    reranking. This consists of items of type `RTI` (standing for "Rerank
- *    Training Instance"), encapsulating an aggregate feature vector of type
- *    `AggregateFeatureVector` (an object encompassing individual feature
- *    vectors for each possible candidate, each one computed for a given
- *    query-candidate pair) and the label of the correct candidate.
+ *    reranking. Each item is a "rerank training instance" (RTI, of type
+ *    `RTI`), encapsulating an aggregate feature vector of type
+ *    `AggregateFeatureVector` and the label of the correct candidate.
+ *    The aggregate feature vector in turn encapsulates the set of
+ *    individual feature vectors (aka candidate instances), one per
+ *    candidate, consisting of features specifying the compatibility
+ *    between query and candidate. See `PointwiseClassifyingReranker` for
+ *    more details.
  *
  * The use of abstract types, rather than tuples, allows the application to
  * choose how to encapsulate the data (e.g. whether to use a raw form or
@@ -165,21 +205,37 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  *
  * Training is as follows:
  *
- * 1. External training data is supplied by the caller.
+ * 1. External training data (a set of "external instances") is supplied
+ *    by the caller.
  *
- * 2. Split this data into N parts (`number_of_splits`).  Process each part
- *    in turn.  For a given part, its data will be used to generate rerank
- *    training data, using an initial ranker trained on the remaining parts.
+ * 2. Split this data into N parts ("splits" or "slices", the number
+ *    determined by `number_of_splits`), and process each slice in turn.
  *
- * 3. From each data item in the external training data, a series of rerank
- *    training instances are generated as follows:
+ * 3. For a given slice, train an initial ranker based on the remaining
+ *    slices. Then process each external instance in the slice.
  *
- *    (1) rank the data item using the initial ranker to produce a set of
- *        possible candidates;
- *    (2) if necessary, augment the possible candidates to include the correct
- *        one;
- *    (3) create a rerank training instance for each combination of query item
- *        and candidate, with "correct" or "incorrect" indicated.
+ * 4. For each external instance, generate a "query training data" object
+ *    (QTD), encapsulating information necessary to generate a rerank training
+ *    instance (RTI), directly usable by a classifier trainer (see above).
+ *    The QTD consists of the query itself, the candidate list with associated
+ *    scores for each candidate when ranked using the initial ranker, and the
+ *    identity of the correct candidate, which must be in the candidate list.
+ *    The candidate list in the QTD is determined by taking the top-ranked N
+ *    candidates (N = `top_n`) from the ranking produced by the initial
+ *    ranker, and augmenting if necessary with the correct candidate.
+ *
+ * 5. Once the entire set of QTD's is generated for all slices, convert each
+ *    QTD into an RTI (see above). The RTI describes the same data as the
+ *    QTD but in the form of an aggregate feature vector (grouping individual
+ *    feature vectors for each candidate), which can be directly used by the
+ *    underlying classifier trainer. The reason for first generating a QTD,
+ *    rather than directly generating an RTI, is that it may be necessary to
+ *    use some global properties of the training corpus to generate the RTI,
+ *    which cannot be determined until the entire corpus is processed.
+ *    (In particular, we don't know the length of the feature vectors until
+ *    we've counted up the distinct feature types that occur anywhere in our
+ *    training data.  All feature vectors must, conceptually, have the same
+ *    length, even if the data itself is stored sparsely.)
  *
  * @tparam Query type of a query
  * @tparam Candidate type of a possible candidate
@@ -190,6 +246,15 @@ trait PointwiseClassifyingRerankerTrainer[
   Query, Candidate, ExtInst, RTI <: DataInstance
 ] extends RerankerLike[Query, Candidate] { self =>
 
+  /**
+   * A class encapsulating "query training data" (QTD) information necessary
+   * to generate a rerank training instance (RTI). A QTD is associated with
+   * an external instance from the training corpus and contains, in a fairly
+   * raw form, the query itself, the candidate list with associated scores
+   * for each candidate when ranked using the initial ranker, and the identity
+   * of the correct candidate, which must be in the candidate list. See
+   * `PointwiseClassifyingRerankerTrainer`.
+   */
   case class QueryTrainingData(query: Query, correct: Candidate,
       cand_scores: Iterable[(Candidate, Double)]) {
     /**
@@ -208,11 +273,10 @@ trait PointwiseClassifyingRerankerTrainer[
 
     /**
      * Convert the data in the object into an aggregate feature vector
-     * describing the candidates for a query.
+     * describing the candidates for a query. This is the primary data in an
+     * RTI (see `PointwiseClassifyingRerankerTrainer`).
      *
-     * @param qtd Input object describing a query, associated candidate list,
-     *    scores from the initial ranker, and correct candidate.
-     * @param create_candidate_evaluation_instance Function converting a
+     * @param create_candidate_featvec Function converting a
      *    query-candidate pair, plus score from the initial ranker, into a
      *    feature vector.
      */
@@ -225,6 +289,9 @@ trait PointwiseClassifyingRerankerTrainer[
       new AggregateFeatureVector(featvecs.toIndexedSeq)
     }
 
+    /**
+     * Describe this object for debugging purposes.
+     */
     def debug_out(prefix: String) {
       errprint("%sTraining item: %s", prefix, format_query_item(query))
       errprint("%sTrue candidate: %s", prefix, format_candidate(correct))
@@ -243,39 +310,61 @@ trait PointwiseClassifyingRerankerTrainer[
   val number_of_splits: Int
 
   /**
-   * Create the classifier used for reranking, given a set of rerank training
-   * data.
+   * Create the classifier used for reranking, given training data.
+   * Each data instance describes a training document in a form
+   * directly usable by the classifier trainer: A rerank training instance
+   * (RTI, see above) and an integer specifying the label of the correct
+   * candidate (corresponding to an index into the RTI's aggregate feature
+   * vector).
    */
   protected def create_rerank_classifier(data: Iterable[(RTI, Int)]
   ): ScoringClassifier
 
   /**
-   * Create a rerank instance to feed to the classifier during evaluation,
-   * given a query item, a potential candidate from the ranker, and the score
-   * from the initial ranker on this candidate.  Note that this function may need
-   * to work differently from the corresponding function used during training
-   * (e.g. in the handling of previously unseen words).
+   * Create a feature vector for a candidate instance (see above) to feed to
+   * the classifier during evaluation, given a query item, a potential
+   * candidate from the ranker, and the score from the initial ranker on this
+   * candidate.  Note that this function may need to work differently from
+   * the corresponding function used during training (e.g. in the handling
+   * of previously unseen words).
    */
   protected def create_candidate_evaluation_instance(query: Query,
     candidate: Candidate, initial_score: Double): FeatureVector
 
   /**
-   * Create an initial ranker based on initial-ranker training data.
+   * Create an initial ranker based on a set of external instances.
    */
   protected def create_initial_ranker(data: Iterable[ExtInst]):
     Ranker[Query, Candidate]
 
   /**
-   * Convert an external instance into a query-candidate pair, if possible,
-   * given the external instance and the initial ranker trained from other
-   * external instances.
+   * Convert a set of external instances into query-candidate pairs.
+   * Each external instance maps to a query object describing the data
+   * in the instances, plus the correct candidate for the query.
+   * We need the initial ranker passed in because the set of potential
+   * candidates may not exist until the ranker is created (e.g. in
+   * GridLocate, cells are populated based on the training data, and in
+   * the case of K-d trees, the cells themselves are shaped from the
+   * training data). Some external instances may not be convertible
+   * (e.g. in GridLocate, if there are no training documents in the
+   * external instance's cell -- remember that the training documents in
+   * question exclude the slice containing the external instance).
+   *
+   * FIXME! There may be a problem with K-d trees since we generate
+   * multiple initial rankers, one per slice, and hence there will be
+   * different cell arrangements.
+   *
+   * @param inst Iterator over external instances in a given slice
+   * @param initial_ranker initial ranker trained from the external
+   *   instances in all other slices
    */
   protected def external_instances_to_query_candidate_pairs(
     inst: Iterator[ExtInst], initial_ranker: Ranker[Query, Candidate]
   ): Iterator[(Query, Candidate)]
 
   /**
-   * Convert a `QueryTrainingData` object to a type-`RTI` object,
+   * Convert a `QueryTrainingData` object to an `RTI` object, i.e. from
+   *
    * encapsulating info used to training the rerank classifier.
    */
   protected def query_training_data_to_rerank_training_instances(
@@ -293,24 +382,12 @@ trait PointwiseClassifyingRerankerTrainer[
   def format_candidate(candidate: Candidate) = candidate.toString
 
   /**
-   * Generate an object encapsulating "query training data" information
-   * necessary to generate a rerank training instance (of type `RTI`; see
-   * above).  The generated `QueryTrainingData` object encapsulates the query,
-   * the candidate list with associated scores for each candidate when ranked
-   * using the initial ranker, and the identity of the correct candidate,
-   * which must be in the candidate list.  This function is passed only the
-   * query and correct candidate (the only info available in the training
-   * corpus) and the appropriate initial ranker, and generates the
-   * remaining info from the ranker.
+   * Generate a QTD (query training data) object. See `QueryTrainingData`
+   * above.
    *
-   * We don't generate the type-`RTI` object directly here because it may
-   * be necessary to use some global properties of the corpus to do this.
-   * (In particular, we don't know the length of the feature vectors until
-   * we've counted up the distinct feature types that occur anywhere in our
-   * training data.  All feature vectors must, conceptually, have the same
-   * length, even if the data itself is stored sparsely.)
-   *
-   * @param initial_ranker Initial ranker used to score the candidate.
+   * @param query Query object corresponding to a training document.
+   * @param correct Correct candidate, as determined from the training corpus.
+   * @param initial_ranker Initial ranker used to score the candidates.
    */
   protected def get_query_training_data(
     query: Query, correct: Candidate, initial_ranker: Ranker[Query, Candidate]
@@ -329,9 +406,9 @@ trait PointwiseClassifyingRerankerTrainer[
   }
 
   /**
-   * Given one of the splits of external training data and an initial ranker
-   * created from the remainder, generate the corresponding rerank training
-   * data.
+   * Given one of the splits of external training instances and an initial
+   * ranker created from the remainder, generate the corresponding QTD
+   * objects. See `QueryTrainingData`.
    */
   protected def get_rerank_training_data_for_split(
       splitnum: Int, data: Iterator[ExtInst],
@@ -360,8 +437,9 @@ trait PointwiseClassifyingRerankerTrainer[
   }
 
   /**
-   * Given external training data, generate the corresponding rerank training
-   * data.  This involves splitting up the rerank data into parts and training
+   * Given all external training instances, generate all corresponding QTD's
+   * (query training data objects). See `QueryTrainingData`. This involves
+   * splitting up the rerank data into parts and training
    * separate initial rankers, as described above.
    */
   protected def get_rerank_training_data(training_data: Iterable[ExtInst]
