@@ -23,6 +23,12 @@ trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
     strategy.return_ranked_cells(item.dist, include)
 }
 
+/**
+ * Object encapsulating a GridLocate data instance to be used by the
+ * classifier that underlies the ranker. This corresponds to a document
+ * in the training corpus and serves as the main part of an RTI (rerank
+ * training instance, see `PointwiseClassifyingRerankerTrainer`).
+ */
 case class GridRankerInst[Co](
   doc: GeoDoc[Co],
   candidates: IndexedSeq[GeoCell[Co]],
@@ -31,6 +37,24 @@ case class GridRankerInst[Co](
   final def feature_vector = fv
 }
 
+/**
+ * A factory for generating "candidate instances", i.e. feature vectors
+ * describing the properties of one of the possible candidates (cells) to
+ * be chosen by a reranker for a given query (i.e. document). Thus, a
+ * candidate instance for a reranker is a query-candidate (i.e. document-cell)
+ * pair, or rather a feature vector describing this pair. In general, the
+ * features describe the compatibility between the query and the candidate,
+ * i.e. in this case the compatibility between the word distributions
+ * (language models) of a document and a cell.
+ *
+ * The factory is in the form of a function that will generate a feature
+ * vector when passed appropriate arguments: a document, a cell, the score
+ * of the cell as produced by the original ranker, and a boolean indicating
+ * whether we are generating the feature vector for use in training a model
+ * or in evaluating a model. (This matters e.g. in the handling of unseen
+ * words, which will modify the global language model during training but
+ * not evaluation.)
+ */
 trait CandidateInstFactory[Co] extends (
   (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
 ) {
@@ -38,12 +62,30 @@ trait CandidateInstFactory[Co] extends (
     new SparseFeatureVectorFactory[Word](word => memoizer.unmemoize(word))
   val scoreword = memoizer.memoize("-SCORE-")
 
-  def make_feature_vector(feats: Iterable[(Word, Double)], score: Double,
-      is_training: Boolean) = {
+  /**
+   * Create a feature vector.
+   *
+   * @param feats Sequence of (name, value) pairs naming features and giving
+   *   their values, specifying the primary data of the feature vector.
+   * @param score Score of cell as candidate for document, as produced by
+   *   the initial ranker.
+   * @param is_training Whether we are in training or evaluation.
+   */
+  protected def make_feature_vector(feats: Iterable[(Word, Double)],
+      score: Double, is_training: Boolean) = {
     val feats_with_score = feats ++ Iterable(scoreword -> score)
     featvec_factory.make_feature_vector(feats_with_score, is_training)
   }
 
+  /**
+   * Generate a feature vector from a query-candidate (document-cell) pair.
+   *
+   * @param document Document serving as a query item
+   * @param cell Cell serving as a candidate to be ranked
+   * @param score Score for this cell as produced by the initial ranker
+   * @param is_training Whether we are training or evaluating a model
+   *   (see above)
+   */
   def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
     is_training: Boolean): FeatureVector
 }
@@ -139,6 +181,12 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
   }
 }
 
+/**
+ * A grid reranker, i.e. a pointwise reranker for doing reranking in a
+ * GridLocate context, based on a grid ranker (for ranking cells in a grid
+ * as possible matches for a given document).
+ * See `PointwiseClassifyingReranker`.
+ */
 trait PointwiseGridReranker[Co]
 extends GridRanker[Co]
    with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co]] {
@@ -146,9 +194,7 @@ extends GridRanker[Co]
 }
 
 /**
- * A grid reranker using a linear classifier.  A grid reranker is a reranker
- * based on a grid ranker (for ranking cells in a grid as possible matches
- * for a given document).
+ * A grid reranker using a linear classifier.  See `PointwiseGridReranker`.
  *
  * @param trainer Factory object for training a linear classifier used for
  *   pointwise reranking.
@@ -192,7 +238,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       val top_n = self.top_n
       protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
           candidate: GeoCell[Co], initial_score: Double) = {
-        self.create_candidate_evaluation_instance(query, candidate, initial_score)
+        self.create_candidate_evaluation_instance(query, candidate,
+          initial_score)
       }
     }
   }

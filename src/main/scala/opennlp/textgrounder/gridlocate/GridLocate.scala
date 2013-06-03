@@ -976,6 +976,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
    * factory that constructs candidate feature vectors for the reranker,
    * i.e. feature vectors measuring the compatibility between a given
    * document and a given cell.
+   *
+   * @see CandidateInstFactory
    */
   protected def create_candidate_instance_factory = {
     params.rerank_instance match {
@@ -1004,13 +1006,22 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
    * documents.
    */
   def create_ranker: GridRanker[Co] = {
+    /* The basic ranker object. */
     def basic_ranker =
       new { val strategy =
               create_strategy_from_documents(read_raw_training_documents)
           } with GridRanker[Co]
     if (params.rerank == "none") basic_ranker
     else {
+      /* Factory object for generating feature vectors describing
+       * candidate instances (document-cell pairs) to be ranked. There is
+       * one such feature vector per cell to be ranked for a given
+       * document, and it measures the compatibility of the document's and
+       * cell's language models.
+       */
       val candidate_instance_factory = create_candidate_instance_factory
+
+      /* Object for training a reraner. */
       val reranker_trainer =
         new LinearClassifierGridRerankerTrainer[Co](
           create_pointwise_classifier_trainer
@@ -1041,6 +1052,9 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
             }
           }
 
+          /* Create the feature vector for a candidate instance (document-cell
+           * pair) during evaluation, by invoking the candidate-instance
+           * factory (see above). */
           protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
               candidate: GeoCell[Co], initial_score: Double) = {
             val featvec =
@@ -1051,11 +1065,16 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
                 query, candidate, initial_score, featvec)
             featvec
           }
+
+          /* Create the initial ranker from training data. */
           protected def create_initial_ranker(
             data: Iterable[DocStatus[RawDocument]]
           ) = new { val strategy =
                      create_strategy_from_documents(_ => data.toIterator) }
                 with GridRanker[Co]
+
+          /* Convert encapsulated raw documents into document-cell pairs.
+           */
           protected def external_instances_to_query_candidate_pairs(
             insts: Iterator[DocStatus[RawDocument]],
             initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
@@ -1071,11 +1090,15 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
             }
           }
         }
+
+      /* Training data, in the form of an iterable over raw documents (suitably
+       * wrapped in a DocStatus object). */
       val training_data = new Iterable[DocStatus[RawDocument]] {
         def iterator =
           read_raw_training_documents(
             "reading %s for generating reranker training data")
       }.view
+      /* Train the reranker. */
       reranker_trainer(training_data)
     }
   }
