@@ -1,0 +1,95 @@
+///////////////////////////////////////////////////////////////////////////////
+//  FeatureVector.scala.template
+//
+//  Copyright (C) 2012, 2013 Ben Wing, The University of Texas at Austin
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+///////////////////////////////////////////////////////////////////////////////
+
+package opennlp.textgrounder
+package learning
+
+/**
+ * IF THIS FILE ENDS WITH .scala, IT'S AUTO-GENERATED FROM
+ * FeatureVector.scala.template.
+ *
+ * (Feature vectors for machine learning, varied by implementation type.)
+ *
+ * @author Ben Wing
+ */
+
+import util.memoizer._
+
+// This indirection is necessary so VECTY gets properly expanded
+#define makespec_join1(a,b) a##b
+#define makespec_join(a,b) makespec_join1(a,b)
+#define makespec(name) makespec_join(VECTY, name)
+
+/**
+ * An efficient implementation of a sparse feature vector, storing the
+ * keys and values as separate Java arrays for maximally efficient
+ * memory use, with the keys sorted so that efficient O(log n) lookup
+ * is possible using binary search.
+ */
+abstract class makespec(CompressedSparseFeatureVector) private[learning] (
+  keys: Array[Int], values: Array[VECTY]
+) extends SparseFeatureVectorLike {
+  assert(keys.length == values.length)
+
+  def stored_entries = keys.length
+
+  def apply(index: Int) = {
+    val keyind = java.util.Arrays.binarySearch(keys, index)
+    if (keyind < 0) 0.0 else values(keyind)
+  }
+
+  def squared_magnitude(label: Int) = {
+    var i = 0
+    var res = 0.0
+    while (i < keys.length) {
+      res += values(i) * values(i)
+      i += 1
+    }
+    res
+  }
+
+  def dot_product(weights: SimpleVector, label: Int) = {
+    assert(length == weights.length)
+    var i = 0
+    var res = 0.0
+    while (i < keys.length) {
+      res += values(i) * weights(keys(i))
+      i += 1
+    }
+    res
+  }
+
+  def update_weights(weights: SimpleVector, scale: Double, label: Int) {
+    assert(length == weights.length)
+    var i = 0
+    while (i < keys.length) {
+      weights(keys(i)) += scale * values(i)
+      i += 1
+    }
+  }
+
+  def toIterable = keys zip (values.map(_.toDouble))
+
+  def string_prefix = "CompressedSparseFeatureVector"
+}
+
+class makespec(BasicCompressedSparseFeatureVector) private[learning] (
+  keys: Array[Int], values: Array[VECTY], val length: Int
+) extends makespec(CompressedSparseFeatureVector)(keys, values) {
+  override val include_displayed_feature = false
+}
