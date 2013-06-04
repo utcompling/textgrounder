@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //  FeatureVector.scala
 //
-//  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2012, 2013 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -238,64 +238,17 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
   }
 }
 
-/**
- * An efficient implementation of a sparse feature vector, storing the
- * keys and values as separate Java arrays for maximally efficient
- * memory use, with the keys sorted so that efficient O(log n) lookup
- * is possible using binary search.
- */
-abstract class CompressedSparseFeatureVector private[learning] (
-  keys: Array[Int], values: Array[Double]
-) extends SparseFeatureVectorLike {
-  assert(keys.length == values.length)
+// abstract class CompressedSparseFeatureVector private[learning] (
+//   keys: Array[Int], values: Array[Double]
+// ) extends SparseFeatureVectorLike {
+// (in FeatureVector.scala.template)
+// }
 
-  def stored_entries = keys.length
-
-  def apply(index: Int) = {
-    val keyind = java.util.Arrays.binarySearch(keys, index)
-    if (keyind < 0) 0.0 else values(keyind)
-  }
-
-  def squared_magnitude(label: Int) = {
-    var i = 0
-    var res = 0.0
-    while (i < keys.length) {
-      res += values(i) * values(i)
-      i += 1
-    }
-    res
-  }
-
-  def dot_product(weights: SimpleVector, label: Int) = {
-    assert(length == weights.length)
-    var i = 0
-    var res = 0.0
-    while (i < keys.length) {
-      res += values(i) * weights(keys(i))
-      i += 1
-    }
-    res
-  }
-
-  def update_weights(weights: SimpleVector, scale: Double, label: Int) {
-    assert(length == weights.length)
-    var i = 0
-    while (i < keys.length) {
-      weights(keys(i)) += scale * values(i)
-      i += 1
-    }
-  }
-
-  def toIterable = keys zip values
-
-  def string_prefix = "CompressedSparseFeatureVector"
-}
-
-class BasicCompressedSparseFeatureVector private[learning] (
-  keys: Array[Int], values: Array[Double], val length: Int
-) extends CompressedSparseFeatureVector(keys, values) {
-  override val include_displayed_feature = false
-}
+// class BasicCompressedSparseFeatureVector private[learning] (
+//   keys: Array[Int], values: Array[Double], val length: Int
+// ) extends CompressedSparseFeatureVector(keys, values) {
+// (in FeatureVector.scala.template)
+// }
 
 //object SparseFeatureVector {
 //  def apply(len: Int, fvs: (Int, Double)*) = {
@@ -381,14 +334,17 @@ class SparseFeatureVectorFactory[T](
   val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
 
   val vector_impl = debugval("featvec") match {
-    case "Compressed" | "compressed" => "Compressed"
-    case "TupleArray" | "tuplearray" | "tuple-array" => "TupleArray"
-    case "Map" | "map" => "Map"
-    case _ => "Compressed"
+    case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
+            "ShortCompressed" | "TupleArray" | "Map") => f
+    case "" => "DoubleCompressed"
   }
 
   errprint("Feature vector implementation: %s", vector_impl match {
-    case "Compressed" => "compressed feature vectors"
+    case "DoubleCompressed" => "compressed feature vectors, using doubles"
+    case "FloatCompressed" => "compressed feature vectors, using floats"
+    case "IntCompressed" => "compressed feature vectors, using ints"
+    case "ShortCompressed" => "compressed feature vectors, using shorts"
+    // case "BitCompressed" => "compressed feature vectors, using bits"
     case "TupleArray" => "tuple-array-backed sparse vectors"
     case "Map" => "map-backed sparse vectors"
   })
@@ -420,15 +376,28 @@ class SparseFeatureVectorFactory[T](
           yield (index.get, value)
       )
     vector_impl match {
-      case "Compressed" => {
-        val (keys, values) =
-          memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
-        new CompressedSparseFeatureVector(keys.toArray, values.toArray) with SparseFeatureVectorMixin
-      }
       case "TupleArray" =>
         new TupleArraySparseFeatureVector(memoized_features.toBuffer) with SparseFeatureVectorMixin
       case "Map" =>
         new MapSparseFeatureVector(memoized_features.toMap) with SparseFeatureVectorMixin
+      case _ => {
+        val (keys, values) =
+          memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
+        vector_impl match {
+          case "DoubleCompressed" =>
+            new DoubleCompressedSparseFeatureVector(keys.toArray,
+              values.toArray) with SparseFeatureVectorMixin
+          case "FloatCompressed" =>
+            new FloatCompressedSparseFeatureVector(keys.toArray,
+              values.map(_.toFloat).toArray) with SparseFeatureVectorMixin
+          case "IntCompressed" =>
+            new IntCompressedSparseFeatureVector(keys.toArray,
+              values.map(_.toInt).toArray) with SparseFeatureVectorMixin
+          case "ShortCompressed" =>
+            new ShortCompressedSparseFeatureVector(keys.toArray,
+              values.map(_.toShort).toArray) with SparseFeatureVectorMixin
+        }
+      }
     }
   }
 }
