@@ -522,9 +522,9 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
         errprint("Yes labels for correct label %s = %s", correct, yeslabs)
         val nolabs = no_labels(inst, correct)
         errprint("No labels for correct label %s = %s", correct, nolabs)
-        val (r,rscore) = argandmin[Int](yeslabs, dotprod(_))
+        val (r,rscore) = argandmin(yeslabs) { dotprod(_) }
         errprint("r,rscore = %s,%s", r, rscore)
-        val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
+        val (s,sscore) = argandmax(nolabs) { dotprod(_) }
         errprint("s,sscore = %s,%s", s, sscore)
         val margin = rscore - sscore
         errprint("margin = %s", margin)
@@ -560,8 +560,8 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
           fv.dot_product(weights(x), x)
         val yeslabs = yes_labels(inst, correct)
         val nolabs = no_labels(inst, correct)
-        val (r,rscore) = argandmin[Int](yeslabs, dotprod(_))
-        val (s,sscore) = argandmax[Int](nolabs, dotprod(_))
+        val (r,rscore) = argandmin(yeslabs) { dotprod(_) }
+        val (s,sscore) = argandmax(nolabs) { dotprod(_) }
         val margin = rscore - sscore
         if (margin < 0)
           num_errors += 1
@@ -800,11 +800,12 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
         errprint("Gold score: %s", goldscore)
         val predicted =
           if (prediction_based)
-            argmax[Int](all_labs, dotprod(_))
+            argmax(all_labs) { dotprod(_) }
           else
-            argmax[Int](all_labs,
+            argmax(all_labs) {
               x=>(dotprod(x) - goldscore +
-                math.sqrt(get_cost(inst, correct, x))))
+                math.sqrt(get_cost(inst, correct, x)))
+            }
         errprint("Predicted label (%s): %s",
           if (prediction_based) "prediction-based" else "max-loss", predicted)
         if (predicted != correct) {
@@ -843,10 +844,11 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
         val goldscore = dotprod(correct)
         val predicted =
           if (prediction_based)
-            argmax[Int](all_labs, dotprod(_))
+            argmax(all_labs) { dotprod(_) }
           else
-            argmax[Int](all_labs,
-              x=>(dotprod(x) - goldscore + math.sqrt(cost(inst, correct, x))))
+            argmax(all_labs) {
+              x=>(dotprod(x) - goldscore + math.sqrt(cost(inst, correct, x)))
+            }
         if (predicted != correct) {
           num_errors += 1
           val loss = dotprod(predicted) - goldscore +
