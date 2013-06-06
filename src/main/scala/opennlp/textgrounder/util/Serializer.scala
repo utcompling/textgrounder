@@ -70,6 +70,11 @@ object Serializer {
     def deserialize(x: String) = x.toLong
   }
 
+  implicit val double_serializer = new Serializer[Double] {
+    def serialize(x: Double) = x.toString
+    def deserialize(x: String) = x.toDouble
+  }
+
   implicit val boolean_serializer = new Serializer[Boolean] {
     def serialize(x: Boolean) = if (x) "yes" else "no"
     def deserialize(x: String) = x match {
