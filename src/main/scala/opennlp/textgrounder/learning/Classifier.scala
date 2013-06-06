@@ -99,7 +99,7 @@ trait ScoringClassifier extends Classifier {
 
   /** Return the best label. */
   def classify(inst: FeatureVector) =
-    argmax[Int](0 until number_of_labels(inst), score_label(inst, _))
+    argmax(0 until number_of_labels(inst)) { score_label(inst, _) }
 
   /** Score a given instance.  Return a sequence of predicted scores, of
     * the same length as the number of labels present.  There is one score
