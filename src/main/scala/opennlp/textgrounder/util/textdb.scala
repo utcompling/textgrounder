@@ -166,26 +166,14 @@ package object textdb {
         get_fixed_field_or_else(key, default)
     }
 
-    def get_fixed_field(key: String) = {
-      if (fixed_values contains key)
-        fixed_values(key)
-      else
-        throw new NoSuchElementException("key not found: %s" format key)
-    }
+    def get_fixed_field(key: String) =
+      fixed_values(key)
 
-    def get_fixed_field_if(key: String) = {
-      if (fixed_values contains key)
-        Some(fixed_values(key))
-      else
-        None
-    }
+    def get_fixed_field_if(key: String) =
+      fixed_values.get(key)
 
-    def get_fixed_field_or_else(key: String, default: String) = {
-      if (fixed_values contains key)
-        fixed_values(key)
-      else
-        default
-    }
+    def get_fixed_field_or_else(key: String, default: String) =
+      fixed_values.getOrElse(key, default)
 
     /**
      * Convert a list of items into a row to be output directly to a text file.
