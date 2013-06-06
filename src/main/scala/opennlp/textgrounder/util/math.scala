@@ -19,6 +19,7 @@
 package opennlp.textgrounder
 package util
 
+import collection._
 import scala.math._
 
 package object math {
@@ -43,7 +44,7 @@ package object math {
   }
 
   /**
-   *  Return the median value of a list.  List will be sorted, so this is O(n).
+   *  Return the median value of a list.
    */
   def median(list: Seq[Double]) = {
     val sorted = list.sorted
@@ -57,10 +58,17 @@ package object math {
   }
   
   /**
-   *  Return the mean of a list.
+   *  Return the mean (average) of a list.
    */
   def mean(list: Seq[Double]) = {
     list.sum / list.length
+  }
+
+  /**
+   *  Return the mode (most common value) of a list.
+   */
+  def mode[T](list: Seq[T]) = {
+    (argmax(list.countItems) { _._2 })._1
   }
 
   def variance(x: Seq[Double]) = {
