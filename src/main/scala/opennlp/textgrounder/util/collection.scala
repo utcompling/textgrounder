@@ -39,6 +39,7 @@ import scala.util.control.Breaks._
 import scala.collection.mutable
 import mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
+import scala.collection.{Map => BaseMap}
 
 /**
  * A package containing various collection-related classes and functions.
@@ -824,5 +825,21 @@ package object collection {
    */
   def list_to_item_count_map[T : Ordering](list: Seq[T]) =
     list.sorted groupBy identity mapValues (_.size)
-}
 
+  implicit def to_CollectionTravOncePimp[T](iable: TraversableOnce[T]) =
+  new {
+    def countItems: BaseMap[T, Int] = {
+      val counts = intmap[T]()
+      iable.foreach { counts(_) += 1 }
+      counts
+    }
+  }
+
+  implicit def to_CollectionNumericPartOrdSeqPimp[T, U : Ordering](
+    seq: Seq[(T, U)]
+  ) = new {
+    private val ordering = implicitly[Ordering[U]]
+    def sortNumeric = seq sortWith { (x,y) => ordering.lt(x._2, y._2) }
+    def sortNumericRev = seq sortWith { (x,y) => ordering.gt(x._2, y._2) }
+  }
+}
