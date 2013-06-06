@@ -22,9 +22,12 @@ import collection.mutable
 
 import util.argparser._
 import util.collection._
+import util.distances._
 import util.experiment._
 import util.io
+import util.math._
 import util.print._
+import util.Serializer
 import util.textdb._
 
 import util.debug._
@@ -83,9 +86,29 @@ object AnalyzeResults extends ExperimentApp("classify") {
     outf.close()
   }
 
+  def print_stats(prefix: String, units: String, nums: Seq[Double]) {
+    def pr(fmt: String, args: Any*) {
+      outprint("%s: %s", prefix, fmt format (args: _*))
+    }
+    pr("Mean: %.2f%s +/- %.2f%s", mean(nums), units, stddev(nums), units)
+    pr("Median: %.2f%s", median(nums), units)
+    pr("Mode: %.2f%s", mode(nums), units)
+    pr("Range: [%.2f%s to %.2f%s]", nums.min, units, nums.max, units)
+  }
+
   def run_program(args: Array[String]) = {
     val correct_cells = intmap[String]()
     val pred_cells = intmap[String]()
+    var numtokens = Vector[Double]()
+    var numtypes = Vector[Int]()
+    var numcorrect = 0
+    var numseen = 0
+    var oracle_dist_true_center = Vector[Double]()
+    var oracle_dist_centroid = Vector[Double]()
+    var oracle_dist_central_point = Vector[Double]()
+    var error_dist_true_center = Vector[Double]()
+    var error_dist_centroid = Vector[Double]()
+    var error_dist_central_point = Vector[Double]()
 
     val filehand = io.local_file_handler
     val input_file =
@@ -95,11 +118,37 @@ object AnalyzeResults extends ExperimentApp("classify") {
     val (schema, field_iter) =
       TextDB.read_textdb_with_schema(filehand, dir, prefix = base)
     for (fieldvals <- field_iter.flatten) {
-      val correct_cell = schema.get_field(fieldvals, "correct-cell")
-      val pred_cell = schema.get_field(fieldvals, "pred-cell")
-      correct_cells(correct_cell) += 1
-      pred_cells(pred_cell) += 1
+      def get[T : Serializer](field: String) =
+        schema.get_value[T](fieldvals, field)
+      def gets(field: String) = schema.get_field(fieldvals, field)
+      val correct_cell = gets("correct-cell")
+      correct_cells(gets("correct-cell")) += 1
+      correct_cells(gets("pred-cell")) += 1
+      val correct_coord = get[SphereCoord]("correct-coord")
+      def dist_to(field: String) =
+        spheredist(correct_coord, get[SphereCoord](field))
+      oracle_dist_true_center :+= dist_to("correct-cell-true-center")
+      oracle_dist_centroid :+= dist_to("correct-cell-centroid")
+      oracle_dist_central_point :+= dist_to("correct-cell-central-point")
+      error_dist_true_center :+= dist_to("pred-cell-true-center")
+      error_dist_centroid :+= dist_to("pred-cell-centroid")
+      error_dist_central_point :+= dist_to("pred-cell-central-point")
+      numtypes :+= get[Int]("numtypes")
+      numtokens :+= get[Double]("numtokens")
+      numseen += 1
+      if (get[Int]("correct-rank") == 1)
+        numcorrect += 1
     }
+    outprint("Accuracy: %.4f (%s/%s)" format
+      ((numcorrect.toDouble / numseen), numcorrect, numseen))
+    print_stats("Oracle distance to central point", " km", oracle_dist_central_point)
+    print_stats("Oracle distance to centroid", " km", oracle_dist_centroid)
+    print_stats("Oracle distance to true center", " km", oracle_dist_true_center)
+    print_stats("Error distance to central point", " km", error_dist_central_point)
+    print_stats("Error distance to centroid", " km", error_dist_centroid)
+    print_stats("Error distance to true center", " km", error_dist_true_center)
+    print_stats("Word types per document", "", numtypes map { _.toDouble })
+    print_stats("Word tokens per document", "", numtokens map { _.toDouble })
     if (params.pred_cell_distribution != null)
       output_freq_of_freq(filehand, params.pred_cell_distribution, pred_cells)
     if (params.correct_cell_distribution != null)
