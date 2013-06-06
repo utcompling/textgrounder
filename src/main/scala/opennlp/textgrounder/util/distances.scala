@@ -98,7 +98,8 @@ package object distances {
     // but either always coerce, or check the bounds ...
     require(SphereCoord.valid(lat, long),
       "Coordinates out of bounds: %s" format toString)
-    override def toString = SphereCoord.format_lat_long(lat, long)
+    override def toString = SphereCoord.serialize(this)
+    def format = SphereCoord.format_lat_long(lat, long)
   }
 
   implicit object SphereCoord extends Serializer[SphereCoord] {
@@ -149,7 +150,8 @@ package object distances {
     }
 
     def deserialize(foo: String) = {
-      val Array(lat, long) = foo.split(",", -1)
+      val foo_stripped = foo.stripPrefix("(").stripSuffix(")")
+      val Array(lat, long) = foo_stripped.split(",", -1)
       SphereCoord(lat.toDouble, long.toDouble)
     }
     
