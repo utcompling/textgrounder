@@ -511,33 +511,60 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-rounds`.""")
 
   val rerank_features_matching_word_choices =
-    Seq("binary", "count", "count-product", "probability", "prob-product",
-        "kl").map("matching-word-" + _)
+    Seq("unigram-binary", "unigram-count", "unigram-count-product",
+        "unigram-probability", "unigram-prob-product", "kl")
+
+  val rerank_features_matching_bigram_choices =
+    Seq("bigram-binary", "bigram-count", "bigram-count-product")
 
   var rerank_features =
     ap.option[String]("rerank-features",
       default = "combined",
-      aliasedChoices = Seq(
-        Seq("kl-div", "kldiv"),
-        Seq("combined"),
-        Seq("trivial")
-      ) ++ rerank_features_matching_word_choices.map(Seq(_))
-      ,
+      choices = Seq("all-kl", "combined", "trivial") ++
+        rerank_features_matching_word_choices ++
+        rerank_features_matching_bigram_choices,
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
 respective language models). The original ranking score for the cell always
-serves as one of the features.  Possibilities are 'trivial' (no features
-beyond the original score, for testing purposes); 'matching-word-binary'
-(use the value 1 when a word exists in both document and cell, 0 otherwise);
-'matching-word-count' (use the document word count when a word exists in both
-document and cell); 'matching-word-count-product' (use the product of the
-document and cell word count when a word exists in both document and cell);
-'matching-word-probability' (use the document probability when a word exists
-in both document and cell); 'matching-word-prob-product' (use the product of
-both the document and cell probability when a word exists in both document
-and cell); 'kl-div' (use the individual word components of the KL-divergence
-between document and cell); 'combined' (use all of the features of all
-the previous methods).  Default %default.
+serves as one of the features.  Possibilities are:
+
+'trivial' (no features beyond the original score, for testing purposes);
+
+'unigram-binary' (use the value 1 when a word exists in both document
+  and cell, 0 otherwise);
+
+'unigram-count' (use the document word count when a word exists in both
+document and cell);
+
+'unigram-count-product' (use the product of the document and cell
+  word count when a word exists in both document and cell);
+
+'unigram-probability' (use the document probability when a word exists
+  in both document and cell);
+
+'unigram-prob-product' (use the product of both the document and cell
+  probability when a word exists in both document and cell);
+
+'kl' (when a word exists in both document and cell, use the individual
+  KL-divergence component score between document and cell for the word,
+  else 0);
+
+'bigram-binary' (similar to 'unigram-binary' but include features for
+  both unigrams and bigrams);
+
+'bigram-count' (similar to 'unigram-count' but include features for
+  both unigrams and bigrams);
+
+'bigram-count-product' (similar to 'unigram-count-product' but include
+  features for both unigrams and bigrams);
+
+'all-kl' (for all words in the document, use the KL-divergence score between
+  document and cell -- probably not useful as distinct from plain 'kl',
+  because the difference is only due to smoothing);
+
+'combined' (use all of the features of all the previous methods).
+
+Default %default.
 
 Note that this only is used when --rerank=pointwise and --rerank-classifier
 specifies something other than 'trivial'.""")
@@ -988,10 +1015,12 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     def create_fact(ty: String): CandidateInstFactory[Co] = {
       if (params.rerank_features_matching_word_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
+      else if (params.rerank_features_matching_bigram_choices contains ty)
+        new BigramMatchingCandidateInstFactory[Co](ty)
       else ty match {
         case "trivial" =>
           new TrivialCandidateInstFactory[Co]
-        case "kl-div" =>
+        case "all-kl" =>
           new KLDivCandidateInstFactory[Co]
         case "combined" =>
           new CombiningCandidateInstFactory[Co](
