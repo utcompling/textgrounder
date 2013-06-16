@@ -1,3 +1,5 @@
+-punct-
+-oov-
 's
 a
 a's
