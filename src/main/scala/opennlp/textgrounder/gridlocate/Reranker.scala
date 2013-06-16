@@ -182,12 +182,12 @@ class KLDivCandidateInstFactory[Co] extends
  * @param value How to compute the value assigned to the words that are
  *   shared:
  *
- * - `matching-word-binary`: always assign 1
- * - `matching-word-count`: use document word count
- * - `matching-word-count-product`: use product of document and cell word count
- * - `matching-word-probability`: use document word probability
- * - `matching-word-prob-product`: use product of document and cell word prob
- * - `matching-word-kl`: use KL-divergence component for document/cell probs
+ * - `unigram-binary`: always assign 1
+ * - `unigram-count`: use document word count
+ * - `unigram-count-product`: use product of document and cell word count
+ * - `unigram-probability`: use document word probability
+ * - `unigram-prob-product`: use product of document and cell word prob
+ * - `kl`: use KL-divergence component for document/cell probs
  */
 class WordMatchingCandidateInstFactory[Co](value: String) extends
     WordByWordCandidateInstFactory[Co] {
@@ -198,13 +198,13 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
       None
     else {
       val wordval = value match {
-        case "matching-word-binary" => 1
-        case "matching-word-count" => count
-        case "matching-word-count-product" => count * qcount
-        case "matching-word-prob-product" =>
+        case "unigram-binary" => 1
+        case "unigram-count" => count
+        case "unigram-count-product" => count * qcount
+        case "unigram-prob-product" =>
           docdist.lookup_word(word) * celldist.lookup_word(word)
-        case "matching-word-probability" => docdist.lookup_word(word)
-        case "matching-word-kl" => {
+        case "unigram-probability" => docdist.lookup_word(word)
+        case "kl" => {
           val p = docdist.lookup_word(word)
           val q = celldist.lookup_word(word)
           p*(log(p/q))
