@@ -266,7 +266,7 @@ package object textdb {
   }
 
   object Schema {
-    val schema_ending_re = """.schema\.txt"""
+    val schema_ending_re = """\.schema\.txt"""
     val schema_ending_text = ".schema.txt"
 
     /**
@@ -401,7 +401,7 @@ package object textdb {
     val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
     val possible_compression_re = """(?:%s)?""" format (
       possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
-    val data_ending_re = """.data\.txt"""
+    val data_ending_re = """\.data\.txt"""
     val data_ending_text = ".data.txt"
 
     /**
