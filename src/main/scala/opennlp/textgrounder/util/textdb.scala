@@ -398,8 +398,9 @@ package object textdb {
   }
 
   object TextDB {
-    val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
-    val possible_compression_re = """(?:%s)?""" format (
+    val possible_compression_endings =
+      Seq("", ".bz2", ".bzip2", ".gz", ".gzip")
+    val possible_compression_re = """(?:%s)""" format (
       possible_compression_endings.map(_.replace(".","""\.""")) mkString "|")
     val data_ending_re = """\.data\.txt"""
     val data_ending_text = ".data.txt"
@@ -594,9 +595,8 @@ package object textdb {
      */
     def textdb_file_matching_patterns(filehand: FileHandler, dir: String,
         suffix: String, file_ending: String) = {
-      val possible_endings = Seq("") ++ possible_compression_endings
-      for {ending <- possible_endings
-           full_ending = "%s%s" format (suffix, file_ending)
+      for {comp_ending <- possible_compression_endings
+           full_ending = "%s%s%s" format (suffix, file_ending, comp_ending)
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
            all_files = filehand.list_files(dir)
            files = all_files.filter(_ endsWith full_ending)
