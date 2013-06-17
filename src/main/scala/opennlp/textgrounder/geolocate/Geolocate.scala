@@ -915,7 +915,7 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
      */
     val param_handling = Seq[(String, Any => String)](
       ("input-corpus", xs => xs.asInstanceOf[Seq[String]] map { x =>
-        val (dir, base) = util.io.local_file_handler.split_filename(x)
+        val (dir, base) = util.io.localfh.split_filename(x)
         if (dir.endsWith("twitter-geotext"))
           "geotext-" + base.replace("docthresh-", "thresh")
         else

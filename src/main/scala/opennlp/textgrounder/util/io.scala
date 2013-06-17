@@ -482,8 +482,16 @@ package object io {
     def list_files(dir: String) = unsupported()
   }
 
-  val local_file_handler = new LocalFileHandler
-  val std_file_handler = new StdFileHandler
+  /**
+   * A file handler for the local file system. Use this to operate on
+   * "normal" (local) files.
+   */
+  val localfh = new LocalFileHandler
+
+  /**
+   * A file handler for stdio handles (stdin, stdout, stderr).
+   */
+  val stdfh = new StdFileHandler
 
   /**
    * Iterate over the given files, recursively processing the files in

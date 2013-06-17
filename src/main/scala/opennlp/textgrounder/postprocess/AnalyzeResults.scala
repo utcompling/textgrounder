@@ -110,7 +110,7 @@ object AnalyzeResults extends ExperimentApp("classify") {
     var error_dist_centroid = Vector[Double]()
     var error_dist_central_point = Vector[Double]()
 
-    val filehand = io.local_file_handler
+    val filehand = io.localfh
     val input_file =
       if (params.input contains "/") params.input
       else "./" + params.input

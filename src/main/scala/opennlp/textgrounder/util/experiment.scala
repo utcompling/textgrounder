@@ -23,7 +23,7 @@ import scala.collection.mutable
 
 import argparser._
 import collection._
-import io.{FileHandler, LocalFileHandler}
+import io.FileHandler
 import metering._
 import os._
 import print.{errprint, set_stdout_stderr_utf_8}
@@ -690,16 +690,11 @@ package object experiment {
   trait HadoopableArgParserExperimentDriver extends
       ArgParserExperimentDriver with ExperimentDriverStats {
     /**
-     * FileHandler object for this driver.
-     */
-    private val local_file_handler = new LocalFileHandler
-
-    /**
      * The file handler object for abstracting file access using either the
      * Hadoop or regular Java API.  By default, references the regular API,
      * but can be overridden.
      */
-    def get_file_handler: FileHandler = local_file_handler
+    def get_file_handler: FileHandler = io.localfh
   }
 
   /**
