@@ -25,7 +25,6 @@ import java.util.Date
 import java.text.DateFormat
 import java.io._
 
-import io._
 import print._
 import text._
 import time.format_minutes_seconds
@@ -130,7 +129,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
         virtual=virtual, wraperr=false), -1L)
     val header = if (virtual) "vsz" else "rss"
     val input =
-      capture_subprocess_output("ps", "-p", getpid_str, "-o", header)
+      io.capture_subprocess_output("ps", "-p", getpid_str, "-o", header)
     val lines = input.split('\n')
     for (line <- lines if line.trim != header.toUpperCase)
       return 1024*line.trim.toLong
@@ -148,7 +147,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
     val header = if (virtual) "VmSize:" else "VmRSS:"
     if (!((new File("/proc/self/status")).exists))
       return -1L
-    for (line <- local_file_handler.openr("/proc/self/status")) {
+    for (line <- io.localfh.openr("/proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith(header)) {
           val size = ("""\s+""".r.split(trimline))(1).toLong

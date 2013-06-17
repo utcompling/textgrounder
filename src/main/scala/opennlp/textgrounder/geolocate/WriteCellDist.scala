@@ -120,7 +120,6 @@ class WriteCellDistDriver extends
 Not generating a cell-distribution file.""", word)
       } else {
         val base = params.output + word
-        val filehand = util.io.local_file_handler
         val cellprob_props =
           for ((cell, prob) <- celldist.cellprobs) yield {
             cell.to_row ++ Seq(
@@ -131,7 +130,7 @@ Not generating a cell-distribution file.""", word)
         note_result("cell-dist-word", Encoder.string(word))
         // note_result("corpus-name", opts.corpus_name)
         // note_result("generating-app", progname)
-        TextDB.write_textdb(filehand, base, cellprob_props.iterator,
+        TextDB.write_textdb(util.io.localfh, base, cellprob_props.iterator,
           results_to_output, field_description)
       }
     }

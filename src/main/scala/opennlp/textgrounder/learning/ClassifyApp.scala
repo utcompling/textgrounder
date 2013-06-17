@@ -135,18 +135,16 @@ object ClassifyApp extends ExperimentApp("classify") {
   }
 
   def run_program(args: Array[String]) = {
-    val local = io.local_file_handler
-    val std = io.std_file_handler
-    val trainSource = local.openr(params.trainSource)
-    val predictSource = local.openr(params.predictSource)
+    val trainSource = io.localfh.openr(params.trainSource)
+    val predictSource = io.localfh.openr(params.predictSource)
 
     // If the output file is given via the option, create and write to that 
     // file; otherwise, use stdout.
     val output = {
       if (params.output == null)
-        std.openw("stdout")
+        io.stdfh.openw("stdout")
       else
-        local.openw(params.output)
+        io.localfh.openw(params.output)
     }
 
     // Train the classifier
