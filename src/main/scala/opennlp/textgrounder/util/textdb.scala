@@ -223,7 +223,7 @@ package object textdb {
   }
 
   class SchemaFromFile(
-    val filehand: FileHandler,
+    // val filehand: FileHandler,
     val filename: String,
     fieldnames: Iterable[String],
     fixed_values: BaseMap[String, String] = Map[String, String](),
@@ -231,9 +231,9 @@ package object textdb {
     split_text: String = "\t"
   ) extends Schema(fieldnames, fixed_values, field_description, split_text) {
     override def toString =
-      "SchemaFromFile(%s, %s, %s, %s, %s, %s)" format (
-        filehand, filename, fieldnames, fixed_values, field_description,
-        split_text)
+      "SchemaFromFile(%s, %s, %s, %s, %s)" format (
+        //filehand,
+        filename, fieldnames, fixed_values, field_description, split_text)
   }
 
   /**
@@ -363,8 +363,8 @@ package object textdb {
               format(schema_file, line))
         fixed_fields += (from -> to)
       }
-      new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields,
-        field_description, split_text)
+      new SchemaFromFile(//filehand,
+        schema_file, fieldnames, fixed_fields, field_description, split_text)
     }
 
     /**
