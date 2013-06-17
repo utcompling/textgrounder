@@ -23,12 +23,13 @@ import collection.mutable
 
 import java.io._
 
-import util.argparser._
-import util.collection._
-import util.textdb._
-import util.experiment._
-import util.io._
-import util.print.warning
+import util._
+import argparser._
+import collection._
+import experiment._
+import io.FileHandler
+import print.warning
+import textdb._
 
 import gridlocate.GeoDoc
 
@@ -66,31 +67,113 @@ the value of --input-suffix.""")
       metavar = "FIELD",
       help = """Remove a field, either from all rows (for a normal field)
 or a fixed field.""")
-  val set_split_by_value =
-    ap.option[String]("set-split-by-value",
-      metavar = "SPLITFIELD,MAX-TRAIN-VAL,MAX-DEV-VAL",
-      help = """Set the "split" field to one of "training", "dev" or "test"
-according to the value of another field (e.g. by time).  For the field named
-SPLITFIELD, values <= MAX-TRAIN-VAL go into the training split;
-values <= MAX-DEV-VAL go into the dev split; and higher values go into the
-test split.  Comparison is lexicographically (i.e. string comparison,
-rather than numeric).""")
+  val add_field_by_range =
+    ap.option[String]("add-field-by-range",
+      metavar = "DESTFIELD,SRCFIELD,NAME:MAXVAL,NAME:MAXVAL,...[,NAME]",
+      help = """Add a field whose value is determined by the range that
+another field lies within. This is normally used along with --split-by-field
+to split the corpus (e.g. into training/dev/test splits) according to
+the range of a given field.
+
+For each record, each NAME:MAXVAL pair is processed in turn, and if the
+value of SRCFIELD is <= MAXVAL, the DESTFIELD will be given the value NAME.
+If the last entry is simply a NAME, then for all remaining records (i.e.
+all values of SRCFIELD greater then the last MAXVAL given), DESTFIELD will
+be assigned that NAME. Comparison is lexicographic (i.e. string comparison),
+rather than numeric.""")
+  val add_field_by_index =
+    ap.option[String]("add-field-by-index",
+      metavar = "DESTFIELD,SRCFIELD,NAME:FILE,NAME:FILE,...[,NAME]",
+      help = """Add a field whose value is determined by the looking up
+the value of another field in a set of index files. This is normally used
+along with --split-by-field to split the corpus (e.g. into training/dev/test
+splits) in a designated fashion, with the various files specifying the
+particular split that each record belongs in.
+
+For each record, each NAME:FILE pair is processed in turn, and if the
+value of SRCFIELD is located in the given file, the DESTFIELD will be
+given the value NAME. If the last entry is simply be a NAME, then for all
+remaining records, DESTFIELD will be assigned that NAME. Each file should
+have one value per line.""")
   val split_by_field =
     ap.option[String]("split-by-field",
       metavar = "FIELD",
       help = """Divide the corpus into separate corpora according to the value
 of the given field. (For example, the "split" field.)  You can combine this
 action with any of the other actions, and they will be done in the right
-order.""")
+order, i.e. all field-changing operations will be done before splitting the
+corpus.""")
   val convert_to_unigram_counts =
     ap.flag("convert-to-unigram-counts",
       help = """If specified, convert the data in the 'text' field to
 unigram counts and add a new 'unigram-counts' field containing
 those counts.""")
 
-  var split_field: String = null
-  var max_training_val: String = null
-  var max_dev_val: String = null
+  val frobbers = mutable.Buffer[RecordFrobber]()
+}
+
+/**
+ * Abstract class for frobbing a record in some fashion, according to
+ * a command-line parameter. There will be a list of such items,
+ * determined by command-line parameters, which will be processed in
+ * order for each record.
+ */
+abstract class RecordFrobber {
+  def frob(docparams: mutable.Map[String, String])
+}
+
+/**
+ * Implement --add-field-by-range.
+ */
+class AddFieldByRange(destfield: String, srcfield: String,
+    ranges: Iterable[(String, String)]) extends RecordFrobber {
+  def frob(docparams: mutable.Map[String, String]) {
+    val srcval = docparams(srcfield)
+    for ((name, maxval) <- ranges) {
+      if (maxval.isEmpty || srcval <= maxval) {
+        docparams(destfield) = name
+        return
+      }
+    }
+  }
+}
+
+/**
+ * Implement --add-field-by-index.
+ */
+class AddFieldByIndex(destfield: String, srcfield: String,
+    index_files: Iterable[(String, String)]) extends RecordFrobber {
+  val indices =
+    for ((name, file) <- index_files) yield {
+      if (file.isEmpty)
+        (name, None)
+      else
+        (name, Some(io.localfh.openr(file).toSet))
+    }
+  def frob(docparams: mutable.Map[String, String]) {
+    val srcval = docparams(srcfield)
+    for ((name, members) <- indices) {
+      if (members == None || members.get.contains(srcval)) {
+        docparams(destfield) = name
+        return
+      }
+    }
+  }
+}
+
+/**
+ * Implement --convert-to-unigram-counts. FIXME: Probably should be
+ * deleted. Use ParseTweets.
+ */
+class ConvertToUnigramCounts extends RecordFrobber {
+  def frob(docparams: mutable.Map[String, String]) {
+    val text = docparams("text")
+    val unigram_counts = intmap[String]()
+    for (word <- text.split(" ", -1))
+      unigram_counts(word) += 1
+    val unigram_counts_text = encode_count_map(unigram_counts.toSeq)
+    docparams += (("unigram-counts", unigram_counts_text))
+  }
 }
 
 /**
@@ -117,22 +200,7 @@ class FrobTextDB(
     docparams ++= (rename_fields(schema.fieldnames) zip fieldvals)
     for (field <- params.remove_field)
       docparams -= field
-    if (params.split_field != null) {
-      if (docparams(params.split_field) <= params.max_training_val)
-        docparams("split") = "training"
-      else if (docparams(params.split_field) <= params.max_dev_val)
-        docparams("split") = "dev"
-      else
-        docparams("split") = "test"
-    }
-    if (params.convert_to_unigram_counts) {
-      val text = docparams("text")
-      val unigram_counts = intmap[String]()
-      for (word <- text.split(" ", -1))
-        unigram_counts(word) += 1
-      val unigram_counts_text = encode_count_map(unigram_counts.toSeq)
-      docparams += (("unigram-counts", unigram_counts_text))
-    }
+    params.frobbers.foreach(_.frob(docparams))
     docparams.toIndexedSeq
   }
 
@@ -300,16 +368,34 @@ class FrobTextDB(
 class FrobTextDBDriver extends
     ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = FrobTextDBParameters
+
+  def parse_add_field_by(value: String) = {
+    val Array(destfield, srcfield, pairs@_*) = value.split(",")
+    val split_pairs = pairs.map { pair =>
+      pair.split(":") match {
+        case Array(name,valstr) => (name, valstr)
+        case Array(name) => (name, "")
+      }
+    }
+    (destfield, srcfield, split_pairs)
+  }
   
   override def handle_parameters() {
     need(params.input_dir, "input-dir")
-    if (params.set_split_by_value != null) {
-      val Array(split_field, training_max, dev_max) =
-        params.set_split_by_value.split(",")
-      params.split_field = split_field
-      params.max_training_val = training_max
-      params.max_dev_val = dev_max
+    if (params.add_field_by_range != null) {
+      val (destfield, srcfield, split_pairs) =
+        parse_add_field_by(params.add_field_by_range)
+      params.frobbers +=
+        new AddFieldByRange(destfield, srcfield, split_pairs)
     }
+    if (params.add_field_by_index != null) {
+      val (destfield, srcfield, split_pairs) =
+        parse_add_field_by(params.add_field_by_index)
+      params.frobbers +=
+        new AddFieldByIndex(destfield, srcfield, split_pairs)
+    }
+    if (params.convert_to_unigram_counts)
+      params.frobbers += new ConvertToUnigramCounts
     if (params.output_suffix == null)
       params.output_suffix = params.input_suffix
     super.handle_parameters()
@@ -340,7 +426,6 @@ e.g. "split" (--split-by-field).
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
 }
-
 //class ScoobiConvertTextToUnigramCountsDriver extends
 //    BaseConvertTextToUnigramCountsDriver {
 //
