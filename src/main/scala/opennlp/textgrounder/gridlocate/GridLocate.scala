@@ -1024,7 +1024,7 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
        */
       val candidate_instance_factory = create_candidate_instance_factory
 
-      /* Object for training a reraner. */
+      /* Object for training a reranker. */
       val reranker_trainer =
         new LinearClassifierGridRerankerTrainer[Co](
           create_pointwise_classifier_trainer
@@ -1047,7 +1047,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
               featvec
             }
 
-            data.map { qtd =>
+            val task = new Meter("converting", "QTD's to RTI's")
+            data.mapMetered(task) { qtd =>
               val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
               val label = qtd.label
               val candidates = qtd.cand_scores.map(_._1).toIndexedSeq
