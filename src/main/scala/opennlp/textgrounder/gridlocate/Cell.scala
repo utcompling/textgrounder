@@ -427,8 +427,7 @@ abstract class GeoGrid[Co](
 
     total_num_docs = 0
 
-    driver.show_progress("computing statistics of", "non-empty cell").
-    foreach(iter_nonempty_cells) { cell =>
+    iter_nonempty_cells foreach { cell =>
       total_num_docs +=
         cell.combined_dist.num_docs
     }
