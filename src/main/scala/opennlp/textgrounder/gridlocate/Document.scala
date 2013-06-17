@@ -519,6 +519,11 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   def finish_document_loading() {
+    if (debug("docstats"))
+      output_document_statistics()
+  }
+
+  def output_document_statistics() {
     // Now output statistics on number of documents seen, etc.
     errprint("")
     errprint("-------------------------------------------------------------------------")
