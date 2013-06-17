@@ -341,7 +341,7 @@ Look for any tweets containing the word "clinton" as well as either the words
   def parse_output_fields(fieldspec: String) = {
     val directives = fieldspec.split("[ ,]")
     val incfields = mutable.LinkedHashSet[String]()
-    for (direc <- Array("default") ++ directives) {
+    for (direc <- directives) {
       direc match {
         case "default" => {
           incfields.clear()
@@ -405,7 +405,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
   type Timestamp = Long
 
-  val empty_map = Map[String, Int]()
+  def empty_map = Map[String, Int]()
 
   /**
    * Data for a tweet or grouping of tweets.
@@ -1403,7 +1403,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val numtweets = t1.numtweets + t2.numtweets
       // Avoid computing stuff we will never use
       val text =
-        if (opts.included_fields contains "text")
+        if ((opts.included_fields contains "text") ||
+            (opts.included_fields contains "unigram-counts") ||
+            (opts.included_fields contains "ngram-counts"))
           t1.text ++ t2.text
         else Seq[String]()
       val positions =
