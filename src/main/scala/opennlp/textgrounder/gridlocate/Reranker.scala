@@ -5,6 +5,7 @@ import math.log
 
 import worddist.WordDist._
 import worddist.UnigramWordDist
+import util.debug._
 import util.print._
 import util.metering._
 import learning._
@@ -107,8 +108,16 @@ class CombiningCandidateInstFactory[Co](
     // For each subsidiary factory, retrieve its features, then add the
     // index of the factory to the feature's name to disambiguate, and
     // concatenate all features.
+    if (debug("combined-features")) {
+      errprint("Document: %s", doc)
+      errprint("Cell: %s", cell)
+    }
     subsidiary_facts.zipWithIndex flatMap { case (fact, index) =>
       fact.get_features(doc, cell) map { case (word, count) =>
+        val featname = "%s$%s" format (memoizer.unmemoize(word), index)
+        if (debug("combined-features")) {
+          errprint("%s = %s", featname, count)
+        }
         // FIXME! May not be necessary to memoize like this. I don't think we
         // need to unmemoize the feature names (except for debugging
         // purposes), so it's enough just to OR the index onto the top bits
@@ -117,8 +126,7 @@ class CombiningCandidateInstFactory[Co](
         // spread-out integers, we can just XOR the index onto the top bits
         // or hash the two numbers together; occasional feature clashes
         // aren't a big deal).
-        (memoizer.memoize("%s$%s" format (memoizer.unmemoize(word), index)),
-          count)
+        (memoizer.memoize(featname), count)
       }
     }
   }
