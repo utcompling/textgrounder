@@ -1015,8 +1015,9 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     def create_fact(ty: String): CandidateInstFactory[Co] = {
       if (params.rerank_features_matching_word_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
-      else if (params.rerank_features_matching_bigram_choices contains ty)
-        new BigramMatchingCandidateInstFactory[Co](ty)
+      //Comment out half-written code, oops ...
+      //else if (params.rerank_features_matching_bigram_choices contains ty)
+      //  new BigramMatchingCandidateInstFactory[Co](ty)
       else ty match {
         case "trivial" =>
           new TrivialCandidateInstFactory[Co]
