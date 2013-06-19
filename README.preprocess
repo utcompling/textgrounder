@@ -10,18 +10,19 @@ The normal output format from the various preprocessing applications is
 called the "textdb" format.  This is output by (e.g.) ParseTweets.
 
 This format stores data in as a tab-separated database, with one item
-per line.  There will be one or more files containing data, ending in
-'-SUFFIX.txt' (or '-SUFFIX.txt.bz2' or '-SUFFIX.txt.gz', if the data is
-compressed), where SUFFIX is an identifier referring to the particular sort
-of data stored. (E.g. tweet data uses the suffix 'tweets'.) In addition, there
-is a single file called a "schema", whose name ends in '-SUFFIX-schema.txt'.
-This specifies the name of each of the fields, as well as the name and value
-of any "fixed" fields (which, conceptually, have the same value for all rows,
-and are used to store extra info about the corpus).  Generally, there will
-be multiple output files when there are multiple reducers in Hadoop, since
-each reducer produces its own output file.  Storing the data this way makes
-it easy to read the files from Hadoop.  Large data files are typically
-stored compressed, and are automatically uncompressed as they are read in.
+per line.  Each textdb corpus consists of one or more files containing
+data, ending in '.data.txt' (or '.data.txt.bz2' or '.data.txt.gz',
+if the data is compressed; the code to read this format automatically
+recognizes the compression suffixes and decompresses on-the-fly). In
+addition, there is a single file called a "schema", whose name ends in
+'.schema.txt'. This specifies the name of each of the fields, as well
+as the name and value of any "fixed" fields (which, conceptually,
+have the same value for all rows, and are used to store extra info
+about the corpus).  Generally, there will be multiple output files when
+there are multiple reducers in Hadoop, since each reducer produces its
+own output file.  Storing the data this way makes it easy to read the
+files from Hadoop.  Large data files are typically stored compressed,
+and are automatically uncompressed as they are read in.
 
 The following formats are used for individual fields:
 
@@ -51,6 +52,8 @@ The schema file is currently in the following format:
 -- Additional lines specify "fixed fields", which are conceptually like
    normal fields but have the same value for every row.  There is one
    line per fixed field, with the field name, a tab, and the field value.
+   Optionally, there may be another tab followed by an "English" version
+   of the field name, for display purposes.
 
 Possibly at some point it may be necessary to specify the field type as well
 as its name.
@@ -66,6 +69,9 @@ after errors along with exponential backoff (absolutely necessary when doing
 Twitter streaming, or you will get locked out temporarily), and starts a new
 file after a certain time period (by default, one day), to keep the resulting
 BZIP-ped files from getting overly large.
+
+WARNING: As of Jun 11, 2013, the Twitter API used in this script no longer
+works. We are in the process of rewriting it to use the newer Twitter API's.
 
 ===============
 Parsing Twitter
