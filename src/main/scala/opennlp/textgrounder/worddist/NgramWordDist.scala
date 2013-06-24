@@ -36,6 +36,15 @@ import util.debug._
 
 import WordDist._
 
+object Ngram {
+  def check_ngram_dist(word_dist: WordDist) = {
+    word_dist match {
+      case x: NgramWordDist => x
+      case _ => throw new IllegalArgumentException("You must use an ngram word distribution for these parameters")
+    }
+  }
+}
+
 object NgramStorage {
   type Ngram = Iterable[String]
 }
@@ -63,7 +72,7 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Add an n-gram with the given count.  If the n-gram exists already,
    * add the count to the existing value.
    */
-  def add_item(ngram: Ngram, count: Double) {
+  def add_item(ngram: Ngram, count: WordCount) {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
@@ -77,7 +86,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     }
   }
 
-  def set_item(ngram: Ngram, count: Double) {
+  def set_item(ngram: Ngram, count: WordCount) {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
@@ -199,7 +208,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //  /**
 //   * Record an n-gram (encoded into a string) and associated count.
 //   */
-//  def record_encoded_ngram(egram: String, count: Int) {
+//  def record_encoded_ngram(egram: String, count: WordCount) {
 //    val n = egram.count(_ == ':') + 1
 //    val mgram = memoizer.memoize(egram)
 //    ensure_ngram_fits(n)
@@ -289,7 +298,7 @@ abstract class NgramWordDist(
    */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
       return_contributing_words: Boolean = false):
-      (Double, collection.Map[String, Double]) = {
+      (Double, collection.Map[String, WordCount]) = {
     assert(false, "Not implemented")
     (0.0, null)
   }
@@ -312,8 +321,23 @@ abstract class NgramWordDist(
 }
 
 /**
- * Class for constructing an n-gram word distribution from a corpus or other
+ * Class for building an n-gram word distribution from a corpus or other
  * data source.
+ *
+ * @param factory Factory object for creating word dists.
+ * @param ignore_case Whether to fold the case of all words to lowercase.
+ * @param stopwords List of words to ignore (FIXME: Not implemented)
+ * @param whitelist List of words to allow; if specified, all others are
+ *   ignored. (FIXME: Not implemented)
+ * @param minimum_word_count Minimum count for a given n-gram. N-grams
+ *   with a lower count after the distribution is complete will be
+ *   replaced with the generic token -OOV- ("out of vocabulary").
+ * @param max_ngram Maximum n-gram size to allow. This is a filter that
+ *   operates on n-grams read directly from a corpus. If 0, allow
+ *   all n-grams.
+ * @param raw_text_max_ngram Maximum n-gram size to create, when creating
+ *   n-grams from raw text (rather than reading from a pre-chunked
+ *   corpus).
  */
 class DefaultNgramWordDistConstructor(
   factory: WordDistFactory,
@@ -321,7 +345,8 @@ class DefaultNgramWordDistConstructor(
   stopwords: Set[String],
   whitelist: Set[String],
   minimum_word_count: Int = 1,
-  max_ngram_length: Int = 3
+  max_ngram: Int = 0,
+  raw_text_max_ngram: Int = 3
 ) extends WordDistConstructor(factory: WordDistFactory) {
   import NgramStorage.Ngram
   /**
@@ -346,42 +371,51 @@ class DefaultNgramWordDistConstructor(
   }
 
   /**
-   * Returns true if the n-gram was counted, false if it was ignored due to
-   * stoplisting and/or whitelisting. */
+   * Returns true if the n-gram was counted, false if it was ignored (e.g.
+   * due to length restrictions, stoplisting or whitelisting). */
   protected def add_ngram_with_count(dist: NgramWordDist,
-      ngram: Ngram, count: Int): Boolean = {
-    val lgram = maybe_lowercase(ngram)
-    // FIXME: Not right with stopwords or whitelist
-    //if (!stopwords.contains(lgram) &&
-    //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-    //  dist.add_item(lgram, count)
-    //  true
-    //}
-    //else
-    //  false
-    dist.model.add_item(lgram, count)
-    return true
+      ngram: Ngram, count: WordCount) = {
+    if (max_ngram > 0 && ngram.size > max_ngram)
+      false
+    else {
+      val lgram = maybe_lowercase(ngram)
+      // FIXME: Not right with stopwords or whitelist
+      //if (!stopwords.contains(lgram) &&
+      //    (whitelist.size == 0 || whitelist.contains(lgram))) {
+        dist.model.add_item(lgram, count)
+        true
+      //}
+      //else
+      //  false
+    }
   }
 
+
+
   protected def imp_add_document(gendist: WordDist,
-      words: Iterable[String], max_ngram_length: Int) {
+      words: Iterable[String], raw_text_max_ngram: Int) {
     val dist = gendist.asInstanceOf[NgramWordDist]
-    for (ngram <- (1 to max_ngram_length).flatMap(words.sliding(_)))
+    for (ngram <- (1 to raw_text_max_ngram).flatMap(words.sliding(_)))
       add_ngram_with_count(dist, ngram, 1)
   }
 
   protected def imp_add_document(gendist: WordDist,
       words: Iterable[String]) {
-    imp_add_document(gendist, words, max_ngram_length)
+    imp_add_document(gendist, words, raw_text_max_ngram)
   }
 
   protected def imp_add_word_distribution(gendist: WordDist,
-      genother: WordDist, partial: Double) {
+      genother: WordDist, partial: WordCount) {
     // FIXME: Implement partial!
-    val dist = gendist.asInstanceOf[NgramWordDist].model
+    val dist = gendist.asInstanceOf[NgramWordDist]
     val other = genother.asInstanceOf[NgramWordDist].model
     for ((ngram, count) <- other.iter_items)
-      dist.add_item(ngram, count)
+      // FIXME: Possible slowdown because we are lowercasing a second
+      // time when it's probably already been done. Currently done this
+      // way rather than directly calling dist.model.add_item() to
+      // check for --max-ngram and similar restrictions, just in case
+      // they were done differently in the source distribution.
+      add_ngram_with_count(dist, ngram, count)
   }
 
   /**
@@ -414,6 +448,8 @@ class DefaultNgramWordDistConstructor(
 
   protected def imp_finish_before_global(dist: WordDist) {
     val model = dist.asInstanceOf[NgramWordDist].model
+    // A table listing OOV ngrams, e.g. Seq(OOV, OOV), Seq(OOV, OOV, OOV), etc.
+    val oov_hash = mutable.Map[Int, Ngram]()
     val oov = Seq("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate n-grams whose count
@@ -423,6 +459,12 @@ class DefaultNgramWordDistConstructor(
     if (minimum_word_count > 1) {
       for ((ngram, count) <- model.iter_items if count < minimum_word_count) {
         model.remove_item(ngram)
+        val siz = ngram.size
+        val oov = oov_hash.getOrElse(siz, {
+          val newoov = (1 to siz).map(_ => "-OOV-")
+          oov_hash(siz) = newoov
+          newoov
+        } )
         model.add_item(oov, count)
       }
     }

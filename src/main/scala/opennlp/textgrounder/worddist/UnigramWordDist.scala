@@ -36,6 +36,15 @@ import util.debug._
 
 import WordDist._
 
+object Unigram {
+  def check_unigram_dist(word_dist: WordDist) = {
+    word_dist match {
+      case x: UnigramWordDist => x
+      case _ => throw new IllegalArgumentException("You must use a unigram word distribution for these parameters")
+    }
+  }
+}
+
 /**
  * An interface for storing and retrieving vocabulary items (e.g. words,
  * n-grams, etc.).
@@ -56,12 +65,12 @@ class UnigramStorage extends ItemStorage[Word] {
   var tokens_accurate = true
   var num_tokens_val = 0.0
 
-  def add_item(item: Word, count: Double) {
+  def add_item(item: Word, count: WordCount) {
     counts(item) += count
     num_tokens_val += count
   }
 
-  def set_item(item: Word, count: Double) {
+  def set_item(item: Word, count: WordCount) {
     counts(item) = count
     tokens_accurate = false
   }
@@ -162,7 +171,7 @@ abstract class UnigramWordDist(
     val other = xother.asInstanceOf[UnigramWordDist]
     var kldiv = 0.0
     val contribs =
-      if (return_contributing_words) mutable.Map[String, Double]() else null
+      if (return_contributing_words) mutable.Map[String, WordCount]() else null
     // 1.
     for (word <- model.iter_keys) {
       val p = lookup_word(word)
@@ -303,10 +312,10 @@ class DefaultUnigramWordDistConstructor(
     }
   }
 
-  // Returns true if the word was counted, false if it was ignored due to stoplisting
-  // and/or whitelisting
+  // Returns true if the word was counted, false if it was ignored due to
+  // stoplisting and/or whitelisting
   protected def add_word_with_count(model: UnigramStorage, word: String,
-      count: Int): Boolean = {
+      count: WordCount): Boolean = {
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
@@ -324,7 +333,7 @@ class DefaultUnigramWordDistConstructor(
   }
 
   protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
-      partial: Double) {
+      partial: WordCount) {
     // FIXME: Implement partial!
     val model = dist.asInstanceOf[UnigramWordDist].model
     val othermodel = other.asInstanceOf[UnigramWordDist].model

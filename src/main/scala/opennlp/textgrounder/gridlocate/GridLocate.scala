@@ -278,12 +278,25 @@ matching), not to toponyms, which are always matched case-insensitively.""")
       default = 1,
       help = """Minimum count of words to consider in word
 distributions.  Words whose count is less than this value are ignored.""")
-  var max_ngram_length =
-    ap.option[Int]("max-ngram-length", "mnl", metavar = "NUM",
+  var max_ngram =
+    ap.option[Int]("max-ngram", "mn", metavar = "NUM",
+      default = 0,
+      help = """Maximum length of n-grams to include in an n-gram word
+distribution. Any larger n-grams included in the source (e.g. corpus)
+will be ignored. A value of 0 means don't filter any n-grams.  See
+also `--raw-text-max-ngram`, which controls the maximum length of n-grams
+generated from a raw document.""")
+  var raw_text_max_ngram =
+    ap.option[Int]("raw-text-max-ngram", "rdmn", metavar = "NUM",
       default = 3,
       help = """Maximum length of n-grams to generate when generating
-n-grams from a raw document.  Does not apply when reading in a corpus that
-has already been parsed into n-grams (as is usually the case).""")
+n-grams from a raw document.  See also `--max-ngram`, which filters out
+all n-grams above a particular length from an existing corpus of n-grams.
+The `--max-ngram` filter apples to n-grams generated from raw documents,
+so if `--max-gram` is set to a positive number, its value should be >=
+the value of `--raw-text-max-ngram` or additional unnecessary work will
+be done generating higher-length n-grams that will then just be thrown
+away.""")
  var tf_idf =
    ap.flag("tf-idf", "tfidf",
       help = """Adjust word counts according to TF-IDF weighting (i.e.
@@ -514,15 +527,15 @@ For the perceptron classifiers, see also `--pa-variant`,
     Seq("unigram-binary", "unigram-count", "unigram-count-product",
         "unigram-probability", "unigram-prob-product", "kl")
 
-  val rerank_features_matching_bigram_choices =
-    Seq("bigram-binary", "bigram-count", "bigram-count-product")
+  val rerank_features_matching_ngram_choices =
+    Seq("ngram-binary", "ngram-count", "ngram-count-product")
 
   var rerank_features =
     ap.option[String]("rerank-features",
       default = "combined",
       choices = Seq("all-kl", "combined", "trivial") ++
         rerank_features_matching_word_choices ++
-        rerank_features_matching_bigram_choices,
+        rerank_features_matching_ngram_choices,
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
 respective language models). The original ranking score for the cell always
@@ -549,14 +562,14 @@ document and cell);
   KL-divergence component score between document and cell for the word,
   else 0);
 
-'bigram-binary' (similar to 'unigram-binary' but include features for
-  both unigrams and bigrams);
+'ngram-binary' (similar to 'unigram-binary' but include features for
+  N-grams up to --max-rerank-ngram);
 
-'bigram-count' (similar to 'unigram-count' but include features for
-  both unigrams and bigrams);
+'ngram-count' (similar to 'unigram-count' but include features for
+  N-grams up to --max-rerank-ngram);
 
-'bigram-count-product' (similar to 'unigram-count-product' but include
-  features for both unigrams and bigrams);
+'ngram-count-product' (similar to 'unigram-count-product' but include
+  N-grams up to --max-rerank-ngram);
 
 'all-kl' (for all words in the document, use the KL-divergence score between
   document and cell -- probably not useful as distinct from plain 'kl',
@@ -754,7 +767,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           stopwords = the_stopwords,
           whitelist = the_whitelist,
           minimum_word_count = params.minimum_word_count,
-          max_ngram_length = params.max_ngram_length)
+          max_ngram = params.max_ngram,
+          raw_text_max_ngram = params.raw_text_max_ngram)
       else
         new DefaultUnigramWordDistConstructor(
           factory,
@@ -1015,9 +1029,8 @@ trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
     def create_fact(ty: String): CandidateInstFactory[Co] = {
       if (params.rerank_features_matching_word_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
-      //Comment out half-written code, oops ...
-      //else if (params.rerank_features_matching_bigram_choices contains ty)
-      //  new BigramMatchingCandidateInstFactory[Co](ty)
+      else if (params.rerank_features_matching_ngram_choices contains ty)
+        new NgramMatchingCandidateInstFactory[Co](ty)
       else ty match {
         case "trivial" =>
           new TrivialCandidateInstFactory[Co]

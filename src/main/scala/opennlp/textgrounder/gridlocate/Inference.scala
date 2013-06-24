@@ -36,15 +36,6 @@ document.
 
 */
 
-object UnigramStrategy {
-  def check_unigram_dist(word_dist: WordDist) = {
-    word_dist match {
-      case x: UnigramWordDist => x
-      case _ => throw new IllegalArgumentException("You must use a unigram word distribution with this strategy")
-    }
-  }
-}
-
 /**
  * Abstract class for grid-locating documents, i.e. computing a ranking of
  * the cells in a grid.
