@@ -125,14 +125,14 @@ trait FastSlowKLDivergence {
 }
 
 /**
- * A class that controls how to construct a word distribution, whether the
+ * A class that controls how to build a word distribution, whether the
  * source comes from a data file, a document, another distribution, etc.
  * The actual words added can be transformed in various ways, e.g.
  * case-folding the words (typically by converting to all lowercase), ignoring
  * words seen in a stoplist, converting some words to a generic -OOV-,
  * eliminating words seen less than a minimum nmber of times, etc.
  */
-abstract class WordDistConstructor(factory: WordDistFactory) {
+abstract class WordDistBuilder(factory: WordDistFactory) {
   /**
    * Actual implementation of `add_document` by subclasses.
    * External callers should use `add_document`.
@@ -231,9 +231,9 @@ trait WordDistFactory {
   var total_num_word_tokens = 0
 
   /**
-   * Corresponding constructor object for building up the word distribution
+   * Corresponding builder object for building up the word distribution
    */
-  val constructor: WordDistConstructor
+  val builder: WordDistBuilder
 
   /**
    * Create an empty word distribution.
@@ -400,7 +400,7 @@ abstract class WordDist(factory: WordDistFactory) {
    * Incorporate a document into the distribution.
    */
   def add_document(words: Iterable[String]) {
-    factory.constructor.add_document(this, words)
+    factory.builder.add_document(this, words)
   }
 
   /**
@@ -409,7 +409,7 @@ abstract class WordDist(factory: WordDistFactory) {
    * interpolating multiple distributions.
    */
   def add_word_distribution(other: WordDist, partial: WordCount = 1.0) {
-    factory.constructor.add_word_distribution(this, other, partial)
+    factory.builder.add_word_distribution(this, other, partial)
   }
 
   /**
@@ -427,7 +427,7 @@ abstract class WordDist(factory: WordDistFactory) {
    * 
    */
   def finish_before_global() {
-    factory.constructor.finish_before_global(this)
+    factory.builder.finish_before_global(this)
   }
 
   /**

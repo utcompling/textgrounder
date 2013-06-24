@@ -54,16 +54,16 @@ storing the data as tab-separated fields and the latter naming the fields.""")
 }
 
 
-/* A constructor that filters the distributions to contain only the words we
+/* A builder that filters the distributions to contain only the words we
    care about, to save memory and time. */
-class FilterUnigramWordDistConstructor(
+class FilterUnigramWordDistBuilder(
     factory: WordDistFactory,
     filter_words: Seq[String],
     ignore_case: Boolean,
     stopwords: Set[String],
     whitelist: Set[String],
     minimum_word_count: Int = 1
-  ) extends DefaultUnigramWordDistConstructor(
+  ) extends DefaultUnigramWordDistBuilder(
     factory, ignore_case, stopwords, whitelist, minimum_word_count
   ) {
 
@@ -93,11 +93,11 @@ class WriteCellDistDriver extends
     params.split_words = params.words.split(',')
   }
 
-  override protected def get_word_dist_constructor_creator = {
+  override protected def get_word_dist_builder_creator = {
     if (word_dist_type != "unigram")
       param_error("Only unigram word distributions supported with WriteCellDist")
     (factory: WordDistFactory) =>
-      new FilterUnigramWordDistConstructor(
+      new FilterUnigramWordDistBuilder(
         factory,
         params.split_words,
         ignore_case = !params.preserve_case_words,

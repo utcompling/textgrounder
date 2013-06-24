@@ -29,11 +29,11 @@ import util.debug._
 import WordDist._
 
 abstract class DiscountedUnigramWordDistFactory(
-  create_constructor: WordDistFactory => WordDistConstructor,
+  create_builder: WordDistFactory => WordDistBuilder,
   val interpolate: Boolean,
   val tf_idf: Boolean
 ) extends UnigramWordDistFactory {
-  val constructor = create_constructor(this)
+  val builder = create_builder(this)
 
   // Estimate of number of unseen word types for all documents
   var total_num_unseen_word_types = 0

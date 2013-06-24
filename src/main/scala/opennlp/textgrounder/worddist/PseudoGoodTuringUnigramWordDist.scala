@@ -39,11 +39,11 @@ import util.debug._
  * especially for bigrams or trigrams).
  */ 
 class PseudoGoodTuringUnigramWordDistFactory(
-    create_constructor: WordDistFactory => WordDistConstructor,
+    create_builder: WordDistFactory => WordDistBuilder,
     interpolate_string: String,
     tf_idf: Boolean
 ) extends DiscountedUnigramWordDistFactory(
-  create_constructor, interpolate_string == "yes", tf_idf
+  create_builder, interpolate_string == "yes", tf_idf
 ) {
   // Total number of types seen once
   var total_num_types_seen_once = 0

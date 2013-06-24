@@ -268,13 +268,13 @@ abstract class UnigramWordDist(
   }
 }
 
-class DefaultUnigramWordDistConstructor(
+class DefaultUnigramWordDistBuilder(
   factory: WordDistFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
   whitelist: Set[String],
   minimum_word_count: Int = 1
-) extends WordDistConstructor(factory: WordDistFactory) {
+) extends WordDistBuilder(factory: WordDistFactory) {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.
    */
