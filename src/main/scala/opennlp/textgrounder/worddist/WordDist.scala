@@ -74,7 +74,7 @@ trait FastSlowKLDivergence {
    */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
       return_contributing_words: Boolean = false):
-      (Double, collection.Map[String, Double])
+      (Double, collection.Map[String, WordCount])
 
   /**
    * Compute the KL-divergence using the "slow" algorithm of
@@ -144,7 +144,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    * External callers should use `add_word_distribution`.
    */
   protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
-    partial: Double = 1.0)
+    partial: WordCount = 1.0)
 
   /**
    * Actual implementation of `finish_before_global` by subclasses.
@@ -168,7 +168,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    * interpolating multiple distributions.
    */
   def add_word_distribution(dist: WordDist, other: WordDist,
-      partial: Double = 1.0) {
+      partial: WordCount = 1.0) {
     assert(!dist.finished)
     assert(!dist.finished_before_global)
     assert(partial >= 0.0 && partial <= 1.0)
@@ -303,6 +303,9 @@ trait WordAsStringMemoizer {
  * on them).
  */
 object WordDist extends WordAsIntMemoizer {
+  // FIXME! This is present to handle partial counts but these weren't
+  // ever really used because they didn't seem to help.
+  type WordCount = Double
 }
 
 /**
@@ -321,13 +324,13 @@ trait ItemStorage[Item] {
    * Add an item with the given count.  If the item exists already,
    * add the count to the existing value.
    */
-  def add_item(item: Item, count: Double)
+  def add_item(item: Item, count: WordCount)
 
   /**
    * Set the item to the given count.  If the item exists already,
    * replace its value with the given one.
    */
-  def set_item(item: Item, count: Double)
+  def set_item(item: Item, count: WordCount)
 
   /**
    * Remove an item, if it exists.
@@ -342,12 +345,12 @@ trait ItemStorage[Item] {
   /**
    * Return the count of a given item.
    */
-  def get_item(item: Item): Double
+  def get_item(item: Item): WordCount
 
   /**
    * Iterate over all items that are stored.
    */
-  def iter_items: Iterable[(Item, Double)]
+  def iter_items: Iterable[(Item, WordCount)]
 
   /**
    * Iterate over all keys that are stored.
@@ -357,7 +360,7 @@ trait ItemStorage[Item] {
   /**
    * Total number of tokens stored.
    */
-  def num_tokens: Double
+  def num_tokens: WordCount
 
   /**
    * Total number of item types (i.e. number of distinct items)
@@ -405,7 +408,7 @@ abstract class WordDist(factory: WordDistFactory) {
    * `partial` is a scaling factor (between 0.0 and 1.0) used for
    * interpolating multiple distributions.
    */
-  def add_word_distribution(other: WordDist, partial: Double = 1.0) {
+  def add_word_distribution(other: WordDist, partial: WordCount = 1.0) {
     factory.constructor.add_word_distribution(this, other, partial)
   }
 

@@ -4,7 +4,8 @@ package gridlocate
 import math.log
 
 import worddist.WordDist._
-import worddist.UnigramWordDist
+import worddist.{Ngram,NgramWordDist,Unigram,UnigramWordDist}
+import worddist.NgramStorage._
 import util.debug._
 import util.print._
 import util.metering._
@@ -142,19 +143,35 @@ abstract class WordByWordCandidateInstFactory[Co] extends
     celldist: UnigramWordDist): Option[Double]
 
   def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
-    doc.dist match {
-      case docdist: UnigramWordDist => {
-       val celldist =
-         UnigramStrategy.check_unigram_dist(cell.combined_dist.word_dist)
-       for ((word, count) <- docdist.model.iter_items;
-            featval = get_word_feature(word, count, docdist, celldist);
-            if featval != None)
-         yield (word, featval.get)
-      }
-      case _ =>
-        fixme_error(
-          "Don't know how to rerank when not using a unigram distribution")
-    }
+    val docdist = Unigram.check_unigram_dist(doc.dist)
+    val celldist = Unigram.check_unigram_dist(cell.combined_dist.word_dist)
+    for ((word, count) <- docdist.model.iter_items;
+         featval = get_word_feature(word, count, docdist, celldist);
+         if featval != None)
+      yield (word, featval.get)
+  }
+}
+
+/**
+ * A factory for generating candidate instances for a document, generating
+ * separate features for each word.
+ */
+abstract class NgramByNgramCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  def get_ngram_feature(word: Ngram, count: Double, docdist: NgramWordDist,
+    celldist: NgramWordDist): Option[Double]
+
+  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+    val docdist = Ngram.check_ngram_dist(doc.dist)
+    val celldist = Ngram.check_ngram_dist(cell.combined_dist.word_dist)
+    for ((ngram, count) <- docdist.model.iter_items;
+         featval = get_ngram_feature(ngram, count, docdist, celldist);
+         if featval != None)
+      // Generate a feature name by concatenating the words. This may
+      // conceivably lead to clashes if a word actually has the
+      // separator in it, but that's unlikely and doesn't really matter
+      // anyway.
+      yield (memoizer.memoize(ngram mkString "|"), featval.get)
   }
 }
 
@@ -209,6 +226,38 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
           val q = celldist.lookup_word(word)
           p*(log(p/q))
         }
+      }
+      Some(wordval)
+    }
+  }
+}
+
+/**
+ * A simple factory for generating candidate instances for a document, using
+ * the presence of matching n-grams between document and cell.
+ *
+ * @param value How to compute the value assigned to the words that are
+ *   shared:
+ *
+ * - `unigram-binary`: always assign 1
+ * - `unigram-count`: use document word count
+ * - `unigram-count-product`: use product of document and cell word count
+ * - `unigram-probability`: use document word probability
+ * - `unigram-prob-product`: use product of document and cell word prob
+ * - `kl`: use KL-divergence component for document/cell probs
+ */
+class NgramMatchingCandidateInstFactory[Co](value: String) extends
+    NgramByNgramCandidateInstFactory[Co] {
+  def get_ngram_feature(word: Ngram, count: Double, docdist: NgramWordDist,
+    celldist: NgramWordDist) = {
+    val qcount = celldist.model.get_item(word)
+    if (qcount == 0.0)
+      None
+    else {
+      val wordval = value match {
+        case "ngram-binary" => 1
+        case "ngram-count" => count
+        case "ngram-count-product" => count * qcount
       }
       Some(wordval)
     }

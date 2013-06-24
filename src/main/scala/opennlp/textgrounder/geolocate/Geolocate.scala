@@ -40,7 +40,7 @@ import util.time.format_minutes_seconds
 import util.debug._
 import gridlocate._
 
-import worddist.{WordDist,WordDistFactory}
+import worddist.{WordDist,WordDistFactory,Unigram}
 import worddist.WordDist._
 
 /*
@@ -123,7 +123,7 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
     new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
-    val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
+    val word_dist = Unigram.check_unigram_dist(_word_dist)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     // Look for a toponym, then a proper noun, then any word.
@@ -148,7 +148,7 @@ class LinkMostCommonToponymGeolocateDocStrategy(
   sphere_grid: SphereGrid
 ) extends GeolocateDocStrategy(stratname, sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
-    val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
+    val word_dist = Unigram.check_unigram_dist(_word_dist)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     var maxword = word_dist.find_most_common_word(
