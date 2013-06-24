@@ -744,24 +744,24 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   lazy protected val the_whitelist = read_whitelist()
 
-  /** Return a function that will create a WordDistConstructor object,
+  /** Return a function that will create a WordDistBuilder object,
    * given a WordDistFactory.
    *
    * Currently there are two factory-type objects for word distributions
    * (language models): WordDistFactory (a lower-level factory to directly
    * create WordDist objects and handle details of initializing smoothing
-   * models and such) and WordDistConstructor (a high-level factory that
+   * models and such) and WordDistBuilder (a high-level factory that
    * knows how to create and initialize WordDists from source data,
    * handling issues like stopwords, vocabulary filtering, etc.). The two
    * factory objects need pointers to each other, and to handle this
-   * needing mutable vars, one needs to create the other in its constructor
-   * function. So, rather than creating a WordDistConstructor ourselves, we
+   * needing mutable vars, one needs to create the other in its builder
+   * function. So, rather than creating a WordDistBuilder ourselves, we
    * pass in a function to create one when creating a WordDistFactory.
    */
-  protected def get_word_dist_constructor_creator =
+  protected def get_word_dist_builder_creator =
     (factory: WordDistFactory) => {
       if (word_dist_type == "ngram")
-        new DefaultNgramWordDistConstructor(
+        new DefaultNgramWordDistBuilder(
           factory,
           ignore_case = !params.preserve_case_words,
           stopwords = the_stopwords,
@@ -770,7 +770,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           max_ngram = params.max_ngram,
           raw_text_max_ngram = params.raw_text_max_ngram)
       else
-        new DefaultUnigramWordDistConstructor(
+        new DefaultUnigramWordDistBuilder(
           factory,
           ignore_case = !params.preserve_case_words,
           stopwords = the_stopwords,
@@ -784,17 +784,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * distributions, i.e. language models.
    */
   protected def create_word_dist_factory = {
-    val create_constructor = get_word_dist_constructor_creator
+    val create_builder = get_word_dist_builder_creator
     if (params.word_dist == "unsmoothed-ngram")
-      new UnsmoothedNgramWordDistFactory(create_constructor)
+      new UnsmoothedNgramWordDistFactory(create_builder)
     else if (params.word_dist == "dirichlet")
-      new DirichletUnigramWordDistFactory(create_constructor,
+      new DirichletUnigramWordDistFactory(create_builder,
         params.interpolate, params.tf_idf, params.dirichlet_factor)
     else if (params.word_dist == "jelinek-mercer")
-      new JelinekMercerUnigramWordDistFactory(create_constructor,
+      new JelinekMercerUnigramWordDistFactory(create_builder,
         params.interpolate, params.tf_idf, params.jelinek_factor)
     else
-      new PseudoGoodTuringUnigramWordDistFactory(create_constructor,
+      new PseudoGoodTuringUnigramWordDistFactory(create_builder,
         params.interpolate, params.tf_idf)
   }
 

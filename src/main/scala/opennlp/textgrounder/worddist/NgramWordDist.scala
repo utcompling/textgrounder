@@ -339,7 +339,7 @@ abstract class NgramWordDist(
  *   n-grams from raw text (rather than reading from a pre-chunked
  *   corpus).
  */
-class DefaultNgramWordDistConstructor(
+class DefaultNgramWordDistBuilder(
   factory: WordDistFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
@@ -347,7 +347,7 @@ class DefaultNgramWordDistConstructor(
   minimum_word_count: Int = 1,
   max_ngram: Int = 0,
   raw_text_max_ngram: Int = 3
-) extends WordDistConstructor(factory: WordDistFactory) {
+) extends WordDistBuilder(factory: WordDistFactory) {
   import NgramStorage.Ngram
   /**
    * Internal map holding the encoded ngrams and counts.

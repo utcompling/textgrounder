@@ -24,12 +24,12 @@ package worddist
  * discounting where we just use a constant discount factor.
  */ 
 class JelinekMercerUnigramWordDistFactory(
-  create_constructor: WordDistFactory => WordDistConstructor,
+  create_builder: WordDistFactory => WordDistBuilder,
   interpolate_string: String,
   tf_idf: Boolean,
   val jelinek_factor: Double
 ) extends DiscountedUnigramWordDistFactory(
-  create_constructor, interpolate_string != "no", tf_idf
+  create_builder, interpolate_string != "no", tf_idf
 ) {
   def create_word_dist = new JelinekMercerUnigramWordDist(this)
 }

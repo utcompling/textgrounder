@@ -24,12 +24,12 @@ package worddist
  * depends on the size of the document.
  */ 
 class DirichletUnigramWordDistFactory(
-    create_constructor: WordDistFactory => WordDistConstructor,
+    create_builder: WordDistFactory => WordDistBuilder,
     interpolate_string: String,
     tf_idf: Boolean,
     val dirichlet_factor: Double
 ) extends DiscountedUnigramWordDistFactory(
-  create_constructor, interpolate_string != "no", tf_idf
+  create_builder, interpolate_string != "no", tf_idf
 ) {
   def create_word_dist = new DirichletUnigramWordDist(this)
 }

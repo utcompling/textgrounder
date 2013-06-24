@@ -309,7 +309,7 @@ abstract class GeoDocFactory[Co : Serializer](
     }
 
     val dist = catch_doc_validation {
-      word_dist_factory.constructor.create_distribution(counts)
+      word_dist_factory.builder.create_distribution(counts)
     }
     val maybedoc = catch_doc_validation {
       imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
