@@ -175,6 +175,75 @@ case class RawDocument(schema: Schema, fields: IndexedSeq[String])
 
 
 /////////////////////////////////////////////////////////////////////////////
+//                          Document language models                       //
+/////////////////////////////////////////////////////////////////////////////
+
+/**
+ * A class holding the word distributions associated with a document.
+ * There may be a separate one needed for reranking (e.g. holding n-grams
+ * when the main ranker uses unigrams).
+ */
+class DocWordDist(
+  val grid_dist: WordDist,
+  val rerank_dist: WordDist
+) extends Iterable[WordDist] {
+  def iterator =
+    if (grid_dist != rerank_dist)
+      Iterator(grid_dist, rerank_dist)
+    else
+      Iterator(grid_dist)
+
+  def add_word_distribution(other: DocWordDist, partial: Double = 1.0) {
+    assert(this.size == other.size)
+    (this zip other).map {
+      case (thisdist, otherdist) =>
+        thisdist.add_word_distribution(otherdist, partial)
+    }
+  }
+
+  def finished = forall(_.finished)
+
+  def finish_before_global() {
+    foreach(_.finish_before_global())
+  }
+
+  def finish_after_global() {
+    foreach(_.finish_after_global())
+  }
+}
+
+/**
+ * A class holding the word distribution factories associated with a document.
+ * There may be a separate one needed for reranking (e.g. holding n-grams
+ * when the main ranker uses unigrams).
+ */
+class DocWordDistFactory(
+  val grid_word_dist_factory: WordDistFactory,
+  val rerank_word_dist_factory: WordDistFactory
+) extends Iterable[WordDistFactory] {
+  def iterator =
+    if (grid_word_dist_factory != rerank_word_dist_factory)
+      Iterator(grid_word_dist_factory, rerank_word_dist_factory)
+    else
+      Iterator(grid_word_dist_factory)
+
+  def create_word_dist = {
+    val grid_dist = grid_word_dist_factory.create_word_dist
+    new DocWordDist(grid_dist,
+      if (grid_word_dist_factory != rerank_word_dist_factory)
+        rerank_word_dist_factory.create_word_dist
+      else
+        grid_dist
+    )
+  }
+
+  def finish_global_distribution() {
+    foreach(_.finish_global_distribution())
+  }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
 //                              Document factories                         //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -184,7 +253,7 @@ case class RawDocument(schema: Schema, fields: IndexedSeq[String])
  */
 abstract class GeoDocFactory[Co : Serializer](
   val driver: GridLocateDriver[Co],
-  val word_dist_factory: WordDistFactory
+  val word_dist_factory: DocWordDistFactory
 ) {
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
@@ -266,7 +335,8 @@ abstract class GeoDocFactory[Co : Serializer](
    * in the main factory.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: WordDist, record_in_factory: Boolean
+      fieldvals: IndexedSeq[String], dist: DocWordDist,
+      record_in_factory: Boolean
   ): Option[GeoDoc[Co]]
 
   /**
@@ -288,7 +358,6 @@ abstract class GeoDocFactory[Co : Serializer](
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     if (record_in_factory)
       num_records_by_split(split) += 1
-    val counts = schema.get_field(fieldvals, driver.word_count_field)
 
     def catch_doc_validation[T](body: => T) = {
       if (debug("rethrow"))
@@ -308,9 +377,23 @@ abstract class GeoDocFactory[Co : Serializer](
       }
     }
 
-    val dist = catch_doc_validation {
-      word_dist_factory.builder.create_distribution(counts)
+    val grid_dist = catch_doc_validation {
+      val counts = schema.get_field(fieldvals,
+        driver.grid_word_count_field)
+      word_dist_factory.grid_word_dist_factory.builder.
+        create_distribution(counts)
     }
+    val rerank_dist =
+      if (driver.rerank_word_count_field == driver.grid_word_count_field)
+        grid_dist
+      else
+        catch_doc_validation {
+          val counts = schema.get_field(fieldvals,
+            driver.rerank_word_count_field)
+          word_dist_factory.rerank_word_dist_factory.builder.
+            create_distribution(counts)
+        }
+    val dist = new DocWordDist(grid_dist, rerank_dist)
     val maybedoc = catch_doc_validation {
       imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
     }
@@ -321,7 +404,7 @@ abstract class GeoDocFactory[Co : Serializer](
       }
       case Some(doc) => {
         assert(doc.split == split)
-        val double_tokens = doc.dist.model.num_tokens
+        val double_tokens = doc.dist.grid_dist.model.num_tokens
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
         assert(double_tokens == tokens)
@@ -385,7 +468,7 @@ abstract class GeoDocFactory[Co : Serializer](
               // Add the distribution to the global stats before
               // eliminating infrequent words through
               // `finish_before_global`.
-              doc.word_dist_factory.note_dist_globally(doc.dist)
+              doc.dist.foreach(lm => lm.factory.note_dist_globally(lm))
             }
             doc.dist.finish_before_global()
             (Some(doc), "processed", "", "")
@@ -398,10 +481,19 @@ abstract class GeoDocFactory[Co : Serializer](
         }
         case e:DistributionCreationException => {
           val rd = rawdoc.maybedoc.get
-          warning("Line %s: %s, word-counts field: %s",
-            rawdoc.lineno, e.message,
-            rd.schema.get_field_or_else(rd.fields,
-              driver.word_count_field, "(missing word-counts field)"))
+          if (driver.grid_word_count_field ==
+              driver.rerank_word_count_field)
+            warning("Line %s: %s, word-counts field: %s",
+              rawdoc.lineno, e.message,
+              rd.schema.get_field_or_else(rd.fields,
+                driver.grid_word_count_field, "(missing word-counts field)"))
+          else
+            warning("Line %s: %s, grid word-counts field: %s, rerank word-counts field: %s",
+              rawdoc.lineno, e.message,
+              rd.schema.get_field_or_else(rd.fields,
+                driver.grid_word_count_field, "(missing grid word-counts field)"),
+              rd.schema.get_field_or_else(rd.fields,
+                driver.rerank_word_count_field, "(missing rerank word-counts field)"))
           (None, "bad", "error creating document distribution", "")
         }
       }
@@ -745,8 +837,7 @@ case class DocValidationException(
  */
 abstract class GeoDoc[Co : Serializer](
   val schema: Schema,
-  val word_dist_factory: WordDistFactory,
-  val dist: WordDist
+  val dist: DocWordDist
 ) {
 
   import util.Serializer._
@@ -799,6 +890,9 @@ abstract class GeoDoc[Co : Serializer](
    * request whether a given corpus type has incoming links marked on it.
    */
   def incoming_links: Option[Int] = None
+
+  val grid_dist = dist.grid_dist
+  val rerank_dist = dist.rerank_dist
 
   def get_fields(fields: Iterable[String]) = fields map get_field
 

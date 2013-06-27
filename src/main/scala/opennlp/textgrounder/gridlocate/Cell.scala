@@ -53,7 +53,7 @@ import worddist.WordDistFactory
  * such type, along with extra boilerplate functions to create objects of
  * these subclasses.
  */
-class CombinedWordDist(factory: WordDistFactory) {
+class CombinedWordDist(factory: DocWordDistFactory) {
   /** The combined word distribution itself. */
   val word_dist = factory.create_word_dist
   /** Number of documents used to create distribution. */
@@ -198,11 +198,13 @@ abstract class GeoCell[Co](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents, %s types, %s tokens, %d links)" format (
+    "GeoCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
       describe_location, unfinished, contains,
       combined_dist.num_docs,
-      combined_dist.word_dist.model.num_types,
-      combined_dist.word_dist.model.num_tokens,
+      combined_dist.word_dist.grid_dist.model.num_types,
+      combined_dist.word_dist.grid_dist.model.num_tokens,
+      combined_dist.word_dist.rerank_dist.model.num_types,
+      combined_dist.word_dist.rerank_dist.model.num_tokens,
       combined_dist.incoming_links)
   }
 
@@ -216,8 +218,14 @@ abstract class GeoCell[Co](
     "centroid" -> get_centroid,
     "central-point" -> get_central_point,
     "num-documents" -> combined_dist.num_docs,
-    "num-word-types" -> combined_dist.word_dist.model.num_types,
-    "num-word-tokens" -> combined_dist.word_dist.model.num_tokens,
+    "grid-num-word-types" ->
+      combined_dist.word_dist.grid_dist.model.num_types,
+    "grid-num-word-tokens" ->
+      combined_dist.word_dist.grid_dist.model.num_tokens,
+    "rerank-num-word-types" ->
+      combined_dist.word_dist.rerank_dist.model.num_types,
+    "rerank-num-word-tokens" ->
+      combined_dist.word_dist.rerank_dist.model.num_tokens,
     "incoming-links" -> combined_dist.incoming_links,
     "most-popular-document" -> (
       if (most_popular_document != null)

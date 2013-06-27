@@ -22,7 +22,7 @@ trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
   val strategy: GridLocateDocStrategy[Co]
   def grid = strategy.grid
   def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
-    strategy.return_ranked_cells(item.dist, include)
+    strategy.return_ranked_cells(item.dist.grid_dist, include)
 }
 
 /**
@@ -143,8 +143,9 @@ abstract class WordByWordCandidateInstFactory[Co] extends
     celldist: UnigramWordDist): Option[Double]
 
   def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
-    val docdist = Unigram.check_unigram_dist(doc.dist)
-    val celldist = Unigram.check_unigram_dist(cell.combined_dist.word_dist)
+    val docdist = Unigram.check_unigram_dist(doc.rerank_dist)
+    val celldist =
+      Unigram.check_unigram_dist(cell.combined_dist.word_dist.rerank_dist)
     for ((word, count) <- docdist.model.iter_items;
          featval = get_word_feature(word, count, docdist, celldist);
          if featval != None)
@@ -162,8 +163,9 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
     celldist: NgramWordDist): Option[Double]
 
   def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
-    val docdist = Ngram.check_ngram_dist(doc.dist)
-    val celldist = Ngram.check_ngram_dist(cell.combined_dist.word_dist)
+    val docdist = Ngram.check_ngram_dist(doc.rerank_dist)
+    val celldist =
+      Ngram.check_ngram_dist(cell.combined_dist.word_dist.grid_dist)
     for ((ngram, count) <- docdist.model.iter_items;
          featval = get_ngram_feature(ngram, count, docdist, celldist);
          if featval != None)
@@ -335,6 +337,6 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       asInstanceOf[PointwiseGridReranker[Co]]
 
   override def format_query_item(item: GeoDoc[Co]) = {
-    "%s, dist=%s" format (item, item.dist.debug_string)
+    "%s, dist=%s" format (item, item.rerank_dist.debug_string)
   }
 }

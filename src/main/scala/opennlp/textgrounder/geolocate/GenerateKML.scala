@@ -47,8 +47,8 @@ class KMLParameters {
 }
 
 class GenerateKMLParameters(
-  val parser: ArgParser = null
-) extends GeolocateParameters {
+  parser: ArgParser
+) extends GeolocateParameters(parser) {
   //// Options used only in KML generation (--mode=generate-kml)
   var kml_words =
     ap.option[String]("k", "kml-words", "kw",
@@ -94,8 +94,8 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override protected def get_word_dist_builder_creator = {
-    if (word_dist_type != "unigram")
+  override protected def get_word_dist_builder_creator(dist_type: String) = {
+    if (grid_word_dist_type != "unigram")
       param_error("Only unigram word distributions supported with GenerateKML")
     (factory: WordDistFactory) =>
       new FilterUnigramWordDistBuilder(

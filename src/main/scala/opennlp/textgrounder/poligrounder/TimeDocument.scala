@@ -26,17 +26,14 @@ import util.textdb.Schema
 import util.print._
 import util.Serializer._
 
-import gridlocate.{GeoDoc,GeoDocFactory,GeoGrid}
-
-import worddist.{WordDist,WordDistFactory}
+import gridlocate._
 
 class TimeDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory,
-  dist: WordDist,
+  dist: DocWordDist,
   val coord: TimeCoord,
   val user: String
-) extends GeoDoc[TimeCoord](schema, word_dist_factory, dist) {
+) extends GeoDoc[TimeCoord](schema, dist) {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
@@ -67,14 +64,14 @@ class TimeDoc(
  */
 class TimeDocFactory(
   override val driver: PoligrounderDriver,
-  word_dist_factory: WordDistFactory
+  word_dist_factory: DocWordDistFactory
 ) extends GeoDocFactory[TimeCoord](
   driver, word_dist_factory
 ) {
   def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: WordDist,
+      fieldvals: IndexedSeq[String], dist: DocWordDist,
       record_in_factory: Boolean) = Some(
-    new TimeDoc(schema, word_dist_factory, dist,
+    new TimeDoc(schema, dist,
       schema.get_value[TimeCoord](fieldvals, "min-timestamp"),
       schema.get_value[String](fieldvals, "user")
     ))

@@ -35,8 +35,8 @@ import worddist._
 import WordDist._
 
 class WriteCellDistParameters(
-  val parser: ArgParser = null
-) extends GeolocateParameters {
+  parser: ArgParser
+) extends GeolocateParameters(parser) {
   var words =
     ap.option[String]("words",
       help = """Words to write distributions for.  Each word should be
@@ -93,8 +93,8 @@ class WriteCellDistDriver extends
     params.split_words = params.words.split(',')
   }
 
-  override protected def get_word_dist_builder_creator = {
-    if (word_dist_type != "unigram")
+  override protected def get_word_dist_builder_creator(dist_type: String) = {
+    if (dist_type != "unigram")
       param_error("Only unigram word distributions supported with WriteCellDist")
     (factory: WordDistFactory) =>
       new FilterUnigramWordDistBuilder(

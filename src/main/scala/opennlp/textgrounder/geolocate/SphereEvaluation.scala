@@ -219,7 +219,7 @@ class GroupedSphereDocEvalStats(
  */
 class RankedSphereGridEvaluator(
   ranker: GridRanker[SphereCoord],
-  driver: GeolocateDocTypeDriver,
+  driver: GeolocateDriver,
   evalstats: DocEvalStats[SphereCoord]
 ) extends RankedGridEvaluator[SphereCoord](
   ranker, driver, evalstats
@@ -239,7 +239,7 @@ class RankedSphereDocEvalResult(
   wrapped.document, wrapped.pred_cells, wrapped.correct_rank
 ) {
   override def print_result(doctag: String,
-      driver: GridLocateDocDriver[SphereCoord]) {
+      driver: GridLocateDriver[SphereCoord]) {
     wrapped.print_result(doctag, driver)
 
     assert(doctag(0) == '#')

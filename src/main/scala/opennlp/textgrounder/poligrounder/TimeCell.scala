@@ -158,10 +158,14 @@ class TimeGrid(
         val comdist = cell.combined_dist
         errprint("Number of documents in %s-chunk: %s", name,
           comdist.num_docs)
-        errprint("Number of types in %s-chunk: %s", name,
-          comdist.word_dist.model.num_types)
-        errprint("Number of tokens in %s-chunk: %s", name,
-          comdist.word_dist.model.num_tokens)
+        errprint("Number of types in %s-chunk grid lm: %s", name,
+          comdist.word_dist.grid_dist.model.num_types)
+        errprint("Number of tokens in %s-chunk grid lm: %s", name,
+          comdist.word_dist.grid_dist.model.num_tokens)
+        errprint("Number of types in %s-chunk rerank lm: %s", name,
+          comdist.word_dist.rerank_dist.model.num_types)
+        errprint("Number of tokens in %s-chunk rerank lm: %s", name,
+          comdist.word_dist.rerank_dist.model.num_tokens)
       }
     }
   }

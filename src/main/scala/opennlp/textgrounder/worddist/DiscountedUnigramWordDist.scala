@@ -104,7 +104,7 @@ abstract class DiscountedUnigramWordDistFactory(
 }
 
 abstract class DiscountedUnigramWordDist(
-  val factory: DiscountedUnigramWordDistFactory
+  override val factory: DiscountedUnigramWordDistFactory
 ) extends UnigramWordDist(factory) {
   type TThis = DiscountedUnigramWordDist
   type TKLCache = DiscountedUnigramKLDivergenceCache

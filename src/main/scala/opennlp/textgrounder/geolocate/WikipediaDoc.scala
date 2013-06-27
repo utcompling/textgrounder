@@ -30,7 +30,7 @@ import util.text.capfirst
 
 import util.debug._
 
-import worddist.{WordDist,WordDistFactory}
+import gridlocate._
 
 /**
  * A document corresponding to a Wikipedia article.
@@ -54,15 +54,14 @@ import worddist.{WordDist,WordDistFactory}
  */
 class WikipediaDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory,
-  dist: WordDist,
+  dist: DocWordDist,
   coord: SphereCoord,
   val title: String,
   val redir: String,
   // FIXME! Make this a val.
   var incoming_links_value: Option[Int] = None,
   val id: Long = 0L
-) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
+) extends RealSphereDoc(schema, dist, coord) {
   override def incoming_links = incoming_links_value
   override def get_field(field: String) = {
     field match {
@@ -184,7 +183,7 @@ class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
   override def create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: WordDist, coord: SphereCoord,
+      fieldvals: IndexedSeq[String], dist: DocWordDist, coord: SphereCoord,
       record_in_factory: Boolean) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
@@ -195,7 +194,7 @@ class WikipediaDocSubfactory(
         namespace)
       None
     } else {
-      val doc = new WikipediaDoc(schema, docfact.word_dist_factory, dist, coord,
+      val doc = new WikipediaDoc(schema, dist, coord,
         id = schema.get_value_or_else[Long](fieldvals, "id", 0L),
         redir = schema.get_value_or_else[String](fieldvals, "redir", ""),
         title = schema.get_value_or_else[String](fieldvals, "title", ""),

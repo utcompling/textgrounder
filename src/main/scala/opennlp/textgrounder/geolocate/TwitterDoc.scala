@@ -22,15 +22,14 @@ package geolocate
 import util.distances._
 import util.textdb.Schema
 
-import worddist.{WordDist,WordDistFactory}
+import gridlocate._
 
 class TwitterTweetDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory,
-  dist: WordDist,
+  dist: DocWordDist,
   coord: SphereCoord,
   val id: Long
-) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
+) extends RealSphereDoc(schema, dist, coord) {
   def title = id.toString
 
   def xmldesc =
@@ -47,19 +46,18 @@ class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new TwitterTweetDoc(schema, docfact.word_dist_factory, dist, coord,
+      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterTweetDoc(schema, dist, coord,
       schema.get_value_or_else[Long](fieldvals, "title", 0L))
     )
 }
 
 class TwitterUserDoc(
   schema: Schema,
-  word_dist_factory: WordDistFactory,
-  dist: WordDist,
+  dist: DocWordDist,
   coord: SphereCoord,
   val user: String
-) extends RealSphereDoc(schema, word_dist_factory, dist, coord) {
+) extends RealSphereDoc(schema, dist, coord) {
   def title = user
 
   def xmldesc =
@@ -76,8 +74,8 @@ class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: WordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new TwitterUserDoc(schema, docfact.word_dist_factory, dist, coord,
+      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterUserDoc(schema, dist, coord,
         schema.get_value_or_else[String](fieldvals, "user", ""))
     )
 }

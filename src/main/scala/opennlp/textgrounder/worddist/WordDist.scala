@@ -378,7 +378,7 @@ trait ItemStorage[Item] {
  * A word distribution, i.e. a statistical distribution over words in
  * a document, cell, etc.
  */
-abstract class WordDist(factory: WordDistFactory) {
+abstract class WordDist(val factory: WordDistFactory) {
   type Item
   val model: ItemStorage[Item]
 

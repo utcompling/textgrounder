@@ -401,14 +401,8 @@ commontop: Extra info for debugging
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
 
-}
+  ////////////// Begin former GridLocateDocParameters
 
-/**
- * Subclass of GridLocateParameters used specifically for assigning cells
- * to test documents based on language-model similarity (e.g. for
- * geolocation).
- */
-trait GridLocateDocParameters extends GridLocateParameters {
   protected def strategy_default = "partial-kl-divergence"
   protected def strategy_choices = Seq(
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
@@ -639,8 +633,6 @@ noisy training data.  We choose C = 1 as a compromise.""")
  * Driver class for creating cell grids over some coordinate space, with a
  * language model associated with each cell and initialized from a corpus
  * of documents by concatenating all documents located within the cell.
- * Subclasses are for particular apps, e.g. GridLocateDocDriver for
- * document-level geolocation.
  *
  * Driver classes like this have `handle_parameters` to check the
  * passed-in parameter values and `run` to do the main operation.
@@ -685,15 +677,28 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     if (params.jelinek_factor < 0.0 || params.jelinek_factor > 1.0) {
       param_error("Value for --jelinek-factor must be between 0.0 and 1.0, but is %g" format params.jelinek_factor)
     }
+
+    if (params.perceptron_aggressiveness < 0)
+      param_error("Perceptron aggressiveness value should be strictly greater than zero")
+    if (params.perceptron_aggressiveness == 0.0) // If default ...
+      // Currently same for both regular and pa-perceptron, despite
+      // differing interpretations.
+      params.perceptron_aggressiveness = 1.0
   }
 
-  protected def word_dist_type = {
+  /**
+   * Type of word dist used in the cell grid.
+   */
+  protected def grid_word_dist_type = {
     if (params.word_dist == "unsmoothed-ngram") "ngram"
     else "unigram"
   }
 
-  def word_count_field = {
-    if (word_dist_type == "ngram")
+  /**
+   * Field in textdb corpus used to access proper type of word dist.
+   */
+  def grid_word_count_field = {
+    if (grid_word_dist_type == "ngram")
       "ngram-counts"
     else
       "unigram-counts"
@@ -758,9 +763,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * function. So, rather than creating a WordDistBuilder ourselves, we
    * pass in a function to create one when creating a WordDistFactory.
    */
-  protected def get_word_dist_builder_creator =
+  protected def get_word_dist_builder_creator(dist_type: String) =
     (factory: WordDistFactory) => {
-      if (word_dist_type == "ngram")
+      if (dist_type == "ngram")
         new DefaultNgramWordDistBuilder(
           factory,
           ignore_case = !params.preserve_case_words,
@@ -783,8 +788,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * command-line parameters. This is a factory for creating word
    * distributions, i.e. language models.
    */
-  protected def create_word_dist_factory = {
-    val create_builder = get_word_dist_builder_creator
+  protected def create_word_dist_factory(dist_type: String) = {
+    val create_builder = get_word_dist_builder_creator(dist_type)
     if (params.word_dist == "unsmoothed-ngram")
       new UnsmoothedNgramWordDistFactory(create_builder)
     else if (params.word_dist == "dirichlet")
@@ -799,12 +804,28 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
+   * Create a DocWordDistFactory object holding the WordDistFactory
+   * objects needed by a document. Currently there may be two if
+   * ranking and reranking require different dists.
+   */
+  protected def create_doc_word_dist_factory = {
+    val grid_word_dist_factory =
+      create_word_dist_factory(grid_word_dist_type)
+    val rerank_word_dist_factory =
+      if (grid_word_dist_type == rerank_word_dist_type)
+        grid_word_dist_factory
+      else
+        create_word_dist_factory(rerank_word_dist_type)
+    new DocWordDistFactory(grid_word_dist_factory, rerank_word_dist_factory)
+  }
+
+  /**
    * Create a document factory (GeoDocFactory) for creating documents
    * (GeoDoc), given factory for creating the word distributions (language
    * models) associated with the documents.
    */
-  protected def create_document_factory(word_dist_factory: WordDistFactory):
-    GeoDocFactory[Co]
+  protected def create_document_factory(
+      word_dist_factory: DocWordDistFactory): GeoDocFactory[Co]
 
   /**
    * Create an empty cell grid (GeoGrid) given a document factory.
@@ -859,7 +880,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
-    val word_dist_factory = create_word_dist_factory
+    val word_dist_factory = create_doc_word_dist_factory
     val docfact = create_document_factory(word_dist_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables
@@ -892,26 +913,22 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * the corpus (or corpora) specified in the command-line parameters.
    */
   def initialize_grid = create_grid_from_documents(read_raw_training_documents)
-}
 
-/**
- * Subclass of GridLocateDriver used specifically for assigning cells
- * to test documents based on language-model similarity (e.g. for
- * geolocation). This is essentially an information-retrieval approach,
- * using language models to model document similarity.
- */
-trait GridLocateDocDriver[Co] extends GridLocateDriver[Co] {
-  override type TParam <: GridLocateDocParameters
+  protected def rerank_word_dist_type = {
+    if (params.rerank == "none")
+      grid_word_dist_type
+    else if (params.rerank_features_matching_ngram_choices.contains(
+        params.rerank_features))
+      "ngram"
+    else
+      "unigram"
+  }
 
-  override def handle_parameters() {
-    super.handle_parameters()
-    if (params.perceptron_aggressiveness < 0)
-      param_error("Perceptron aggressiveness value should be strictly greater than zero")
-    if (params.perceptron_aggressiveness == 0.0) // If default ...
-      // Currently same for both regular and pa-perceptron, despite
-      // differing interpretations.
-      params.perceptron_aggressiveness = 1.0
-
+  def rerank_word_count_field = {
+    if (rerank_word_dist_type == "ngram")
+      "ngram-counts"
+    else
+      "unigram-counts"
   }
 
   /**
