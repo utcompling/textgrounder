@@ -85,7 +85,7 @@ class WordCellDist[Co](
     // Compute and store un-normalized probabilities for all cells
     for (cell <- grid.iter_nonempty_cells) {
       val word_dist =
-        Unigram.check_unigram_dist(cell.combined_dist.word_dist)
+        Unigram.check_unigram_dist(cell.combined_dist.word_dist.grid_dist)
       val prob = word_dist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of

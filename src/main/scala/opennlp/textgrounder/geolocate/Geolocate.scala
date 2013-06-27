@@ -218,7 +218,8 @@ class LinkMostCommonToponymGeolocateDocStrategy(
  *   Because they are vars, they can be freely set to other values.
  *
  */
-trait GeolocateParameters extends GridLocateParameters {
+class GeolocateParameters(val parser: ArgParser
+    ) extends GridLocateParameters {
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
     ap.option[Double]("degrees-per-cell", "dpc", metavar = "DEGREES",
@@ -282,82 +283,8 @@ Default value '%default' means no interpolation is used.""")
     ap.flag("combined-kd-grid", help = """Combine both the KD tree and
 uniform grid cell models?""")
 
-}
+  ////////////// Begin former GeolocateDocParameters
 
-trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
-  override type TParam <: GeolocateParameters
-  override def handle_parameters() {
-    super.handle_parameters()
-
-    if (params.width_of_multi_cell <= 0)
-      param_error("Width of multi cell must be positive")
-
-    // Handle different ways of specifying grid size
-
-    def check_set(value: Double, desc: String) = {
-      if (value < 0)
-        param_error(desc + " must be positive if specified")
-      if (value > 0)
-        1
-      else 
-        0
-    }
-    val num_set =
-      check_set(params.miles_per_cell, "Miles per cell") +
-      check_set(params.km_per_cell, "Kilometers per cell") +
-      check_set(params.degrees_per_cell, "Degrees per cell")
-    if (num_set == 0)
-      params.degrees_per_cell = 1.0
-    else if (num_set > 1)
-      param_error("Only one of --miles-per-cell, --km-per-cell, --degrees-per-cell may be given")
-    val (computed_dpc, computed_mpc, computed_kpc) =
-      (params.degrees_per_cell, params.miles_per_cell, params.km_per_cell) match {
-        case (deg, miles, km) if deg > 0 =>
-          (deg, deg * miles_per_degree, deg * km_per_degree)
-        case (deg, miles, km) if miles > 0 =>
-          (miles / miles_per_degree, miles, miles * km_per_mile)
-        case (deg, miles, km) if km > 0 =>
-          (km / km_per_degree, km / km_per_mile, km)
-      }
-
-    // NOTE! Setting this will NOT change the values returned using the
-    // argparser programmatic interface onto iterating through params or
-    // retrieving them by name. That requires reflection and is difficult
-    // or impossible (given current Scala limitations) to implement in a way
-    // that works cleanly, interfaces with the desired way of retrieving/
-    // setting parameters as variables (so that type-checking works, etc.)
-    // and doesn't require needless extra boilerplate.
-    params.degrees_per_cell = computed_dpc
-    params.km_per_cell = computed_kpc
-    params.miles_per_cell = computed_mpc
-  }
-
-  protected def create_document_factory(word_dist_factory: WordDistFactory) =
-    new SphereDocFactory(this, word_dist_factory)
-
-  protected def create_grid(docfact: GeoDocFactory[SphereCoord]) = {
-    val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
-    if (params.combined_kd_grid) {
-      val kdcg =
-        KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
-          params.kd_use_backoff, params.kd_interpolate_weight)
-      val mrcg =
-        new MultiRegularGrid(params.degrees_per_cell,
-          params.width_of_multi_cell, sphere_docfact)
-      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
-    } else if (params.kd_tree) {
-      KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
-        params.kd_use_backoff, params.kd_interpolate_weight)
-    } else {
-      new MultiRegularGrid(params.degrees_per_cell,
-        params.width_of_multi_cell, sphere_docfact)
-    }
-  }
-}
-
-class GeolocateDocParameters(
-  val parser: ArgParser
-) extends GeolocateParameters with GridLocateDocParameters {
   var eval_format =
     ap.option[String]("f", "eval-format",
       default = "internal",
@@ -456,15 +383,54 @@ Default '%default'.""")
 Default '%default'.""")
 }
 
-// FUCK ME.  Have to make this abstract and GeolocateDocDriver a subclass
-// so that the TParam can be overridden in HadoopGeolocateDocDriver.
-trait GeolocateDocTypeDriver extends GeolocateDriver with
-  GridLocateDocDriver[SphereCoord] {
-  override type TParam <: GeolocateDocParameters
-  type TRunRes = Iterable[_]
 
+trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
+  override type TParam <: GeolocateParameters
   override def handle_parameters() {
     super.handle_parameters()
+
+    if (params.width_of_multi_cell <= 0)
+      param_error("Width of multi cell must be positive")
+
+    // Handle different ways of specifying grid size
+
+    def check_set(value: Double, desc: String) = {
+      if (value < 0)
+        param_error(desc + " must be positive if specified")
+      if (value > 0)
+        1
+      else 
+        0
+    }
+    val num_set =
+      check_set(params.miles_per_cell, "Miles per cell") +
+      check_set(params.km_per_cell, "Kilometers per cell") +
+      check_set(params.degrees_per_cell, "Degrees per cell")
+    if (num_set == 0)
+      params.degrees_per_cell = 1.0
+    else if (num_set > 1)
+      param_error("Only one of --miles-per-cell, --km-per-cell, --degrees-per-cell may be given")
+    val (computed_dpc, computed_mpc, computed_kpc) =
+      (params.degrees_per_cell, params.miles_per_cell, params.km_per_cell) match {
+        case (deg, miles, km) if deg > 0 =>
+          (deg, deg * miles_per_degree, deg * km_per_degree)
+        case (deg, miles, km) if miles > 0 =>
+          (miles / miles_per_degree, miles, miles * km_per_mile)
+        case (deg, miles, km) if km > 0 =>
+          (km / km_per_degree, km / km_per_mile, km)
+      }
+
+    // NOTE! Setting this will NOT change the values returned using the
+    // argparser programmatic interface onto iterating through params or
+    // retrieving them by name. That requires reflection and is difficult
+    // or impossible (given current Scala limitations) to implement in a way
+    // that works cleanly, interfaces with the desired way of retrieving/
+    // setting parameters as variables (so that type-checking works, etc.)
+    // and doesn't require needless extra boilerplate.
+    params.degrees_per_cell = computed_dpc
+    params.km_per_cell = computed_kpc
+    params.miles_per_cell = computed_mpc
+
 
     // The *-most-common-toponym strategies require case preserving
     // (as if set by --preseve-case-words), while most other strategies want
@@ -484,6 +450,29 @@ trait GeolocateDocTypeDriver extends GeolocateDriver with
         param_error("--eval-file should not be given when --eval-format=internal")
     } else
       need_seq(params.eval_file, "eval-file", "evaluation file(s)")
+  }
+
+  protected def create_document_factory(
+      word_dist_factory: DocWordDistFactory) =
+    new SphereDocFactory(this, word_dist_factory)
+
+  protected def create_grid(docfact: GeoDocFactory[SphereCoord]) = {
+    val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
+    if (params.combined_kd_grid) {
+      val kdcg =
+        KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
+          params.kd_use_backoff, params.kd_interpolate_weight)
+      val mrcg =
+        new MultiRegularGrid(params.degrees_per_cell,
+          params.width_of_multi_cell, sphere_docfact)
+      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
+    } else if (params.kd_tree) {
+      KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
+        params.kd_use_backoff, params.kd_interpolate_weight)
+    } else {
+      new MultiRegularGrid(params.degrees_per_cell,
+        params.width_of_multi_cell, sphere_docfact)
+    }
   }
 
   override def create_strategy(stratname: String, grid: GeoGrid[SphereCoord]) = {
@@ -750,6 +739,10 @@ found   : (String, Iterator[evalobj.TEvalRes])
         )
     }
   }
+}
+
+trait GeolocateDocumentDriver extends GeolocateDriver {
+  type TRunRes = Iterable[_]
 
   /**
    * Do the actual document geolocation.  Results to stderr (see above), and
@@ -807,21 +800,14 @@ found   : (String, Iterator[evalobj.TEvalRes])
   }
 }
 
-class GeolocateDocDriver extends
-    GeolocateDocTypeDriver with StandaloneExperimentDriverStats {
-  override type TParam = GeolocateDocParameters
+class StandaloneGeolocateDocumentDriver extends
+    GeolocateDocumentDriver with StandaloneExperimentDriverStats {
+  override type TParam = GeolocateParameters
 }
 
 abstract class GeolocateApp(appname: String) extends
     GridLocateApp(appname) {
   override type TDriver <: GeolocateDriver
-}
-
-abstract class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document") {
-  type TDriver = GeolocateDocDriver
-  // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver = new TDriver
 
   override def output_command_line_parameters() {
     super.output_command_line_parameters()
@@ -840,13 +826,19 @@ abstract class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document
       errprint("%s: %s", english, format_float(value))
     }
   }
+}
 
+class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document") {
+  type TDriver = StandaloneGeolocateDocumentDriver
+  // FUCKING TYPE ERASURE
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver = new TDriver
 }
 
 /**
  * The normal application for geolocating a document.
  */
-object GeolocateDocumentApp extends GeolocateDocumentTypeApp
+object GeolocateDocumentApp extends GeolocateDocumentTypeApp { }
 
 /**
  * An application for generating a tag describing the command-line

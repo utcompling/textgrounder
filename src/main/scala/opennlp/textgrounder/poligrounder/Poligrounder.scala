@@ -76,7 +76,6 @@ import util.time._
 import gridlocate._
 import util.debug._
 
-import worddist.{WordDist,WordDistFactory}
 import worddist.WordDist._
 
 /*
@@ -187,7 +186,7 @@ class PoligrounderDriver extends
     super.handle_parameters()
   }
 
-  protected def create_document_factory(word_dist_factory: WordDistFactory) =
+  protected def create_document_factory(word_dist_factory: DocWordDistFactory) =
     new TimeDocFactory(this, word_dist_factory)
 
   protected def create_grid(docfact: GeoDocFactory[TimeCoord]) = {

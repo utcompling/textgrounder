@@ -184,7 +184,9 @@ abstract class HadoopGeolocateApp(
   }
 }
 
-trait HadoopGeolocateParameters extends GeolocateParameters {
+class HadoopGeolocateParameters(
+  parser: ArgParser
+) extends GeolocateParameters(parser) {
   var textgrounder_dir =
     ap.option[String]("textgrounder-dir",
       help = """Directory to use in place of TEXTGROUNDER_DIR environment
@@ -199,12 +201,11 @@ variable (e.g. in Hadoop).""")
 /**
  * Base mix-in for a Geolocate application using Hadoop.
  *
- * @see HadoopGeolocateDriver
+ * @see GeolocateDriver
  */
 
-trait HadoopGeolocateDriver
-    extends GeolocateDriver
-       with HadoopExperimentDriver {
+trait HadoopGeolocateDriver extends
+    GeolocateDriver with HadoopExperimentDriver {
   override type TParam <: HadoopGeolocateParameters
 
   override def handle_parameters() {
@@ -212,6 +213,17 @@ trait HadoopGeolocateDriver
     need(params.textgrounder_dir, "textgrounder-dir")
     TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
   }
+}
+
+/**
+ * Class for a geolocate-document application using Hadoop.
+ *
+ * @see HadoopGeolocateDriver
+ */
+
+class HadoopGeolocateDocumentDriver extends
+    GeolocateDocumentDriver with HadoopGeolocateDriver {
+  override type TParam = HadoopGeolocateParameters
 }
 
 /************************************************************************/
@@ -224,7 +236,7 @@ class DocEvalMapper
        with HadoopGeolocateTextDBMixin {
   def progname = HadoopGeolocateDocumentApp.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
-  type TDriver = HadoopGeolocateDocDriver
+  type TDriver = HadoopGeolocateDocumentDriver
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
@@ -283,10 +295,10 @@ class DocResultReducer extends
 
   type TContext = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  var driver: HadoopGeolocateDocDriver = _
+  var driver: HadoopGeolocateDocumentDriver = _
 
   override def setup(context: TContext) {
-    driver = new HadoopGeolocateDocDriver
+    driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
   }
 
@@ -300,23 +312,9 @@ class DocResultReducer extends
   }
 }
 
-class HadoopGeolocateDocParameters(
-  parser: ArgParser = null
-) extends GeolocateDocParameters(parser) with HadoopGeolocateParameters {
-}
-
-/**
- * Class for running the geolocate-document app using Hadoop.
- */
-
-class HadoopGeolocateDocDriver extends
-    GeolocateDocTypeDriver with HadoopGeolocateDriver {
-  override type TParam = HadoopGeolocateDocParameters
-}
-
 object HadoopGeolocateDocumentApp extends
     HadoopGeolocateApp("TextGrounder geolocate-document") {
-  type TDriver = HadoopGeolocateDocDriver
+  type TDriver = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver

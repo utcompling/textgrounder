@@ -193,7 +193,7 @@ class KLDivergenceStrategy[Co](
     self.kl_divergence(self_kl_cache, other, partial = partial)
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
-    val cell_word_dist = cell.combined_dist.word_dist
+    val cell_word_dist = cell.combined_dist.word_dist.grid_dist
     var kldiv = call_kl_divergence(word_dist, cell_word_dist)
     if (symmetric) {
       val kldiv2 = cell_word_dist.kl_divergence(null, word_dist,
@@ -222,7 +222,7 @@ class KLDivergenceStrategy[Co](
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           fast_slow_dist.slow_kl_divergence_debug(
-            cell.combined_dist.word_dist, partial = partial,
+            cell.combined_dist.word_dist.grid_dist, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
@@ -262,7 +262,7 @@ class CosineSimilarityStrategy[Co](
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
     val cossim =
-      word_dist.cosine_similarity(cell.combined_dist.word_dist,
+      word_dist.cosine_similarity(cell.combined_dist.word_dist.grid_dist,
         partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -291,7 +291,7 @@ class NaiveBayesDocStrategy[Co](
       } else (1.0, 0.0))
 
     val word_logprob =
-      cell.combined_dist.word_dist.get_nbayes_logprob(word_dist)
+      cell.combined_dist.word_dist.grid_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
       log(cell.combined_dist.num_docs.toDouble /
           grid.total_num_docs)
