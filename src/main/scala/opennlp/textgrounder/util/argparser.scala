@@ -279,7 +279,8 @@ package object argparser {
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
-          """Cannot convert argument "%s" to an integer.""" format rawval)
+          """Param "%s": Cannot convert argument "%s" to an integer."""
+          format (name, rawval))
     }
   }
 
@@ -292,8 +293,8 @@ package object argparser {
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
-          """Cannot convert argument "%s" to a floating-point number."""
-          format rawval)
+          """Param "%s": Cannot convert argument "%s" to a floating-point number."""
+          format (name, rawval))
     }
   }
 
@@ -440,9 +441,10 @@ package object argparser {
       case "on" => true
       case "off" => false
       case _ => throw new ArgParserConversionException(
-          ("""Cannot convert argument "%s" to a boolean.  """ +
+          ("""Param "%s": Cannot convert argument "%s" to a boolean.  """ +
            """Recognized values (case-insensitive) are """ +
-           """yes, no, y, n, true, false, t, f, on, off.""") format rawval)
+           """yes, no, y, n, true, false, t, f, on, off.""") format
+           (name, rawval))
     }
   }
 
@@ -1027,11 +1029,21 @@ package object argparser {
     }
 
     protected def argot_converter[T](
-        convert: (String, String, ArgParser) => T, canon_name: String,
-        choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+        is_multi: Boolean, convert: (String, String, ArgParser) => T,
+        canon_name: String, choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
       (rawval: String, argop: CommandLineArgument[T]) => {
         val converted = convert(rawval, canon_name, this)
         checkChoices(converted, choices, aliasedChoices)
+      }
+    }
+
+    protected def argot_converter_with_params[T](
+        is_multi: Boolean, convert: (String, String, ArgParser) => T,
+        canon_name: String, choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+      (rawval: String, argop: CommandLineArgument[(T, String)]) => {
+        val (raw, params) = rawval span (_ != ':')
+        val converted = convert(raw, canon_name, this)
+        (checkChoices(converted, choices, aliasedChoices), params)
       }
     }
 
@@ -1047,11 +1059,32 @@ package object argparser {
         val arg = new ArgSingle(this, canon_name, default)
         arg.wrap =
           (argot.option[T](name.toList, canon_metavar, canon_help)
-           (argot_converter(convert, canon_name, choices, aliasedChoices)))
+           (argot_converter(is_multi = false, convert, canon_name,
+             choices, aliasedChoices)))
         arg
       }
       handle_argument[T,T](name, default, metavar, choices, aliasedChoices,
         help, create_underlying _)
+    }
+
+    def optionSeqWithParams[T](name: Seq[String],
+      default: (T, String) = (null.asInstanceOf[T], ""),
+      metavar: String = null,
+      choices: Seq[T] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
+      help: String = "")
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgSingle(this, canon_name, default)
+        arg.wrap =
+          (argot.option[(T, String)](name.toList, canon_metavar, canon_help)
+           (argot_converter_with_params(is_multi = false, convert, canon_name,
+             choices, aliasedChoices)))
+        arg
+      }
+      handle_argument[T,(T, String)](name, default, metavar,
+        choices, aliasedChoices, help, create_underlying _)
     }
 
     /**
@@ -1135,6 +1168,34 @@ package object argparser {
         aliasedChoices = aliasedChoices, help = help)(convert, m)
     }
 
+    /**
+     * Define a single-valued option of type T, with parameters.
+     * This is like `option` but the value can include parameters, e.g.
+     * 'foo:2:3' in place of just 'foo'. The value is a tuple of
+     * (basicValue, params) where `basicValue` is whatever would be
+     * returned as the value of an `option` and `params` is a string,
+     * the raw value of the parameters (including any leading colon).
+     * The parameters themselves should be converted by
+     * `parseSubParams` or `parseSubParams2`. Any `choices` or
+     * `aliasedChoices` specified refer only to the `basicValue`
+     * part of the option value.
+     */
+    def optionWithParams[T](
+      name1: String, name2: String = null, name3: String = null,
+      name4: String = null, name5: String = null, name6: String = null,
+      name7: String = null, name8: String = null, name9: String = null,
+      default: (T, String) = (null.asInstanceOf[T], ""),
+      metavar: String = null,
+      choices: Seq[T] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
+      help: String = "")
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
+      optionSeqWithParams[T](nonNullVals(name1, name2, name3, name4, name5,
+        name6, name7, name8, name9),
+        metavar = metavar, default = default, choices = choices,
+        aliasedChoices = aliasedChoices, help = help)(convert, m)
+    }
+
     def flagSeq(name: Seq[String],
       help: String = "") = {
       import ArgotConverters._
@@ -1187,7 +1248,8 @@ package object argparser {
         val arg = new ArgMulti[T](this, canon_name, default)
         arg.wrap =
           (argot.multiOption[T](name.toList, canon_metavar, canon_help)
-           (argot_converter(convert, canon_name, choices, aliasedChoices)))
+           (argot_converter(is_multi = true, convert, canon_name,
+             choices, aliasedChoices)))
         arg
       }
       handle_argument[T,Seq[T]](name, default, metavar, choices, aliasedChoices,
@@ -1241,15 +1303,15 @@ package object argparser {
       default: T = null.asInstanceOf[T],
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
-      help: String = "",
-      optional: Boolean = false)
+      help: String = "", optional: Boolean = false)
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgSingle(this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.parameter[T](canon_name, canon_help, optional)
-           (argot_converter(convert, canon_name, choices, aliasedChoices)))
+           (argot_converter(is_multi = false, convert, canon_name,
+             choices, aliasedChoices)))
         arg
       }
       handle_argument[T,T](Seq(name), default, null, choices, aliasedChoices,
@@ -1274,12 +1336,79 @@ package object argparser {
         val arg = new ArgMulti[T](this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.multiParameter[T](canon_name, canon_help, optional)
-           (argot_converter(convert, canon_name, choices, aliasedChoices)))
+           (argot_converter(is_multi = true, convert, canon_name,
+             choices, aliasedChoices)))
         arg
       }
       handle_argument[T,Seq[T]](Seq(name), default, null, choices,
         aliasedChoices, help, create_underlying _,
         is_multi = true, is_positional = true)
+    }
+
+    /**
+     * Parse a sub-parameter specified with an argument's value,
+     * in an argument specified as with `optionWithParams`, when at most
+     * one such sub-parameter can be given.
+     *
+     * @param argtype Type of argument (usually the basic value of the
+     *   argument or some variant); used only for error messages.
+     * @param spec The sub-parameter spec, i.e. the string in the second
+     *   part of the tuple returned as the value of `optionWithParams` or
+     *   the like.
+     * @param default Default value of sub-parameter, if not specified.
+     * @param convert Function to convert the raw value into a value of
+     *   type `T`, as in `option` and the like.
+     */
+    def parseSubParams[T](argtype: String, spec: String,
+      default: T = null.asInstanceOf[T])
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
+      val specs = spec.split(":", -1)
+      specs.tail.length match {
+        case 0 => default
+        case 1 =>
+          if (specs(1) == "") default
+          else convert(specs(1), argtype, this)
+        case _ => throw new ArgParserConversionException(
+          """too many parameters for type "%s": %d seen, at most 1 allowed"""
+          format (argtype, specs.tail.length))
+      }
+    }
+
+    /**
+     * Parse a sub-parameter specified with an argument's value,
+     * in an argument specified as with `optionWithParams`, when at most
+     * two such sub-parameters can be given.
+     *
+     * @see #parseSubParams[T]
+     */
+    def parseSubParams2[T,U](argtype: String, spec: String,
+      default: (T,U) = (null.asInstanceOf[T], null.asInstanceOf[U]))
+    (implicit convertT: (String, String, ArgParser) => T,
+      convertU: (String, String, ArgParser) => U,
+      m: Manifest[T]) = {
+      val specs = spec.split(":", -1)
+      val (deft, defu) = default
+      specs.tail.length match {
+        case 0 => default
+        case 1 => {
+          val t =
+            if (specs(1) == "") deft
+            else convertT(specs(1), argtype, this)
+          (t, defu)
+        }
+        case 2 => {
+          val t =
+            if (specs(1) == "") deft
+            else convertT(specs(1), argtype, this)
+          val u =
+            if (specs(2) == "") deft
+            else convertT(specs(2), argtype, this)
+          (t, u)
+        }
+        case _ => throw new ArgParserConversionException(
+          """too many parameters for type "%s": %d seen, at most 2 allowed"""
+          format (argtype, specs.tail.length))
+      }
     }
 
     /**
