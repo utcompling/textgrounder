@@ -206,37 +206,81 @@ process all.""")
   //      help = """Skip this many after each one processed.  Default 0.""")
 
   //// Options used when creating word distributions
+  var jelinek_factor_default = 0.3
+  var dirichlet_factor_default = 500.0
   var word_dist =
-    ap.option[String]("word-dist", "wd",
-      default = "pseudo-good-turing",
+    ap.optionWithParams[String]("word-dist", "wd",
+      default = ("pseudo-good-turing", ""),
       aliasedChoices = Seq(
         Seq("pseudo-good-turing", "pgt"),
         Seq("dirichlet"),
         Seq("jelinek-mercer", "jelinek"),
         Seq("unsmoothed-ngram")),
       help = """Type of word distribution to use.  Possibilities are
-'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
-distribution), 'dirichlet' (Dirichlet smoothing over a unigram distribution),
-'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over a unigram
-distribution), and 'unsmoothed-ngram' (an unsmoothed n-gram distribution).
-Default '%default'.
+'pseudo-good-turing' (a simplified version of Good-Turing smoothing over a
+unigram distribution), 'dirichlet' (Dirichlet smoothing over a unigram
+distribution), 'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over
+a unigram distribution), and 'unsmoothed-ngram' (an unsmoothed n-gram
+distribution). Default '%%default'.
 
-Note that all three involve some type of discounting, i.e. taking away a
-certain amount of probability mass compared with the maximum-likelihood
-distribution (which estimates 0 probability for words unobserved in a
-particular document), so that unobserved words can be assigned positive
-probability, based on their probability across all documents (i.e. their
-global distribution).  The difference is in how the discounting factor is
-computed, as well as the default value for whether to do interpolation
-(always mix the global distribution in) or back-off (use the global
-distribution only for words not seen in the document).  Jelinek-Mercer
-and Dirichlet do interpolation by default, while pseudo-Good-Turing
-does back-off; but this can be overridden using --interpolate.
-Jelinek-Mercer uses a fixed discounting factor; Dirichlet uses a
-discounting factor that gets smaller and smaller the larger the document,
-while pseudo-Good-Turing uses a discounting factor that reserves total
-mass for unobserved words that is equal to the total mass observed
-for words seen once.""")
+For Dirichlet and Jelinek, an optional smoothing parameter can be given,
+following a colon, e.g. 'jelinek:0.2' or 'dirichlet:10000'. The higher
+the value, the more smoothing is done. Default is %g for Jelinek and
+%g for Dirichlet. The parameter must be between 0.0 and 1.0 for Jelinek,
+and >= 0.0 for Dirichlet. In both cases, a value of 0.0 means no smoothing
+(making both methods equivalent). See below for more explanation.
+
+An unsmoothed distribution is simply the maximum-likelihood (MLE)
+distribution, which assigns probability to words according to how often
+they have been observed in the document, with all words that do not occur
+in the document assigned 0 probability. These zero-value probabilities
+are problematic both conceptually (in that it means that words that happen
+not to have been seen so far can never be seen in the future) and
+practically, and so it is usually better to "smooth" an MLE distribution
+to ensure that all words have a non-zero probability (even if small).
+
+All of the implemented smoothed distributions operate by discounting, i.e.
+taking away a certain amount of probability mass from the words in the MLE
+distribution and distributing it over the unseen words, in proportion to
+their probability across all documents (i.e. their global distribution).
+Discounting is done either by interpolation (taking a weighted average
+of the MLE and global distributions, so that the global-distribution
+statistics are mixed into all words) or back-off (using the global
+distribution only for words not seen in the document). In both cases a
+"discounting factor" (between 0.0 and 1.0) determines what fraction of
+the total probability mass is reserved for the global distribution: A
+value of 0.0 means no smoothing, while a value of 1.0 means that the
+MLE distribution is totally ignored in favor of the global distribution.
+
+In Jelinek smoothing, the discounting factor is directly specified by
+the smoothing parameter.
+
+In Dirichlet smoothing, the discounting factor is
+m/(|D|+m) = 1/(1+|D|/m) where m is the smoothing parameter and |D|
+is the length of the document in words. This means that the longer the
+document, the smaller the discounting factor: i.e. large documents are
+smoothed less than small ones because the MLE is expected to be more
+accurate (because more information is available). Furthermore, the value
+of m can be thought of as indicating (very roughly) the expected
+document size: When the document length |D| = m, the discounting factor
+is 1/2, and in general if |D| = n*m, then the discounting factor is
+1/(1+n), so that for documents significantly larger than m, the MLE
+distribution is weighted much more than the global distribution, while
+for for documents significantly smaller than m, the reverse is true.
+
+Note that the smoothing mostly affects the cell distributions rather
+than the test document distributions; hence the value of m should
+reflect this.
+
+Pseudo-Good-Turing has no smoothing parameter, and automatically sets
+the discounting factor equal to the fraction of MLE probability mass
+occupied by words seen once. The intuition here is that the probability
+of seeing an unseen word can be estimated by the fraction of tokens that
+correspond to words seen only once.
+
+By default, Jelinek and Dirichlet do interpolation and Pseudo-Good-Turing
+does back-off, by this can be overridden using --interpolate.""" format (
+  jelinek_factor_default, dirichlet_factor_default))
   var interpolate =
     ap.option[String]("interpolate",
       default = "default",
@@ -248,22 +292,26 @@ for words seen once.""")
 Possibilities are 'yes', 'no', and 'default' (which means 'yes' when doing
 Dirichlet or Jelinek-Mercer smoothing, 'no' when doing pseudo-Good-Turing
 smoothing).""")
-  var jelinek_factor =
-    ap.option[Double]("jelinek-factor", "jf",
-      default = 0.3,
-      help = """Smoothing factor when doing Jelinek-Mercer smoothing.
-The higher the value, the more relative weight to give to the global
-distribution vis-a-vis the document-specific distribution.  This
-should be a value between 0.0 (no smoothing at all) and 1.0 (total
-smoothing, i.e. use only the global distribution and ignore
-document-specific distributions entirely).  Default %default.""")
-  var dirichlet_factor =
-    ap.option[Double]("dirichlet-factor", "df",
-      default = 500,
-      help = """Smoothing factor when doing Dirichlet smoothing.
-The higher the value, the more relative weight to give to the global
-distribution vis-a-vis the document-specific distribution.  Default
-%default.""")
+
+  var rerank_word_dist =
+    ap.optionWithParams[String]("rerank-word-dist", "rwd",
+      default = ("pseudo-good-turing", ""),
+      aliasedChoices = Seq(
+        Seq("pseudo-good-turing", "pgt"),
+        Seq("dirichlet"),
+        Seq("jelinek-mercer", "jelinek"),
+        Seq("unsmoothed-ngram")),
+      help = """Word dist for reranking. See `--word-dist`.""")
+  var rerank_interpolate =
+    ap.option[String]("rerank-interpolate",
+      default = "default",
+      aliasedChoices = Seq(
+        Seq("yes", "interpolate"),
+        Seq("no", "backoff"),
+        Seq("default")),
+      help = """Whether to do interpolation rather than back-off when
+reranking. See `--interpolate`.""")
+
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
@@ -674,10 +722,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     need_seq(params.input_corpus, "input-corpus")
 
-    if (params.jelinek_factor < 0.0 || params.jelinek_factor > 1.0) {
-      param_error("Value for --jelinek-factor must be between 0.0 and 1.0, but is %g" format params.jelinek_factor)
-    }
-
     if (params.perceptron_aggressiveness < 0)
       param_error("Perceptron aggressiveness value should be strictly greater than zero")
     if (params.perceptron_aggressiveness == 0.0) // If default ...
@@ -788,19 +832,36 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * command-line parameters. This is a factory for creating word
    * distributions, i.e. language models.
    */
-  protected def create_word_dist_factory(dist_type: String) = {
+  protected def create_word_dist_factory(dist_type: String,
+      dist_spec: (String, String), interpolate: String) = {
     val create_builder = get_word_dist_builder_creator(dist_type)
-    if (params.word_dist == "unsmoothed-ngram")
+    val (dist, distparams) = dist_spec
+    if (dist == "unsmoothed-ngram")
       new UnsmoothedNgramWordDistFactory(create_builder)
-    else if (params.word_dist == "dirichlet")
+    else if (dist == "dirichlet") {
+      val dirichlet_factor = params.parser.parseSubParams(dist, distparams,
+        default = params.dirichlet_factor_default)
+      if (dirichlet_factor < 0.0)
+        param_error("Dirichlet factor must be >= 0, but is %g"
+          format dirichlet_factor)
       new DirichletUnigramWordDistFactory(create_builder,
-        params.interpolate, params.tf_idf, params.dirichlet_factor)
-    else if (params.word_dist == "jelinek-mercer")
+        interpolate, params.tf_idf, dirichlet_factor)
+    }
+    else if (dist == "jelinek-mercer") {
+      val jelinek_factor = params.parser.parseSubParams(dist, distparams,
+        default = params.jelinek_factor_default)
+      if (jelinek_factor < 0.0 || jelinek_factor > 1.0)
+        param_error("Jelinek factor must be between 0.0 and 1.0, but is %g"
+          format jelinek_factor)
       new JelinekMercerUnigramWordDistFactory(create_builder,
-        params.interpolate, params.tf_idf, params.jelinek_factor)
-    else
+        interpolate, params.tf_idf, jelinek_factor)
+    }
+    else {
+      if (distparams.contains(':'))
+        param_error("Parameters not allowed for pseudo-Good-Turing")
       new PseudoGoodTuringUnigramWordDistFactory(create_builder,
-        params.interpolate, params.tf_idf)
+        interpolate, params.tf_idf)
+    }
   }
 
   /**
@@ -810,12 +871,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_doc_word_dist_factory = {
     val grid_word_dist_factory =
-      create_word_dist_factory(grid_word_dist_type)
+      create_word_dist_factory(grid_word_dist_type, params.word_dist,
+        params.interpolate)
     val rerank_word_dist_factory =
       if (grid_word_dist_type == rerank_word_dist_type)
         grid_word_dist_factory
       else
-        create_word_dist_factory(rerank_word_dist_type)
+        create_word_dist_factory(rerank_word_dist_type,
+          params.rerank_word_dist, params.rerank_interpolate)
     new DocWordDistFactory(grid_word_dist_factory, rerank_word_dist_factory)
   }
 
