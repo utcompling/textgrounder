@@ -165,7 +165,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
   def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
     val docdist = Ngram.check_ngram_dist(doc.rerank_dist)
     val celldist =
-      Ngram.check_ngram_dist(cell.combined_dist.word_dist.grid_dist)
+      Ngram.check_ngram_dist(cell.combined_dist.word_dist.rerank_dist)
     for ((ngram, count) <- docdist.model.iter_items;
          featval = get_ngram_feature(ngram, count, docdist, celldist);
          if featval != None)
