@@ -30,7 +30,7 @@ if [ -z "$sort" ]; then
 fi
 
 if [ "$verbose" != yes ]; then
-  echo "%Accur.	Mean	Median	Average	File"
+  echo "%Accur.	Mean	Median	Average	Runtime     RSS         File"
 fi
 
 function output() {
@@ -44,9 +44,14 @@ for x in ${1+"$@"}; do
   mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
   median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
   acc=$(echo "$results" | egrep 'Percent correct =' | perl -pe 's/.*= (.*?)%.*/$1/')
+  finalstats="`sed -n '/^Ending final results/,/^Program running time/p' $x`"
+  runtime=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours /:/;' -e 's/ minutes /:/;' -e 's/ seconds//;')
+  rss=$(echo "$finalstats" | egrep 'Memory usage, actual' | perl -pe 's/.*: (.*?) bytes/$1/')
   #echo "Mean: $mean"
   #echo "Median: $median"
   #echo "%Accuracy: $acc"
+  #echo "Runtime: $runtime"
+  #echo "RSS: $rss"
   avg=
   if [ -n "$mean" -a -n "$median" ]; then
     avg=`echo "2k $mean $median + 2/p" | dc`
@@ -58,7 +63,7 @@ for x in ${1+"$@"}; do
     fi
   else
     if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
-      echo "$acc	$mean	$median	$avg	$args"
+      echo "$acc	$mean	$median	$avg	$runtime    $rss        $args"
     fi
   fi
 done
