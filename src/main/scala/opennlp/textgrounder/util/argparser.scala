@@ -1449,7 +1449,7 @@ package object argparser {
           call_parse()
         } catch {
           case e: ArgParserException => {
-            System.out.println(e.message)
+            System.err.println(e.message)
             System.exit(1)
           }
         }
