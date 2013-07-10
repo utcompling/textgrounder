@@ -709,7 +709,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
 */
 ): GridEvaluator[SphereCoord] = {
     val output_result_with_units =
-      (kmdist: Double) => km_and_miles(kmdist)
+      (kmdist: Double) => "%.2f km" format kmdist // km_and_miles(kmdist)
 
     val create_stats: (ExperimentDriverStats, String) =>
         DocEvalStats[SphereCoord] =
