@@ -127,53 +127,6 @@ class EvalStats(
   }
 }
 
-class EvalStatsWithRank(
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  max_rank_for_credit: Int = 10
-) extends EvalStats(driver_stats, prefix, Map[String, String]()) {
-  val incorrect_by_exact_rank = intmap[Int]()
-  val correct_by_up_to_rank = intmap[Int]()
-  var incorrect_past_max_rank = 0
-  var total_credit = 0
-
-  def record_result(rank: Int) {
-    assert(rank >= 1)
-    val correct = rank == 1
-    super.record_result(correct, reason = null)
-    if (rank <= max_rank_for_credit) {
-      total_credit += max_rank_for_credit + 1 - rank
-      incorrect_by_exact_rank(rank) += 1
-      for (i <- rank to max_rank_for_credit)
-        correct_by_up_to_rank(i) += 1
-    } else
-      incorrect_past_max_rank += 1
-  }
-
-  override def output_correct_results() {
-    super.output_correct_results()
-    val possible_credit = max_rank_for_credit * total_instances
-    output_fraction("Percent correct with partial credit",
-      total_credit, possible_credit)
-    for (i <- 2 to max_rank_for_credit) {
-      output_fraction("  Correct is at or above rank %s" format i,
-        correct_by_up_to_rank(i), total_instances)
-    }
-  }
-
-  override def output_incorrect_results() {
-    super.output_incorrect_results()
-    for (i <- 2 to max_rank_for_credit) {
-      output_fraction("  Incorrect, with correct at rank %s" format i,
-        incorrect_by_exact_rank(i),
-        total_instances)
-    }
-    output_fraction("  Incorrect, with correct not in top %s" format
-      max_rank_for_credit,
-      incorrect_past_max_rank, total_instances)
-  }
-}
-
 //////// Statistics for locating documents
 
 /**
@@ -277,7 +230,9 @@ class DocEvalResult[Co](
  */
 trait DocEvalStats[Co] extends EvalStats {
   // "True dist" means actual distance in km's or whatever.
+  // Error distance for actual predicted top cell.
   val true_dists = mutable.Buffer[Double]()
+  // Error distance if we always picked the correct cell.
   val oracle_true_dists = mutable.Buffer[Double]()
 
   val output_result_with_units: Double => String
@@ -775,6 +730,14 @@ class RankedDocEvalResult[Co](
   document, pred_cell.grid,
   pred_cell.get_central_point
 ) {
+  /**
+   * "True distance" (rather than e.g. degree distance) between document's
+   * coordinate and the coordinate that would be predicted if we picked a given
+   * cell as the correct one.
+   */
+  def pred_truedist_for_cell(cell: GeoCell[Co]) =
+    document.distance_to_coord(cell.get_central_point)
+
   override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
     super.print_result(doctag, driver)
     errprint("%s:  correct cell at rank: %s", doctag, correct_rank)
@@ -940,13 +903,98 @@ class FullRerankedDocEvalResult[Co](
 class RankedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   prefix: String,
-  val output_result_with_units: Double => String,
-  max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit
+  val output_result_with_units: Double => String
+) extends EvalStats(driver_stats, prefix, Map[String, String]()
 ) with DocEvalStats[Co] {
+  val top_n_for_oracle_dists =
+    Seq(1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100)
+  val max_rank_for_exact_incorrect = 10
+  val max_top_n = top_n_for_oracle_dists.max
+  val incorrect_by_exact_rank = intmap[Int]()
+  val correct_by_up_to_rank = intmap[Int]()
+  var incorrect_past_max_rank = 0
+  var total_credit = 0
+
+  // Error distance if we always picked the best possible cell within the
+  // top N items after the initial ranking. This indicates the best we
+  // could do if our reranker functioned as an oracle within the a given
+  // value of --rerank-top-n.
+  val oracle_true_dists_at = bufmap[Int, Double]()
+  val oracle_saw_correct_at = bufmap[Int, Double]()
+
   override def record_result(res: DocEvalResult[Co]) {
     super.record_result(res)
-    record_result(res.asInstanceOf[RankedDocEvalResult[Co]].correct_rank)
+    val rankres = res.asInstanceOf[FullRankedDocEvalResult[Co]]
+
+    // Code formerly in EvalStatsWithRank.
+    {
+      val corrank = rankres.correct_rank
+      assert(corrank >= 1)
+      val correct = corrank == 1
+      super.record_result(correct, reason = null)
+      var within_max_rank = false
+      if (corrank <= max_top_n) {
+        total_credit += max_top_n + 1 - corrank
+        for (n <- top_n_for_oracle_dists if corrank <= n)
+          correct_by_up_to_rank(n) += 1
+      }
+      if (corrank <= max_rank_for_exact_incorrect)
+        incorrect_by_exact_rank(corrank) += 1
+      else
+        incorrect_past_max_rank += 1
+    }
+
+    // Compute best possible error distance among top N items. First we
+    // compute a list of best error distance at all values of N up to the
+    // largest one we're considering. This is monotonically decreasing
+    // so to compute the new best we only need compare the most recently
+    // computed best with the error distance for the cell at the next
+    // rank.
+    val min_errors =
+      rankres.pred_cells.take(max_top_n).foldLeft(Vector(Double.MaxValue)) {
+        (minerrors, cell_score_pair) =>
+          val (cell_at_rank, score) = cell_score_pair
+          val newbest =
+            minerrors.last min rankres.pred_truedist_for_cell(cell_at_rank)
+          minerrors :+ newbest
+      }
+    for (rank <- top_n_for_oracle_dists)
+      oracle_true_dists_at(rank) :+= min_errors(rank)
+    true_dists += res.pred_truedist
+    oracle_true_dists += res.correct_truedist
+  }
+
+  override def output_correct_results() {
+    // This just prints the percent correct, but we incorporate it below.
+    // super.output_correct_results()
+    for (i <- top_n_for_oracle_dists) {
+      output_fraction("  Percent correct at rank <= %s" format i,
+        correct_by_up_to_rank(i), total_instances)
+    }
+    val possible_credit = max_top_n * total_instances
+    output_fraction("Percent correct with partial credit (rank <= %d)"
+                    format max_top_n,
+      total_credit, possible_credit)
+  }
+
+  override def output_incorrect_results() {
+    super.output_incorrect_results()
+     errprint("                                           %10s %10s",
+       "mean", "median")
+    for (i <- top_n_for_oracle_dists) {
+       errprint("Oracle true error distance at rank <= %-4s %10s %10s",
+         "%d:" format i,
+         output_result_with_units(mean(oracle_true_dists_at(i))),
+         output_result_with_units(median(oracle_true_dists_at(i))))
+    }
+    for (i <- 2 to max_rank_for_exact_incorrect) {
+      output_fraction("  Incorrect, with correct at rank %s" format i,
+        incorrect_by_exact_rank(i),
+        total_instances)
+    }
+    output_fraction("  Incorrect, with correct not in top %s" format
+      max_rank_for_exact_incorrect,
+      incorrect_past_max_rank, total_instances)
   }
 }
 
