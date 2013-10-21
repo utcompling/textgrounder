@@ -6,7 +6,7 @@ version := "0.1.0"
 
 organization := "OpenNLP"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.2"
 
 crossPaths := false
 
@@ -31,41 +31,43 @@ resolvers ++= Seq("Cloudera Maven Repository" at "https://repository.cloudera.co
 resolvers += "snapshots" at "http://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= Seq(
-  "com.google.guava" % "guava" % "10.0.1",
-  "org.jdom" % "jdom" % "1.1",
+  // "com.google.guava" % "guava" % "15.0",
+  // "org.jdom" % "jdom" % "2.0.5",
   "org.apache.commons" % "commons-lang3" % "3.1",
-  "org.apache.commons" % "commons-compress" % "1.3",
+  "org.apache.commons" % "commons-compress" % "1.5",
   // The following don't appear to be used currently.
-  // "com.google.inject" % "guice" % "2.0",
+  // "com.google.inject" % "guice" % "3.0",
   // "commons-cli" % "commons-cli" % "1.2",
-  // "org.xerial" % "sqlite-jdbc" % "3.6.20",
-  // "org.apache.opennlp" % "opennlp-maxent" % "3.0.1-incubating",
-  "org.apache.opennlp" % "opennlp-tools" % "1.5.1-incubating",
+  // "org.xerial" % "sqlite-jdbc" % "3.7.2",
+  // "org.apache.opennlp" % "opennlp-maxent" % "3.0.3",
+  "org.apache.opennlp" % "opennlp-tools" % "1.5.3",
   // The use of %% instead of % causes the Scala version to get appended,
-  // i.e. it's equivalent to the use of single % with "argot_2.9.1".
+  // i.e. it's equivalent to the use of single % with "argot_2.10.2".
   // This is for Scala-specific dependencies.
   // Remove this for the moment because there's a modified version (styled
-  // as version "0.3.5-benwing") in the unmanaged lib/. (Fuck me, our
-  // unmanaged junto.jar also includes a copy of Argot 0.3.5, so we will have
+  // as version "1.0.1-benwing") in the unmanaged lib/. (Fuck me, our
+  // unmanaged junto.jar includes a copy of Argot 0.3.5, so we will have
   // class path problems with a newer managed version of Argot until we
   // remove this!)
-  // "org.clapper" %% "argot" % "0.3.5",
+  // "org.clapper" %% "argot" % "1.0.1",
+  // If we remove Argot we need to include Argot's dependencies.
+  "org.clapper" %% "grizzled-scala" % "1.1.2",
   // 
   // The following is the old way we got Hadoop added.  Out of date, has lots
   // of problems.  Now it's included as a dependency of Scoobi. 
   // "org.apache.hadoop" % "hadoop-core" % "0.20.205.0",
   // This was necessary because of a stupid bug in the Maven POM for Hadoop
   // (the "old way") above, which leaves this out. (Supposedly Hadoop
-  // originally used version 1.5.2, but version 1.9.1 doesn't seem to cause
+  // originally used version 1.5.2, but version 1.9.13 doesn't seem to cause
   // problems.) But not needed at all if we don't use that Hadoop POM.
-  // "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.1",
+  // "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.13",
   //
   // Currently log4j is provided automatically by something (probably Scoobi).
   // If this fails to be the case at some point, we can use the following:
   // "log4j" % "log4j" % "1.2.17",
   //
   // Trove
-  "net.sf.trove4j" % "trove4j" % "3.0.2",
+  "net.sf.trove4j" % "trove4j" % "3.0.3",
   //
   // Scoobi
   // The following is the library we actually use, but because it's not
@@ -96,26 +98,19 @@ libraryDependencies ++= Seq(
   //  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT" % "provided",
   //
   // Dependencies for Scoobi, etc.
-  "log4j" % "log4j" % "1.2.16",
+  "log4j" % "log4j" % "1.2.17"
   // The following needed for Scoobi 0.1, but evidently not any more.
   // "javassist" % "javassist" % "3.12.1.GA",
   //
   // Find repository for trove-scala; currently stored unmanaged
   // "com.codahale" % "trove-scala_2.9.1" % "0.0.2-SNAPSHOT"
-  //
-  // Jerkson - a better library for processing JSON, although still in
-  // development
-  "com.codahale" % "jerkson_2.9.1" % "0.5.0"
   )
 
 // turn on all warnings in Java code
 javacOptions ++= Seq("-Xlint")
 
 // turn on all Scala warnings; also turn on deprecation warnings.
-// "-Ydependent-method-types" is suggested by the Scoobi 0.4 documentation.
-// Who knows what it does?  Evidently it's recently (end of 2011) been made
-// on by default, although I assume this applies only to Scala 2.10.
-scalacOptions ++= Seq("-Ydependent-method-types", "-deprecation", "-Xlint", "-unchecked")
+scalacOptions ++= Seq("-deprecation", "-Xlint", "-unchecked")
 
 // Add optimization
 scalacOptions ++= Seq("-optimise")
