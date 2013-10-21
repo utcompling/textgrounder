@@ -39,10 +39,10 @@ package object text {
     try {
       x.toDouble
     } catch {
-      case _ => {
+      case _: Exception => {
         val y = x.trim()
         if (y != "") warning("Expected number, saw %s", y)
-        0.
+        0.0
       }
     }
   }

@@ -116,7 +116,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
     try {
       fn
     } catch {
-      case e@_ => { errprint("%s", e); errval }
+      case e: Exception => { errprint("%s", e); errval }
     }
   }
 

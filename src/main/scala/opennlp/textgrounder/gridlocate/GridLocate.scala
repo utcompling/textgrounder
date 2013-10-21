@@ -734,7 +734,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * Type of word dist used in the cell grid.
    */
   protected def grid_word_dist_type = {
-    if (params.word_dist == "unsmoothed-ngram") "ngram"
+    if (params.word_dist == (("unsmoothed-ngram", ""))) "ngram"
     else "unigram"
   }
 

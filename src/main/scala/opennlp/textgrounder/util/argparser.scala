@@ -1017,9 +1017,9 @@ package object argparser {
           }) mkString ""
         val underobj = create_underlying(canon, canon_metavar, canon_help)
         argmap(canon) = underobj
-        argtype(canon) = manifest[U].erasure
+        argtype(canon) = manifest[U].runtimeClass
         if (is_multi)
-          argtype_multi(canon) = manifest[T].erasure
+          argtype_multi(canon) = manifest[T].runtimeClass
         if (is_positional)
           argpositional += canon
         if (is_flag)

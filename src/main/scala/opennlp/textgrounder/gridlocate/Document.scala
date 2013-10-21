@@ -163,7 +163,7 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
       val results = file_statuses.flatMap(tracker.handle_status(_))
       if (debug("per-document")) {
         val output_stats =
-          new SideEffectIterator { tracker.note_document_counters(file) }
+          new SideEffectIterator({ tracker.note_document_counters(file) })
         results ++ output_stats
       } else
         results

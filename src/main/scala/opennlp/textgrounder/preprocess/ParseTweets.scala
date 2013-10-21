@@ -801,11 +801,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def time = stringLit ^^ { s => (s, parse_date(s)) } ^? (
       { case (_, Some(x)) => x },
-      { case (s, None) => "Unable to parse date %s" format s } )
+      { case (s, None) => "Unable to parse date %s" format s
+        case _ => internal_error("Should not get here") } )
 
     def short_interval = stringLit ^^ { parse_date_interval(_) } ^? (
       { case (Some((from, to)), "") => (from, to) },
-      { case (None, errmess) => errmess } )
+      { case (None, errmess) => errmess
+        case _ => internal_error("Should not get here") } )
      
     def full_interval = "(" ~> time ~ time <~ ")" ^^ {
       case from ~ to => (from, to) }
