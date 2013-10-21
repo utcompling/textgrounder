@@ -6,7 +6,7 @@ version := "0.1.0"
 
 organization := "OpenNLP"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.2"
 
 crossPaths := false
 
@@ -112,10 +112,7 @@ libraryDependencies ++= Seq(
 javacOptions ++= Seq("-Xlint")
 
 // turn on all Scala warnings; also turn on deprecation warnings.
-// "-Ydependent-method-types" is suggested by the Scoobi 0.4 documentation.
-// Who knows what it does?  Evidently it's recently (end of 2011) been made
-// on by default, although I assume this applies only to Scala 2.10.
-scalacOptions ++= Seq("-Ydependent-method-types", "-deprecation", "-Xlint", "-unchecked")
+scalacOptions ++= Seq("-deprecation", "-Xlint", "-unchecked")
 
 // Add optimization
 scalacOptions ++= Seq("-optimise")
