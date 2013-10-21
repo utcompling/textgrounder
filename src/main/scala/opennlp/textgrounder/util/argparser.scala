@@ -447,7 +447,9 @@ package object argparser {
            (name, rawval))
     }
   }
+}
 
+package argparser {
   /**
    * Superclass of all exceptions related to `argparser`.  These exceptions
    * are generally thrown during argument parsing.  Normally, the exceptions

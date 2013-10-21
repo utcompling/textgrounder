@@ -45,7 +45,7 @@ import os._
  * outside of package 'util', and simply 'import io._' inside of it.
  */
 
-package object io {
+package io {
 
   //////////////////////////////////////////////////////////////////////////////
   //                            File reading functions                        //
@@ -481,7 +481,9 @@ package object io {
     def make_directories(filename: String) = unsupported()
     def list_files(dir: String) = unsupported()
   }
+}
 
+package object io {
   /**
    * A file handler for the local file system. Use this to operate on
    * "normal" (local) files.

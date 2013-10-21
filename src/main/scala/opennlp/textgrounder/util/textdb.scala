@@ -84,7 +84,7 @@ import io._
  * However, there are a number of convenience functions for handling
  * common situations (e.g. all files in a single directory).
  */
-package object textdb {
+package textdb {
   /**
    * An object describing a textdb schema, i.e. a description of each of the
    * fields in a textdb, along with "fixed fields" containing the same
@@ -647,24 +647,24 @@ package object textdb {
       }
       outstr.close()
     }
-  }
 
-  /**
-   * Parse a line into fields, according to `split_text` (usually TAB).
-   * `lineno` and `schema` are used for verifying the correct number of
-   * fields and handling errors.
-   */
-  def line_to_fields(line: String, lineno: Long, schema: Schema
-      ): Option[IndexedSeq[String]] = {
-    val fieldvals = line.split(schema.split_re, -1).toIndexedSeq
-    if (fieldvals.size != schema.fieldnames.size) {
-      warning(
-        """Line %s: Bad record, expected %s fields, saw %s fields;
-        skipping line=%s""", lineno, schema.fieldnames.size,
-        fieldvals.size, line)
-      None
-    } else
-      Some(fieldvals)
+    /**
+     * Parse a line into fields, according to `split_text` (usually TAB).
+     * `lineno` and `schema` are used for verifying the correct number of
+     * fields and handling errors.
+     */
+    def line_to_fields(line: String, lineno: Long, schema: Schema
+        ): Option[IndexedSeq[String]] = {
+      val fieldvals = line.split(schema.split_re, -1).toIndexedSeq
+      if (fieldvals.size != schema.fieldnames.size) {
+        warning(
+          """Line %s: Bad record, expected %s fields, saw %s fields;
+          skipping line=%s""", lineno, schema.fieldnames.size,
+          fieldvals.size, line)
+        None
+      } else
+        Some(fieldvals)
+    }
   }
 
   /**
@@ -714,6 +714,41 @@ package object textdb {
       decode_chars_regex.replaceAllIn(str, m => decode_chars_map(m.matched))
   }
 
+  object Encoder {
+    def count_map(x: BaseMap[String, Int]) =
+      encode_count_map(x.toSeq)
+    def count_map_seq(x: Iterable[(String, Int)]) =
+      encode_count_map(x)
+    def string_map(x: BaseMap[String, String]) =
+      encode_string_map(x.toSeq)
+    def string_map_seq(x: Iterable[(String, String)]) =
+      encode_string_map(x)
+    def string(x: String) = encode_string_for_whole_field(x)
+    def string_in_seq(x: String) = encode_string_for_sequence_field(x)
+    def string_seq(x: Iterable[String]) =
+      x.map(encode_string_for_sequence_field) mkString ">>"
+    def timestamp(x: Long) = x.toString
+    def long(x: Long) = x.toString
+    def int(x: Int) = x.toString
+    def double(x: Double) = x.toString
+  }
+
+  object Decoder {
+    def count_map(x: String) = decode_count_map(x).toMap
+    def count_map_seq(x: String) = decode_count_map(x)
+    def string_map(x: String) = decode_string_map(x).toMap
+    def string_map_seq(x: String) = decode_string_map(x)
+    def string(x: String) = decode_string_for_whole_field(x)
+    def string_seq(x: String) =
+      x.split(">>", -1).map(decode_string_for_sequence_field)
+    def timestamp(x: String) = x.toLong
+    def long(x: String) = x.toLong
+    def int(x: String) = x.toInt
+    def double(x: String) = x.toDouble
+  }
+}
+
+package object textdb {
   private val endec_string_for_map_field =
     new EncodeDecode(Seq('%', ':', ' ', '\t', '\n', '\r', '\f'))
   private val endec_string_for_sequence_field =
@@ -912,38 +947,4 @@ package object textdb {
       }
     }
   }
-
-  object Encoder {
-    def count_map(x: BaseMap[String, Int]) =
-      encode_count_map(x.toSeq)
-    def count_map_seq(x: Iterable[(String, Int)]) =
-      encode_count_map(x)
-    def string_map(x: BaseMap[String, String]) =
-      encode_string_map(x.toSeq)
-    def string_map_seq(x: Iterable[(String, String)]) =
-      encode_string_map(x)
-    def string(x: String) = encode_string_for_whole_field(x)
-    def string_in_seq(x: String) = encode_string_for_sequence_field(x)
-    def string_seq(x: Iterable[String]) =
-      x.map(encode_string_for_sequence_field) mkString ">>"
-    def timestamp(x: Long) = x.toString
-    def long(x: Long) = x.toString
-    def int(x: Int) = x.toString
-    def double(x: Double) = x.toString
-  }
-
-  object Decoder {
-    def count_map(x: String) = decode_count_map(x).toMap
-    def count_map_seq(x: String) = decode_count_map(x)
-    def string_map(x: String) = decode_string_map(x).toMap
-    def string_map_seq(x: String) = decode_string_map(x)
-    def string(x: String) = decode_string_for_whole_field(x)
-    def string_seq(x: String) =
-      x.split(">>", -1).map(decode_string_for_sequence_field)
-    def timestamp(x: String) = x.toLong
-    def long(x: String) = x.toLong
-    def int(x: String) = x.toInt
-    def double(x: String) = x.toDouble
-  }
-
 }

@@ -58,7 +58,7 @@ import math.MeanShift
      between two SphereCoords; likewise degree_dist() to compute degree
      distance between two SphereCoords
  */
-package object distances {
+protected class DistancesPackage {
  
   /***** Fixed values *****/
 
@@ -328,3 +328,6 @@ package object distances {
       res
   }
 }
+
+package object distances extends DistancesPackage { }
+

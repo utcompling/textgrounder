@@ -27,6 +27,7 @@ import java.io._
 
 import util.collection._
 import util.textdb._
+import util.textdb.TextDB._
 import util.distances._
 import util.experiment._
 import util.io._

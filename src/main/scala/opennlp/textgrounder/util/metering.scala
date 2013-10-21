@@ -31,7 +31,7 @@ import time.format_minutes_seconds
 //                             Metered Tasks                               //
 /////////////////////////////////////////////////////////////////////////////
 
-package object metering {
+package metering {
   /**
    * Class for tracking number of items processed in a long task, and
    * reporting periodic status messages concerning how many items
@@ -248,7 +248,9 @@ package object metering {
       } finally { m.finish() }
     }
   }
+}
 
+package object metering {
   implicit def to_MeteredIteratorPimp[T](iter: Iterator[T]) =
     new MeteredIteratorPimp[T](iter)
   implicit def to_MeteredIterablePimp[T](iable: Iterable[T]) =
