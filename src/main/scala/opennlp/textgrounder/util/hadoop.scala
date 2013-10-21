@@ -41,7 +41,7 @@ import io._
 import print._
 import textdb._
 
-package object hadoop {
+package hadoop {
   class HadoopFileHandler(conf: Configuration) extends FileHandler {
     protected def get_file_system(filename: String) = {
       FileSystem.get(URI.create(filename), conf)
