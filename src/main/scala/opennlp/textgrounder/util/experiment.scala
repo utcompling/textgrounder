@@ -31,7 +31,7 @@ import text._
 import textdb.Encoder
 import time.format_minutes_seconds
 
-package object experiment {
+package experiment {
   /**
    * A general experiment driver class for programmatic access to a program
    * that runs experiments.
