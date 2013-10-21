@@ -338,7 +338,8 @@ class NgramComparer(min_prob: Double, max_items: Int) extends
 object DistributionComparer {
   def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) =
-    grid.pairs(category).before_cell.combined_dist.word_dist match {
+    /* FIXME: What about rerank_dist? */
+    grid.pairs(category).before_cell.combined_dist.word_dist.grid_dist match {
       case _: UnigramWordDist =>
         new UnigramComparer(min_prob, max_items)
       case _: NgramWordDist =>

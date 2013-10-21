@@ -35,7 +35,7 @@ trait Serializer[T] {
     try {
       deserialize(foo)
     } catch {
-      case _ => return false
+      case _: Exception => return false
     }
     return true
   }

@@ -460,7 +460,7 @@ package object textdb {
       val re = ("""^(.*)""" + full_suffix_re).r
       base match {
         case re(prefix, suffix, ending) =>
-          Some(dir, prefix, suffix, ending)
+          Some((dir, prefix, suffix, ending))
         case _ => None
       }
     }

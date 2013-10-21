@@ -195,13 +195,13 @@ package object metering {
 
     def iterate[T](iter: Iterator[T]) = {
       val wrapiter = new InterruptibleIterator(iter)
-      new SideEffectIterator { start() } ++
+      new SideEffectIterator({ start() }) ++
       wrapiter.map { x => 
         if (item_processed())
           wrapiter.stop()
         x
       } ++
-      new SideEffectIterator { finish() }
+      new SideEffectIterator({ finish() })
     }
   }
 

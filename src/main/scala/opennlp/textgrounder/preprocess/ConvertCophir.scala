@@ -166,7 +166,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     try {
       Some(str.toInt)
     } catch {
-      case e:NumberFormatException =>
+      case e: NumberFormatException =>
         problem("Unable to parse number", "'%s': %s" format (str, e))
     }
   }
@@ -185,7 +185,7 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     val maybedom = try {
       Some(xml.XML.loadString(rawxml))
     } catch {
-      case _ =>
+      case _: Exception =>
         problem("Unable to parse XML filename", filename)
     }
 
@@ -357,10 +357,10 @@ object ConvertCophir
     val test_srcdir = opts.output + "-test"
    
     // output data files
-    persist(
+    persist((
       TextOutput.toTextFile(training, opts.output),
       TextOutput.toTextFile(dev, dev_srcdir),
-      TextOutput.toTextFile(test, test_srcdir))
+      TextOutput.toTextFile(test, test_srcdir)))
 
     // move/rename data files
     rename_output_files(filehand, opts.output,
