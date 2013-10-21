@@ -21,6 +21,7 @@ package util
 
 import math._
 import text.split_with_delim
+import print.internal_error
 
 package object time {
 
@@ -115,7 +116,7 @@ package object time {
           try {
             valstr.toDouble
           } catch {
-            case e => return (None,
+            case e: Exception => return (None,
               "Unable to convert value '%s' in component '%s' in time offset '%s': %s" format
               (valstr, valstr + units, str, e))
           }
@@ -144,6 +145,7 @@ package object time {
       val timelen = parse_time_offset(offsetstr) match {
         case (Some(len), "") => len
         case (None, errmess) => return (None, errmess)
+        case _ => internal_error("Should never get here")
       }
       parse_date(datestr) match {
         case Some(date) =>

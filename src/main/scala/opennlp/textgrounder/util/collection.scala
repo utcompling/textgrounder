@@ -40,6 +40,7 @@ import scala.collection.mutable
 import mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
 import scala.collection.{Map => BaseMap}
+import scala.reflect.ClassTag
 
 /**
  * A package containing various collection-related classes and functions.
@@ -314,7 +315,7 @@ package object collection {
    can reuse a Dynamic Array multiple times without constantly creating
    new objects.  Also has specialization.
    */
-  class DynamicArray[@specialized T: ClassManifest](initial_alloc: Int = 8) {
+  class DynamicArray[@specialized T: ClassTag](initial_alloc: Int = 8) {
     protected val multiply_factor = 1.5
     var array = new Array[T](initial_alloc)
     var length = 0
@@ -605,11 +606,11 @@ package object collection {
       var seen_any = false
       for {(lower, upper) <- iteration_range
            // FIXME SCALABUG: This is a bug in Scala if I have to do this
-           val collector = items_by_range.getOrElse(lower, null.asInstanceOf[Coll])
+           collector = items_by_range.getOrElse(lower, null.asInstanceOf[Coll])
            if (collector != null || unseen_all ||
                (unseen_between && seen_any &&
-                upper != max_value && upper <= highest_seen))
-           val col2 = if (collector != null) collector else create(lower)
+               upper != max_value && upper <= highest_seen))
+           col2 = if (collector != null) collector else create(lower)
           }
       yield {
         if (collector != null) seen_any = true

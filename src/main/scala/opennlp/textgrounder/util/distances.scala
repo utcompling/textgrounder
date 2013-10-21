@@ -78,7 +78,7 @@ package object distances {
   // Number of km per degree, at the equator.  For longitude, this is the
   // same everywhere, but for latitude it is proportional to the degrees away
   // from the equator.
-  val km_per_degree = Pi * 2 * earth_radius_in_km / 360.
+  val km_per_degree = Pi * 2 * earth_radius_in_km / 360.0
  
   // Number of miles per degree, at the equator.
   val miles_per_degree = km_per_degree / km_per_mile
@@ -143,9 +143,9 @@ package object distances {
       var newlat = lat
       var newlong = long
       if (newlat > maximum_latitude) newlat = maximum_latitude
-      while (newlong > maximum_longitude) newlong -= 360.
+      while (newlong > maximum_longitude) newlong -= 360.0
       if (newlat < minimum_latitude) newlat = minimum_latitude
-      while (newlong < minimum_longitude) newlong += 360.
+      while (newlong < minimum_longitude) newlong += 360.0
       (newlat, newlong)
     }
 
@@ -162,11 +162,11 @@ package object distances {
   // coordinates.
   
   def spheredist(p1: SphereCoord, p2: SphereCoord): Double = {
-    if (p1 == null || p2 == null) return 1000000.
-    val thisRadLat = (p1.lat / 180.) * Pi
-    val thisRadLong = (p1.long / 180.) * Pi
-    val otherRadLat = (p2.lat / 180.) * Pi
-    val otherRadLong = (p2.long / 180.) * Pi
+    if (p1 == null || p2 == null) return 1000000.0
+    val thisRadLat = (p1.lat / 180.0) * Pi
+    val thisRadLong = (p1.long / 180.0) * Pi
+    val otherRadLat = (p2.lat / 180.0) * Pi
+    val otherRadLong = (p2.long / 180.0) * Pi
           
     val anglecos = (sin(thisRadLat)*sin(otherRadLat)
                 + cos(thisRadLat)*cos(otherRadLat)*
@@ -179,9 +179,9 @@ package object distances {
       if (abs(anglecos) > 1.000001) {
         warning("Something wrong in computation of spherical distance, out-of-range cosine value %f",
           anglecos)
-        return 1000000.
+        return 1000000.0
       } else
-        return 0.
+        return 0.0
     }
     return earth_radius_in_km * acos(anglecos)
   }
@@ -206,10 +206,10 @@ package object distances {
   def square_area(botleft: SphereCoord, topright: SphereCoord) = {
     var (lat1, lon1) = (botleft.lat, botleft.long)
     var (lat2, lon2) = (topright.lat, topright.long)
-    lat1 = (lat1 / 180.) * Pi
-    lat2 = (lat2 / 180.) * Pi
-    lon1 = (lon1 / 180.) * Pi
-    lon2 = (lon2 / 180.) * Pi
+    lat1 = (lat1 / 180.0) * Pi
+    lat2 = (lat2 / 180.0) * Pi
+    lon1 = (lon1 / 180.0) * Pi
+    lon2 = (lon2 / 180.0) * Pi
 
     (earth_radius_in_km * earth_radius_in_km) *
       abs(sin(lat1) - sin(lat2)) *
@@ -221,10 +221,10 @@ package object distances {
    * they wrap around.
    */
   def average_longitudes(long1: Double, long2: Double): Double = {
-    if (long1 - long2 > 180.)
-      average_longitudes(long1 - 360., long2)
-    else if (long2 - long1 > 180.)
-      average_longitudes(long1, long2 - 360.)
+    if (long1 - long2 > 180.0)
+      average_longitudes(long1 - 360.0, long2)
+    else if (long2 - long1 > 180.0)
+      average_longitudes(long1, long2 - 360.0)
     else
       (long1 + long2) / 2.0
   }

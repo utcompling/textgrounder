@@ -70,7 +70,7 @@ import util.textdb._
 import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
-import util.print.errprint
+import util.print.{errprint, internal_error}
 import util.time._
 
 import gridlocate._
@@ -158,6 +158,7 @@ class PoligrounderDriver extends
       parse_date_interval(param) match {
         case (Some((start, end)), "") => (start, end)
         case (None, errmess) => param_error(errmess)
+        case _ => internal_error("Should never get here")
       }
     }
     from_chunk = parse_interval(params.from)
