@@ -33,7 +33,7 @@ import text._
 import io._
 import os._
 
-package object print {
+protected class PrintCollection {
 
   ////////////////////////////////////////////////////////////////////////////
   //                            Text output functions                       //
@@ -143,7 +143,7 @@ package object print {
     errprint("Warning: " + format, args: _*)
   }
   
-  private[print] object WarningsSeen {
+  private object WarningsSeen {
     val warnings_seen = mutable.Set[String]()
   }
 
@@ -336,3 +336,6 @@ package object print {
       maxrows)
   }
 }
+
+package object print extends PrintCollection { }
+

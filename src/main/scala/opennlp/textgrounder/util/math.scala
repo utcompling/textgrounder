@@ -77,7 +77,9 @@ package object math {
   }
 
   def stddev(x: Seq[Double]) = sqrt(variance(x))
+}
 
+package math {
   abstract class MeanShift[Coord : Manifest](
       h: Double = 1.0,
       max_stddev: Double = 1e-10,

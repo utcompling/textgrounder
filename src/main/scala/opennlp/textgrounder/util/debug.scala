@@ -38,5 +38,4 @@ class DebugSettings {
   }
 }
 
-package object debug extends DebugSettings {
-}
+package object debug extends DebugSettings { }

@@ -172,7 +172,9 @@ package object text {
   def capfirst(st: String) = {
     if (st == "") st else st(0).toString.capitalize + st.drop(1)
   }
-  
+}
+
+package text {
   /*
     A simple object to make regexps a bit less awkward.  Works like this:
 

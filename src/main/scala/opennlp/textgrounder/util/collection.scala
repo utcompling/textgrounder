@@ -61,7 +61,7 @@ import scala.reflect.ClassTag
  *    -- 'merge_numbered_sequences_uniquely'
  */
 
-package object collection {
+protected class CollectionPackage {
 
   ////////////////////////////////////////////////////////////////////////////
   //                               Default maps                             //
@@ -844,3 +844,5 @@ package object collection {
     def sortNumericRev = seq sortWith { (x,y) => ordering.gt(x._2, y._2) }
   }
 }
+
+package object collection extends CollectionPackage { }
