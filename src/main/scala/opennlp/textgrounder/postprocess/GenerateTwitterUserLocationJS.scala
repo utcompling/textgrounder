@@ -78,6 +78,7 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
     outf.close()
   }
 
+  def single_quote_escape_string(str: String) = str.replace("'", "\\'")
   def run_program(args: Array[String]) = {
     val input_file =
       if (params.input contains "/") params.input
@@ -86,6 +87,8 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
     val (schema, field_iter) =
       TextDB.read_textdb_with_schema(io.localfh, dir, prefix = base)
 
+    // FIXME!! Currently we're hard-coding a view on the SF bay. Need to
+    // compute centroid and bounding box of points given.
     val prelude =
 """<!DOCTYPE html>
 <html>
@@ -236,7 +239,8 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
               positions map {
                 case (time, coord) => "[ %s, %s ]" format (coord, time)
               } mkString ("," + indent14)
-            ("[ '%s', [" + indent14 + "%s ] ]") format (user, position_text)
+            ("[ '%s', [" + indent14 + "%s ] ]") format (
+              single_quote_escape_string(user), position_text)
           }
         val path_text = lines mkString ("," + indent12)
 
@@ -247,7 +251,8 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
                coord = schema.get_field(fieldvals, "coord")
                if coord != ""
                user = schema.get_field(fieldvals, "user")
-          } yield "[ %s, '%s' ]" format (coord, user)
+          } yield "[ %s, '%s' ]" format (
+              coord, single_quote_escape_string(user))
 
         val marker_text = markers mkString ("," + indent12)
 
