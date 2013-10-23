@@ -3,7 +3,7 @@ package opennlp.textgrounder
 import gridlocate._
 import util.distances._
 
-package object geolocate {
+package geolocate {
   /**
    * A general trait holding SphereDoc-specific code for storing the
    * result of evaluation on a document.  Here we simply compute the
@@ -24,7 +24,9 @@ package object geolocate {
      */
     val pred_degdist = degree_dist(stats.document.coord, stats.pred_coord)
   }
+}
 
+package object geolocate {
   implicit def to_SphereDocEvalResult(
     stats: DocEvalResult[SphereCoord]
   ) = new SphereDocEvalResult(stats)
