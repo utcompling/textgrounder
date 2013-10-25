@@ -173,6 +173,14 @@ one of the following:
    'm' = minutes, 's' = seconds.  Negative offsets are allowed, to indicate
    an interval backwards from a reference point.
 
+-- An expression specifying a bounding-box restriction on the location of
+   the tweet (i.e. the tweet's location must be within a given bounding
+   box), e.g. for North America:
+   
+   -- 'LOCATION WITHIN (-25.0,-126.0,49.0,-60.0)'
+
+   The format is (MINLAT, MINLONG, MAXLAT, MAXLONG).
+   
 Examples:
 
 --filter-tweets "mitt romney OR obama"
@@ -501,6 +509,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         }
       }
     }
+
+    /**
+     * Return true if tweet has a fully-specified latitude and longitude.
+     */
+    def has_latlong = !isNaN(lat) && !isNaN(long)
   }
 
   object Tweet extends ParseTweetsAction {
@@ -720,6 +733,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
     }
 
+    case class LocationWithin(bbox: (Double, Double, Double, Double)
+        ) extends Expr {
+      def matches(tw: Tweet, text: Iterable[String]) = {
+        val (minlat, minlong, maxlat, maxlong) = bbox
+        (tw.has_latlong &&
+         tw.lat >= minlat && tw.lat <= maxlat &&
+         tw.long >= minlong && tw.long <= maxlong)
+      }
+    }
+
     // NOT CURRENTLY USED, but potentially useful as an indicator of how to
     // implement a parser for numbers.
 //    class ExprLexical extends StdLexical {
@@ -786,8 +809,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     override val lexical = new FilterLexical
-    lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "WITHIN")
-    lexical.delimiters ++= List("(", ")", "<", "<=", ">", ">=")
+    lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "LOCATION", "WITHIN")
+    lexical.delimiters ++= List("(", ")", "<", "<=", ">", ">=", ",")
 
     def word = stringLit ^^ {
       s => EConst(Seq(if (foldcase) s.toLowerCase else s))
@@ -798,6 +821,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def compare_op = ( "<=" | "<" | ">=" | ">" )
+
+    def parse_float(x: String) = {
+      try {
+        Some(x.toDouble)
+      } catch {
+        case _: NumberFormatException => None
+      }
+    }
 
     def time = stringLit ^^ { s => (s, parse_date(s)) } ^? (
       { case (_, Some(x)) => x },
@@ -814,6 +845,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     
     def interval = (short_interval | full_interval)
 
+    def latlong = stringLit ^^ { s => (s, parse_float(s)) } ^? (
+      { case (_, Some(x)) => x },
+      { case (s, None) => "Unable to parse coordinate %s" format s
+        case _ => internal_error("Should not get here") } )
+
+    def bounding_box = ("(" ~> latlong ~ ("," ~> latlong) ~ ("," ~> latlong) ~
+        ("," ~> latlong) <~ ")") ^^ {
+      case minlat ~ minlong ~ maxlat ~ maxlong => (
+        minlat, minlong, maxlat, maxlong) }
+
     def time_compare = "TIME" ~> compare_op ~ time ^^ {
       case op ~ time => TimeCompare(op, time)
       // case op~time if parse_time(time) => TimeCompare(op, time)
@@ -821,6 +862,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def time_within = "TIME" ~> "WITHIN" ~> interval ^^ {
       interval => TimeWithin(interval)
+    }
+
+    def location_within = "LOCATION" ~> "WITHIN" ~> bounding_box ^^ {
+      bbox => LocationWithin(bbox)
     }
 
     def parens: Parser[Expr] = "(" ~> expr <~ ")"
@@ -1459,7 +1504,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * and longitude.
      */
     private def has_latlong(tw: Tweet) = {
-      val good = !isNaN(tw.lat) && !isNaN(tw.long)
+      val good = tw.has_latlong
       if (!good)
         bump_counter("grouped tweets filtered due to missing lat/long")
       good
