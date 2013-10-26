@@ -173,11 +173,13 @@ one of the following:
    'm' = minutes, 's' = seconds.  Negative offsets are allowed, to indicate
    an interval backwards from a reference point.
 
--- An expression specifying a bounding-box restriction on the location of
-   the tweet (i.e. the tweet's location must be within a given bounding
-   box), e.g. for North America:
+-- An expression specifying a restriction on the location of the tweet.
+   This can either be 'LOCATION EXISTS', indicating that the tweet must
+   have a location, or a more specific restriction requiring both that
+   the location exist and be within a given bounding box, e.g. for
+   North America:
    
-   -- 'LOCATION WITHIN (-25.0,-126.0,49.0,-60.0)'
+   -- 'LOCATION WITHIN (25.0,-126.0,49.0,-60.0)'
 
    The format is (MINLAT, MINLONG, MAXLAT, MAXLONG).
    
@@ -305,11 +307,6 @@ Look for any tweets containing the word "clinton" as well as either the words
 
   // FIXME!! The following should really be controllable using the
   // normal filter mechanism, rather than the special-case hacks below.
-  var geographic_only = ap.flag("geographic-only", "go",
-    help="""Filter out tweets that don't have a geotag.""")
-  var north_america_only = ap.flag("north-america-only", "nao",
-    help="""Filter out tweets that don't have a geotag or that have a
-    geotag outside of North America.""")
   var filter_spammers = ap.flag("filter-spammers", "fs",
     help="""Filter out tweets that don't have number of tweets within
     [10, 1000], or number of followers >= 10, or number of people
@@ -743,8 +740,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
     }
 
+    case class LocationExists() extends Expr {
+      def matches(tw: Tweet, text: Iterable[String]) = {
+        tw.has_latlong
+      }
+    }
+
     // NOT CURRENTLY USED, but potentially useful as an indicator of how to
-    // implement a parser for numbers.
+    // implement a parser for numbers. Instead we currently handle floating-
+    // point numbers using parse_float(). 
 //    class ExprLexical extends StdLexical {
 //      override def token: Parser[Token] = floatingToken | super.token
 //
@@ -792,7 +796,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       def isPrintable(ch: Char) =
          !ch.isControl && !ch.isSpaceChar && !ch.isWhitespace && ch != EofCh
       def isPrintableNonDelim(ch: Char) =
-         isPrintable(ch) && ch != '(' && ch != ')'
+         isPrintable(ch) && ch != '(' && ch != ')' && ch != ','
       def unquotedWordChar = elem("unquoted word char",
          ch => ch != '"' && isPrintableNonDelim(ch))
       def quotedWordChar = elem("quoted word char",
@@ -809,7 +813,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     override val lexical = new FilterLexical
-    lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "LOCATION", "WITHIN")
+    lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "LOCATION",
+      "WITHIN", "EXISTS")
+    // FIXME! This is partly duplicated above in isPrintableNonDelim, and
+    // the function above is required to handle parens and commas not
+    // delimited by whitespace. Do we need this defn here at all?
     lexical.delimiters ++= List("(", ")", "<", "<=", ">", ">=", ",")
 
     def word = stringLit ^^ {
@@ -868,11 +876,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       bbox => LocationWithin(bbox)
     }
 
+    def location_exists = "LOCATION" ~> "EXISTS" ^^ {
+      _ => LocationExists()
+    }
+
     def parens: Parser[Expr] = "(" ~> expr <~ ")"
 
     def not: Parser[ENot] = "NOT" ~> term ^^ { ENot(_) }
 
-    def term = ( words | parens | not | time_compare | time_within )
+    def term = ( words | parens | not | time_compare | time_within |
+      location_within | location_exists)
 
     def andexpr = term * (
       "AND" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) } )
@@ -1544,35 +1557,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       good
     }
 
-    // bounding box for north america
-    val MIN_LAT = 25.0
-    val MIN_LNG = -126.0
-    val MAX_LAT = 49.0
-    val MAX_LNG = -60.0
-
-    /**
-     * Return true if this tweet (combination) is located within the
-     * bounding box of North America.
-     */
-    private def matches_north_america(tw: Tweet): Boolean = {
-      val good = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
-                 (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
-      if (!good)
-        bump_counter("grouped tweets filtered due to outside North America")
-      good
-    }
-
     /**
      * Return true if this tweet (combination) matches all of the
-     * misc. filters (--geographic-only, --north-america-only,
-     * --filter-spammers).
+     * misc. filters (--filter-spammers).
      *
      * FIXME: Eliminate misc. filters, make them possible using
      * normal filter mechanism.
      */
     private def matches_misc_filters(tw: Tweet): Boolean = {
-      (!opts.geographic_only || has_latlong(tw)) &&
-      (!opts.north_america_only || matches_north_america(tw)) &&
       (!opts.filter_spammers || is_nonspammer(tw))
     }
 
