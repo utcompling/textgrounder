@@ -2,11 +2,14 @@ import AssemblyKeys._ // for sbt-assembly
 
 name := "TextGrounder"
 
+// If you change this, you also have to change bin/textgrounder
+// (TEXTGROUNDER_VERSION)
 version := "0.1.0"
 
 organization := "OpenNLP"
 
-scalaVersion := "2.10.2"
+// If you change this, you also have to change bin/textgrounder (SCALA_LIB)
+scalaVersion := "2.10.3"
 
 crossPaths := false
 
@@ -69,16 +72,14 @@ libraryDependencies ++= Seq(
   // Scoobi
   // The following is the library we actually use, but because it's not
   // available on a web repository anywhere, we put a local copy in lib/.
-  // "com.nicta" % "scoobi_2.9.2" % "0.6.0-cdh3-SNAPSHOT-benwing",
-  //
-  // The following are other possibilities.
-  // "com.nicta" % "scoobi_2.9.2" % "0.4.0",
-  // "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3",
-  // "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT",
-  // This should hopefully indicate that we want the dependencies of
-  // Scoobi 0.5 but we "provide" the library itself (i.e. in reality we
-  // replace the library with an updated version, stored in the lib/ dir)
-  "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3",
+  // "com.nicta" % "scoobi_2.10" % "0.6.0-cdh3-SNAPSHOT-benwing",
+  // 
+  // We used to specify the unmodified library so as to get its dependencies,
+  // but there's no build of 0.6.0-cdh3 for Scoobi 2.10 anywhere on the
+  // web. (No support any more for cdh3 in Scoobi at all.) The idea was that
+  // the local library in lib/ overrode the unmodified library itself.
+  // Now we need to specify all the dependencies (see below).
+  // "com.nicta" % "scoobi_2.9.2" % "0.6.0-cdh3",
   // "provided" if we use Scoobi's package-hadoop instead of sbt-assembly.
   // This is another way of building an assembly for Hadoop that includes all
   // the dependent libraries into the JAR file.  To do that, we have to move
@@ -89,16 +90,19 @@ libraryDependencies ++= Seq(
   // 'textgrounder build package-hadoop' instead of
   // 'textgrounder build assembly'.
   // "com.nicta" % "scoobi_2.9.2" % "0.4.0" % "provided",
-  // A newer version that fixes a bug handling empty intermediate checkpoints
-  // in Scoobi (among other things), but leads to compile errors that I don't
-  // know how to fix.
-  //  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT" % "provided",
+  // Scoobi's dependencies.
+  "javassist" % "javassist" % "3.12.1.GA",
+  "org.apache.avro" % "avro-mapred" % "1.7.2",
+  "org.apache.avro" % "avro" % "1.7.2",
+  "org.apache.hadoop" % "hadoop-core" % "0.20.2-cdh3u1",
+  "com.thoughtworks.xstream" % "xstream" % "1.4.3" intransitive(),
+  "org.scalaz" %% "scalaz-core" % "7.1.0-M3",
+  // "org.scalaz" %% "scalaz-core" % "7.0.3",
+  "org.specs2" %% "specs2" % "1.12.3" % "optional",
+  "com.chuusai" %% "shapeless" % "1.2.4",
   //
   // Additional dependency related to Scoobi; not in Scoobi's build.sbt.
   "log4j" % "log4j" % "1.2.17"
-  // The following needed for Scoobi 0.1, but evidently not any more.
-  // "javassist" % "javassist" % "3.12.1.GA",
-  //
   // Find repository for trove-scala; currently stored unmanaged
   // "com.codahale" % "trove-scala_2.9.1" % "0.0.2-SNAPSHOT"
   )
