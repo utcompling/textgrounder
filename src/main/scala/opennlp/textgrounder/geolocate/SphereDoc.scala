@@ -21,7 +21,7 @@ package geolocate
 
 import collection.mutable
 
-import util.distances._
+import util.spherical._
 import util.textdb.Schema
 import util.print.warning_once
 import util.Serializer._

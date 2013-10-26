@@ -22,7 +22,7 @@ import collection.mutable
 
 import util.argparser._
 import util.collection._
-import util.distances._
+import util.spherical._
 import util.experiment._
 import util.io
 import util.math._

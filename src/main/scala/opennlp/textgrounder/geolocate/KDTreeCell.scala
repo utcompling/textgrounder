@@ -26,7 +26,7 @@ import scala.collection.mutable.Map
 
 import ags.utils.KdTree
 
-import util.distances.SphereCoord
+import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
 

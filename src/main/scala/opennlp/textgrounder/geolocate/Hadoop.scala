@@ -28,7 +28,7 @@ import org.apache.hadoop.fs.Path
 
 import util.argparser._
 import util.collection.TransposeIterator
-import util.distances._
+import util.spherical._
 import util.hadoop._
 import util.io.FileHandler
 import util.math.{mean, median}

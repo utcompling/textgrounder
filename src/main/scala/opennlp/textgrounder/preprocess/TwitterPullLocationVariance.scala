@@ -27,7 +27,7 @@ import java.text.{SimpleDateFormat, ParseException}
 import math.pow
 
 import util.Twokenize
-import util.distances.{spheredist, SphereCoord}
+import util.spherical.{spheredist, SphereCoord}
 
 /*
  * This program takes, as input, files which contain one tweet

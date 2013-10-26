@@ -24,7 +24,7 @@ import java.io.{FileSystem=>_,_}
 import org.apache.hadoop.io._
 
 import util.argparser._
-import util.distances.SphereCoord
+import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
 import util.textdb._

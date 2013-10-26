@@ -19,8 +19,8 @@
 package opennlp.textgrounder
 package geolocate
 
-import util.distances.spheredist
-import util.distances.SphereCoord
+import util.spherical.spheredist
+import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
 
