@@ -26,7 +26,7 @@ import collection.mutable
 import scala.util.control.Breaks._
 
 import util.collection.{DoubleTableByRange}
-import util.distances._
+import util.spherical._
 import util.experiment.ExperimentDriverStats
 import util.math.{mean, median}
 import util.io.{FileHandler}

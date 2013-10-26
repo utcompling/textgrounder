@@ -23,7 +23,7 @@ import math._
 import collection.mutable
 
 import util.collection._
-import util.distances._
+import util.spherical._
 import util.print.{errout, errprint}
 import util.experiment._
 

@@ -67,7 +67,6 @@ import collection.mutable
 import util.argparser._
 import util.collection._
 import util.textdb._
-import util.distances._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.print.{errprint, internal_error}

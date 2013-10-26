@@ -26,7 +26,7 @@ import collection.mutable
 
 import util.collection._
 import util.text.format_float
-import util.distances._
+import util.time._
 import util.print.{errout, errprint}
 import util.experiment._
 

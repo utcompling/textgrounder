@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package gridlocate
 
 import util.argparser._
-import util.distances._
+import util.spherical._
 import util.experiment._
 import util.io.FileHandler
 import util.metering._

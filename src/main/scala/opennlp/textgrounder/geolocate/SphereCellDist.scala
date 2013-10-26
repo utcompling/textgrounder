@@ -21,7 +21,7 @@ package geolocate
 
 import math._
 
-import util.distances._
+import util.spherical._
 
 import gridlocate.{GeoGrid,WordCellDist,CellDistFactory}
 import worddist.WordDist._
