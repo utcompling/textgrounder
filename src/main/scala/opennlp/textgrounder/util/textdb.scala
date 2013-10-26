@@ -84,7 +84,7 @@ import io._
  * However, there are a number of convenience functions for handling
  * common situations (e.g. all files in a single directory).
  */
-protected class TextDBCollection {
+package object textdb {
   /**
    * An object describing a textdb schema, i.e. a description of each of the
    * fields in a textdb, along with "fixed fields" containing the same
@@ -946,7 +946,4 @@ protected class TextDBCollection {
     def double(x: String) = x.toDouble
   }
 
-}
-
-package object textdb extends TextDBCollection {
 }

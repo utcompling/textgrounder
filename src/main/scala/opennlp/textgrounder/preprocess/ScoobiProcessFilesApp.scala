@@ -187,7 +187,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
 
   // This is necessary to turn off the LibJars mechanism, which is somewhat
   // buggy and interferes with assemblies.
-  override def upload = false
+  override lazy val upload = false
   def create_params(ap: ArgParser): ParamType
   val operation_category = "MainApp"
   def output_command_line_parameters(arg_parser: ArgParser) {
