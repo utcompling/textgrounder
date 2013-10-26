@@ -20,7 +20,7 @@
 package opennlp.textgrounder
 package geolocate
 
-import util.distances._
+import util.spherical._
 
 import gridlocate.{GeoCell,GeoGrid}
 

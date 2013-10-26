@@ -22,7 +22,7 @@ package geolocate
 import collection.mutable
 
 import util.collection._
-import util.distances._
+import util.spherical._
 import util.textdb.Schema
 import util.print.{errprint, warning}
 import util.Serializer._

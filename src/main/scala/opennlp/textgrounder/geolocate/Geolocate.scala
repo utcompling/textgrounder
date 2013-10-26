@@ -28,7 +28,7 @@ import collection.mutable
 
 import util.argparser._
 import util.collection._
-import util.distances._
+import util.spherical._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.os._
@@ -513,7 +513,7 @@ The error is as follows:
 
 scala.tools.nsc.symtab.Types$TypeError: type mismatch;
 found   : (String, Iterator[evalobj.TEvalRes])
-  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] with opennlp.textgrounder.gridlocate.CoordDocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] <: opennlp.textgrounder.gridlocate.DocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]}#TEvalRes])
+  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] with opennlp.textgrounder.gridlocate.CoordDocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] <: opennlp.textgrounder.gridlocate.DocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]}#TEvalRes])
   at scala.tools.nsc.typechecker.Contexts$Context.error(Contexts.scala:298)
   at scala.tools.nsc.typechecker.Infer$Inferencer.error(Infer.scala:207)
   at scala.tools.nsc.typechecker.Infer$Inferencer.typeError(Infer.scala:217)
@@ -705,7 +705,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
   at java.lang.Thread.run(Thread.java:680)
 [error] (compile:compile) scala.tools.nsc.symtab.Types$TypeError: type mismatch;
 [error]  found   : (String, Iterator[evalobj.TEvalRes])
-[error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] with opennlp.textgrounder.gridlocate.CoordDocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] <: opennlp.textgrounder.gridlocate.DocEvalResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]}#TEvalRes])
+[error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] with opennlp.textgrounder.gridlocate.CoordDocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc] <: opennlp.textgrounder.gridlocate.DocEvalResult[opennlp.textgrounder.util.spherical.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDoc]}#TEvalRes])
 */
 ): GridEvaluator[SphereCoord] = {
     val output_result_with_units =

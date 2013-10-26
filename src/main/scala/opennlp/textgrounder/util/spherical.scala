@@ -24,6 +24,8 @@ import scala.math._
 import print.warning
 import math.MeanShift
 
+import net.liftweb
+
 /*
   The coordinates of a point are spherical coordinates, indicating a
   latitude and longitude.  Latitude ranges from -90 degrees (south) to
@@ -58,7 +60,7 @@ import math.MeanShift
      between two SphereCoords; likewise degree_dist() to compute degree
      distance between two SphereCoords
  */
-protected class DistancesPackage {
+protected class SphericalImpl {
  
   /***** Fixed values *****/
 
@@ -106,6 +108,22 @@ protected class DistancesPackage {
     def format_lat_long(lat: Double, long: Double) =
       "(%.2f,%.2f)".format(lat, long)
 
+    /** Look up a lat/long coord and return the nearest "place" to the
+      * coord, using MapQuest. E.g. -37.8,122.0 maps to
+      * Some("Montego Drive, Danville, Contra Costa, California, 94526, United States of America")
+      *
+      * Return value is None when no place could be found.
+      */
+    def lookup_lat_long_mapquest(lat: Double, long: Double) = {
+      val mapquest_url =
+        "http://open.mapquestapi.com/nominatim/v1/search?q=%s,%s&format=json" format (lat, long)
+      val response = scala.io.Source.fromURL(mapquest_url).mkString
+      val parsed = liftweb.json.parse(response)
+      val places = parsed.values.asInstanceOf[List[Map[String, Any]]]
+      if (places.length == 0) None
+      else Some(places(0)("display_name").asInstanceOf[String])
+    }
+      
     // Create a coord, with METHOD defining how to handle coordinates
     // out of bounds.  If METHOD =  "validate", check within bounds,
     // and abort if not.  If "coerce", coerce within bounds (latitudes
@@ -262,72 +280,7 @@ protected class DistancesPackage {
       SphereCoord(lat, long)
     }
   }
-
-  // A 1-dimensional time coordinate (Epoch time, i.e. elapsed time since the
-  // Jan 1, 1970 Unix Epoch, in milliseconds).  The use of a 64-bit long to
-  // represent Epoch time in milliseconds is common in Java and also used in
-  // Twitter (gives you over 300,000 years).  An alternative is to use a
-  // double to represent seconds, which gets you approximately the same
-  // accuracy -- 52 bits of mantissa to represent any integer <= 2^52
-  // exactly, similar to the approximately 53 bits worth of seconds you
-  // get when using milliseconds.
-  //
-  // Note that having this here is an important check on the correctness
-  // of the code elsewhere -- if by mistake you leave off the type
-  // parameters when calling a function, and the function asks for a type
-  // with a serializer and there's only one such type available, Scala
-  // automatically uses that one type.  Hence code may work fine until you
-  // add a second serializable type, and then lots of compile errors.
-
-  case class TimeCoord(millis: Long) {
-    override def toString = "%s (%s)" format (millis, format_time(millis))
-  }
-
-  implicit object TimeCoord extends Serializer[TimeCoord] {
-    def deserialize(foo: String) = TimeCoord(foo.toLong)
-    def serialize(foo: TimeCoord) = "%s".format(foo.millis)
-  }
-
-  /**
-   * Convert a time in milliseconds since the Epoch into a more familiar
-   * format, e.g. Wed Jun 27 03:49:08 EDT 2012 in place of 1340783348365.
-   */
-  def format_time(millis: Long) = new java.util.Date(millis).toString
-
-  /**
-   * Convert an interval in milliseconds into a more familiar format, e.g.
-   * 3m5s in place of 185000.
-   */
-  def format_interval(millis: Long) = {
-    val sec_part_as_milli = millis % 60000
-    val sec_part = sec_part_as_milli / 1000.0
-    val truncated_mins = millis / 60000
-    val min_part = truncated_mins % 60
-    val truncated_hours = truncated_mins / 60
-    val hour_part = truncated_hours % 24
-    val truncated_days = truncated_hours / 24
-    var res = ""
-    if (res.length > 0 || truncated_days > 0)
-      res += " " + truncated_days + "days"
-    if (res.length > 0 || hour_part > 0)
-      res += " " + hour_part + "hr"
-    if (res.length > 0 || min_part > 0)
-      res += " " + min_part + "min"
-    if (res.length > 0 || sec_part > 0) {
-      val int_sec_part = sec_part.toInt
-      val secstr =
-        if (int_sec_part == sec_part)
-          int_sec_part
-        else
-          "%.2f" format sec_part
-      res += " " + secstr + "sec"
-    }
-    if (res.length > 0 && res(0) == ' ')
-      res.tail
-    else
-      res
-  }
 }
 
-package object distances extends DistancesPackage { }
+package object spherical extends SphericalImpl { }
 

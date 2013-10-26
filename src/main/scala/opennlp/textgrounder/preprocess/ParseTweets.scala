@@ -53,6 +53,7 @@ import util.textdb._
 import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
 import util.print._
+import util.spherical.SphereCoord
 import util.text.with_commas
 import util.time._
 
@@ -218,7 +219,9 @@ Look for any tweets containing the word "clinton" as well as either the words
     2. A field set, meaning to include those fields; currently the recognized
        sets are 'big-fields' (fields that may become arbitrarily large,
        including 'positions', 'user-mentions', 'retweets', 'hashtags', 'urls',
-       'text', 'count') and 'small-fields' (all remaining fields).
+       'text', 'counts'), 'small-fields' (all remaining fields except for
+       'unigram-counts', 'ngram-counts' and 'mapquest-place') and
+       'inherent-fields' (both 'big-fields' and 'small-fields').
 
     3. A field name or field set with a preceding + sign, same as if the
        + sign were omitted.
@@ -282,12 +285,21 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'counts': 'ngram-counts' if --max-ngram > 1, else 'unigram-counts' 
 
-    The default is as follows:
+    'mapquest-place': The nearest "place" for the lat/long position,
+      found using MapQuest. Empty if no position exists or or if no
+      place can be found.
+
+    The default value is the directive 'default', which is defined as follows:
     
     1. For --input-format=raw-lines, include only 'path', 'numtweets',
-       'text' and 'counts'. (Only these fields are meaningful.)
+       'text' and 'counts'. (Most other fields are not meaningful.)
     2. Else, for --grouping=file, all small fields.
-    3. Else everything.
+    3. Else all small and big fieldsg.
+
+    Note that specifying a value for this parameter will override the
+    'default' directive, so that only the specified field names will be
+    output, unless the 'default' directive is included at the beginning
+    of the parameter's value.
 """)
   var filter_groups = ap.option[String]("filter-groups",
     help="""Boolean expression used to filter on the grouped-tweet level.
@@ -468,6 +480,21 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        -- TweetFilterParser.main() below
     */
   ) {
+    def lookup_mapquest_place: String = {
+      errout("Looking up %s,%s in MapQuest... ", lat, long)
+      val place = if (!has_latlong) "" else {
+        try {
+          SphereCoord.lookup_lat_long_mapquest(lat, long) getOrElse ""
+        } catch {
+          case e:Exception =>
+            errprint("%s" format e)
+            return ""
+        }
+      }
+      errprint(place)
+      place
+    }
+
     def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) = {
       import Encoder.{long => elong, _}
       opts.included_fields map { field =>
@@ -503,6 +530,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "text" => string_seq(text)
           case "unigram-counts" => tokenize_act.emit_unigrams(text)
           case "ngram-counts" => tokenize_act.emit_ngrams(text)
+          case "mapquest-place" => lookup_mapquest_place
         }
       }
     }
@@ -527,7 +555,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     val all_fields = small_fields ++ big_fields
 
-    val possible_fields = all_fields ++ Seq("unigram-counts", "ngram-counts")
+    val possible_fields =
+      all_fields ++ Seq("unigram-counts", "ngram-counts", "mapquest-place")
 
     def default_fields(opts: ParseTweetsParams) = {
       if (opts.input_format == "raw-lines")

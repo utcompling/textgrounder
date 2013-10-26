@@ -1,7 +1,7 @@
 package opennlp.textgrounder
 
 import gridlocate._
-import util.distances._
+import util.spherical._
 
 package geolocate {
   /**

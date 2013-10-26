@@ -21,9 +21,10 @@ package poligrounder
 
 import collection.mutable
 
-import util.distances._
+import util.spherical._
 import util.textdb.Schema
 import util.print._
+import util.time._
 import util.Serializer._
 
 import gridlocate._
