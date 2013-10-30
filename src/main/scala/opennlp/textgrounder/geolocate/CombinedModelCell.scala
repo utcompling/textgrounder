@@ -46,6 +46,11 @@ class CombinedModelGrid(
 
   def add_training_documents_to_grid(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+    // FIXME! This is broken because it ends up trying to compute the
+    // smoothing statistics multiple times (each time it iterates over the
+    // documents). We need to do this only once (probably after populating
+    // the grid). In reality we need to separate out the code that handles
+    // smoothing and other global mods. 
     for (model <- models)
       model.add_training_documents_to_grid(get_rawdocs)
   }

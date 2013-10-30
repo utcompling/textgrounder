@@ -409,6 +409,7 @@ abstract class GeoGrid[Co](
     // In reality, all the glop handled by finish_before_global() and
     // note_dist_globally() (as well as record_in_subfactory) and such
     // should be handled by separate mapping stages onto the documents.
+    // See `raw_documents_to_documents`.
     for (doc <- docfact.raw_documents_to_documents(get_rawdocs("reading"),
            record_in_subfactory = true,
            note_globally = true,
