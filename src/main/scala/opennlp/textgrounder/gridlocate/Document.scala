@@ -78,6 +78,26 @@ case class DocStatus[TDoc](
 }
 
 /******** Counters to track what's going on ********/
+
+/**
+ * An object used to track (i.e. maintain status on) the number of documents
+ * read or generated from a given source file in a document corpus,
+ * including successes, skipped records, and various types of failures.
+ * This uses the concept of a "counter", as found in Hadoop (but also
+ * implemented outside of Hadoop). A counter can be thought of as a remote
+ * variable (i.e. state that may be shared between different machines in a
+ * network) that can only hold a single non-negative integer and changes
+ * to the integer can only involve incrementing it; i.e. they're useful for
+ * counting occurrences of events but not too much else.
+ *
+ * @tparam T type of the document being processed (usually either
+ *   `RawDocument` or `GeoDoc`)
+ * @param shortfile A version of the source file name, used in logging
+ *   messages; may omit directories or other information shared among
+ *   multiple file names.
+ * @param driver Object used to transmit counters externally, e.g. to
+ *   log files, to the Hadoop job tracker machine, etc.
+ */
 class DocCounterTracker[T](
   shortfile: String,
   driver: ExperimentDriverStats
@@ -140,6 +160,17 @@ class DocCounterTracker[T](
   }
 }
 
+/**
+ * A factory object for generating `DocCounterTracker` objects, for
+ * tracking the number of successful/skipped/failed documents read from
+ * a corpus source file. There will be one such tracker per source file.
+ * See `DocCounterTracker` for more info, e.g. the concept of "counter".
+ *
+ * @tparam T type of the document being processed (usually either
+ *   `RawDocument` or `GeoDoc`)
+ * @param driver Object used to transmit counters externally, e.g. to
+ *   log files, to the Hadoop job tracker machine, etc.
+ */
 class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   def filename_to_counter_name(filehand: FileHandler, file: String) = {
     var (_, base) = filehand.split_filename(file)
@@ -172,6 +203,14 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   }
 }
 
+/**
+ * An object encapsulating a "raw document", i.e. directly encapsulating
+ * the fields of the document as read from a textdb database or similar.
+ * We separate out raw and processed documents (class `GeoDoc`) because
+ * in some circumstances we may need to process the raw documents multiple
+ * times in different ways, e.g. when creating splits for cross-validation
+ * (as done when training a reranker).
+ * */
 case class RawDocument(schema: Schema, fields: IndexedSeq[String])
 
 
@@ -439,12 +478,24 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   /**
-   * Convert a raw document (describing the fields of the document) to
-   * an actual document object.
+   * Convert a raw document (directly describing the fields of the document,
+   * as read from a textdb database or similar) to an actual document object.
+   * Both the raw and processed document objects are encapsulated in a
+   * `DocStatus` object indicating whether the processing that generated the
+   * object was successful or not, and if not, why not. Eventually, the
+   * processed document objects themselves are extracted (using
+   * `document_statuses_to_documents`); this throws away failures, but in the
+   * process logs them appropriately. By encapsulating the success or failure
+   * this way, we allow the logging to be delayed until the point where a
+   * given document is actually consumed, for proper sequencing.
    *
-   * @param schema Schema for textdb, indicating names of fields, etc.
+   * @param rawdoc Raw document as directly read from a corpus.
    * @param record_in_factory Whether to record the document in the document
-   *  factory.
+   *  factory. (FIXME, this should be handled separately. See
+   *  `raw_documents_to_documents`.)
+   * @param note_globally Whether to incorporate the document's word
+   *  counts into the global smoothing statistics. (FIXME, this should be
+   *  handled separately, as above.)
    * @return a DocStatus describing the document.
    */
   def raw_document_to_document_status(rawdoc: DocStatus[RawDocument],
@@ -502,12 +553,18 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 
   /**
-   * Convert a line from a textdb database into a document, returning a
-   * DocStatus describing the document.
+   * Convert a line (a single record) from a textdb database (document corpus)
+   * into a document, returning a DocStatus describing the document.
    *
+   * @param filehand The FileHandler for the file system holding the corpus.
+   *   Largely used for logging purposes.
+   * @param file The file name from which this line was read, for logging
+   *   purposes.
+   * @param line The line itself.
+   * @param lineno The line number of the line, for logging purposes.
    * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_factory Whether to record the document in the document
-   *  factory.
+   * @param record_in_factory See `raw_documents_to_documents`.
+   * @param note_globally See `raw_documents_to_documents`.
    */
   def line_to_document_status(filehand: FileHandler, file: String,
       line: String, lineno: Long, schema: Schema, record_in_factory: Boolean,
@@ -521,10 +578,6 @@ abstract class GeoDocFactory[Co : Serializer](
   /**
    * Convert raw documents into document statuses.
    *
-   * @param filehand The FileHandler for the directory of the corpus.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying a particular corpus if many exist in
-   *   the same dir (e.g. "-dev")
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
@@ -556,6 +609,18 @@ abstract class GeoDocFactory[Co : Serializer](
       }
   }
 
+  /**
+   * Process the document status objects encapsulating document objects
+   * (class `GeoDoc`) and extract the document objects themselves.
+   * The processing mostly involves logging successes, failures and
+   * such to counters (see `DocCounterTracker`). The connection to an
+   * external logging mechanism is handled by `driver`, a class parameter
+   * of `GeoDocFactory` (the class we are within).
+   *
+   * @param docstatus Iterator over processed documents encapsulated in
+   *   `DocStatus` objects. See `raw_documents_to_documents`.
+   * @return Iterator directly over processed documents.
+   */
   def document_statuses_to_documents(
     docstats: Iterator[DocStatus[GeoDoc[Co]]]
   ) = {
@@ -563,6 +628,64 @@ abstract class GeoDocFactory[Co : Serializer](
       process_statuses(docstats)
   }
 
+  /**
+   * Convert raw documents (directly describing the fields of the document,
+   * as read from a textdb database or similar) to actual document objects.
+   * Both the raw and processed document objects are encapsulated in a
+   * `DocStatus` object indicating whether the processing that generated the
+   * object was successful or not, and if not, why not. Eventually, the
+   * processed document objects themselves are extracted (using
+   * `document_statuses_to_documents`); this throws away failures, but in the
+   * process logs them appropriately. By encapsulating the success or failure
+   * this way, we allow the logging to be delayed until the point where a
+   * given document is actually consumed, for proper sequencing.
+   *
+   * FIXME: This and many other functions are polluted by extra arguments
+   * `record_in_subfactory`, `note_globally`, and `finish_globally`.
+   * Properly, the extra actions triggered by these arguments should be
+   * handled externally, i.e. by separate functions called as necessary by
+   * one of the outermost callers. Currently, doing that is a bit tricky
+   * because of `record_in_subfactory`, which (as things currently stand)
+   * needs to be passed into the function that creates processed GeoDoc
+   * objects (and in turn down into the appropriate factory function for
+   * creating these objects). This mechanism is *only* needed by Wikipedia
+   * objects, and only for handling redirects, which require a two-pass
+   * procedure whereby the redirects are recorded during iteration over
+   * raw documents and afterwards some information (e.g. coordinates) is
+   * propagated from the redirected-to documents to the corresponding
+   * redirecting documents. (E.g. document 'Tucson' in Wikipedia is
+   * actually a redirect to document 'Tucson, Arizona', and we might want
+   * things like geocoordinates that are associated with the latter to
+   * also be associated with the former. However, we might not encounter
+   * 'Tucson, Arizona' until we already have processed 'Tucson' so we
+   * can't do a single-pass algorithm.)
+   *
+   * (In actuality, the only information that actually needs to be
+   * propagated this way is internal-link counts, and this isn't even
+   * used much currently.)
+   *
+   * The proper way to handle these redirects is to do all the needed
+   * propagation in the preprocessing step that generates the Wikipedia
+   * textdb corpus, so that the redirects don't need to be included in
+   * the corpus at all and the whole `record_in_subfactory` mechanism
+   * becomes unnecessary.
+   *
+   * The other two arguments `note_globally` and `finish_globally`, which
+   * relate to smoothing, can easily be handled by the callers.
+   *
+   * @param rawdoc Raw document as directly read from a corpus.
+   * @param record_in_subfactory Whether to record documents in any
+   *   subfactories. (FIXME: See above.)
+   * @param note_globally Whether to add each document's words to the global
+   *   smoothing statistics (e.g. for back-off or interpolation).  Normally
+   *   false, but may be true during bootstrapping of those statistics.
+   *   (FIXME: See above.)
+   * @param finish_globally Whether to compute statistics of the documents'
+   *   distributions that depend on global (e.g. back-off) distribution
+   *   statistics.  Normally true, but may be false during bootstrapping of
+   *   those statistics. (FIXME: See above.)
+   * @return Iterator over documents.
+   */
   def raw_documents_to_documents(
     rawdocs: Iterator[DocStatus[RawDocument]],
     record_in_subfactory: Boolean = false,
