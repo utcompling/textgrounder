@@ -24,6 +24,8 @@ import scala.math._
 import print.warning
 import math.MeanShift
 
+import net.liftweb
+
 /*
   The coordinates of a point are spherical coordinates, indicating a
   latitude and longitude.  Latitude ranges from -90 degrees (south) to
@@ -106,6 +108,22 @@ protected class SphericalImpl {
     def format_lat_long(lat: Double, long: Double) =
       "(%.2f,%.2f)".format(lat, long)
 
+    /** Look up a lat/long coord and return the nearest "place" to the
+      * coord, using MapQuest. E.g. -37.8,122.0 maps to
+      * Some("Montego Drive, Danville, Contra Costa, California, 94526, United States of America")
+      *
+      * Return value is None when no place could be found.
+      */
+    def lookup_lat_long_mapquest(lat: Double, long: Double) = {
+      val mapquest_url =
+        "http://open.mapquestapi.com/nominatim/v1/search?q=%s,%s&format=json" format (lat, long)
+      val response = scala.io.Source.fromURL(mapquest_url).mkString
+      val parsed = liftweb.json.parse(response)
+      val places = parsed.values.asInstanceOf[List[Map[String, Any]]]
+      if (places.length == 0) None
+      else Some(places(0)("display_name").asInstanceOf[String])
+    }
+      
     // Create a coord, with METHOD defining how to handle coordinates
     // out of bounds.  If METHOD =  "validate", check within bounds,
     // and abort if not.  If "coerce", coerce within bounds (latitudes
