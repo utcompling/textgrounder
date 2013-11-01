@@ -35,6 +35,7 @@ libraryDependencies ++= Seq(
   // "org.jdom" % "jdom" % "2.0.5",
   "org.apache.commons" % "commons-lang3" % "3.1",
   "org.apache.commons" % "commons-compress" % "1.5",
+  "net.liftweb" %% "lift-json" % "2.6-M1",
   // The following don't appear to be used currently.
   // "com.google.inject" % "guice" % "3.0",
   // "commons-cli" % "commons-cli" % "1.2",
@@ -61,10 +62,6 @@ libraryDependencies ++= Seq(
   // originally used version 1.5.2, but version 1.9.13 doesn't seem to cause
   // problems.) But not needed at all if we don't use that Hadoop POM.
   // "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.13",
-  //
-  // Currently log4j is provided automatically by something (probably Scoobi).
-  // If this fails to be the case at some point, we can use the following:
-  // "log4j" % "log4j" % "1.2.17",
   //
   // Trove
   "net.sf.trove4j" % "trove4j" % "3.0.3",
@@ -97,7 +94,7 @@ libraryDependencies ++= Seq(
   // know how to fix.
   //  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT" % "provided",
   //
-  // Dependencies for Scoobi, etc.
+  // Additional dependency related to Scoobi; not in Scoobi's build.sbt.
   "log4j" % "log4j" % "1.2.17"
   // The following needed for Scoobi 0.1, but evidently not any more.
   // "javassist" % "javassist" % "3.12.1.GA",
