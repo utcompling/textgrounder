@@ -51,6 +51,8 @@ libraryDependencies ++= Seq(
   // class path problems with a newer managed version of Argot until we
   // remove this!)
   // "org.clapper" %% "argot" % "1.0.1",
+  // If we remove Argot we need to include Argot's dependencies.
+  "org.clapper" %% "grizzled-scala" % "1.1.2",
   // 
   // The following is the old way we got Hadoop added.  Out of date, has lots
   // of problems.  Now it's included as a dependency of Scoobi. 
