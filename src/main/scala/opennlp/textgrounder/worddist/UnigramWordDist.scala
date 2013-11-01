@@ -220,7 +220,7 @@ abstract class UnigramWordDist(
       // training data at all, i.e. we don't even have any global values to
       // back off to. General practice is to ignore such words.
       if (value > 0)
-        logprob += log(value)
+        logprob += count * log(value)
     }
     // FIXME: Also use baseline (prior probability)
     logprob
