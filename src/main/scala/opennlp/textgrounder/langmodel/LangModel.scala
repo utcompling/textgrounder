@@ -619,4 +619,23 @@ abstract class LangModel(val factory: LangModelFactory) {
   override def toString = toString(
     LangModelConstants.lang_model_words_to_print
   )
+
+  /**
+   * Return the grams (words or n-grams) that contribute most to the
+   * Naive Bayes probability of the given document's language model,
+   * evaluated over this language model. Each gram gets an additive weight of
+   * count * log(prob), which is returned along with the gram.
+   *
+   * @param relative_to If empty, as above. If one other language model is
+   *   given, return grams whose relative contribution to the Naive Bayes
+   *   probability of this model compared with the other lang model is
+   *   greatest, i.e. those for which
+   *     weight = count * (log(thisprob) - log(otherprob))
+   *   is greatest. If multiple other language models are given, use
+   *   the same formula for comparing two language models but for each gram,
+   *   compare this language model to each of the others in turn and take
+   *   the maximum weight as the gram's weight.
+   */
+  def get_most_contributing_grams(langmodel: LangModel,
+    relative_to: Iterable[LangModel] = Iterable()): Iterable[(Item, Double)]
 }

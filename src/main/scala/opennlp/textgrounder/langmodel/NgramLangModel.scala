@@ -292,6 +292,9 @@ abstract class NgramLangModel(
   def get_nbayes_logprob(xlangmodel: LangModel) = ???
 
   def find_most_common_word(pred: String => Boolean): Option[Word] = ???
+
+  def get_most_contributing_grams(xlangmodel: LangModel,
+      xrelative_to: Iterable[LangModel] = Iterable()) = ???
 }
 
 /**

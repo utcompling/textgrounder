@@ -187,20 +187,52 @@ abstract class UnigramLangModel(
    */
   def kl_divergence_34(other: UnigramLangModel): Double
   
+  def get_nbayes_factor(word: Item, count: WordCount) = {
+    val value = lookup_word(word)
+    assert(value >= 0)
+    // The probability returned will be 0 for words never seen in the
+    // training data at all, i.e. we don't even have any global values to
+    // back off to. General practice is to ignore such words.
+    if (value > 0)
+      count * log(value)
+    else 0.0
+  }
+
   def get_nbayes_logprob(xlangmodel: LangModel) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
-    var logprob = 0.0
-    for ((word, count) <- langmodel.model.iter_items) {
-      val value = lookup_word(word)
-      assert(value >= 0)
-      // The probability returned will be 0 for words never seen in the
-      // training data at all, i.e. we don't even have any global values to
-      // back off to. General practice is to ignore such words.
-      if (value > 0)
-        logprob += count * log(value)
-    }
     // FIXME: Also use baseline (prior probability)
-    logprob
+    langmodel.model.iter_items.map {
+      case (word, count) => get_nbayes_factor(word, count)
+    }.sum
+  }
+
+  def get_most_contributing_grams(xlangmodel: LangModel,
+      xrelative_to: Iterable[LangModel] = Iterable()) = {
+    val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
+    val relative_to = xrelative_to.map(_.asInstanceOf[UnigramLangModel])
+    val itemcounts = langmodel.model.iter_items
+    val weights =
+      if (relative_to.isEmpty)
+        itemcounts.map {
+          case (word, count) => (word, get_nbayes_factor(word, count))
+        }
+      else if (relative_to.size == 1) {
+        val othermodel = relative_to.head
+        itemcounts.map {
+          case (word, count) => (word, get_nbayes_factor(word, count) -
+            othermodel.get_nbayes_factor(word, count))
+        }
+      } else {
+        itemcounts.map {
+          case (word, count) => {
+            val factor = get_nbayes_factor(word, count)
+            val relcontribs =
+              relative_to.map { factor - _.get_nbayes_factor(word, count) }
+            (word, relcontribs maxBy { _.abs})
+          }
+        }
+      }
+    weights.toSeq.sortWith { _._2.abs > _._2.abs }
   }
 
   /**

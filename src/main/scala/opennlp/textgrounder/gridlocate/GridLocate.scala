@@ -59,6 +59,7 @@ object GridLocateConstants {
   val default_gridranksize = 11
   val kldiv_num_contrib_cells = 5
   val kldiv_num_contrib_words = 25
+  val relcontribwords_to_print = 15
 
   // For outputting periodic result status when evaluating a test set
   // of documents
@@ -454,6 +455,11 @@ This is a single number, and the grid will be a square centered on the
 correct cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
+
+relcontribwords: Print out words contributing most to the choice of the
+top-ranked cell vs. other cells. This is computed as if the Naive Bayes
+algorithm were being used. We compare cell at rank 1 vs. cell at rank 2,
+and cell at rank 1 vs. other cells, individually for each word.
 
 wordcountdocs: Regenerate document file, filtering out documents not
 seen in any counts file.
