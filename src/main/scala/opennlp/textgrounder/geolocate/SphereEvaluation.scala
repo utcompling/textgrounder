@@ -212,7 +212,7 @@ class GroupedSphereDocEvalStats(
 /**
  * Specialization of `RankedGridEvaluator` for SphereCoords (latitude/
  * longitude coordinates on the surface of a sphere).  Class for evaluating
- * (geolocating) a test document using a strategy that ranks the cells in the
+ * (geolocating) a test document using a ranker that ranks the cells in the
  * cell grid and picks the central point of the top-ranked one.
  *
  * Only needed to support debug("gridrank").
@@ -268,11 +268,11 @@ class RankedSphereDocEvalResult(
 // * in the PCL Travel corpus.
 // */
 //class PCLTravelGeolocateDocEvaluator(
-//  strategy: GridLocateDocStrategy[SphereCoord],
+//  ranker: GridRanker[SphereCoord],
 //  grid: GeoGrid[SphereCoord],
 //  filehand: FileHandler,
 //  filenames: Iterable[String]
-//) extends CorpusEvaluator(strategy.stratname, grid.driver) {
+//) extends CorpusEvaluator(ranker.ranker_name, grid.driver) {
 //  type TEvalDoc = TitledDoc
 //  type TEvalRes = TitledDocResult
 //
@@ -310,7 +310,7 @@ class RankedSphereDocEvalResult(
 //    dist.finish_before_global()
 //    dist.finish_after_global()
 //    val cells =
-//      strategy.return_ranked_cells(dist, include = Iterable[SphereCell]())
+//      ranker.return_ranked_cells(dist, include = Iterable[SphereCell]())
 //    // FIXME: This should be output by a result object we return.
 //    errprint("")
 //    errprint("Document with title: %s", doc.title)

@@ -33,13 +33,13 @@ import worddist.WordDist._
 /**
  * This is the Sphere-specific version of `WordCellDist`, which is used for
  * a distribution over cells that is associated with a single word.  This
- * is used in particular for the strategies and Geolocate applications that
+ * is used in particular for the rankers and Geolocate applications that
  * need to invert the per-cell word distributions to obtain a per-word cell
  * distribution: Specifically, the GenerateKML app (which generates a KML
  * file showing the cell distribution of a given word across the Earth);
- * the `average-cell-probability` strategy (which uses the inversion strategy
+ * the `average-cell-probability` ranker (which uses the inversion strategy
  * to obtain a distribution of cells for each word in a document, and then
- * averages them); and the `most-common-toponym` baseline strategy (which
+ * averages them); and the `most-common-toponym` baseline ranker (which
  * similarly uses the inversion strategy but obtains a single distribution of
  * cells for the most common toponym in the document, and uses this
  * distribution directly to generate the list of ranked cells).

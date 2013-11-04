@@ -147,12 +147,12 @@ import gridlocate._
 
    OUR IMPLEMENTATION:
 
-   Input values to map() are tuples (strategy, document).  Output items
-   are have key = (cellgrid-details, strategy), value = result for
+   Input values to map() are tuples (ranker, document).  Output items
+   are have key = (cellgrid-details, ranker), value = result for
    particular document (includes various items, including document,
    predicted cell, true rank, various distances).  No combiner, since
    we have to compute a median, meaning we need all values.  Reducer
-   computes mean/median for all values for a given cellgrid/strategy.
+   computes mean/median for all values for a given cellgrid/ranker.
    NOTE: For identifying a particular cell, we use indices, since we
    can't pass pointers.  For KD trees and such, we conceivably might have
    to pass in to the reducer some complex details identifying the
@@ -284,7 +284,7 @@ class DocEvalMapper
       }
     val evalobj = driver.create_cell_evaluator(ranker)
     for (result <- evalobj.evaluate_documents(docstats)) {
-      context.write(new Text(ranker.strategy.stratname),
+      context.write(new Text(ranker.ranker_name),
         new DoubleWritable(result.pred_truedist))
     }
   }

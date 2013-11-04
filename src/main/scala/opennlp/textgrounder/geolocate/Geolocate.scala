@@ -97,11 +97,11 @@ doing geolocation is split up into various classes:
    on the surface of a sphere.
 -- The cell grid class SphereGrid has subclasses for the different types of
    grids (MultiRegularGrid, KDTreeGrid).
--- Different types of strategy objects (subclasses of
-   GeolocateDocStrategy, in turn a subclass of GridLocateDocStrategy)
-   implement the different inference methods specified using `--strategy`,
-   e.g. KLDivergenceStrategy or NaiveBayesDocStrategy. The driver method
-   `setup_for_run` creates the necessary strategy objects.
+-- Different types of ranker objects (subclasses of
+   GeoGridRanker, in turn a subclass of GridRanker)
+   implement the different inference methods specified using `--ranker`,
+   e.g. KLDivergenceGridRanker or NaiveBayesGridRanker. The driver method
+   `setup_for_run` creates the necessary ranker objects.
 -- Evaluation is performed using different GridEvaluator objects, e.g.
    RankedSphereGridEvaluator and MeanShiftSphereGridEvaluator. 
 */
@@ -110,15 +110,15 @@ doing geolocation is split up into various classes:
 //                           Evaluation strategies                         //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class GeolocateDocStrategy(
-  stratname: String,
+abstract class GeoGridRanker(
+  ranker_name: String,
   sphere_grid: SphereGrid
-) extends GridLocateDocStrategy[SphereCoord](stratname, sphere_grid) { }
+) extends GridRanker[SphereCoord](ranker_name, sphere_grid) { }
 
-class CellDistMostCommonToponymGeolocateDocStrategy(
-  stratname: String,
+class CellDistMostCommonToponymGeoGridRanker(
+  ranker_name: String,
   sphere_grid: SphereGrid
-) extends GeolocateDocStrategy(stratname, sphere_grid) {
+) extends GeoGridRanker(ranker_name, sphere_grid) {
   val cdist_factory =
     new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
@@ -143,10 +143,10 @@ class CellDistMostCommonToponymGeolocateDocStrategy(
   }
 }
 
-class LinkMostCommonToponymGeolocateDocStrategy(
-  stratname: String,
+class LinkMostCommonToponymGeoGridRanker(
+  ranker_name: String,
   sphere_grid: SphereGrid
-) extends GeolocateDocStrategy(stratname, sphere_grid) {
+) extends GeoGridRanker(ranker_name, sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = Unigram.check_unigram_dist(_word_dist)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
@@ -195,7 +195,7 @@ class LinkMostCommonToponymGeolocateDocStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGridLocateDocStrategy[SphereCoord](stratname, sphere_grid).
+      new RandomGridRanker[SphereCoord](ranker_name, sphere_grid).
         return_ranked_cells(word_dist, include))
   }
 }
@@ -306,13 +306,13 @@ IMPLEMENTED.)
 //is in PCL-Travel XML format, and uses each chapter in the evaluation
 //file as a document to evaluate.""")
 
-  override protected def strategy_choices = super.strategy_choices ++ Seq(
+  override protected def ranker_choices = super.ranker_choices ++ Seq(
         Seq("link-most-common-toponym"),
         Seq("cell-distribution-most-common-toponym",
             "celldist-most-common-toponym"))
 
-  override protected def strategy_baseline_help =
-    super.strategy_baseline_help +
+  override protected def ranker_baseline_help =
+    super.ranker_baseline_help +
 """'link-most-common-toponym' means to look for the toponym that occurs the
 most number of times in the document, and then use the internal-link
 baseline to match it to a location.
@@ -325,11 +325,10 @@ of the most common toponym.
     ap.option[String]("coord-strategy", "cs",
       default = "top-ranked",
       choices = Seq("top-ranked", "mean-shift"),
-      help = """Strategy/strategies to use to choose the best coordinate for
-a document.
+      help = """Strategy to use to choose the best coordinate for a document.
 
 'top-ranked' means to choose the single best-ranked cell according to the
-scoring strategy specified using '--strategy', and use its central point.
+scoring ranker specified using '--ranker', and use its central point.
 
 'mean-shift' means to take the K best cells (according to '--k-best'),
 and then compute a single point using the mean-shift algorithm.  This
@@ -432,10 +431,10 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     params.miles_per_cell = computed_mpc
 
 
-    // The *-most-common-toponym strategies require case preserving
-    // (as if set by --preseve-case-words), while most other strategies want
+    // The *-most-common-toponym rankers require case preserving
+    // (as if set by --preseve-case-words), while most other rankers want
     // the opposite.  So check to make sure we don't have a clash.
-    if (params.strategy endsWith "most-common-toponym") {
+    if (params.ranker endsWith "most-common-toponym") {
       errprint("Forcibly setting --preseve-case-words to true")
       params.preserve_case_words = true
     }
@@ -475,13 +474,14 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     }
   }
 
-  override def create_strategy(stratname: String, grid: GeoGrid[SphereCoord]) = {
-    stratname match {
+  override def create_named_ranker(ranker_name: String,
+      grid: GeoGrid[SphereCoord]) = {
+    ranker_name match {
       case "link-most-common-toponym" =>
-        new LinkMostCommonToponymGeolocateDocStrategy(stratname, grid)
+        new LinkMostCommonToponymGeoGridRanker(ranker_name, grid)
       case "celldist-most-common-toponym" =>
-        new CellDistMostCommonToponymGeolocateDocStrategy(stratname, grid)
-      case other => super.create_strategy(other, grid)
+        new CellDistMostCommonToponymGeoGridRanker(ranker_name, grid)
+      case other => super.create_named_ranker(other, grid)
     }
   }
 
@@ -498,15 +498,18 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
    */
   def create_cell_evaluator(ranker: GridRanker[SphereCoord]
 /*
+
+THE FOLLOWING IS OBSOLETE.
+
 If you leave off the return type of this function, then you get a compile
 crash when trying to compile the following code in
 Hadoop.scala:DocResultMapper:
 
-    val stratname_evaluators =
-      for ((stratname, strategy, docstats) <-
+    val ranker_name_evaluators =
+      for ((ranker_name, ranker, docstats) <-
         get_stat_iters(driver.iter_strategies, orig_docstats)) yield {
-          val evalobj = driver.create_cell_evaluator(strategy, stratname)
-          (stratname, evalobj.evaluate_documents(docstats))
+          val evalobj = driver.create_cell_evaluator(ranker, ranker_name)
+          (ranker_name, evalobj.evaluate_documents(docstats))
         }
 
 The error is as follows:
@@ -764,7 +767,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
         params.eval_format match {
 //          case "pcl-travel" => {
 //            val evalobj =
-//              new PCLTravelGeolocateDocEvaluator(strategy, grid,
+//              new PCLTravelGeolocateDocEvaluator(ranker, grid,
 //                get_file_handler, params.eval_file)
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
@@ -914,7 +917,7 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
           base
       } mkString "+"
       ),
-      ("strategy", valonly),
+      ("ranker", valonly),
       ("word-dist", valonly),
       ("interpolate", x => x match {
         case "yes" => "interpolate"
