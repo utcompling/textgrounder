@@ -1006,7 +1006,7 @@ abstract class GeoDoc[Co : Serializer](
    * number of links pointing to it in some sort of link structure), return
    * Some(NUM-LINKS); else return None.
    *
-   * FIXME: This is used to establish a prior for the Naive Bayes strategy,
+   * FIXME: This is used to establish a prior for the Naive Bayes ranker,
    * and is computed on a cell level, which is why we have it here; but it
    * seems too specific and tied to Wikipedia.  Also, perhaps we want to
    * split it into has_incoming_links and incoming_links (without the Option[]

@@ -29,45 +29,21 @@ import worddist._
 
 /*
 
-This file implements the various strategies used for inference of the
-location of a document in a grid -- more specifically, returning a
-ranking of the suitability of the cells of the grid for a given
-document.
+This file implements the various rankers used for inference of the
+location of a document in a grid -- i.e. returning a ranking of the
+suitability of the cells of the grid for a given document.
 
 */
 
 /**
- * Abstract class for grid-locating documents, i.e. computing a ranking of
- * the cells in a grid.
- *
- * @param stratname Name of the strategy, for output purposes
- * @param grid Grid containing the cells
- */
-abstract class GridLocateDocStrategy[Co](
-  val stratname: String,
-  val grid: GeoGrid[Co]
-) {
-  /**
-   * For a given word distribution (describing a test document), return
-   * an Iterable of tuples, each listing a particular cell on the Earth
-   * and a score of some sort.  The cells given in `include` must be
-   * included in the list.  Higher scores are better.  The results should
-   * be in sorted order, with better cells earlier.
-   */
-  def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GeoCell[Co]]):
-    Iterable[(GeoCell[Co], Double)]
-}
-
-/**
- * Class that implements a very simple baseline strategy -- pick a random
+ * Class that implements a very simple baseline ranker -- pick a random
  * cell.
  */
 
-class RandomGridLocateDocStrategy[Co](
-  stratname: String,
+class RandomGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](stratname, grid) {
+) extends GridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(word_dist: WordDist,
       include: Iterable[GeoCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
@@ -77,16 +53,16 @@ class RandomGridLocateDocStrategy[Co](
 }
 
 /**
- * Class that implements a simple baseline strategy -- pick the "most
+ * Class that implements a simple baseline ranker -- pick the "most
  * popular" cell (the one either with the largest number of documents, or
  * the most number of links pointing to it, if `internal_link` is true).
  */
 
-class MostPopularGridLocateDocStrategy[Co] (
-  stratname: String,
+class MostPopularGridRanker[Co] (
+  ranker_name: String,
   grid: GeoGrid[Co],
   internal_link: Boolean
-) extends GridLocateDocStrategy[Co](stratname, grid) {
+) extends GridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
@@ -100,14 +76,14 @@ class MostPopularGridLocateDocStrategy[Co] (
 }
 
 /**
- * Abstract class that implements a strategy for grid location that
+ * Abstract class that implements a ranker for grid location that
  * involves directly comparing the document distribution against each cell
  * in turn and computing a score.
  */
-abstract class PointwiseScoreStrategy[Co](
-  stratname: String,
+abstract class PointwiseScoreGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](stratname, grid) {
+) extends GridRanker[Co](ranker_name, grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
@@ -166,7 +142,7 @@ abstract class PointwiseScoreStrategy[Co](
 }
 
 /**
- * Class that implements a strategy for document geolocation by computing
+ * Class that implements a ranker for document geolocation by computing
  * the KL-divergence between document and cell (approximately, how much
  * the word distributions differ).  Note that the KL-divergence as currently
  * implemented uses the smoothed word distributions.
@@ -179,12 +155,12 @@ abstract class PointwiseScoreStrategy[Co](
  * (Not by default; the comparison is fundamentally asymmetric in
  * any case since it's comparing documents against cells.)
  */
-class KLDivergenceStrategy[Co](
-  stratname: String,
+class KLDivergenceGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co],
   partial: Boolean = true,
   symmetric: Boolean = false
-) extends PointwiseScoreStrategy[Co](stratname, grid) {
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   var self_kl_cache: KLDivergenceCache = null
   val slow = false
@@ -242,7 +218,7 @@ class KLDivergenceStrategy[Co](
 }
 
 /**
- * Class that implements a strategy for document geolocation by computing
+ * Class that implements a ranker for document geolocation by computing
  * the cosine similarity between the distributions of document and cell.
  * FIXME: We really should transform the distributions by TF/IDF before
  * doing this.
@@ -253,12 +229,12 @@ class KLDivergenceStrategy[Co](
  * This only computes the similarity involving words in the document
  * distribution, rather than considering all words in the vocabulary.
  */
-class CosineSimilarityStrategy[Co](
-  stratname: String,
+class CosineSimilarityGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co],
   smoothed: Boolean = false,
   partial: Boolean = false
-) extends PointwiseScoreStrategy[Co](stratname, grid) {
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
     val cossim =
@@ -271,12 +247,12 @@ class CosineSimilarityStrategy[Co](
   }
 }
 
-/** Use a Naive Bayes strategy for comparing document and cell. */
-class NaiveBayesDocStrategy[Co](
-  stratname: String,
+/** Use a Naive Bayes ranker for comparing document and cell. */
+class NaiveBayesGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co],
   use_baseline: Boolean = true
-) extends PointwiseScoreStrategy[Co](stratname, grid) {
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
     val params = grid.driver.params
@@ -301,10 +277,10 @@ class NaiveBayesDocStrategy[Co](
   }
 }
 
-class AverageCellProbabilityStrategy[Co](
-  stratname: String,
+class AverageCellProbabilityGridRanker[Co](
+  ranker_name: String,
   grid: GeoGrid[Co]
-) extends GridLocateDocStrategy[Co](stratname, grid) {
+) extends GridRanker[Co](ranker_name, grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[Co](lru_cache_size)
 

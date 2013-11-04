@@ -385,7 +385,7 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
     ap.option[Int]("lru-cache-size", "lru", metavar = "SIZE",
       default = 400,
       help = """Number of entries in the LRU cache.  Default %default.
-Used only when --strategy=average-cell-probability.""")
+Used only when --ranker=average-cell-probability.""")
 
   //// Miscellaneous options for controlling internal operation
   var no_parallel =
@@ -444,15 +444,15 @@ cell: Print out info on each cell of the Earth as it's generated.  Also
 triggers some additional info during toponym resolution. (Document me.)
 
 commontop: Extra info for debugging
- --baseline-strategy=link-most-common-toponym.
+ --baseline-ranker=link-most-common-toponym.
 
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
 
   ////////////// Begin former GridLocateDocParameters
 
-  protected def strategy_default = "partial-kl-divergence"
-  protected def strategy_choices = Seq(
+  protected def ranker_default = "partial-kl-divergence"
+  protected def ranker_choices = Seq(
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
         Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
         Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
@@ -471,7 +471,7 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
         Seq("random"),
         Seq("num-documents", "numdocs", "num-docs"))
 
-  protected def strategy_non_baseline_help =
+  protected def ranker_non_baseline_help =
 """'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
 divergence between the document and cell is smallest.
 
@@ -498,7 +498,7 @@ the count the word in the document.
 
 """
 
-  protected def strategy_baseline_help =
+  protected def ranker_baseline_help =
 """'internal-link' (or 'link') means use number of internal links pointing to the
 document or cell.
 
@@ -509,16 +509,16 @@ use number of documents in cell.
 
 """
 
-  var strategy =
-    ap.option[String]("s", "strategy",
-      default = strategy_default,
-      aliasedChoices = strategy_choices,
-      help = """Strategy/strategies to use for geolocation.
-""" + strategy_non_baseline_help +
+  var ranker =
+    ap.option[String]("s", "ranker", "strategy",
+      default = ranker_default,
+      aliasedChoices = ranker_choices,
+      help = """Ranking strategy/strategies to use for geolocation.
+""" + ranker_non_baseline_help +
 """In addition, the following "baseline" probabilities exist, which use
 simple algorithms meant for comparison purposes.
 
-""" + strategy_baseline_help +
+""" + ranker_baseline_help +
 """Default is '%default'.""")
 
   //// Reranking options
@@ -995,50 +995,51 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Create a strategy object, which returns a ranking over potential
-   * grid cells, given a test document. This is used to locate a test
-   * document in the grid (e.g. for geolocation), generally by comparing
-   * the test document's word distribution (language model) to the
-   * word distribution of each grid cell.
+   * Create a ranker object corresponding to the given name. A ranker object
+   * returns a ranking over potential grid cells, given a test document.
+   * This is used to locate a test document in the grid (e.g. for
+   * geolocation), generally by comparing the test document's word
+   * distribution (language model) to the word distribution of each
+   * grid cell.
    */
-  def create_strategy(stratname: String, grid: GeoGrid[Co]) = {
-    stratname match {
+  def create_named_ranker(ranker_name: String, grid: GeoGrid[Co]) = {
+    ranker_name match {
       case "random" =>
-        new RandomGridLocateDocStrategy[Co](stratname, grid)
+        new RandomGridRanker[Co](ranker_name, grid)
       case "internal-link" =>
-        new MostPopularGridLocateDocStrategy[Co](stratname, grid, true)
+        new MostPopularGridRanker[Co](ranker_name, grid, true)
       case "num-documents" =>
-        new MostPopularGridLocateDocStrategy[Co](stratname, grid, false)
+        new MostPopularGridRanker[Co](ranker_name, grid, false)
       case "naive-bayes-no-baseline" =>
-        new NaiveBayesDocStrategy[Co](stratname, grid, false)
+        new NaiveBayesGridRanker[Co](ranker_name, grid, false)
       case "naive-bayes-with-baseline" =>
-        new NaiveBayesDocStrategy[Co](stratname, grid, true)
+        new NaiveBayesGridRanker[Co](ranker_name, grid, true)
       case "cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = false,
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = false)
       case "partial-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = false,
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = true)
       case "smoothed-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = true,
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = true,
           partial = false)
       case "smoothed-partial-cosine-similarity" =>
-        new CosineSimilarityStrategy[Co](stratname, grid, smoothed = true,
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = true,
           partial = true)
       case "full-kl-divergence" =>
-        new KLDivergenceStrategy[Co](stratname, grid, symmetric = false,
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = false,
           partial = false)
       case "partial-kl-divergence" =>
-        new KLDivergenceStrategy[Co](stratname, grid, symmetric = false,
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = false,
           partial = true)
       case "symmetric-full-kl-divergence" =>
-        new KLDivergenceStrategy[Co](stratname, grid, symmetric = true,
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = true,
           partial = false)
       case "symmetric-partial-kl-divergence" =>
-        new KLDivergenceStrategy[Co](stratname, grid, symmetric = true,
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = true,
           partial = true)
       case "average-cell-probability" =>
-        new AverageCellProbabilityStrategy[Co](stratname, grid)
+        new AverageCellProbabilityGridRanker[Co](ranker_name, grid)
     }
   }
 
@@ -1051,7 +1052,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * vector describes the compatibility of a test document (a "query")
    * with a given cell (a "candidate"), where the candidate cells are
    * the top N cells taken from some initial ranking (as determined
-   * using a strategy object -- see create_strategy). The classifier
+   * using a ranker object -- see create_ranker). The classifier
    * is trained using a single-weight multi-label training algorithm,
    * where the possible "labels" are in fact a set of candidates for
    * a given training instance, and the algorithm generally tries to
@@ -1134,9 +1135,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_ranker: GridRanker[Co] = {
     /* The basic ranker object. */
     def basic_ranker =
-      new { val strategy =
-              create_strategy_from_documents(read_raw_training_documents)
-          } with GridRanker[Co]
+      create_ranker_from_documents(read_raw_training_documents)
     if (params.rerank == "none") basic_ranker
     else {
       /* Factory object for generating feature vectors describing
@@ -1196,9 +1195,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           /* Create the initial ranker from training data. */
           protected def create_initial_ranker(
             data: Iterable[DocStatus[RawDocument]]
-          ) = new { val strategy =
-                     create_strategy_from_documents(_ => data.toIterator) }
-                with GridRanker[Co]
+          ) = create_ranker_from_documents(_ => data.toIterator)
 
           /* Convert encapsulated raw documents into document-cell pairs.
            */
@@ -1232,14 +1229,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   /**
    * Create a grid populated from the specified training documents
-   * (`create_grid_from_documents`), then create a strategy object that
+   * (`create_grid_from_documents`), then create a ranker object that
    * references this grid.
    */
-  def create_strategy_from_documents(
+  def create_ranker_from_documents(
     get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
     val grid = create_grid_from_documents(get_rawdocs)
-    create_strategy(params.strategy, grid)
+    create_named_ranker(params.ranker, grid)
   }
 
   /**

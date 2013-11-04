@@ -1521,8 +1521,8 @@ possible choices are %choices.""")
        . */
     var daniel = ap.multiOption[String]("daniel",
       choices = Seq("mene", "tekel", "upharsin"))
-    var strategy =
-      ap.multiOption[String]("s", "strategy",
+    var ranker =
+      ap.multiOption[String]("r", "ranker",
         aliasedChoices = Seq(
           Seq("baseline"),
           Seq("none"),

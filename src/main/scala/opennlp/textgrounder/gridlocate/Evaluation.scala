@@ -381,14 +381,14 @@ class GroupedDocEvalStats[Co](
  * Uses the command-line parameters to determine which documents
  * should be skipped.
  *
- * @param stratname Name of the strategy used for performing evaluation.
+ * @param ranker_name Name of the ranker used for performing evaluation.
  *   This is output in various status messages.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such, in particular command-line parameters that allow a subset of the
  *   total set of documents to be evaluated.
  */
 abstract class CorpusEvaluator(
-  stratname: String,
+  ranker_name: String,
   val driver: GridLocateDriver[_]
 ) {
   /** Type of document to evaluate. */
@@ -487,22 +487,22 @@ abstract class CorpusEvaluator(
       // print out results
       if ((new_elapsed - last_elapsed >= 300 &&
         new_processed - last_processed >= 10)) {
-        errprint("Results after %d documents (strategy %s):",
-          task.num_processed, stratname)
+        errprint("Results after %d documents (ranker %s):",
+          task.num_processed, ranker_name)
         output_results(isfinal = false)
-        errprint("End of results after %d documents (strategy %s):",
-          task.num_processed, stratname)
+        errprint("End of results after %d documents (ranker %s):",
+          task.num_processed, ranker_name)
         last_elapsed = new_elapsed
         last_processed = new_processed
       }
       res
     } ++ new SideEffectIterator( {
       errprint("")
-      errprint("Final results for strategy %s: All %d documents processed:",
-        stratname, task.num_processed)
+      errprint("Final results for ranker %s: All %d documents processed:",
+        ranker_name, task.num_processed)
       errprint("Ending operation at %s", curtimehuman)
       output_results(isfinal = true)
-      errprint("Ending final results for strategy %s", stratname)
+      errprint("Ending final results for ranker %s", ranker_name)
       output_resource_usage()
     } )
   }
@@ -535,7 +535,7 @@ abstract class GridEvaluator[Co](
   val ranker: GridRanker[Co],
   override val driver: GridLocateDriver[Co],
   evalstats: DocEvalStats[Co]
-) extends CorpusEvaluator(ranker.strategy.stratname, driver) {
+) extends CorpusEvaluator(ranker.ranker_name, driver) {
   type TEvalDoc = GeoDoc[Co]
   override type TEvalRes = DocEvalResult[Co]
 
@@ -581,7 +581,7 @@ abstract class GridEvaluator[Co](
 
   /**
    * Compare the document to the pseudo-documents associated with each cell,
-   * using the strategy for this evaluator.  Return a tuple
+   * using the ranker for this evaluator.  Return a tuple
    * (pred_cells, correct_rank), where:
    *
    *  pred_cells = List of predicted cells, from best to worst; each list

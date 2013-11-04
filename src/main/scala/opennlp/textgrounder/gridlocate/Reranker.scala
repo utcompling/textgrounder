@@ -3,9 +3,9 @@ package gridlocate
 
 import math.log
 
-import worddist.WordDist._
-import worddist.{Ngram,NgramWordDist,Unigram,UnigramWordDist}
+import worddist.{WordDist,Ngram,NgramWordDist,Unigram,UnigramWordDist}
 import worddist.NgramStorage._
+import WordDist._
 import util.debug._
 import util.print._
 import util.metering._
@@ -13,16 +13,30 @@ import learning._
 
 /**
  * A ranker for ranking cells in a grid as possible matches for a given
- * document.
+ * document (aka "grid-locating a document").
  *
- * @param strategy Object encapsulating the strategy used for performing
- *   ranking.
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param grid Grid containing the cells over which this ranker operates
  */
-trait GridRanker[Co] extends Ranker[GeoDoc[Co], GeoCell[Co]] {
-  val strategy: GridLocateDocStrategy[Co]
-  def grid = strategy.grid
+abstract class GridRanker[Co](
+  val ranker_name: String,
+  val grid: GeoGrid[Co]
+) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
+  /**
+   * For a given word distribution (describing a test document), return
+   * an Iterable of tuples, each listing a particular cell on the Earth
+   * and a score of some sort.  The cells given in `include` must be
+   * included in the list.  Higher scores are better.  The results should
+   * be in sorted order, with better cells earlier.
+   */
+  def return_ranked_cells(word_dist: WordDist,
+      include: Iterable[GeoCell[Co]]):
+    Iterable[(GeoCell[Co], Double)]
+
   def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
-    strategy.return_ranked_cells(item.dist.grid_dist, include)
+    return_ranked_cells(item.dist.grid_dist, include)
 }
 
 /**
@@ -272,10 +286,14 @@ class NgramMatchingCandidateInstFactory[Co](value: String) extends
  * as possible matches for a given document).
  * See `PointwiseClassifyingReranker`.
  */
-trait PointwiseGridReranker[Co]
-extends GridRanker[Co]
-   with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co]] {
-  lazy val strategy = initial_ranker.asInstanceOf[GridRanker[Co]].strategy
+abstract class PointwiseGridReranker[Co](ranker_name: String,
+  grid: GeoGrid[Co]
+) extends GridRanker[Co](ranker_name, grid)
+  with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co]] {
+    def return_ranked_cells(word_dist: WordDist,
+        include: Iterable[GeoCell[Co]]) =
+      initial_ranker.asInstanceOf[GridRanker[Co]].return_ranked_cells(
+        word_dist, include)
 }
 
 /**
@@ -317,7 +335,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     _rerank_classifier: ScoringClassifier,
     _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
   ) = {
-    new PointwiseGridReranker[Co] {
+    val grid_ir = _initial_ranker.asInstanceOf[GridRanker[Co]]
+    new PointwiseGridReranker[Co](grid_ir.ranker_name, grid_ir.grid) {
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n

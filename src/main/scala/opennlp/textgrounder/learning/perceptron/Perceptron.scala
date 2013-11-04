@@ -156,10 +156,9 @@ import util.debug._
  *
  * 1. Our job is, given a query and a set of candidates, rank the candidates
  *    according to how well they fit the query.  Ranking using a perceptron
- *    or other linear classifier is usually (using a "pointwise ranking
- *    strategy") performed simply by scoring each one standardly (using a
- *    dot product), and ranking according to descending sort order of the
- *    score.
+ *    or other linear classifier is usually (using a "pointwise ranker"),
+ *    performed simply by scoring each one standardly (using a dot product),
+ *    and ranking according to descending sort order of the score.
  * 2. For the purposes of ranking, in place of the normal feature vector
  *    describing a candidate, we have we have a "ranking feature vector"
  *    describing the combination of query and candidate, which includes
