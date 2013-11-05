@@ -22,7 +22,7 @@ package geolocate
 
 import util.spherical._
 
-import gridlocate.{GeoCell,GeoGrid}
+import gridlocate.{GridCell,Grid}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //

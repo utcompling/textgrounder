@@ -22,8 +22,8 @@ import learning._
  */
 abstract class GridRanker[Co](
   val ranker_name: String,
-  val grid: GeoGrid[Co]
-) extends Ranker[GeoDoc[Co], GeoCell[Co]] {
+  val grid: Grid[Co]
+) extends Ranker[GridDoc[Co], GridCell[Co]] {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -32,10 +32,10 @@ abstract class GridRanker[Co](
    * be in sorted order, with better cells earlier.
    */
   def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GeoCell[Co]]):
-    Iterable[(GeoCell[Co], Double)]
+      include: Iterable[GridCell[Co]]):
+    Iterable[(GridCell[Co], Double)]
 
-  def evaluate(item: GeoDoc[Co], include: Iterable[GeoCell[Co]]) =
+  def evaluate(item: GridDoc[Co], include: Iterable[GridCell[Co]]) =
     return_ranked_cells(item.dist.grid_dist, include)
 }
 
@@ -46,8 +46,8 @@ abstract class GridRanker[Co](
  * training instance, see `PointwiseClassifyingRerankerTrainer`).
  */
 case class GridRankerInst[Co](
-  doc: GeoDoc[Co],
-  candidates: IndexedSeq[GeoCell[Co]],
+  doc: GridDoc[Co],
+  candidates: IndexedSeq[GridCell[Co]],
   fv: AggregateFeatureVector
 ) extends DataInstance {
   final def feature_vector = fv
@@ -72,7 +72,7 @@ case class GridRankerInst[Co](
  * not evaluation.)
  */
 trait CandidateInstFactory[Co] extends (
-  (GeoDoc[Co], GeoCell[Co], Double, Boolean) => FeatureVector
+  (GridDoc[Co], GridCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory =
     new SparseFeatureVectorFactory[Word](word => memoizer.unmemoize(word))
@@ -86,7 +86,7 @@ trait CandidateInstFactory[Co] extends (
    * @param doc Document of document-cell pair.
    * @param cell Cell of document-cell pair.
    */
-  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]): Iterable[(Word, Double)]
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]): Iterable[(Word, Double)]
 
   /**
    * Generate a feature vector from a query-candidate (document-cell) pair.
@@ -97,7 +97,7 @@ trait CandidateInstFactory[Co] extends (
    * @param is_training Whether we are training or evaluating a model
    *   (see above)
    */
-  def apply(doc: GeoDoc[Co], cell: GeoCell[Co], score: Double,
+  def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
     is_training: Boolean) = {
     val feats_with_score =
       get_features(doc, cell) ++ Iterable(scoreword -> score)
@@ -110,7 +110,7 @@ trait CandidateInstFactory[Co] extends (
  * nothing but the score passed in.
  */
 class TrivialCandidateInstFactory[Co] extends CandidateInstFactory[Co] {
-  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = Iterable()
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = Iterable()
 }
 
 /**
@@ -119,7 +119,7 @@ class TrivialCandidateInstFactory[Co] extends CandidateInstFactory[Co] {
 class CombiningCandidateInstFactory[Co](
   val subsidiary_facts: Iterable[CandidateInstFactory[Co]]
 ) extends CandidateInstFactory[Co] {
-  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
     // For each subsidiary factory, retrieve its features, then add the
     // index of the factory to the feature's name to disambiguate, and
     // concatenate all features.
@@ -156,7 +156,7 @@ abstract class WordByWordCandidateInstFactory[Co] extends
   def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
     celldist: UnigramWordDist): Option[Double]
 
-  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val docdist = Unigram.check_unigram_dist(doc.rerank_dist)
     val celldist =
       Unigram.check_unigram_dist(cell.combined_dist.word_dist.rerank_dist)
@@ -176,7 +176,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
   def get_ngram_feature(word: Ngram, count: Double, docdist: NgramWordDist,
     celldist: NgramWordDist): Option[Double]
 
-  def get_features(doc: GeoDoc[Co], cell: GeoCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val docdist = Ngram.check_ngram_dist(doc.rerank_dist)
     val celldist =
       Ngram.check_ngram_dist(cell.combined_dist.word_dist.rerank_dist)
@@ -287,11 +287,11 @@ class NgramMatchingCandidateInstFactory[Co](value: String) extends
  * See `PointwiseClassifyingReranker`.
  */
 abstract class PointwiseGridReranker[Co](ranker_name: String,
-  grid: GeoGrid[Co]
+  grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid)
-  with PointwiseClassifyingReranker[GeoDoc[Co], GeoCell[Co]] {
+  with PointwiseClassifyingReranker[GridDoc[Co], GridCell[Co]] {
     def return_ranked_cells(word_dist: WordDist,
-        include: Iterable[GeoCell[Co]]) =
+        include: Iterable[GridCell[Co]]) =
       initial_ranker.asInstanceOf[GridRanker[Co]].return_ranked_cells(
         word_dist, include)
 }
@@ -305,7 +305,7 @@ abstract class PointwiseGridReranker[Co](ranker_name: String,
 abstract class LinearClassifierGridRerankerTrainer[Co](
   val trainer: SingleWeightLinearClassifierTrainer[GridRankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GeoDoc[Co], GeoCell[Co], DocStatus[RawDocument], GridRankerInst[Co]
+    GridDoc[Co], GridCell[Co], DocStatus[RawDocument], GridRankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
     data: Iterable[(GridRankerInst[Co], Int)]
@@ -333,15 +333,15 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
    */
   override protected def create_reranker(
     _rerank_classifier: ScoringClassifier,
-    _initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
+    _initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
   ) = {
     val grid_ir = _initial_ranker.asInstanceOf[GridRanker[Co]]
     new PointwiseGridReranker[Co](grid_ir.ranker_name, grid_ir.grid) {
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
-          candidate: GeoCell[Co], initial_score: Double) = {
+      protected def create_candidate_evaluation_instance(query: GridDoc[Co],
+          candidate: GridCell[Co], initial_score: Double) = {
         self.create_candidate_evaluation_instance(query, candidate,
           initial_score)
       }
@@ -355,7 +355,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     super.apply(training_data).
       asInstanceOf[PointwiseGridReranker[Co]]
 
-  override def format_query_item(item: GeoDoc[Co]) = {
+  override def format_query_item(item: GridDoc[Co]) = {
     "%s, dist=%s" format (item, item.rerank_dist.debug_string)
   }
 }

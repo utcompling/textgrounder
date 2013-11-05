@@ -149,8 +149,8 @@ class EvalStats(
  * @param pred_coord predicted coordinate of the document
  */
 class DocEvalResult[Co](
-  val document: GeoDoc[Co],
-  val grid: GeoGrid[Co],
+  val document: GridDoc[Co],
+  val grid: Grid[Co],
   val pred_coord: Co
 ) {
   /**
@@ -281,7 +281,7 @@ trait DocEvalStats[Co] extends EvalStats {
  */
 class GroupedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   create_stats: (ExperimentDriverStats, String) => DocEvalStats[Co]
 ) extends EvalStats(driver_stats, null, null) with DocEvalStats[Co] {
 
@@ -536,7 +536,7 @@ abstract class GridEvaluator[Co](
   override val driver: GridLocateDriver[Co],
   evalstats: DocEvalStats[Co]
 ) extends CorpusEvaluator(ranker.ranker_name, driver) {
-  type TEvalDoc = GeoDoc[Co]
+  type TEvalDoc = GridDoc[Co]
   override type TEvalRes = DocEvalResult[Co]
 
   class GridDocCounterTrackerFactory extends
@@ -569,8 +569,8 @@ abstract class GridEvaluator[Co](
     evalstats.output_results() // all_results = isfinal)
   }
 
-  def get_correct_rank(candidates: Iterable[(GeoCell[Co], Double)],
-      correct_cell: GeoCell[Co]) = {
+  def get_correct_rank(candidates: Iterable[(GridCell[Co], Double)],
+      correct_cell: GridCell[Co]) = {
     candidates.zipWithIndex.find {
       case ((cell, score), index) => cell == correct_cell
     } match {
@@ -592,13 +592,13 @@ abstract class GridEvaluator[Co](
    * @param document Document to evaluate.
    * @param correct_cell Cell in the cell grid which contains the document.
    */
-  def return_ranked_cells(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
+  def return_ranked_cells(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
     if (driver.params.oracle_results)
       (Iterable((correct_cell, 0.0)), 1)
     else {
-      val include = Iterable[GeoCell[Co]]()
+      val include = Iterable[GridCell[Co]]()
       ranker match {
-        case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] if debug("reranker") => {
+        case reranker: Reranker[GridDoc[Co], GridCell[Co]] if debug("reranker") => {
           val (initial_ranking, reranking) =
             reranker.evaluate_with_initial_ranking(document, include)
           errprint("Correct cell initial rank: %s",
@@ -623,7 +623,7 @@ abstract class GridEvaluator[Co](
    * @param document Document to evaluate.
    * @param correct_cell Cell in the cell grid which contains the document.
    */
-  def imp_evaluate_document(document: GeoDoc[Co], correct_cell: GeoCell[Co]
+  def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]
   ): DocEvalResult[Co]
 
   override def process_document_statuses(
@@ -643,7 +643,7 @@ abstract class GridEvaluator[Co](
    *
    * @param document Document to evaluate.
    */
-  def evaluate_document(document: GeoDoc[Co]) = {
+  def evaluate_document(document: GridDoc[Co]) = {
     val (skip, reason) = would_skip_document(document)
     assert(!skip)
     assert(document.grid_dist.finished)
@@ -685,13 +685,13 @@ class RankedGridEvaluator[Co](
 ) extends GridEvaluator[Co] (
   ranker, driver, evalstats
 ) {
-  def imp_evaluate_document(document: GeoDoc[Co],
-      correct_cell: GeoCell[Co]) = {
+  def imp_evaluate_document(document: GridDoc[Co],
+      correct_cell: GridCell[Co]) = {
     ranker match {
-      case reranker: Reranker[GeoDoc[Co], GeoCell[Co]] => {
+      case reranker: Reranker[GridDoc[Co], GridCell[Co]] => {
         val (initial_ranking, reranking) =
           reranker.evaluate_with_initial_ranking(document,
-            Iterable[GeoCell[Co]]())
+            Iterable[GridCell[Co]]())
         val correct_rank = get_correct_rank(reranking, correct_cell)
         val initial_correct_rank = get_correct_rank(initial_ranking, correct_cell)
         new FullRerankedDocEvalResult[Co](document, reranking, correct_rank,
@@ -723,8 +723,8 @@ class RankedGridEvaluator[Co](
  *        predicted cell
  */
 class RankedDocEvalResult[Co](
-  document: GeoDoc[Co],
-  val pred_cell: GeoCell[Co],
+  document: GridDoc[Co],
+  val pred_cell: GridCell[Co],
   val correct_rank: Int
 ) extends DocEvalResult[Co](
   document, pred_cell.grid,
@@ -735,7 +735,7 @@ class RankedDocEvalResult[Co](
    * coordinate and the coordinate that would be predicted if we picked a given
    * cell as the correct one.
    */
-  def pred_truedist_for_cell(cell: GeoCell[Co]) =
+  def pred_truedist_for_cell(cell: GridCell[Co]) =
     document.distance_to_coord(cell.get_central_point)
 
   override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
@@ -754,10 +754,10 @@ class RankedDocEvalResult[Co](
 }
 
 class RerankedDocEvalResult[Co](
-  document: GeoDoc[Co],
-  pred_cell: GeoCell[Co],
+  document: GridDoc[Co],
+  pred_cell: GridCell[Co],
   correct_rank: Int,
-  val initial_pred_cell: GeoCell[Co],
+  val initial_pred_cell: GridCell[Co],
   val initial_correct_rank: Int
 ) extends RankedDocEvalResult[Co](
   document, pred_cell, correct_rank
@@ -791,8 +791,8 @@ class RerankedDocEvalResult[Co](
  *        predicted cell
  */
 class FullRankedDocEvalResult[Co](
-  document: GeoDoc[Co],
-  val pred_cells: Iterable[(GeoCell[Co], Double)],
+  document: GridDoc[Co],
+  val pred_cells: Iterable[(GridCell[Co], Double)],
   correct_rank: Int
 ) extends RankedDocEvalResult[Co](
   document, pred_cells.head._1, correct_rank
@@ -858,10 +858,10 @@ class FullRankedDocEvalResult[Co](
  *        predicted cell
  */
 class FullRerankedDocEvalResult[Co](
-  document: GeoDoc[Co],
-  pred_cells: Iterable[(GeoCell[Co], Double)],
+  document: GridDoc[Co],
+  pred_cells: Iterable[(GridCell[Co], Double)],
   correct_rank: Int,
-  initial_pred_cells: Iterable[(GeoCell[Co], Double)],
+  initial_pred_cells: Iterable[(GridCell[Co], Double)],
   initial_correct_rank: Int
 ) extends FullRankedDocEvalResult[Co](
   document, pred_cells, correct_rank
@@ -1015,9 +1015,9 @@ abstract class CoordGridEvaluator[Co](
 ) extends GridEvaluator[Co](
   ranker, driver, evalstats
 ) {
-  def find_best_point(document: GeoDoc[Co], correct_cell: GeoCell[Co]): Co
+  def find_best_point(document: GridDoc[Co], correct_cell: GridCell[Co]): Co
 
-  def imp_evaluate_document(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
+  def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
     val pred_coord = find_best_point(document, correct_cell)
     new CoordDocEvalResult[Co](document, ranker.grid, pred_coord)
   }
@@ -1034,8 +1034,8 @@ abstract class CoordGridEvaluator[Co](
  * @param pred_coord predicted coordinate of the document
  */
 class CoordDocEvalResult[Co](
-  document: GeoDoc[Co],
-  grid: GeoGrid[Co],
+  document: GridDoc[Co],
+  grid: Grid[Co],
   pred_coord: Co
 ) extends DocEvalResult[Co](
   document, grid, pred_coord
@@ -1085,7 +1085,7 @@ class MeanShiftGridEvaluator[Co](
 ) extends CoordGridEvaluator[Co](
   ranker, driver, evalstats
 ) {
-  def find_best_point(document: GeoDoc[Co], correct_cell: GeoCell[Co]) = {
+  def find_best_point(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
     val (pred_cells, correct_rank) = return_ranked_cells(document, correct_cell)
     val top_k = pred_cells.take(k_best).map(_._1.get_central_point).toIndexedSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)

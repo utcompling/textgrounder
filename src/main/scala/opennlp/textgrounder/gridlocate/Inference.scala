@@ -42,10 +42,10 @@ suitability of the cells of the grid for a given document.
 
 class RandomGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co]
+  grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GeoCell[Co]]) = {
+      include: Iterable[GridCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
@@ -60,10 +60,10 @@ class RandomGridRanker[Co](
 
 class MostPopularGridRanker[Co] (
   ranker_name: String,
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   internal_link: Boolean
 ) extends GridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
       yield (cell,
@@ -82,13 +82,13 @@ class MostPopularGridRanker[Co] (
  */
 abstract class PointwiseScoreGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co]
+  grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
    */
-  def score_cell(word_dist: WordDist, cell: GeoCell[Co]): Double
+  def score_cell(word_dist: WordDist, cell: GridCell[Co]): Double
 
   /**
    * Compare a word distribution (for a document, typically) against all
@@ -96,7 +96,7 @@ abstract class PointwiseScoreGridRanker[Co](
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells_serially(word_dist: WordDist,
-    include: Iterable[GeoCell[Co]]) = {
+    include: Iterable[GridCell[Co]]) = {
       for (cell <- grid.iter_nonempty_cells_including(include)) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
@@ -113,12 +113,12 @@ abstract class PointwiseScoreGridRanker[Co](
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells_parallel(word_dist: WordDist,
-    include: Iterable[GeoCell[Co]]) = {
+    include: Iterable[GridCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
     cells.par.map(c => (c, score_cell(word_dist, c)))
   }
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
     val parallel = !grid.driver.params.no_parallel
     val cell_buf = {
       if (parallel)
@@ -157,7 +157,7 @@ abstract class PointwiseScoreGridRanker[Co](
  */
 class KLDivergenceGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   partial: Boolean = true,
   symmetric: Boolean = false
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
@@ -168,7 +168,7 @@ class KLDivergenceGridRanker[Co](
   def call_kl_divergence(self: WordDist, other: WordDist) =
     self.kl_divergence(self_kl_cache, other, partial = partial)
 
-  def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
+  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
     val cell_word_dist = cell.combined_dist.word_dist.grid_dist
     var kldiv = call_kl_divergence(word_dist, cell_word_dist)
     if (symmetric) {
@@ -181,7 +181,7 @@ class KLDivergenceGridRanker[Co](
   }
 
   override def return_ranked_cells(word_dist: WordDist,
-      include: Iterable[GeoCell[Co]]) = {
+      include: Iterable[GridCell[Co]]) = {
     // This will be used by `score_cell` above.
     self_kl_cache = word_dist.get_kl_divergence_cache()
 
@@ -231,12 +231,12 @@ class KLDivergenceGridRanker[Co](
  */
 class CosineSimilarityGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   smoothed: Boolean = false,
   partial: Boolean = false
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
+  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
     val cossim =
       word_dist.cosine_similarity(cell.combined_dist.word_dist.grid_dist,
         partial = partial, smoothed = smoothed)
@@ -250,11 +250,11 @@ class CosineSimilarityGridRanker[Co](
 /** Use a Naive Bayes ranker for comparing document and cell. */
 class NaiveBayesGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   use_baseline: Boolean = true
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(word_dist: WordDist, cell: GeoCell[Co]) = {
+  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
     val params = grid.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
@@ -279,7 +279,7 @@ class NaiveBayesGridRanker[Co](
 
 class AverageCellProbabilityGridRanker[Co](
   ranker_name: String,
-  grid: GeoGrid[Co]
+  grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[Co](lru_cache_size)
@@ -287,7 +287,7 @@ class AverageCellProbabilityGridRanker[Co](
   val cdist_factory =
     create_cell_dist_factory(grid.driver.params.lru_cache_size)
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GeoCell[Co]]) = {
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
     val celldist =
       cdist_factory.get_cell_dist_for_word_dist(grid, word_dist)
     celldist.get_ranked_cells(include)

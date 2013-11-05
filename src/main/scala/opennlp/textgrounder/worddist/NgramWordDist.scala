@@ -31,7 +31,7 @@ import util.textdb
 import util.io.{FileHandler, FileFormatException}
 import util.print.{errprint, warning}
 
-import gridlocate.GeoDoc
+import gridlocate.GridDoc
 import util.debug._
 
 import WordDist._

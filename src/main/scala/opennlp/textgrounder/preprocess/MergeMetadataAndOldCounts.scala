@@ -25,7 +25,7 @@ import collection.mutable
 
 import java.io.{InputStream, PrintStream}
 
-import gridlocate.GeoDoc
+import gridlocate.GridDoc
 
 import util.argparser._
 import util.collection.DynamicArray

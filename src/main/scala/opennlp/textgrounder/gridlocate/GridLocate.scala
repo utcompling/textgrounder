@@ -883,17 +883,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Create a document factory (GeoDocFactory) for creating documents
-   * (GeoDoc), given factory for creating the word distributions (language
+   * Create a document factory (GridDocFactory) for creating documents
+   * (GridDoc), given factory for creating the word distributions (language
    * models) associated with the documents.
    */
   protected def create_document_factory(
-      word_dist_factory: DocWordDistFactory): GeoDocFactory[Co]
+      word_dist_factory: DocWordDistFactory): GridDocFactory[Co]
 
   /**
-   * Create an empty cell grid (GeoGrid) given a document factory.
+   * Create an empty cell grid (Grid) given a document factory.
    */
-  protected def create_grid(docfact: GeoDocFactory[Co]): GeoGrid[Co]
+  protected def create_grid(docfact: GridDocFactory[Co]): Grid[Co]
 
   /**
    * Read the raw training documents.  This uses the values of the parameters
@@ -913,7 +913,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
     val dociter = params.input_corpus.toIterator.flatMapMetered(task) { dir =>
-        GeoDocFactory.read_raw_documents_from_textdb(get_file_handler,
+        GridDocFactory.read_raw_documents_from_textdb(get_file_handler,
           dir, "-training")
     }
     for (doc <- dociter) yield {
@@ -1002,7 +1002,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * distribution (language model) to the word distribution of each
    * grid cell.
    */
-  def create_named_ranker(ranker_name: String, grid: GeoGrid[Co]) = {
+  def create_named_ranker(ranker_name: String, grid: Grid[Co]) = {
     ranker_name match {
       case "random" =>
         new RandomGridRanker[Co](ranker_name, grid)
@@ -1158,8 +1158,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             data: Iterable[QueryTrainingData]
           ): Iterable[(GridRankerInst[Co], Int)] = {
 
-            def create_candidate_featvec(query: GeoDoc[Co],
-                candidate: GeoCell[Co], initial_score: Double) = {
+            def create_candidate_featvec(query: GridDoc[Co],
+                candidate: GridCell[Co], initial_score: Double) = {
               val featvec =
                 candidate_instance_factory(query, candidate, initial_score,
                   is_training = true)
@@ -1181,8 +1181,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           /* Create the feature vector for a candidate instance (document-cell
            * pair) during evaluation, by invoking the candidate-instance
            * factory (see above). */
-          protected def create_candidate_evaluation_instance(query: GeoDoc[Co],
-              candidate: GeoCell[Co], initial_score: Double) = {
+          protected def create_candidate_evaluation_instance(query: GridDoc[Co],
+              candidate: GridCell[Co], initial_score: Double) = {
             val featvec =
               candidate_instance_factory(query, candidate, initial_score,
                 is_training = false)
@@ -1201,7 +1201,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
            */
           protected def external_instances_to_query_candidate_pairs(
             insts: Iterator[DocStatus[RawDocument]],
-            initial_ranker: Ranker[GeoDoc[Co], GeoCell[Co]]
+            initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
           ) = {
             val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
             val grid = grid_ranker.grid

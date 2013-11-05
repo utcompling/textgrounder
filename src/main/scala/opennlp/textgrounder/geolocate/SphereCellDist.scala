@@ -23,7 +23,7 @@ import math._
 
 import util.spherical._
 
-import gridlocate.{GeoGrid,WordCellDist,CellDistFactory}
+import gridlocate.{Grid,WordCellDist,CellDistFactory}
 import worddist.WordDist._
 
 /////////////////////////////////////////////////////////////////////////////

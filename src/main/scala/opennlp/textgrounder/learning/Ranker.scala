@@ -199,7 +199,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  * the ranker, and in turn, conversion of a raw document to a query-candidate
  * pair (using `external_instances_to_query_candidate_pairs`) makes use of
  * these back-off statistics to generate the "cooked" query object of type
- * `GeoDoc[Co]`. In other words, the same `ExtInst` object might generate
+ * `GridDoc[Co]`. In other words, the same `ExtInst` object might generate
  * multiple query-candidate pairs depending on which split it falls in and
  * whether this split is used for training the initial ranker of the reranker.
  *

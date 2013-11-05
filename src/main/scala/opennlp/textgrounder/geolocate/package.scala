@@ -31,9 +31,9 @@ package object geolocate {
     stats: DocEvalResult[SphereCoord]
   ) = new SphereDocEvalResult(stats)
 
-  type SphereDoc = GeoDoc[SphereCoord]
-  type SphereCell = GeoCell[SphereCoord]
-  type SphereGrid = GeoGrid[SphereCoord]
+  type SphereDoc = GridDoc[SphereCoord]
+  type SphereCell = GridCell[SphereCoord]
+  type SphereGrid = Grid[SphereCoord]
   def get_sphere_docfact(grid: SphereGrid) =
     grid.docfact.asInstanceOf[SphereDocFactory]
 }

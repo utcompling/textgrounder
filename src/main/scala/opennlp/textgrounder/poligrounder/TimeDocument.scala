@@ -34,7 +34,7 @@ class TimeDoc(
   dist: DocWordDist,
   val coord: TimeCoord,
   val user: String
-) extends GeoDoc[TimeCoord](schema, dist) {
+) extends GridDoc[TimeCoord](schema, dist) {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
@@ -58,7 +58,7 @@ class TimeDoc(
 }
 
 /**
- * A GeoDocFactory specifically for documents with coordinates described
+ * A GridDocFactory specifically for documents with coordinates described
  * by a TimeCoord.
  * We delegate the actual document creation to a subfactory specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
@@ -66,7 +66,7 @@ class TimeDoc(
 class TimeDocFactory(
   override val driver: PoligrounderDriver,
   word_dist_factory: DocWordDistFactory
-) extends GeoDocFactory[TimeCoord](
+) extends GridDocFactory[TimeCoord](
   driver, word_dist_factory
 ) {
   def imp_create_and_init_document(schema: Schema,
