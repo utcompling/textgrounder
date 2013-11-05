@@ -298,10 +298,7 @@ abstract class NgramLangModel(
    */
   def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
       return_contributing_words: Boolean = false):
-      (Double, collection.Map[String, WordCount]) = {
-    assert(false, "Not implemented")
-    (0.0, null)
-  }
+      (Double, collection.Map[String, WordCount]) = ???
 
   /**
    * Steps 3 and 4 of KL-divergence computation.
@@ -309,15 +306,9 @@ abstract class NgramLangModel(
    */
   def kl_divergence_34(other: NgramLangModel): Double
   
-  def get_nbayes_logprob(xlangmodel: LangModel) = {
-    assert(false, "Not implemented")
-    0.0
-  }
+  def get_nbayes_logprob(xlangmodel: LangModel) = ???
 
-  def find_most_common_word(pred: String => Boolean): Option[Word] = {
-    assert(false, "Not implemented")
-    None
-  }
+  def find_most_common_word(pred: String => Boolean): Option[Word] = ???
 }
 
 /**
