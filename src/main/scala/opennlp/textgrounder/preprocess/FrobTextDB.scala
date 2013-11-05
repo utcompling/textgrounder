@@ -31,7 +31,7 @@ import io.FileHandler
 import print.warning
 import textdb._
 
-import gridlocate.GeoDoc
+import gridlocate.GridDoc
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

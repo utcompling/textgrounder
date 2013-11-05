@@ -33,17 +33,17 @@ import worddist.WordDist._
  */
 
 class CellDist[Co](
-  val grid: GeoGrid[Co]
+  val grid: Grid[Co]
 ) {
-  val cellprobs = mutable.Map[GeoCell[Co], Double]()
+  val cellprobs = mutable.Map[GridCell[Co], Double]()
 
   def set_cell_probabilities(
-      probs: collection.Map[GeoCell[Co], Double]) {
+      probs: collection.Map[GridCell[Co], Double]) {
     cellprobs.clear()
     cellprobs ++= probs
   }
 
-  def get_ranked_cells(include: Iterable[GeoCell[Co]]) = {
+  def get_ranked_cells(include: Iterable[GridCell[Co]]) = {
     val probs =
       if (include.size == 0)
         cellprobs
@@ -73,7 +73,7 @@ class CellDist[Co](
  */
 
 class WordCellDist[Co](
-  grid: GeoGrid[Co],
+  grid: Grid[Co],
   val word: Word
 ) extends CellDist[Co](grid) {
   var normalized = false
@@ -135,7 +135,7 @@ class CellDistFactory[Co](
   val lru_cache_size: Int
 ) {
   def create_word_cell_dist(
-    grid: GeoGrid[Co], word: Word
+    grid: Grid[Co], word: Word
   ) = new WordCellDist[Co](grid, word)
 
   var cached_dists: LRUCache[Word, WordCellDist[Co]] = null
@@ -144,7 +144,7 @@ class CellDistFactory[Co](
    * Return a cell distribution over a single word, using a least-recently-used
    * cache to optimize access.
    */
-  def get_cell_dist(grid: GeoGrid[Co], word: Word) = {
+  def get_cell_dist(grid: Grid[Co], word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
@@ -162,12 +162,12 @@ class CellDistFactory[Co](
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(grid: GeoGrid[Co], xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(grid: Grid[Co], xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[GeoCell[Co]]()
+    val cellprobs = doublemap[GridCell[Co]]()
     for ((word, count) <- word_dist.model.iter_items) {
       val dist = get_cell_dist(grid, word)
       for ((cell, prob) <- dist.cellprobs)

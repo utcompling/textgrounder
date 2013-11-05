@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  GeoDoc.scala
+//  GridDoc.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
@@ -91,7 +91,7 @@ case class DocStatus[TDoc](
  * counting occurrences of events but not too much else.
  *
  * @tparam T type of the document being processed (usually either
- *   `RawDocument` or `GeoDoc`)
+ *   `RawDocument` or `GridDoc`)
  * @param shortfile A version of the source file name, used in logging
  *   messages; may omit directories or other information shared among
  *   multiple file names.
@@ -167,7 +167,7 @@ class DocCounterTracker[T](
  * See `DocCounterTracker` for more info, e.g. the concept of "counter".
  *
  * @tparam T type of the document being processed (usually either
- *   `RawDocument` or `GeoDoc`)
+ *   `RawDocument` or `GridDoc`)
  * @param driver Object used to transmit counters externally, e.g. to
  *   log files, to the Hadoop job tracker machine, etc.
  */
@@ -206,7 +206,7 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
 /**
  * An object encapsulating a "raw document", i.e. directly encapsulating
  * the fields of the document as read from a textdb database or similar.
- * We separate out raw and processed documents (class `GeoDoc`) because
+ * We separate out raw and processed documents (class `GridDoc`) because
  * in some circumstances we may need to process the raw documents multiple
  * times in different ways, e.g. when creating splits for cross-validation
  * (as done when training a reranker).
@@ -291,7 +291,7 @@ class DocWordDistFactory(
  * Factory for creating documents and maintaining statistics and certain
  * other info about them.
  */
-abstract class GeoDocFactory[Co : Serializer](
+abstract class GridDocFactory[Co : Serializer](
   val driver: GridLocateDriver[Co],
   val word_dist_factory: DocWordDistFactory
 ) {
@@ -377,7 +377,7 @@ abstract class GeoDocFactory[Co : Serializer](
   protected def imp_create_and_init_document(schema: Schema,
       fieldvals: IndexedSeq[String], dist: DocWordDist,
       record_in_factory: Boolean
-  ): Option[GeoDoc[Co]]
+  ): Option[GridDoc[Co]]
 
   /**
    * Create, initialize and return a document with the given fieldvals,
@@ -500,7 +500,7 @@ abstract class GeoDocFactory[Co : Serializer](
    */
   def raw_document_to_document_status(rawdoc: DocStatus[RawDocument],
       record_in_factory: Boolean, note_globally: Boolean
-    ): DocStatus[GeoDoc[Co]] = {
+    ): DocStatus[GridDoc[Co]] = {
     rawdoc map_result { rd =>
       try {
         create_and_init_document(rd.schema, rd.fields, record_in_factory) match {
@@ -569,9 +569,9 @@ abstract class GeoDocFactory[Co : Serializer](
   def line_to_document_status(filehand: FileHandler, file: String,
       line: String, lineno: Long, schema: Schema, record_in_factory: Boolean,
       note_globally: Boolean
-    ): DocStatus[GeoDoc[Co]] = {
+    ): DocStatus[GridDoc[Co]] = {
     raw_document_to_document_status(
-      GeoDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
+      GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
       record_in_factory, note_globally)
   }
 
@@ -611,20 +611,20 @@ abstract class GeoDocFactory[Co : Serializer](
 
   /**
    * Process the document status objects encapsulating document objects
-   * (class `GeoDoc`) and extract the document objects themselves.
+   * (class `GridDoc`) and extract the document objects themselves.
    * The processing mostly involves logging successes, failures and
    * such to counters (see `DocCounterTracker`). The connection to an
    * external logging mechanism is handled by `driver`, a class parameter
-   * of `GeoDocFactory` (the class we are within).
+   * of `GridDocFactory` (the class we are within).
    *
    * @param docstatus Iterator over processed documents encapsulated in
    *   `DocStatus` objects. See `raw_documents_to_documents`.
    * @return Iterator directly over processed documents.
    */
   def document_statuses_to_documents(
-    docstats: Iterator[DocStatus[GeoDoc[Co]]]
+    docstats: Iterator[DocStatus[GridDoc[Co]]]
   ) = {
-    new DocCounterTrackerFactory[GeoDoc[Co]](driver).
+    new DocCounterTrackerFactory[GridDoc[Co]](driver).
       process_statuses(docstats)
   }
 
@@ -646,7 +646,7 @@ abstract class GeoDocFactory[Co : Serializer](
    * handled externally, i.e. by separate functions called as necessary by
    * one of the outermost callers. Currently, doing that is a bit tricky
    * because of `record_in_subfactory`, which (as things currently stand)
-   * needs to be passed into the function that creates processed GeoDoc
+   * needs to be passed into the function that creates processed GridDoc
    * objects (and in turn down into the appropriate factory function for
    * creating these objects). This mechanism is *only* needed by Wikipedia
    * objects, and only for handling redirects, which require a two-pass
@@ -720,7 +720,7 @@ abstract class GeoDocFactory[Co : Serializer](
       note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val rawdocs =
-      GeoDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
+      GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
     raw_documents_to_document_statuses(rawdocs, record_in_subfactory,
       note_globally, finish_globally)
   }
@@ -878,7 +878,7 @@ abstract class GeoDocFactory[Co : Serializer](
   }
 }
 
-object GeoDocFactory {
+object GridDocFactory {
   /**
    * Convert a line from a textdb database into a raw document status,
    * listing the fields in the document.
@@ -920,7 +920,7 @@ object GeoDocFactory {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                                GeoDocs                                  //
+//                                GridDocs                                  //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -959,7 +959,7 @@ case class DocValidationException(
  * @param word_dist_factory
  * @param dist Object containing word distribution of this document.
  */
-abstract class GeoDoc[Co : Serializer](
+abstract class GridDoc[Co : Serializer](
   val schema: Schema,
   val dist: DocWordDist
 ) {
@@ -1031,7 +1031,7 @@ abstract class GeoDoc[Co : Serializer](
     }
   }
 
-  // def __repr__ = "GeoDoc(%s)" format toString.encode("utf-8")
+  // def __repr__ = "GridDoc(%s)" format toString.encode("utf-8")
 
   def shortstr = "%s" format title
 

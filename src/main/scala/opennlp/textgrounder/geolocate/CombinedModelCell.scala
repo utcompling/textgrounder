@@ -24,7 +24,7 @@ import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
 
-import gridlocate.GeoDocFactory
+import gridlocate.GridDocFactory
 import gridlocate.{DocStatus, RawDocument}
 
 class CombinedModelGrid(

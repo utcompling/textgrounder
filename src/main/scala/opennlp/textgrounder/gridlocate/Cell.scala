@@ -71,7 +71,7 @@ class CombinedWordDist(factory: DocWordDistFactory) {
    *  `partial` is a scaling factor (between 0.0 and 1.0) used for
    *  interpolating multiple distributions.
    */
-  def add_document(doc: GeoDoc[_], partial: Double = 1.0) {
+  def add_document(doc: GridDoc[_], partial: Double = 1.0) {
     /* Formerly, we arranged things so that we were passed in all documents,
        regardless of the split.  The reason for this was that the decision
        was made to accumulate link counts from all documents, even in the
@@ -135,12 +135,12 @@ class CombinedWordDist(factory: DocWordDistFactory) {
  * @tparam Co The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
  */
-abstract class GeoCell[Co](
-    val grid: GeoGrid[Co]
+abstract class GridCell[Co](
+    val grid: Grid[Co]
 ) {
   val combined_dist =
     new CombinedWordDist(grid.docfact.word_dist_factory)
-  var most_popular_document: GeoDoc[Co] = _
+  var most_popular_document: GridDoc[Co] = _
   var mostpopdoc_links = 0
 
   /**
@@ -198,7 +198,7 @@ abstract class GeoCell[Co](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
+    "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
       describe_location, unfinished, contains,
       combined_dist.num_docs,
       combined_dist.word_dist.grid_dist.model.num_types,
@@ -251,7 +251,7 @@ abstract class GeoCell[Co](
    * debugging-output purposes, so the exact representation isn't too important.
    */
   def xmldesc =
-    <GeoCell>
+    <GridCell>
       <bounds>{ describe_location }</bounds>
       <finished>{ finished }</finished>
       {
@@ -261,12 +261,12 @@ abstract class GeoCell[Co](
       }
       <numDocuments>{ combined_dist.num_docs }</numDocuments>
       <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
-    </GeoCell>
+    </GridCell>
 
   /**
    * Add a document to the distribution for the cell.
    */
-  def add_document(doc: GeoDoc[Co]) {
+  def add_document(doc: GridDoc[Co]) {
     assert(!finished)
     combined_dist.add_document(doc)
     if (doc.incoming_links != None &&
@@ -289,7 +289,7 @@ abstract class GeoCell[Co](
 /**
  * Abstract class for a general grid of cells.  The grid is defined over
  * a continuous space (e.g. the surface of the Earth).  The space is indexed
- * by coordinates (of type Co).  Each cell (of type GeoCell[Co]) covers
+ * by coordinates (of type Co).  Each cell (of type GridCell[Co]) covers
  * some portion of the space.  There is also a set of documents (of type
  * TDoc), each of which is indexed by a coordinate and which has a
  * distribution describing the contents of the document.  The distributions
@@ -325,8 +325,8 @@ abstract class GeoCell[Co](
  * (3) After this, it should be possible to list the cells by calling
  *     `iter_nonempty_cells`.
  */
-abstract class GeoGrid[Co](
-    val docfact: GeoDocFactory[Co]
+abstract class Grid[Co](
+    val docfact: GridDocFactory[Co]
 ) {
   def driver = docfact.driver
 
@@ -345,8 +345,8 @@ abstract class GeoGrid[Co](
    * existing cells and determining its center.  The reason for not recording
    * such cells is to make sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_document(doc: GeoDoc[Co], create_non_recorded: Boolean):
-    Option[GeoCell[Co]]
+  def find_best_cell_for_document(doc: GridDoc[Co], create_non_recorded: Boolean):
+    Option[GridCell[Co]]
 
   /**
    * Add the given training documents to the cell grid.
@@ -370,7 +370,7 @@ abstract class GeoGrid[Co](
   /**
    * Iterate over all non-empty cells.
    */
-  def iter_nonempty_cells: Iterable[GeoCell[Co]]
+  def iter_nonempty_cells: Iterable[GridCell[Co]]
   
   /*********************** Not meant to be overridden *********************/
 
@@ -385,7 +385,7 @@ abstract class GeoGrid[Co](
    * Iterate over all non-empty cells, making sure to include the given cells
    *  even if empty.
    */
-  def iter_nonempty_cells_including(include: Iterable[GeoCell[Co]]) = {
+  def iter_nonempty_cells_including(include: Iterable[GridCell[Co]]) = {
     val cells = iter_nonempty_cells
     if (include.size == 0)
       cells
@@ -402,7 +402,7 @@ abstract class GeoGrid[Co](
    */
   protected def default_add_training_documents_to_grid(
     get_rawdocs: String => Iterator[DocStatus[RawDocument]],
-    add_document_to_grid: GeoDoc[Co] => Unit
+    add_document_to_grid: GridDoc[Co] => Unit
   ) {
     // FIXME: The "finish_globally" flag needs to be tied into the
     // recording of global statistics in the word dists.

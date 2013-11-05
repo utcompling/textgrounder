@@ -31,17 +31,17 @@ import util.print.{errprint, warning}
  * be given as integers; use memoization as necessary to map them down.
  */
 class UserFrequencyModel[Co](
-  val grid: GeoGrid[Co]
+  val grid: Grid[Co]
 ) {
   // For each cell, we have a set listing the term-user pairs seen. We
   // encode them as a Long for speed and memory savings.
-  val term_user_pairs = setmap[GeoCell[Co], Long]()
+  val term_user_pairs = setmap[GridCell[Co], Long]()
 
   /**
    * Record an occurrence of a given term token seen, along with the user
    * generating the token and the cell it goes in.
    */
-  def add_triple(term: Int, user: Int, cell: GeoCell[Co]) {
+  def add_triple(term: Int, user: Int, cell: GridCell[Co]) {
     // This is a bit tricky. We need to combine two ints into a long, but to do
     // this properly we need to treat the int that goes into the lower 32 bits
     // as unsigned. Java (hence Scala) doesn't provide unsigned integers, but
@@ -57,7 +57,7 @@ class UserFrequencyModel[Co](
    * Return a map from memoized words to counts of the unique users for a
    * given word in a given cell.
    */
-  def get_term_counts(cell: GeoCell[Co]) = {
+  def get_term_counts(cell: GridCell[Co]) = {
     val terms = term_user_pairs(cell).map {
       pair => (pair >> 32).toInt
     }

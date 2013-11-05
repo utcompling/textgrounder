@@ -86,10 +86,10 @@ The Geolocate code works as follows:
 In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
 
--- Classes exist in `gridlocate` for an individual document (GeoDoc),
-   the factory of all documents (GeoDocFactory), the grid containing cells
-   into which the documents are placed (GeoGrid), and the individual cells
-   in the grid (GeoCell).  There also needs to be a class specifying a
+-- Classes exist in `gridlocate` for an individual document (GridDoc),
+   the factory of all documents (GridDocFactory), the grid containing cells
+   into which the documents are placed (Grid), and the individual cells
+   in the grid (GridCell).  There also needs to be a class specifying a
    coordinate identifying a document (e.g. time or latitude/longitude pair).
    Specific versions of all of these are created for Geolocate, identified
    by the word "Sphere" (SphereDoc, SphereCell, SphereCoord, etc.),
@@ -98,7 +98,7 @@ doing geolocation is split up into various classes:
 -- The cell grid class SphereGrid has subclasses for the different types of
    grids (MultiRegularGrid, KDTreeGrid).
 -- Different types of ranker objects (subclasses of
-   GeoGridRanker, in turn a subclass of GridRanker)
+   SphereGridRanker, in turn a subclass of GridRanker)
    implement the different inference methods specified using `--ranker`,
    e.g. KLDivergenceGridRanker or NaiveBayesGridRanker. The driver method
    `setup_for_run` creates the necessary ranker objects.
@@ -110,15 +110,15 @@ doing geolocation is split up into various classes:
 //                           Evaluation strategies                         //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class GeoGridRanker(
+abstract class SphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends GridRanker[SphereCoord](ranker_name, sphere_grid) { }
 
-class CellDistMostCommonToponymGeoGridRanker(
+class CellDistMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
-) extends GeoGridRanker(ranker_name, sphere_grid) {
+) extends SphereGridRanker(ranker_name, sphere_grid) {
   val cdist_factory =
     new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
@@ -143,10 +143,10 @@ class CellDistMostCommonToponymGeoGridRanker(
   }
 }
 
-class LinkMostCommonToponymGeoGridRanker(
+class LinkMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
-) extends GeoGridRanker(ranker_name, sphere_grid) {
+) extends SphereGridRanker(ranker_name, sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = Unigram.check_unigram_dist(_word_dist)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
@@ -455,7 +455,7 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       word_dist_factory: DocWordDistFactory) =
     new SphereDocFactory(this, word_dist_factory)
 
-  protected def create_grid(docfact: GeoDocFactory[SphereCoord]) = {
+  protected def create_grid(docfact: GridDocFactory[SphereCoord]) = {
     val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
     if (params.combined_kd_grid) {
       val kdcg =
@@ -475,12 +475,12 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   }
 
   override def create_named_ranker(ranker_name: String,
-      grid: GeoGrid[SphereCoord]) = {
+      grid: Grid[SphereCoord]) = {
     ranker_name match {
       case "link-most-common-toponym" =>
-        new LinkMostCommonToponymGeoGridRanker(ranker_name, grid)
+        new LinkMostCommonToponymSphereGridRanker(ranker_name, grid)
       case "celldist-most-common-toponym" =>
-        new CellDistMostCommonToponymGeoGridRanker(ranker_name, grid)
+        new CellDistMostCommonToponymSphereGridRanker(ranker_name, grid)
       case other => super.create_named_ranker(other, grid)
     }
   }

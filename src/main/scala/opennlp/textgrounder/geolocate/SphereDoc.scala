@@ -32,7 +32,7 @@ abstract class RealSphereDoc(
   schema: Schema,
   dist: DocWordDist,
   val coord: SphereCoord
-) extends GeoDoc[SphereCoord](schema, dist) {
+) extends GridDoc[SphereCoord](schema, dist) {
   def has_coord = coord != null
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
@@ -63,7 +63,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
 }
 
 /**
- * A GeoDocFactory specifically for documents with coordinates described
+ * A GridDocFactory specifically for documents with coordinates described
  * by a SphereCoord (latitude/longitude coordinates on the Earth).
  * We delegate the actual document creation to a subfactory specific to the
  * type of corpus (e.g. Wikipedia or Twitter).
@@ -71,7 +71,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
 class SphereDocFactory(
   override val driver: GeolocateDriver,
   word_dist_factory: DocWordDistFactory
-) extends GeoDocFactory[SphereCoord](
+) extends GridDocFactory[SphereCoord](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subfactory =

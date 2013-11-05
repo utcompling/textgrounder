@@ -224,8 +224,8 @@ class RankedSphereGridEvaluator(
 ) extends RankedGridEvaluator[SphereCoord](
   ranker, driver, evalstats
 ) {
-  override def imp_evaluate_document(document: GeoDoc[SphereCoord],
-      correct_cell: GeoCell[SphereCoord]) = {
+  override def imp_evaluate_document(document: GridDoc[SphereCoord],
+      correct_cell: GridCell[SphereCoord]) = {
     val result = super.imp_evaluate_document(document, correct_cell)
     new RankedSphereDocEvalResult(
       result.asInstanceOf[FullRankedDocEvalResult[SphereCoord]]
@@ -269,7 +269,7 @@ class RankedSphereDocEvalResult(
 // */
 //class PCLTravelGeolocateDocEvaluator(
 //  ranker: GridRanker[SphereCoord],
-//  grid: GeoGrid[SphereCoord],
+//  grid: Grid[SphereCoord],
 //  filehand: FileHandler,
 //  filenames: Iterable[String]
 //) extends CorpusEvaluator(ranker.ranker_name, grid.driver) {
