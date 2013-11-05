@@ -182,10 +182,19 @@ abstract class GridCell[Co](
       get_centroid
   }
 
+  /** Language model of cell. */
+  def lang_model = combined_lang_model.lang_model
+  /** Number of documents in cell. */
+  def num_docs = combined_lang_model.num_docs
+  /** Whether the cell is empty. */
+  def is_empty = combined_lang_model.is_empty
+  /** Total number of incoming links to all documents in cell. */
+  def incoming_links = combined_lang_model.incoming_links
+
   /**
    * Return true if we have finished creating and populating the cell.
    */
-  def finished = combined_lang_model.lang_model.finished
+  def finished = lang_model.finished
   /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
@@ -200,12 +209,12 @@ abstract class GridCell[Co](
 
     "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
       describe_location, unfinished, contains,
-      combined_lang_model.num_docs,
-      combined_lang_model.lang_model.grid_lm.model.num_types,
-      combined_lang_model.lang_model.grid_lm.model.num_tokens,
-      combined_lang_model.lang_model.rerank_lm.model.num_types,
-      combined_lang_model.lang_model.rerank_lm.model.num_tokens,
-      combined_lang_model.incoming_links)
+      num_docs,
+      lang_model.grid_lm.model.num_types,
+      lang_model.grid_lm.model.num_tokens,
+      lang_model.rerank_lm.model.num_types,
+      lang_model.rerank_lm.model.num_tokens,
+      incoming_links)
   }
 
   // def __repr__() = {
@@ -217,16 +226,16 @@ abstract class GridCell[Co](
     "true-center" -> get_true_center,
     "centroid" -> get_centroid,
     "central-point" -> get_central_point,
-    "num-documents" -> combined_lang_model.num_docs,
+    "num-documents" -> num_docs,
     "grid-num-word-types" ->
-      combined_lang_model.lang_model.grid_lm.model.num_types,
+      lang_model.grid_lm.model.num_types,
     "grid-num-word-tokens" ->
-      combined_lang_model.lang_model.grid_lm.model.num_tokens,
+      lang_model.grid_lm.model.num_tokens,
     "rerank-num-word-types" ->
-      combined_lang_model.lang_model.rerank_lm.model.num_types,
+      lang_model.rerank_lm.model.num_types,
     "rerank-num-word-tokens" ->
-      combined_lang_model.lang_model.rerank_lm.model.num_tokens,
-    "incoming-links" -> combined_lang_model.incoming_links,
+      lang_model.rerank_lm.model.num_tokens,
+    "incoming-links" -> incoming_links,
     "most-popular-document" -> (
       if (most_popular_document != null)
         Encoder.string(most_popular_document.title)
@@ -259,8 +268,8 @@ abstract class GridCell[Co](
           (<mostPopularDocument>most_popular_document.xmldesc</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocuments>{ combined_lang_model.num_docs }</numDocuments>
-      <incomingLinks>{ combined_lang_model.incoming_links }</incomingLinks>
+      <numDocuments>{ num_docs }</numDocuments>
+      <incomingLinks>{ incoming_links }</incomingLinks>
     </GridCell>
 
   /**
@@ -281,8 +290,8 @@ abstract class GridCell[Co](
    */
   def finish() {
     assert(!finished)
-    combined_lang_model.lang_model.finish_before_global()
-    combined_lang_model.lang_model.finish_after_global()
+    lang_model.finish_before_global()
+    lang_model.finish_after_global()
   }
 }
 
@@ -438,7 +447,7 @@ abstract class Grid[Co](
 
     iter_nonempty_cells foreach { cell =>
       total_num_docs +=
-        cell.combined_lang_model.num_docs
+        cell.num_docs
     }
 
     driver.note_print_result("number-of-non-empty-cells", num_non_empty_cells,

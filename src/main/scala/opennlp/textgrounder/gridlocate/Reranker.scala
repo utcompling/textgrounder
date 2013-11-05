@@ -159,7 +159,7 @@ abstract class WordByWordCandidateInstFactory[Co] extends
   def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
     val celldist =
-      Unigram.check_unigram_lang_model(cell.combined_lang_model.lang_model.rerank_lm)
+      Unigram.check_unigram_lang_model(cell.lang_model.rerank_lm)
     for ((word, count) <- doclm.model.iter_items;
          featval = get_word_feature(word, count, doclm, celldist);
          if featval != None)
@@ -179,7 +179,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
   def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
     val celldist =
-      Ngram.check_ngram_lang_model(cell.combined_lang_model.lang_model.rerank_lm)
+      Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
     for ((ngram, count) <- doclm.model.iter_items;
          featval = get_ngram_feature(ngram, count, doclm, celldist);
          if featval != None)
