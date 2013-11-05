@@ -4,7 +4,7 @@
 
 # 1. Single-run example:
 #
-# $ qsub-tg-geolocate --verbose geotext --word-dist jelinek --jelinek-factor 0.4
+# $ qsub-tg-geolocate --verbose geotext --lang-model jelinek:0.4
 #
 # Here we specify arguments as if we were running tg-geolocate.  This can
 # include arguments before the dataset, e.g. --verbose (as shown) or
@@ -12,7 +12,7 @@
 #
 # 2. Multi-run example:
 #
-# $ qsub-tg-geolocate 0.1 0.2 0.3 -- --verbose geotext --word-dist jelinek --jelinek-factor {}
+# $ qsub-tg-geolocate 0.1 0.2 0.3 -- --verbose geotext --lang-model jelinek:{}
 #
 # In this case, we specify a set of arguments, followed by --, followed in
 # turn by the arguments by tg-geolocate, where {} is replaced by the
