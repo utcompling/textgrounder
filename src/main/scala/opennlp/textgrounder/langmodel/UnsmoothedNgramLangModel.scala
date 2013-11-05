@@ -46,31 +46,19 @@ class UnsmoothedNgramLangModel(
   }
 
   def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = {
-    assert(false, "Not implemented")
-    0.0
-  }
+      partial: Boolean = false) = ???
 
   def cosine_similarity(other: LangModel, partial: Boolean = false,
-      smoothed: Boolean = false) = {
-    assert(false, "Not implemented")
-    0.0
-  }
+      smoothed: Boolean = false) = ???
 
-  def kl_divergence_34(other: NgramLangModel) = {
-    assert(false, "Not implemented")
-    0.0
-  }
+  def kl_divergence_34(other: NgramLangModel) = ???
  
   /**
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
    */
   def inner_kl_divergence_34(other: TThis,
-      overall_probs_diff_words: Double) = {
-    assert(false, "Not implemented")
-    0.0
-  }
+      overall_probs_diff_words: Double) = ???
 
   def lookup_ngram(ngram: Ngram) =
     model.get_item(ngram).toDouble / num_tokens

@@ -32,7 +32,7 @@ import util.spherical._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.os._
-import util.print.{errprint, outprint, fixme_error}
+import util.print.{errprint, outprint}
 import util.text.format_float
 import util.textdb.Encoder
 import util.time.format_minutes_seconds
@@ -780,8 +780,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(docstats)
           }
-          case "raw-text" =>
-            fixme_error("raw-text eval format not yet implemented")
+          case "raw-text" => ???
         }
       // The call to `toIndexedSeq` forces evaluation of the Iterator
       val results = results_iter.toIndexedSeq
