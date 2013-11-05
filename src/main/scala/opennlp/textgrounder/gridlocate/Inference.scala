@@ -68,9 +68,9 @@ class MostPopularGridRanker[Co] (
         grid.iter_nonempty_cells_including(include))
       yield (cell,
         (if (internal_link)
-           cell.combined_lang_model.incoming_links
+           cell.incoming_links
          else
-           cell.combined_lang_model.num_docs).toDouble)).
+           cell.num_docs).toDouble)).
     toIndexedSeq sortWith (_._2 > _._2)
   }
 }
@@ -101,7 +101,7 @@ abstract class PointwiseScoreGridRanker[Co](
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
             cell.describe_indices, cell.describe_location,
-            cell.combined_lang_model.num_docs)
+            cell.num_docs)
         }
         (cell, score_cell(lang_model, cell))
       }
@@ -135,7 +135,7 @@ abstract class PointwiseScoreGridRanker[Co](
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
           cell.describe_indices, cell.describe_location,
-          cell.combined_lang_model.num_docs, score)
+          cell.num_docs, score)
     }
     retval
   }
@@ -169,7 +169,7 @@ class KLDivergenceGridRanker[Co](
     self.kl_divergence(self_kl_cache, other, partial = partial)
 
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
-    val cell_lang_model = cell.combined_lang_model.lang_model.grid_lm
+    val cell_lang_model = cell.lang_model.grid_lm
     var kldiv = call_kl_divergence(lang_model, cell_lang_model)
     if (symmetric) {
       val kldiv2 = cell_lang_model.kl_divergence(null, lang_model,
@@ -198,7 +198,7 @@ class KLDivergenceGridRanker[Co](
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           fast_slow_dist.slow_kl_divergence_debug(
-            cell.combined_lang_model.lang_model.grid_lm, partial = partial,
+            cell.lang_model.grid_lm, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
@@ -238,7 +238,7 @@ class CosineSimilarityGridRanker[Co](
 
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val cossim =
-      lang_model.cosine_similarity(cell.combined_lang_model.lang_model.grid_lm,
+      lang_model.cosine_similarity(cell.lang_model.grid_lm,
         partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -267,9 +267,9 @@ class NaiveBayesGridRanker[Co](
       } else (1.0, 0.0))
 
     val word_logprob =
-      cell.combined_lang_model.lang_model.grid_lm.get_nbayes_logprob(lang_model)
+      cell.lang_model.grid_lm.get_nbayes_logprob(lang_model)
     val baseline_logprob =
-      log(cell.combined_lang_model.num_docs.toDouble /
+      log(cell.num_docs.toDouble /
           grid.total_num_docs)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)

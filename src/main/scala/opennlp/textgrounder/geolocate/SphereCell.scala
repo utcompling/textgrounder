@@ -175,7 +175,7 @@ abstract class RectangularCell(
   val centroid = new Array[Double](2)
 
   def get_centroid = {
-    val nd = combined_lang_model.num_docs
+    val nd = num_docs
     if (nd == 0) {
       // if we have an empty cell, there is no such thing as
       // a centroid, so default to the center

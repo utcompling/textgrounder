@@ -160,7 +160,7 @@ class DocEvalResult[Co](
   /**
    * Number of documents in the correct cell
    */
-  val num_docs_in_correct_cell = correct_cell.combined_lang_model.num_docs
+  val num_docs_in_correct_cell = correct_cell.num_docs
   /**
    * Central point of the correct cell
    */
@@ -210,7 +210,7 @@ class DocEvalResult[Co](
     "correct-cell-true-center" -> correct_cell.get_true_center,
     "correct-cell-centroid" -> correct_cell.get_centroid,
     "correct-cell-central-point" -> correct_cell.get_central_point,
-    "correct-cell-numdocs" -> correct_cell.combined_lang_model.num_docs,
+    "correct-cell-numdocs" -> correct_cell.num_docs,
     "pred-coord" -> pred_coord,
     "oracle-dist" -> correct_truedist,
     "error-dist" -> pred_truedist
@@ -653,7 +653,7 @@ abstract class GridEvaluator[Co](
     assert(maybe_correct_cell != None)
     val correct_cell = maybe_correct_cell.get
     if (debug("lots") || debug("commontop")) {
-      val naitr = correct_cell.combined_lang_model.num_docs
+      val naitr = correct_cell.num_docs
       errprint("Evaluating document %s with %s documents in correct cell",
         document, naitr)
     }
@@ -748,7 +748,7 @@ class RankedDocEvalResult[Co](
     "pred-cell-true-center" -> pred_cell.get_true_center,
     "pred-cell-centroid" -> pred_cell.get_centroid,
     "pred-cell-central-point" -> pred_cell.get_central_point,
-    "pred-cell-numdocs" -> pred_cell.combined_lang_model.num_docs,
+    "pred-cell-numdocs" -> pred_cell.num_docs,
     "correct-rank" -> correct_rank
   )
 }
@@ -772,7 +772,7 @@ class RerankedDocEvalResult[Co](
     "initial-pred-cell" -> initial_pred_cell.describe_location,
     "initial-pred-cell-true-center" -> initial_pred_cell.get_true_center,
     "initial-pred-cell-central-point" -> initial_pred_cell.get_central_point,
-    "initial-pred-cell-numdocs" -> initial_pred_cell.combined_lang_model.num_docs,
+    "initial-pred-cell-numdocs" -> initial_pred_cell.num_docs,
     "initial-correct-rank" -> initial_correct_rank
   )
 }

@@ -138,7 +138,7 @@ class TimeGrid(
       category <- categories
       pair = pairs(category)
       v <- List(pair.before_cell, pair.after_cell)
-      if (!v.combined_lang_model.is_empty)
+      if (!v.is_empty)
     } yield v
   }
 
@@ -149,9 +149,9 @@ class TimeGrid(
       pair.after_cell.finish()
       /* FIXME!!!  Computation of num_non_empty_cells should happen
          automatically!  */
-      if (!pair.before_cell.combined_lang_model.is_empty)
+      if (!pair.before_cell.is_empty)
         num_non_empty_cells += 1
-      if (!pair.after_cell.combined_lang_model.is_empty)
+      if (!pair.after_cell.is_empty)
         num_non_empty_cells += 1
       for ((cell, name) <-
           Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
@@ -178,7 +178,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
   def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
   def get_lm(cell: TimeCell): LM =
-    cell.combined_lang_model.lang_model.asInstanceOf[LM]
+    cell.lang_model.asInstanceOf[LM]
   def get_keys(lm: LM) = lm.model.iter_keys.toSet
   def lookup_item(lm: LM, item: Item): Double
   def format_item(item: Item): String
@@ -340,7 +340,7 @@ object LangModelComparer {
   def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) =
     /* FIXME: What about rerank_lm? */
-    grid.pairs(category).before_cell.combined_lang_model.lang_model.grid_lm match {
+    grid.pairs(category).before_cell.lang_model.grid_lm match {
       case _: UnigramLangModel =>
         new UnigramComparer(min_prob, max_items)
       case _: NgramLangModel =>

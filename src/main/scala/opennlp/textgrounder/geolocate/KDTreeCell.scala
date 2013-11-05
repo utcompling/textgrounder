@@ -157,7 +157,7 @@ class KdTreeGrid(
       driver.show_progress("interpolating", "K-d tree cell").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
-        val wd = cell.combined_lang_model.lang_model
+        val wd = cell.lang_model
         val model = wd.asInstanceOf[UnigramLangModel].model
 
         for ((k,v) <- model.iter_items) {
@@ -165,7 +165,7 @@ class KdTreeGrid(
         }
 
         val pcell = nodes_to_cell(node.parent)
-        val pwd = pcell.combined_lang_model.lang_model
+        val pwd = pcell.lang_model
         val pmodel = pwd.asInstanceOf[UnigramLangModel].model
 
         for ((k,v) <- pmodel.iter_items) {

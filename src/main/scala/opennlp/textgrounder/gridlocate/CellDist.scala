@@ -85,7 +85,7 @@ class WordCellDist[Co](
     // Compute and store un-normalized probabilities for all cells
     for (cell <- grid.iter_nonempty_cells) {
       val lang_model =
-        Unigram.check_unigram_lang_model(cell.combined_lang_model.lang_model.grid_lm)
+        Unigram.check_unigram_lang_model(cell.lang_model.grid_lm)
       val prob = lang_model.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
