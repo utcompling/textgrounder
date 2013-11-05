@@ -314,7 +314,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     between e.g. the name "Mark" and the word "mark".""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
-    help="""Largest size of n-grams to create.  Default 1, i.e. distribution
+    help="""Largest size of n-grams to create.  Default 1, i.e. language model
     only contains unigrams.""")
 
   // FIXME!! The following should really be controllable using the

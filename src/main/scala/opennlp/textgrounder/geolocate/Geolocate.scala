@@ -40,8 +40,8 @@ import util.time.format_minutes_seconds
 import util.debug._
 import gridlocate._
 
-import worddist.{WordDist,WordDistFactory,Unigram}
-import worddist.WordDist._
+import langmodel.{LangModel,LangModelFactory,Unigram}
+import langmodel.LangModel._
 
 /*
 
@@ -122,22 +122,22 @@ class CellDistMostCommonToponymSphereGridRanker(
   val cdist_factory =
     new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
 
-  def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
-    val word_dist = Unigram.check_unigram_dist(_word_dist)
+  def return_ranked_cells(_lang_model: LangModel, include: Iterable[SphereCell]) = {
+    val lang_model = Unigram.check_unigram_lang_model(_lang_model)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
-    var maxword = word_dist.find_most_common_word(
+    var maxword = lang_model.find_most_common_word(
       word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
-      maxword = word_dist.find_most_common_word(
+      maxword = lang_model.find_most_common_word(
         word => word(0).isUpper)
     }
     if (maxword == None)
-      maxword = word_dist.find_most_common_word(word => true)
+      maxword = lang_model.find_most_common_word(word => true)
     cdist_factory.get_cell_dist(sphere_grid, maxword.get).
       get_ranked_cells(include)
   }
@@ -147,14 +147,14 @@ class LinkMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
-  def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
-    val word_dist = Unigram.check_unigram_dist(_word_dist)
+  def return_ranked_cells(_lang_model: LangModel, include: Iterable[SphereCell]) = {
+    val lang_model = Unigram.check_unigram_lang_model(_lang_model)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
-    var maxword = word_dist.find_most_common_word(
+    var maxword = lang_model.find_most_common_word(
       word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
-      maxword = word_dist.find_most_common_word(
+      maxword = lang_model.find_most_common_word(
         word => wikipedia_fact.word_is_toponym(word))
     }
     if (debug("commontop"))
@@ -196,7 +196,7 @@ class LinkMostCommonToponymSphereGridRanker(
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
       new RandomGridRanker[SphereCoord](ranker_name, sphere_grid).
-        return_ranked_cells(word_dist, include))
+        return_ranked_cells(lang_model, include))
   }
 }
 
@@ -240,8 +240,8 @@ cells that cover the Earth.  If given, it overrides the value of
 is used.""")
   var width_of_multi_cell =
     ap.option[Int]("width-of-multi-cell", metavar = "CELLS", default = 1,
-      help = """Width of the cell used to compute a statistical
-distribution for geolocation purposes, in terms of number of tiling cells.
+      help = """Width of the cell used to compute a language model
+for geolocation purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
 later versions.  In normal circumstances, the value is 1, i.e. use a single
 tiling cell to compute each multi cell.  If the value is more than
@@ -271,11 +271,12 @@ on the longest dimension. Default '%default'.""")
 
   var kd_use_backoff =
     ap.flag("kd-backoff", "kd-use-backoff",
-      help = """Specifies if we should back off to larger cell distributions.""")
+      help = """Specifies if we should back off to larger cell
+language models.""")
 
   var kd_interpolate_weight =
     ap.option[Double]("kd-interpolate-weight", "kdiw", default = 0.0,
-      help = """Specifies the weight given to parent distributions.
+      help = """Specifies the weight given to parent language models.
 Default value '%default' means no interpolation is used.""")
 
   //// Combining the kd-tree model with the cell-grid model
@@ -452,8 +453,8 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   }
 
   protected def create_document_factory(
-      word_dist_factory: DocWordDistFactory) =
-    new SphereDocFactory(this, word_dist_factory)
+      lang_model_factory: DocLangModelFactory) =
+    new SphereDocFactory(this, lang_model_factory)
 
   protected def create_grid(docfact: GridDocFactory[SphereCoord]) = {
     val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
@@ -918,7 +919,7 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
       } mkString "+"
       ),
       ("ranker", valonly),
-      ("word-dist", valonly),
+      ("lang-model", valonly),
       ("interpolate", x => x match {
         case "yes" => "interpolate"
         case "no" => "backoff"

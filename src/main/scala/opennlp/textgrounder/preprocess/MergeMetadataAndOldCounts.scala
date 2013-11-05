@@ -61,11 +61,11 @@ class MMCParameters(val parser: ArgParser) extends
 /**
  * A simple reader for word-count files in the old multi-line count format.
  * This is stripped of debugging code, code to handle case-merging, stopwords
- * and other modifications of the distributions, etc.  All it does is
- * read the distributions and pass them to `handle_document`.
+ * and other modifications of the language models, etc.  All it does is
+ * read the language models and pass them to `handle_document`.
  */
 
-trait SimpleUnigramWordDistBuilder {
+trait SimpleUnigramLangModelBuilder {
   val initial_dynarr_size = 1000
   val keys_dynarr =
     new DynamicArray[String](initial_alloc = initial_dynarr_size)
@@ -123,16 +123,16 @@ trait SimpleUnigramWordDistBuilder {
 }
 
 /**
- * A simple factory for reading in the unigram distributions in the old
+ * A simple factory for reading in the unigram language models in the old
  * format.
  */
-class MMCUnigramWordDistHandler(
+class MMCUnigramLangModelHandler(
   schema: Schema,
   document_fieldvals: Map[String, Seq[String]],
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
-) extends SimpleUnigramWordDistBuilder {
+) extends SimpleUnigramLangModelBuilder {
   val new_schema = new Schema(schema.fieldnames ++ Seq("unigram-counts"),
     schema.fixed_values)
   val writer = new TextDBWriter(new_schema)
@@ -206,7 +206,7 @@ counts file also containing the metadata.
       }).toMap
 
     val counts_handler =
-      new MMCUnigramWordDistHandler(schema,
+      new MMCUnigramLangModelHandler(schema,
         document_fieldvals, filehand, params.output_dir,
         params.output_file_prefix)
     counts_handler.read_word_counts(filehand, params.counts_file)

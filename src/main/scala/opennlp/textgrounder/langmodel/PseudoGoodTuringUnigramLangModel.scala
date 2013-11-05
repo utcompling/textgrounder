@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  PseudoGoodTuringUnigramWordDist.scala
+//  PseudoGoodTuringUnigramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,7 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import util.print.errprint
 
@@ -38,11 +38,11 @@ import util.debug._
  * of the mass or whatever to unseen words, as can happen to add-one smoothing
  * especially for bigrams or trigrams).
  */ 
-class PseudoGoodTuringUnigramWordDistFactory(
-    create_builder: WordDistFactory => WordDistBuilder,
+class PseudoGoodTuringUnigramLangModelFactory(
+    create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,
     tf_idf: Boolean
-) extends DiscountedUnigramWordDistFactory(
+) extends DiscountedUnigramLangModelFactory(
   create_builder, interpolate_string == "yes", tf_idf
 ) {
   // Total number of types seen once
@@ -57,7 +57,7 @@ class PseudoGoodTuringUnigramWordDistFactory(
   // look up in.
   // unknown_document_counts = ([], [])
 
-  override def finish_global_distribution() {
+  override def finish_global_backoff_stats() {
     // Now, adjust overall_word_probs accordingly.
     //// FIXME: A simple calculation reveals that in the scheme where we use
     //// globally_unseen_word_prob, total_num_types_seen_once cancels out and
@@ -75,19 +75,19 @@ class PseudoGoodTuringUnigramWordDistFactory(
                total_num_word_types, total_num_word_tokens,
                total_num_types_seen_once,
                (overall_word_probs.values sum))
-    super.finish_global_distribution()
+    super.finish_global_backoff_stats()
   }
 
-  def create_word_dist = new PseudoGoodTuringUnigramWordDist(this)
+  def create_lang_model = new PseudoGoodTuringUnigramLangModel(this)
 }
 
-class PseudoGoodTuringUnigramWordDist(
-  factory: PseudoGoodTuringUnigramWordDistFactory
-) extends DiscountedUnigramWordDist(factory) {
+class PseudoGoodTuringUnigramLangModel(
+  factory: PseudoGoodTuringUnigramLangModelFactory
+) extends DiscountedUnigramLangModel(factory) {
   /**
    * Here we compute the value of `overall_unseen_mass`, which depends
    * on the global `overall_word_probs` computed from all of the
-   * distributions.
+   * lang models.
    */
   override protected def imp_finish_after_global() {
     // Compute probabilities.  Use a very simple version of Good-Turing

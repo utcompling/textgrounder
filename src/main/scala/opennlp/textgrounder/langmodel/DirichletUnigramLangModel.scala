@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  JelinekMercerUnigramWordDist.scala
+//  DirichletUnigramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,28 +17,30 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 /**
- * This class implements Jelinek-Mercer discounting, the simplest type of
- * discounting where we just use a constant discount factor.
+ * This class implements Dirichlet discounting, where the discount factor
+ * depends on the size of the document.
  */ 
-class JelinekMercerUnigramWordDistFactory(
-  create_builder: WordDistFactory => WordDistBuilder,
-  interpolate_string: String,
-  tf_idf: Boolean,
-  val jelinek_factor: Double
-) extends DiscountedUnigramWordDistFactory(
+class DirichletUnigramLangModelFactory(
+    create_builder: LangModelFactory => LangModelBuilder,
+    interpolate_string: String,
+    tf_idf: Boolean,
+    val dirichlet_factor: Double
+) extends DiscountedUnigramLangModelFactory(
   create_builder, interpolate_string != "no", tf_idf
 ) {
-  def create_word_dist = new JelinekMercerUnigramWordDist(this)
+  def create_lang_model = new DirichletUnigramLangModel(this)
 }
 
-class JelinekMercerUnigramWordDist(
-  factory: JelinekMercerUnigramWordDistFactory
-) extends DiscountedUnigramWordDist(factory) {
+class DirichletUnigramLangModel(
+  factory: DirichletUnigramLangModelFactory
+) extends DiscountedUnigramLangModel(factory) {
   override protected def imp_finish_after_global() {
-    unseen_mass = factory.jelinek_factor
+    unseen_mass = 1.0 -
+      (model.num_tokens.toDouble /
+        (model.num_tokens + factory.dirichlet_factor))
     super.imp_finish_after_global()
   }
 }

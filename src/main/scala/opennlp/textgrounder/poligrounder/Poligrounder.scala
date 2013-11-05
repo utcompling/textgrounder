@@ -52,7 +52,7 @@ corpus and amalgamates them using a grid of some sort.  We can reuse this
 to amalgate documents by time.  E.g. if we want to compare two specific time
 periods, we will have two corresponding cells, one for each period, and
 throw away the remaining documents.  In other cases where we might want to
-look at distributions over a period of time, we will have more cells, at
+look at language models over a period of time, we will have more cells, at
 (possibly more or less) regular intervals.
 
 */
@@ -75,7 +75,7 @@ import util.time._
 import gridlocate._
 import util.debug._
 
-import worddist.WordDist._
+import langmodel.LangModel._
 
 /*
 
@@ -111,12 +111,12 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
     help = """Chunk of end time to compare.""")
 
   var min_prob = ap.option[Double]("min-prob", "mp", default = 0.0,
-    help = """Mininum probability when comparing distributions.
+    help = """Mininum probability when comparing language models.
     Default is 0.0, which means no restrictions.""")
 
   var max_items = ap.option[Int]("max-items", "mi", default = 200,
     help = """Maximum number of items (words or n-grams) to output when
-    comparing distributions.  Default is %default.  This applies separately
+    comparing language models.  Default is %default.  This applies separately
     to those items that have increased and decreased, meaning the total
     number counting both kinds may be as much as twice the maximum.""")
 
@@ -134,10 +134,10 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
 //  var mode = ap.option[String]("m", "mode",
 //    default = "combined",
 //    choices = Seq("combined", "ideo-users"),
-//    help = """How to compare distributions.  Possible values are
+//    help = """How to compare language models.  Possible values are
 //    
 //    'combined': For a given time period, combine all users into a single
-//    distribution.
+//    language model.
 //    
 //    'ideo-users': Retrieve the ideology of the users and use that to
 //    separate the users into liberal and conservative, and compare those
@@ -186,8 +186,8 @@ class PoligrounderDriver extends
     super.handle_parameters()
   }
 
-  protected def create_document_factory(word_dist_factory: DocWordDistFactory) =
-    new TimeDocFactory(this, word_dist_factory)
+  protected def create_document_factory(lang_model_factory: DocLangModelFactory) =
+    new TimeDocFactory(this, lang_model_factory)
 
   protected def create_grid(docfact: GridDocFactory[TimeCoord]) = {
     val time_docfact = docfact.asInstanceOf[TimeDocFactory]
@@ -208,11 +208,11 @@ class PoligrounderDriver extends
   def run() {
     val grid = initialize_grid
     if (params.ideological_user_corpus == null)
-      DistributionComparer.compare_cells_2way(
+      LangModelComparer.compare_cells_2way(
         grid.asInstanceOf[TimeGrid], "all",
         params.min_prob, params.max_items)
     else
-      DistributionComparer.compare_cells_4way(
+      LangModelComparer.compare_cells_4way(
         grid.asInstanceOf[TimeGrid], "liberal", "conservative",
         params.min_prob, params.max_items)
   }

@@ -24,7 +24,7 @@ import math._
 import util.spherical._
 
 import gridlocate.{Grid,WordCellDist,CellDistFactory}
-import worddist.WordDist._
+import langmodel.LangModel._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //
@@ -34,7 +34,7 @@ import worddist.WordDist._
  * This is the Sphere-specific version of `WordCellDist`, which is used for
  * a distribution over cells that is associated with a single word.  This
  * is used in particular for the rankers and Geolocate applications that
- * need to invert the per-cell word distributions to obtain a per-word cell
+ * need to invert the per-cell language models to obtain a per-word cell
  * distribution: Specifically, the GenerateKML app (which generates a KML
  * file showing the cell distribution of a given word across the Earth);
  * the `average-cell-probability` ranker (which uses the inversion strategy

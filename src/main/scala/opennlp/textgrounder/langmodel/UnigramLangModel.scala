@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  UnigramWordDist.scala
+//  UnigramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2012 Mike Speriosu, The University of Texas at Austin
@@ -18,7 +18,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import math._
 import collection.mutable
@@ -34,13 +34,13 @@ import util.print.{errprint, warning}
 import gridlocate.GridDoc
 import util.debug._
 
-import WordDist._
+import LangModel._
 
 object Unigram {
-  def check_unigram_dist(word_dist: WordDist) = {
-    word_dist match {
-      case x: UnigramWordDist => x
-      case _ => throw new IllegalArgumentException("You must use a unigram word distribution for these parameters")
+  def check_unigram_lang_model(lang_model: LangModel) = {
+    lang_model match {
+      case x: UnigramLangModel => x
+      case _ => throw new IllegalArgumentException("You must use a unigram language model for these parameters")
     }
   }
 }
@@ -105,7 +105,7 @@ class UnigramStorage extends ItemStorage[Word] {
 }
 
 /**
- * Unigram word distribution with a table listing counts for each word,
+ * Unigram language model with a table listing counts for each word,
  * initialized from the given key/value pairs.
  *
  * @param key Array holding keys, possibly over-sized, so that the internal
@@ -116,9 +116,9 @@ class UnigramStorage extends ItemStorage[Word] {
  *   statistics.
  */
 
-abstract class UnigramWordDist(
-  factory: UnigramWordDistFactory
-) extends WordDist(factory) with FastSlowKLDivergence {
+abstract class UnigramLangModel(
+  factory: UnigramLangModelFactory
+) extends LangModel(factory) with FastSlowKLDivergence {
   type Item = Word
   val pmodel = new UnigramStorage()
   val model = pmodel
@@ -138,7 +138,7 @@ abstract class UnigramWordDist(
           view(0, num_actual_words_to_print))
       yield "%s=%s" format (memoizer.unmemoize(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
+    "UnigramLangModel(%d types, %s tokens%s%s, %s)" format (
         model.num_types, model.num_tokens, innerToString,
         finished_str, words)
   }
@@ -149,16 +149,16 @@ abstract class UnigramWordDist(
 
   /**
    * This is a basic unigram implementation of the computation of the
-   * KL-divergence between this distribution and another distribution,
+   * KL-divergence between this lang model and another lang model,
    * including possible debug information.
    * 
    * Computing the KL divergence is a bit tricky, especially in the
    * presence of smoothing, which assigns probabilities even to words not
-   * seen in either distribution.  We have to take into account:
+   * seen in either lang model.  We have to take into account:
    * 
-   * 1. Words in this distribution (may or may not be in the other).
-   * 2. Words in the other distribution that are not in this one.
-   * 3. Words in neither distribution but seen globally.
+   * 1. Words in this lang model (may or may not be in the other).
+   * 2. Words in the other lang model that are not in this one.
+   * 3. Words in neither lang model but seen in the global back-off stats.
    * 4. Words never seen at all.
    * 
    * The computation of steps 3 and 4 depends heavily on the particular
@@ -166,9 +166,9 @@ abstract class UnigramWordDist(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
       return_contributing_words: Boolean = false) = {
-    val other = xother.asInstanceOf[UnigramWordDist]
+    val other = xother.asInstanceOf[UnigramLangModel]
     var kldiv = 0.0
     val contribs =
       if (return_contributing_words) mutable.Map[String, WordCount]() else null
@@ -208,12 +208,12 @@ abstract class UnigramWordDist(
    * Steps 3 and 4 of KL-divergence computation.
    * @see #slow_kl_divergence_debug
    */
-  def kl_divergence_34(other: UnigramWordDist): Double
+  def kl_divergence_34(other: UnigramLangModel): Double
   
-  def get_nbayes_logprob(xworddist: WordDist) = {
-    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+  def get_nbayes_logprob(xlangmodel: LangModel) = {
+    val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     var logprob = 0.0
-    for ((word, count) <- worddist.model.iter_items) {
+    for ((word, count) <- langmodel.model.iter_items) {
       val value = lookup_word(word)
       assert(value >= 0)
       // The probability returned will be 0 for words never seen in the
@@ -227,14 +227,14 @@ abstract class UnigramWordDist(
   }
 
   /**
-   * Return the probabilitiy of a given word in the distribution.
+   * Return the probability of a given word in the lang model.
    */
   protected def imp_lookup_word(word: Word): Double
 
   def lookup_word(word: Word): Double = {
     assert(finished)
     if (empty)
-      throw new IllegalStateException("Attempt to lookup word %s in empty distribution %s"
+      throw new IllegalStateException("Attempt to lookup word %s in empty lang model %s"
         format (memoizer.unmemoize(word), this))
     val wordprob = imp_lookup_word(word)
     // Write this way because if negated as an attempt to catch bad values,
@@ -268,13 +268,13 @@ abstract class UnigramWordDist(
   }
 }
 
-class DefaultUnigramWordDistBuilder(
-  factory: WordDistFactory,
+class DefaultUnigramLangModelBuilder(
+  factory: LangModelFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
   whitelist: Set[String],
   minimum_word_count: Int = 1
-) extends WordDistBuilder(factory: WordDistFactory) {
+) extends LangModelBuilder(factory: LangModelFactory) {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.
    */
@@ -326,17 +326,17 @@ class DefaultUnigramWordDistBuilder(
       false
   }
 
-  protected def imp_add_document(dist: WordDist, words: Iterable[String]) {
-    val model = dist.asInstanceOf[UnigramWordDist].model
+  protected def imp_add_document(lm: LangModel, words: Iterable[String]) {
+    val model = lm.asInstanceOf[UnigramLangModel].model
     for (word <- words)
       add_word_with_count(model, word, 1)
   }
 
-  protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
+  protected def imp_add_language_model(lm: LangModel, other: LangModel,
       partial: WordCount) {
     // FIXME: Implement partial!
-    val model = dist.asInstanceOf[UnigramWordDist].model
-    val othermodel = other.asInstanceOf[UnigramWordDist].model
+    val model = lm.asInstanceOf[UnigramLangModel].model
+    val othermodel = other.asInstanceOf[UnigramLangModel].model
     for ((word, count) <- othermodel.iter_items)
       model.add_item(word, count)
   }
@@ -345,9 +345,9 @@ class DefaultUnigramWordDistBuilder(
    * Actual implementation of `add_keys_values` by subclasses.
    * External callers should use `add_keys_values`.
    */
-  protected def imp_add_keys_values(dist: WordDist, keys: Array[String],
+  protected def imp_add_keys_values(lm: LangModel, keys: Array[String],
       values: Array[Int], num_words: Int) {
-    val model = dist.asInstanceOf[UnigramWordDist].model
+    val model = lm.asInstanceOf[UnigramLangModel].model
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
@@ -364,24 +364,24 @@ class DefaultUnigramWordDistBuilder(
   } 
 
   /**
-   * Incorporate a set of (key, value) pairs into the distribution.
+   * Incorporate a set of (key, value) pairs into the language model.
    * The number of pairs to add should be taken from `num_words`, not from
    * the actual length of the arrays passed in.  The code should be able
    * to handle the possibility that the same word appears multiple times,
    * adding up the counts for each appearance of the word.
    */
-  protected def add_keys_values(dist: WordDist,
+  protected def add_keys_values(lm: LangModel,
       keys: Array[String], values: Array[Int], num_words: Int) {
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
+    assert(!lm.finished)
+    assert(!lm.finished_before_global)
     assert(keys.length >= num_words)
     assert(values.length >= num_words)
-    imp_add_keys_values(dist, keys, values, num_words)
+    imp_add_keys_values(lm, keys, values, num_words)
   }
 
-  protected def imp_finish_before_global(gendist: WordDist) {
-    val dist = gendist.asInstanceOf[UnigramWordDist]
-    val model = dist.model
+  protected def imp_finish_before_global(gendist: LangModel) {
+    val lm = gendist.asInstanceOf[UnigramLangModel]
+    val model = lm.model
     val oov = memoizer.memoize("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate words whose count
@@ -397,17 +397,17 @@ class DefaultUnigramWordDistBuilder(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def create_distribution(countstr: String) = {
+  def create_lang_model(countstr: String) = {
     parse_counts(countstr)
-    // Now set the distribution on the document.
-    val dist = factory.create_word_dist
-    add_keys_values(dist, keys_dynarr.array, values_dynarr.array,
+    // Now set the language model on the document.
+    val lm = factory.create_lang_model
+    add_keys_values(lm, keys_dynarr.array, values_dynarr.array,
       keys_dynarr.length)
-    dist
+    lm
   }
 }
 
 /**
- * General factory for UnigramWordDist distributions.
+ * General factory for UnigramLangModel language models.
  */ 
-trait UnigramWordDistFactory extends WordDistFactory { }
+trait UnigramLangModelFactory extends LangModelFactory { }

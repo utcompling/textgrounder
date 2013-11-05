@@ -44,7 +44,7 @@ import gridlocate.{DocStatus, RawDocument}
   the equator and is derived from the value for the Earth's radius.)
 
   In addition, we form a square of tiling cells in order to create a
-  "multi cell", which is used to compute a distribution over words.  The
+  "multi cell", which is used to compute a language model.  The
   number of tiling cells on a side of a multi cell is determined by
   --width-of-multi-cell.  Note that if this is greater than 1, different
   multi cells will overlap.
@@ -177,8 +177,8 @@ class MultiRegularCell(
 /**
  * Grid composed of possibly-overlapping multi cells, based on an underlying
  * grid of regularly-spaced square cells tiling the earth.  The multi cells,
- * over which word distributions are computed for comparison with the word
- * distribution of a given document, are composed of NxN tiles, where possibly
+ * over which language models are computed for comparison with the language
+ * model of a given document, are composed of NxN tiles, where possibly
  * N > 1.
  *
  * FIXME: We should abstract out the concept of a grid composed of tiles and
@@ -226,7 +226,7 @@ class MultiRegularGrid(
    * Mapping from index of southwest corner of multi cell to corresponding
    * cell object.  A "multi cell" is made up of a square of tiling cells,
    * with the number of cells on a side determined by `width_of_multi_cell'.
-   * A word distribution is associated with each multi cell.
+   * A language model is associated with each multi cell.
    *
    * We don't just create an array because we expect many cells to have no
    * documents in them, esp. as we decrease the cell size.
@@ -479,7 +479,7 @@ class MultiRegularGrid(
     assert(all_cells_computed)
     (for {
       v <- corner_to_multi_cell.values
-      if (!v.combined_dist.is_empty)
+      if (!v.combined_lang_model.is_empty)
     } yield v).toIndexedSeq
   }
 

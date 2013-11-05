@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  NgramWordDist.scala
+//  NgramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2012 Mike Speriosu, The University of Texas at Austin
@@ -18,7 +18,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import math._
 import collection.mutable
@@ -34,13 +34,13 @@ import util.print.{errprint, warning}
 import gridlocate.GridDoc
 import util.debug._
 
-import WordDist._
+import LangModel._
 
 object Ngram {
-  def check_ngram_dist(word_dist: WordDist) = {
-    word_dist match {
-      case x: NgramWordDist => x
-      case _ => throw new IllegalArgumentException("You must use an ngram word distribution for these parameters")
+  def check_ngram_lang_model(lang_model: LangModel) = {
+    lang_model match {
+      case x: NgramLangModel => x
+      case _ => throw new IllegalArgumentException("You must use an ngram language model for these parameters")
     }
   }
 }
@@ -219,7 +219,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //}
 
 /**
- * Basic n-gram word distribution with tables listing counts for each n-gram.
+ * Basic n-gram language model with tables listing counts for each n-gram.
  * This is an abstract class because the smoothing algorithm (how to return
  * probabilities for a given n-gram) isn't specified.  This class takes care
  * of storing the n-grams.
@@ -247,14 +247,14 @@ class OpenNLPNgramStorer extends NgramStorage {
  * memory location (or index) in the trie serving as the value returned back
  * after memoization.
  * 
- * @param factory A `WordDistFactory` object used to create this distribution.
+ * @param factory A `LangModelFactory` object used to create this lang model.
  *   The object also stores global properties of various sorts (e.g. for
  *   smothing).
  */
 
-abstract class NgramWordDist(
-    factory: WordDistFactory
-  ) extends WordDist(factory) with FastSlowKLDivergence {
+abstract class NgramLangModel(
+    factory: LangModelFactory
+  ) extends LangModel(factory) with FastSlowKLDivergence {
   import NgramStorage.Ngram
   type Item = Ngram
   val model = new OpenNLPNgramStorer
@@ -271,7 +271,7 @@ abstract class NgramWordDist(
                                    view(0, num_words_to_print)))
         yield "%s=%s" format (word mkString " ", count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "NgramWordDist(%d types, %s tokens%s%s, %s)" format (
+    "NgramLangModel(%d types, %s tokens%s%s, %s)" format (
         model.num_types, model.num_tokens, innerToString, finished_str, words)
   }
 
@@ -279,16 +279,16 @@ abstract class NgramWordDist(
 
   /**
    * This is a basic unigram implementation of the computation of the
-   * KL-divergence between this distribution and another distribution,
+   * KL-divergence between this lang model and another lang model,
    * including possible debug information.
    * 
    * Computing the KL divergence is a bit tricky, especially in the
    * presence of smoothing, which assigns probabilities even to words not
-   * seen in either distribution.  We have to take into account:
+   * seen in either lang model.  We have to take into account:
    * 
-   * 1. Words in this distribution (may or may not be in the other).
-   * 2. Words in the other distribution that are not in this one.
-   * 3. Words in neither distribution but seen globally.
+   * 1. Words in this lang model (may or may not be in the other).
+   * 2. Words in the other lang model that are not in this one.
+   * 3. Words in neither lang model but seen in the global backoff stats.
    * 4. Words never seen at all.
    * 
    * The computation of steps 3 and 4 depends heavily on the particular
@@ -296,7 +296,7 @@ abstract class NgramWordDist(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, WordCount]) = {
     assert(false, "Not implemented")
@@ -307,9 +307,9 @@ abstract class NgramWordDist(
    * Steps 3 and 4 of KL-divergence computation.
    * @see #slow_kl_divergence_debug
    */
-  def kl_divergence_34(other: NgramWordDist): Double
+  def kl_divergence_34(other: NgramLangModel): Double
   
-  def get_nbayes_logprob(xworddist: WordDist) = {
+  def get_nbayes_logprob(xlangmodel: LangModel) = {
     assert(false, "Not implemented")
     0.0
   }
@@ -321,16 +321,16 @@ abstract class NgramWordDist(
 }
 
 /**
- * Class for building an n-gram word distribution from a corpus or other
+ * Class for building an n-gram language model from a corpus or other
  * data source.
  *
- * @param factory Factory object for creating word dists.
+ * @param factory Factory object for creating lang models.
  * @param ignore_case Whether to fold the case of all words to lowercase.
  * @param stopwords List of words to ignore (FIXME: Not implemented)
  * @param whitelist List of words to allow; if specified, all others are
  *   ignored. (FIXME: Not implemented)
  * @param minimum_word_count Minimum count for a given n-gram. N-grams
- *   with a lower count after the distribution is complete will be
+ *   with a lower count after the lang model is complete will be
  *   replaced with the generic token -OOV- ("out of vocabulary").
  * @param max_ngram Maximum n-gram size to allow. This is a filter that
  *   operates on n-grams read directly from a corpus. If 0, allow
@@ -339,15 +339,15 @@ abstract class NgramWordDist(
  *   n-grams from raw text (rather than reading from a pre-chunked
  *   corpus).
  */
-class DefaultNgramWordDistBuilder(
-  factory: WordDistFactory,
+class DefaultNgramLangModelBuilder(
+  factory: LangModelFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
   whitelist: Set[String],
   minimum_word_count: Int = 1,
   max_ngram: Int = 0,
   raw_text_max_ngram: Int = 3
-) extends WordDistBuilder(factory: WordDistFactory) {
+) extends LangModelBuilder(factory: LangModelFactory) {
   import NgramStorage.Ngram
   /**
    * Internal map holding the encoded ngrams and counts.
@@ -373,7 +373,7 @@ class DefaultNgramWordDistBuilder(
   /**
    * Returns true if the n-gram was counted, false if it was ignored (e.g.
    * due to length restrictions, stoplisting or whitelisting). */
-  protected def add_ngram_with_count(dist: NgramWordDist,
+  protected def add_ngram_with_count(lm: NgramLangModel,
       ngram: Ngram, count: WordCount) = {
     if (max_ngram > 0 && ngram.size > max_ngram)
       false
@@ -382,7 +382,7 @@ class DefaultNgramWordDistBuilder(
       // FIXME: Not right with stopwords or whitelist
       //if (!stopwords.contains(lgram) &&
       //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-        dist.model.add_item(lgram, count)
+        lm.model.add_item(lgram, count)
         true
       //}
       //else
@@ -392,50 +392,50 @@ class DefaultNgramWordDistBuilder(
 
 
 
-  protected def imp_add_document(gendist: WordDist,
+  protected def imp_add_document(gendist: LangModel,
       words: Iterable[String], raw_text_max_ngram: Int) {
-    val dist = gendist.asInstanceOf[NgramWordDist]
+    val lm = gendist.asInstanceOf[NgramLangModel]
     for (ngram <- (1 to raw_text_max_ngram).flatMap(words.sliding(_)))
-      add_ngram_with_count(dist, ngram, 1)
+      add_ngram_with_count(lm, ngram, 1)
   }
 
-  protected def imp_add_document(gendist: WordDist,
+  protected def imp_add_document(gendist: LangModel,
       words: Iterable[String]) {
     imp_add_document(gendist, words, raw_text_max_ngram)
   }
 
-  protected def imp_add_word_distribution(gendist: WordDist,
-      genother: WordDist, partial: WordCount) {
+  protected def imp_add_language_model(gendist: LangModel,
+      genother: LangModel, partial: WordCount) {
     // FIXME: Implement partial!
-    val dist = gendist.asInstanceOf[NgramWordDist]
-    val other = genother.asInstanceOf[NgramWordDist].model
+    val lm = gendist.asInstanceOf[NgramLangModel]
+    val other = genother.asInstanceOf[NgramLangModel].model
     for ((ngram, count) <- other.iter_items)
       // FIXME: Possible slowdown because we are lowercasing a second
       // time when it's probably already been done. Currently done this
-      // way rather than directly calling dist.model.add_item() to
+      // way rather than directly calling lm.model.add_item() to
       // check for --max-ngram and similar restrictions, just in case
-      // they were done differently in the source distribution.
-      add_ngram_with_count(dist, ngram, count)
+      // they were done differently in the source lang model.
+      add_ngram_with_count(lm, ngram, count)
   }
 
   /**
-   * Incorporate a set of (key, value) pairs into the distribution.
+   * Incorporate a set of (key, value) pairs into the lang model.
    * The number of pairs to add should be taken from `num_ngrams`, not from
    * the actual length of the arrays passed in.  The code should be able
    * to handle the possibility that the same ngram appears multiple times,
    * adding up the counts for each appearance of the ngram.
    */
-  protected def add_parsed_ngrams(gendist: WordDist,
+  protected def add_parsed_ngrams(gendist: LangModel,
       grams: collection.Map[String, Int]) {
-    val dist = gendist.asInstanceOf[NgramWordDist]
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
+    val lm = gendist.asInstanceOf[NgramLangModel]
+    assert(!lm.finished)
+    assert(!lm.finished_before_global)
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
     for ((egram, count) <- grams) {
       val ngram = textdb.decode_ngram_for_map_field(egram)
-      if (add_ngram_with_count(dist, ngram, count)) {
+      if (add_ngram_with_count(lm, ngram, count)) {
         addedTypes += 1
         addedTokens += count
       }
@@ -446,8 +446,8 @@ class DefaultNgramWordDistBuilder(
     //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
   } 
 
-  protected def imp_finish_before_global(dist: WordDist) {
-    val model = dist.asInstanceOf[NgramWordDist].model
+  protected def imp_finish_before_global(lm: LangModel) {
+    val model = lm.asInstanceOf[NgramLangModel].model
     // A table listing OOV ngrams, e.g. Seq(OOV, OOV), Seq(OOV, OOV, OOV), etc.
     val oov_hash = mutable.Map[Int, Ngram]()
     val oov = Seq("-OOV-")
@@ -473,16 +473,16 @@ class DefaultNgramWordDistBuilder(
   def maybe_lowercase(ngram: Ngram) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def create_distribution(countstr: String) = {
+  def create_lang_model(countstr: String) = {
     parse_counts(countstr)
-    // Now set the distribution on the document.
-    val dist = factory.create_word_dist
-    add_parsed_ngrams(dist, parsed_ngrams)
-    dist
+    // Now set the lang model on the document.
+    val lm = factory.create_lang_model
+    add_parsed_ngrams(lm, parsed_ngrams)
+    lm
   }
 }
 
 /**
- * General factory for NgramWordDist distributions.
+ * General factory for NgramLangModel lang models.
  */ 
-abstract class NgramWordDistFactory extends WordDistFactory { }
+abstract class NgramLangModelFactory extends LangModelFactory { }

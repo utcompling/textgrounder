@@ -160,7 +160,7 @@ class DocEvalResult[Co](
   /**
    * Number of documents in the correct cell
    */
-  val num_docs_in_correct_cell = correct_cell.combined_dist.num_docs
+  val num_docs_in_correct_cell = correct_cell.combined_lang_model.num_docs
   /**
    * Central point of the correct cell
    */
@@ -186,10 +186,10 @@ class DocEvalResult[Co](
    */
   def print_result(doctag: String, driver: GridLocateDriver[Co]) {
     errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    // errprint("%s:Document language model: %s", doctag, document.grid_lm)
     errprint("%s:  %d types, %f tokens",
-      doctag, document.grid_dist.model.num_types,
-      document.grid_dist.model.num_tokens)
+      doctag, document.grid_lm.model.num_types,
+      document.grid_lm.model.num_tokens)
 
     errprint("%s:  Distance %s to correct cell central point at %s",
       doctag, document.output_distance(correct_truedist), correct_central_point)
@@ -202,15 +202,15 @@ class DocEvalResult[Co](
   def to_row = Seq(
     "document" -> document,
     "correct-coord" -> document.coord,
-    "numtypes" -> document.grid_dist.model.num_types,
-    "numtokens" -> document.grid_dist.model.num_tokens,
-    "rerank-dist-numtypes" -> document.rerank_dist.model.num_types,
-    "rerank-dist-numtokens" -> document.rerank_dist.model.num_tokens,
+    "numtypes" -> document.grid_lm.model.num_types,
+    "numtokens" -> document.grid_lm.model.num_tokens,
+    "rerank-lm-numtypes" -> document.rerank_lm.model.num_types,
+    "rerank-lm-numtokens" -> document.rerank_lm.model.num_tokens,
     "correct-cell" -> correct_cell.describe_location,
     "correct-cell-true-center" -> correct_cell.get_true_center,
     "correct-cell-centroid" -> correct_cell.get_centroid,
     "correct-cell-central-point" -> correct_cell.get_central_point,
-    "correct-cell-numdocs" -> correct_cell.combined_dist.num_docs,
+    "correct-cell-numdocs" -> correct_cell.combined_lang_model.num_docs,
     "pred-coord" -> pred_coord,
     "oracle-dist" -> correct_truedist,
     "error-dist" -> pred_truedist
@@ -646,14 +646,14 @@ abstract class GridEvaluator[Co](
   def evaluate_document(document: GridDoc[Co]) = {
     val (skip, reason) = would_skip_document(document)
     assert(!skip)
-    assert(document.grid_dist.finished)
-    assert(document.rerank_dist.finished)
+    assert(document.grid_lm.finished)
+    assert(document.rerank_lm.finished)
     val maybe_correct_cell =
       ranker.grid.find_best_cell_for_document(document, true)
     assert(maybe_correct_cell != None)
     val correct_cell = maybe_correct_cell.get
     if (debug("lots") || debug("commontop")) {
-      val naitr = correct_cell.combined_dist.num_docs
+      val naitr = correct_cell.combined_lang_model.num_docs
       errprint("Evaluating document %s with %s documents in correct cell",
         document, naitr)
     }
@@ -748,7 +748,7 @@ class RankedDocEvalResult[Co](
     "pred-cell-true-center" -> pred_cell.get_true_center,
     "pred-cell-centroid" -> pred_cell.get_centroid,
     "pred-cell-central-point" -> pred_cell.get_central_point,
-    "pred-cell-numdocs" -> pred_cell.combined_dist.num_docs,
+    "pred-cell-numdocs" -> pred_cell.combined_lang_model.num_docs,
     "correct-rank" -> correct_rank
   )
 }
@@ -772,7 +772,7 @@ class RerankedDocEvalResult[Co](
     "initial-pred-cell" -> initial_pred_cell.describe_location,
     "initial-pred-cell-true-center" -> initial_pred_cell.get_true_center,
     "initial-pred-cell-central-point" -> initial_pred_cell.get_central_point,
-    "initial-pred-cell-numdocs" -> initial_pred_cell.combined_dist.num_docs,
+    "initial-pred-cell-numdocs" -> initial_pred_cell.combined_lang_model.num_docs,
     "initial-correct-rank" -> initial_correct_rank
   )
 }

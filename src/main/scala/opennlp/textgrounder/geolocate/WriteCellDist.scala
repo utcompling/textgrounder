@@ -31,8 +31,8 @@ import util.textdb._
  
 import gridlocate._
 
-import worddist._
-import WordDist._
+import langmodel._
+import LangModel._
 
 class WriteCellDistParameters(
   parser: ArgParser
@@ -54,23 +54,23 @@ storing the data as tab-separated fields and the latter naming the fields.""")
 }
 
 
-/* A builder that filters the distributions to contain only the words we
+/* A builder that filters the language models to contain only the words we
    care about, to save memory and time. */
-class FilterUnigramWordDistBuilder(
-    factory: WordDistFactory,
+class FilterUnigramLangModelBuilder(
+    factory: LangModelFactory,
     filter_words: Seq[String],
     ignore_case: Boolean,
     stopwords: Set[String],
     whitelist: Set[String],
     minimum_word_count: Int = 1
-  ) extends DefaultUnigramWordDistBuilder(
+  ) extends DefaultUnigramLangModelBuilder(
     factory, ignore_case, stopwords, whitelist, minimum_word_count
   ) {
 
-  override def finish_before_global(dist: WordDist) {
-    super.finish_before_global(dist)
+  override def finish_before_global(lang_model: LangModel) {
+    super.finish_before_global(lang_model)
 
-    val model = dist.asInstanceOf[UnigramWordDist].model
+    val model = lang_model.asInstanceOf[UnigramLangModel].model
     val oov = memoizer.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
@@ -93,11 +93,11 @@ class WriteCellDistDriver extends
     params.split_words = params.words.split(',')
   }
 
-  override protected def get_word_dist_builder_creator(dist_type: String) = {
-    if (dist_type != "unigram")
-      param_error("Only unigram word distributions supported with WriteCellDist")
-    (factory: WordDistFactory) =>
-      new FilterUnigramWordDistBuilder(
+  override protected def get_lang_model_builder_creator(lm_type: String) = {
+    if (lm_type != "unigram")
+      param_error("Only unigram language models supported with WriteCellDist")
+    (factory: LangModelFactory) =>
+      new FilterUnigramLangModelBuilder(
         factory,
         params.split_words,
         ignore_case = !params.preserve_case_words,

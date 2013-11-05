@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  UnsmoothedNgramWordDist.scala
+//  UnsmoothedNgramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,24 +17,24 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
-class UnsmoothedNgramWordDistFactory(
-  create_builder: WordDistFactory => WordDistBuilder
-) extends NgramWordDistFactory {
+class UnsmoothedNgramLangModelFactory(
+  create_builder: LangModelFactory => LangModelBuilder
+) extends NgramLangModelFactory {
   val builder = create_builder(this)
-  def create_word_dist = new UnsmoothedNgramWordDist(this)
+  def create_lang_model = new UnsmoothedNgramLangModel(this)
 
-  def finish_global_distribution() {
+  def finish_global_backoff_stats() {
   }
 }
 
-class UnsmoothedNgramWordDist(
-  gen_factory: WordDistFactory
-) extends NgramWordDist(gen_factory) {
+class UnsmoothedNgramLangModel(
+  gen_factory: LangModelFactory
+) extends NgramLangModel(gen_factory) {
   import NgramStorage.Ngram
 
-  type TThis = UnsmoothedNgramWordDist
+  type TThis = UnsmoothedNgramLangModel
 
   def innerToString = ""
 
@@ -45,19 +45,19 @@ class UnsmoothedNgramWordDist(
     num_tokens = model.num_tokens
   }
 
-  def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false) = {
     assert(false, "Not implemented")
     0.0
   }
 
-  def cosine_similarity(other: WordDist, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = false,
       smoothed: Boolean = false) = {
     assert(false, "Not implemented")
     0.0
   }
 
-  def kl_divergence_34(other: NgramWordDist) = {
+  def kl_divergence_34(other: NgramLangModel) = {
     assert(false, "Not implemented")
     0.0
   }

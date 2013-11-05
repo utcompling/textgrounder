@@ -30,7 +30,7 @@ import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
 
-import worddist.UnigramWordDist
+import langmodel.UnigramLangModel
 import gridlocate.{DocStatus, RawDocument}
 
 class KdTreeCell(
@@ -135,14 +135,14 @@ class KdTreeGrid(
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
-    // need to finish generating all the word distributions
+    // need to finish generating all the language models
     for (c <- nodes_to_cell.valuesIterator) {
       c.finish()
     }
 
     if (interpolateWeight > 0) {
       // this is really gross. we need to interpolate all the nodes
-      // by modifying their worddist.count map. We are breaking
+      // by modifying their langmodel.count map. We are breaking
       // so many levels of abstraction by doing this AND preventing
       // us from using interpolation with bigrams :(
       //
@@ -157,16 +157,16 @@ class KdTreeGrid(
       driver.show_progress("interpolating", "K-d tree cell").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
-        val wd = cell.combined_dist.word_dist
-        val model = wd.asInstanceOf[UnigramWordDist].model
+        val wd = cell.combined_lang_model.lang_model
+        val model = wd.asInstanceOf[UnigramLangModel].model
 
         for ((k,v) <- model.iter_items) {
           model.set_item(k, (1 - interpolateWeight) * v)
         }
 
         val pcell = nodes_to_cell(node.parent)
-        val pwd = pcell.combined_dist.word_dist
-        val pmodel = pwd.asInstanceOf[UnigramWordDist].model
+        val pwd = pcell.combined_lang_model.lang_model
+        val pmodel = pwd.asInstanceOf[UnigramLangModel].model
 
         for ((k,v) <- pmodel.iter_items) {
           val oldv = if (model contains k) model.get_item(k) else 0.0

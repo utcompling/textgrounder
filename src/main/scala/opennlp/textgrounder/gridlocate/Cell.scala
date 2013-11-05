@@ -26,37 +26,37 @@ import util.print.{errprint, warning}
 import util.experiment._
 import util.textdb.Encoder
 
-import worddist.WordDistFactory
+import langmodel.LangModelFactory
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Word distributions                          //
+//                        Combined language models                         //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Distribution over words resulting from combining the individual
- * distributions of a number of documents.  We track the number of
- * documents making up the distribution, as well as the total incoming link
- * count for all of these documents.  Note that some documents contribute
- * to the link count but not the word distribution; hence, there are two
- * concepts of "empty", depending on whether all contributing documents or
- * only those that contributed to the word distribution are counted.
- * (The primary reason for documents not contributing to the distribution
- * is that they're not in the training set; see comments below.  However,
- * some documents simply don't have distributions defined for them in the
- * document file -- e.g. if there was a problem extracting the document's
- * words in the preprocessing stage.)
+ * Language model resulting from combining the individual language models
+ * of a number of documents.  We track the number of documents making up
+ * the language model, as well as the total incoming link count for all
+ * of these documents.  Note that some documents contribute to the link
+ * count but not the language model; hence, there are two concepts of
+ * "empty", depending on whether all contributing documents or only those
+ * that contributed to the language model are counted. (The primary reason
+ * for documents not contributing to the language model is that they're not
+ * in the training set; see comments below.  However, some documents simply
+ * don't have language models defined for them in the document file -- e.g.
+ * if there was a problem extracting the document's words in the
+ * preprocessing stage.)
  *
- * Note that we embed the actual object describing the word distribution
- * as a field in this object, rather than extending (subclassing) WordDist.
- * The reason for this is that there are multiple types of WordDists, and
+ * Note that we embed the actual object describing the language model
+ * as a field in this object, rather than extending (subclassing) LangModel.
+ * The reason for this is that there are multiple types of LangModels, and
  * so subclassing would require creating a different subclass for every
  * such type, along with extra boilerplate functions to create objects of
  * these subclasses.
  */
-class CombinedWordDist(factory: DocWordDistFactory) {
-  /** The combined word distribution itself. */
-  val word_dist = factory.create_word_dist
-  /** Number of documents used to create distribution. */
+class CombinedLangModel(factory: DocLangModelFactory) {
+  /** The combined language model itself. */
+  val lang_model = factory.create_lang_model
+  /** Number of documents used to create language model. */
   var num_docs = 0
   /** Total number of incoming links. */
   var incoming_links = 0
@@ -67,9 +67,9 @@ class CombinedWordDist(factory: DocWordDistFactory) {
   def is_empty = num_docs == 0
 
   /**
-   *  Add the given document to the total distribution seen so far.
+   *  Add the given document to the total language model seen so far.
    *  `partial` is a scaling factor (between 0.0 and 1.0) used for
-   *  interpolating multiple distributions.
+   *  interpolating multiple language models.
    */
   def add_document(doc: GridDoc[_], partial: Double = 1.0) {
     /* Formerly, we arranged things so that we were passed in all documents,
@@ -94,14 +94,14 @@ class CombinedWordDist(factory: DocWordDistFactory) {
        evaluation.
        
        Note that we do NOT include word counts from dev-set or test-set
-       documents in the word distribution for a cell.  This keeps to the
+       documents in the language model for a cell.  This keeps to the
        above rule about only training on your training set, and is OK
        because (1) each document in a cell contributes a similar amount of
        word counts (assuming the documents are somewhat similar in size),
        hence in a cell with multiple documents, each individual document
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
-       of documents in a cell does not affect the distribution.
+       of documents in a cell does not affect the language model.
        
        However, once the corpora were separated into sub-corpora based on
        the training/dev/test split, passing in all documents complicated
@@ -119,7 +119,7 @@ class CombinedWordDist(factory: DocWordDistFactory) {
       case _ =>
     }
 
-    word_dist.add_word_distribution(doc.dist, partial)
+    lang_model.add_language_model(doc.lang_model, partial)
     num_docs += 1
   }
 }
@@ -138,8 +138,8 @@ class CombinedWordDist(factory: DocWordDistFactory) {
 abstract class GridCell[Co](
     val grid: Grid[Co]
 ) {
-  val combined_dist =
-    new CombinedWordDist(grid.docfact.word_dist_factory)
+  val combined_lang_model =
+    new CombinedLangModel(grid.docfact.lang_model_factory)
   var most_popular_document: GridDoc[Co] = _
   var mostpopdoc_links = 0
 
@@ -185,7 +185,7 @@ abstract class GridCell[Co](
   /**
    * Return true if we have finished creating and populating the cell.
    */
-  def finished = combined_dist.word_dist.finished
+  def finished = combined_lang_model.lang_model.finished
   /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
@@ -200,12 +200,12 @@ abstract class GridCell[Co](
 
     "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
       describe_location, unfinished, contains,
-      combined_dist.num_docs,
-      combined_dist.word_dist.grid_dist.model.num_types,
-      combined_dist.word_dist.grid_dist.model.num_tokens,
-      combined_dist.word_dist.rerank_dist.model.num_types,
-      combined_dist.word_dist.rerank_dist.model.num_tokens,
-      combined_dist.incoming_links)
+      combined_lang_model.num_docs,
+      combined_lang_model.lang_model.grid_lm.model.num_types,
+      combined_lang_model.lang_model.grid_lm.model.num_tokens,
+      combined_lang_model.lang_model.rerank_lm.model.num_types,
+      combined_lang_model.lang_model.rerank_lm.model.num_tokens,
+      combined_lang_model.incoming_links)
   }
 
   // def __repr__() = {
@@ -217,16 +217,16 @@ abstract class GridCell[Co](
     "true-center" -> get_true_center,
     "centroid" -> get_centroid,
     "central-point" -> get_central_point,
-    "num-documents" -> combined_dist.num_docs,
+    "num-documents" -> combined_lang_model.num_docs,
     "grid-num-word-types" ->
-      combined_dist.word_dist.grid_dist.model.num_types,
+      combined_lang_model.lang_model.grid_lm.model.num_types,
     "grid-num-word-tokens" ->
-      combined_dist.word_dist.grid_dist.model.num_tokens,
+      combined_lang_model.lang_model.grid_lm.model.num_tokens,
     "rerank-num-word-types" ->
-      combined_dist.word_dist.rerank_dist.model.num_types,
+      combined_lang_model.lang_model.rerank_lm.model.num_types,
     "rerank-num-word-tokens" ->
-      combined_dist.word_dist.rerank_dist.model.num_tokens,
-    "incoming-links" -> combined_dist.incoming_links,
+      combined_lang_model.lang_model.rerank_lm.model.num_tokens,
+    "incoming-links" -> combined_lang_model.incoming_links,
     "most-popular-document" -> (
       if (most_popular_document != null)
         Encoder.string(most_popular_document.title)
@@ -259,16 +259,16 @@ abstract class GridCell[Co](
           (<mostPopularDocument>most_popular_document.xmldesc</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocuments>{ combined_dist.num_docs }</numDocuments>
-      <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
+      <numDocuments>{ combined_lang_model.num_docs }</numDocuments>
+      <incomingLinks>{ combined_lang_model.incoming_links }</incomingLinks>
     </GridCell>
 
   /**
-   * Add a document to the distribution for the cell.
+   * Add a document to the language model for the cell.
    */
   def add_document(doc: GridDoc[Co]) {
     assert(!finished)
-    combined_dist.add_document(doc)
+    combined_lang_model.add_document(doc)
     if (doc.incoming_links != None &&
       doc.incoming_links.get > mostpopdoc_links) {
       mostpopdoc_links = doc.incoming_links.get
@@ -277,12 +277,12 @@ abstract class GridCell[Co](
   }
 
   /**
-   * Finish any computations related to the cell's word distribution.
+   * Finish any computations related to the cell's language model.
    */
   def finish() {
     assert(!finished)
-    combined_dist.word_dist.finish_before_global()
-    combined_dist.word_dist.finish_after_global()
+    combined_lang_model.lang_model.finish_before_global()
+    combined_lang_model.lang_model.finish_after_global()
   }
 }
 
@@ -292,9 +292,9 @@ abstract class GridCell[Co](
  * by coordinates (of type Co).  Each cell (of type GridCell[Co]) covers
  * some portion of the space.  There is also a set of documents (of type
  * TDoc), each of which is indexed by a coordinate and which has a
- * distribution describing the contents of the document.  The distributions
+ * language model describing the contents of the document.  The language models
  * of all the documents in a cell (i.e. whose coordinate is within the cell)
- * are amalgamated to form the distribution of the cell.
+ * are amalgamated to form the language model of the cell.
  *
  * One example is the SphereGrid -- a grid of cells covering the Earth.
  * ("Sphere" is used here in its mathematical meaning of the surface of a
@@ -321,7 +321,7 @@ abstract class GridCell[Co](
  * (1) Documents are added one-by-one to a grid by calling
  *     `add_document_to_cell`.
  * (2) After all documents have been added, `initialize_cells` is called
- *     to generate the cells and create their distribution.
+ *     to generate the cells and create their language model.
  * (3) After this, it should be possible to list the cells by calling
  *     `iter_nonempty_cells`.
  */
@@ -405,9 +405,9 @@ abstract class Grid[Co](
     add_document_to_grid: GridDoc[Co] => Unit
   ) {
     // FIXME: The "finish_globally" flag needs to be tied into the
-    // recording of global statistics in the word dists.
+    // recording of global statistics in the language models.
     // In reality, all the glop handled by finish_before_global() and
-    // note_dist_globally() (as well as record_in_subfactory) and such
+    // note_lang_model_globally() (as well as record_in_subfactory) and such
     // should be handled by separate mapping stages onto the documents.
     // See `raw_documents_to_documents`.
     for (doc <- docfact.raw_documents_to_documents(get_rawdocs("reading"),
@@ -416,9 +416,9 @@ abstract class Grid[Co](
            finish_globally = false)) {
       add_document_to_grid(doc)
     }
-    // Compute overall distribution values (e.g. back-off statistics).
-    errprint("Finishing global dist...")
-    docfact.word_dist_factory.finish_global_distribution()
+    // Compute overall backoff statistics.
+    errprint("Finishing global backoff stats...")
+    docfact.lang_model_factory.finish_global_backoff_stats()
     docfact.finish_document_loading()
   }
 
@@ -438,7 +438,7 @@ abstract class Grid[Co](
 
     iter_nonempty_cells foreach { cell =>
       total_num_docs +=
-        cell.combined_dist.num_docs
+        cell.combined_lang_model.num_docs
     }
 
     driver.note_print_result("number-of-non-empty-cells", num_non_empty_cells,

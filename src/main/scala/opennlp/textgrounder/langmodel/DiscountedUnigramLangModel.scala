@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  DiscountedUnigramWordDist.scala
+//  DiscountedUnigramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,7 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import math._
 
@@ -26,13 +26,13 @@ import util.print.errprint
 
 import util.debug._
 
-import WordDist._
+import LangModel._
 
-abstract class DiscountedUnigramWordDistFactory(
-  create_builder: WordDistFactory => WordDistBuilder,
+abstract class DiscountedUnigramLangModelFactory(
+  create_builder: LangModelFactory => LangModelBuilder,
   val interpolate: Boolean,
   val tf_idf: Boolean
-) extends UnigramWordDistFactory {
+) extends UnigramLangModelFactory {
   val builder = create_builder(this)
 
   // Estimate of number of unseen word types for all documents
@@ -52,9 +52,9 @@ abstract class DiscountedUnigramWordDistFactory(
   var num_documents = 0
   var global_normalization_factor = 0.0
 
-  override def note_dist_globally(dist: WordDist) {
-    val udist = dist.asInstanceOf[DiscountedUnigramWordDist]
-    super.note_dist_globally(dist)
+  override def note_lang_model_globally(lm: LangModel) {
+    val udist = lm.asInstanceOf[DiscountedUnigramLangModel]
+    super.note_lang_model_globally(lm)
     assert(!owp_adjusted)
     for ((word, count) <- udist.model.iter_items) {
       if (!(overall_word_probs contains word))
@@ -69,7 +69,7 @@ abstract class DiscountedUnigramWordDistFactory(
     }
     num_documents += 1
     if (debug("lots")) {
-      errprint("""For word dist, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
+      errprint("""For lang model, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
         udist.model.num_tokens, udist.unseen_mass, udist.overall_unseen_mass)
     }
   }
@@ -84,7 +84,7 @@ abstract class DiscountedUnigramWordDistFactory(
   // look up in.
   // unknown_document_counts = ([], [])
 
-  def finish_global_distribution() {
+  def finish_global_backoff_stats() {
     /* We do in-place conversion of counts to probabilities.  Make sure
        this isn't done twice!! */
     assert (!owp_adjusted)
@@ -103,10 +103,10 @@ abstract class DiscountedUnigramWordDistFactory(
   }
 }
 
-abstract class DiscountedUnigramWordDist(
-  override val factory: DiscountedUnigramWordDistFactory
-) extends UnigramWordDist(factory) {
-  type TThis = DiscountedUnigramWordDist
+abstract class DiscountedUnigramLangModel(
+  override val factory: DiscountedUnigramLangModelFactory
+) extends UnigramLangModel(factory) {
+  type TThis = DiscountedUnigramLangModel
   type TKLCache = DiscountedUnigramKLDivergenceCache
 
   /** Total probability mass to be assigned to all words not
@@ -184,7 +184,7 @@ abstract class DiscountedUnigramWordDist(
   /**
    * Here we compute the value of `overall_unseen_mass`, which depends
    * on the global `overall_word_probs` computed from all of the
-   * distributions.
+   * lang models.
    */
   protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
@@ -210,31 +210,31 @@ abstract class DiscountedUnigramWordDist(
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
-      errprint("For distribution %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
+      errprint("For lang model %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
         format (this, normalization_factor, model.num_tokens, unseen_mass))
   }
 
-  def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false) = {
-    FastDiscountedUnigramWordDist.fast_kl_divergence(
+    FastDiscountedUnigramLangModel.fast_kl_divergence(
       this.asInstanceOf[TThis], cache.asInstanceOf[TKLCache],
       other.asInstanceOf[TThis], interpolate = factory.interpolate,
       partial = partial)
   }
 
-  def cosine_similarity(other: WordDist, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = false,
       smoothed: Boolean = false) = {
     if (smoothed)
-      FastDiscountedUnigramWordDist.fast_smoothed_cosine_similarity(
+      FastDiscountedUnigramLangModel.fast_smoothed_cosine_similarity(
         this.asInstanceOf[TThis], other.asInstanceOf[TThis],
         partial = partial)
     else
-      FastDiscountedUnigramWordDist.fast_cosine_similarity(
+      FastDiscountedUnigramLangModel.fast_cosine_similarity(
         this.asInstanceOf[TThis], other.asInstanceOf[TThis],
         partial = partial)
   }
 
-  def kl_divergence_34(other: UnigramWordDist) = {
+  def kl_divergence_34(other: UnigramLangModel) = {
     var overall_probs_diff_words = 0.0
     for (word <- other.model.iter_keys if !(model contains word)) {
       overall_probs_diff_words += factory.overall_word_probs(word)
@@ -252,13 +252,13 @@ abstract class DiscountedUnigramWordDist(
       overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
-    // 3. For words seen in neither dist but seen globally:
+    // 3. For words seen in neither lm but seen globally:
     // You can show that this is
     //
     // factor1 = (log(self.unseen_mass) - log(self.overall_unseen_mass)) -
     //           (log(other.unseen_mass) - log(other.overall_unseen_mass))
     // factor2 = self.unseen_mass / self.overall_unseen_mass * factor1
-    // kldiv = factor2 * (sum(words seen globally but not in either dist)
+    // kldiv = factor2 * (sum(words seen globally but not in either lm)
     //                    of overall_word_probs[word]) 
     //
     // The final sum
@@ -270,9 +270,9 @@ abstract class DiscountedUnigramWordDist(
     // So we just need the sum over the words in other, not self.
     //
     // Note that the above formula was derived using back-off, but it
-    // still applies in interpolation.  For words seen in neither dist,
+    // still applies in interpolation.  For words seen in neither lm,
     // the only difference between back-off and interpolation is that
-    // the "overall_unseen_mass" factors for all distributions are
+    // the "overall_unseen_mass" factors for all lang models are
     // effectively 1.0 (and the corresponding log terms above disappear).
 
     val factor1 = ((log(unseen_mass) - log(overall_unseen_mass)) -

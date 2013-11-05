@@ -3,9 +3,9 @@ package gridlocate
 
 import math.log
 
-import worddist.{WordDist,Ngram,NgramWordDist,Unigram,UnigramWordDist}
-import worddist.NgramStorage._
-import WordDist._
+import langmodel.{LangModel,Ngram,NgramLangModel,Unigram,UnigramLangModel}
+import langmodel.NgramStorage._
+import LangModel._
 import util.debug._
 import util.print._
 import util.metering._
@@ -25,18 +25,18 @@ abstract class GridRanker[Co](
   val grid: Grid[Co]
 ) extends Ranker[GridDoc[Co], GridCell[Co]] {
   /**
-   * For a given word distribution (describing a test document), return
+   * For a given language model (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
    * and a score of some sort.  The cells given in `include` must be
    * included in the list.  Higher scores are better.  The results should
    * be in sorted order, with better cells earlier.
    */
-  def return_ranked_cells(word_dist: WordDist,
+  def return_ranked_cells(lang_model: LangModel,
       include: Iterable[GridCell[Co]]):
     Iterable[(GridCell[Co], Double)]
 
   def evaluate(item: GridDoc[Co], include: Iterable[GridCell[Co]]) =
-    return_ranked_cells(item.dist.grid_dist, include)
+    return_ranked_cells(item.lang_model.grid_lm, include)
 }
 
 /**
@@ -60,7 +60,7 @@ case class GridRankerInst[Co](
  * candidate instance for a reranker is a query-candidate (i.e. document-cell)
  * pair, or rather a feature vector describing this pair. In general, the
  * features describe the compatibility between the query and the candidate,
- * i.e. in this case the compatibility between the word distributions
+ * i.e. in this case the compatibility between the language models
  * (language models) of a document and a cell.
  *
  * The factory is in the form of a function that will generate a feature
@@ -80,7 +80,7 @@ trait CandidateInstFactory[Co] extends (
 
   /**
    * Return a set of feature-value pairs for a document-cell pair, describing
-   * similarities between the document and cell's distributions.
+   * similarities between the document and cell's language models.
    * Meant to be supplied by subclasses.
    *
    * @param doc Document of document-cell pair.
@@ -153,15 +153,15 @@ class CombiningCandidateInstFactory[Co](
  */
 abstract class WordByWordCandidateInstFactory[Co] extends
     CandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
-    celldist: UnigramWordDist): Option[Double]
+  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
+    celldist: UnigramLangModel): Option[Double]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val docdist = Unigram.check_unigram_dist(doc.rerank_dist)
+    val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
     val celldist =
-      Unigram.check_unigram_dist(cell.combined_dist.word_dist.rerank_dist)
-    for ((word, count) <- docdist.model.iter_items;
-         featval = get_word_feature(word, count, docdist, celldist);
+      Unigram.check_unigram_lang_model(cell.combined_lang_model.lang_model.rerank_lm)
+    for ((word, count) <- doclm.model.iter_items;
+         featval = get_word_feature(word, count, doclm, celldist);
          if featval != None)
       yield (word, featval.get)
   }
@@ -173,15 +173,15 @@ abstract class WordByWordCandidateInstFactory[Co] extends
  */
 abstract class NgramByNgramCandidateInstFactory[Co] extends
     CandidateInstFactory[Co] {
-  def get_ngram_feature(word: Ngram, count: Double, docdist: NgramWordDist,
-    celldist: NgramWordDist): Option[Double]
+  def get_ngram_feature(word: Ngram, count: Double, doclm: NgramLangModel,
+    celldist: NgramLangModel): Option[Double]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val docdist = Ngram.check_ngram_dist(doc.rerank_dist)
+    val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
     val celldist =
-      Ngram.check_ngram_dist(cell.combined_dist.word_dist.rerank_dist)
-    for ((ngram, count) <- docdist.model.iter_items;
-         featval = get_ngram_feature(ngram, count, docdist, celldist);
+      Ngram.check_ngram_lang_model(cell.combined_lang_model.lang_model.rerank_lm)
+    for ((ngram, count) <- doclm.model.iter_items;
+         featval = get_ngram_feature(ngram, count, doclm, celldist);
          if featval != None)
       // Generate a feature name by concatenating the words. This may
       // conceivably lead to clashes if a word actually has the
@@ -197,9 +197,9 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
  */
 class KLDivCandidateInstFactory[Co] extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
-      celldist: UnigramWordDist) = {
-    val p = docdist.lookup_word(word)
+  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
+      celldist: UnigramLangModel) = {
+    val p = doclm.lookup_word(word)
     val q = celldist.lookup_word(word)
     if (q == 0.0)
       None
@@ -224,8 +224,8 @@ class KLDivCandidateInstFactory[Co] extends
  */
 class WordMatchingCandidateInstFactory[Co](value: String) extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, docdist: UnigramWordDist,
-      celldist: UnigramWordDist) = {
+  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
+      celldist: UnigramLangModel) = {
     val qcount = celldist.model.get_item(word)
     if (qcount == 0.0)
       None
@@ -235,10 +235,10 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
         case "unigram-count" => count
         case "unigram-count-product" => count * qcount
         case "unigram-prob-product" =>
-          docdist.lookup_word(word) * celldist.lookup_word(word)
-        case "unigram-probability" => docdist.lookup_word(word)
+          doclm.lookup_word(word) * celldist.lookup_word(word)
+        case "unigram-probability" => doclm.lookup_word(word)
         case "kl" => {
-          val p = docdist.lookup_word(word)
+          val p = doclm.lookup_word(word)
           val q = celldist.lookup_word(word)
           p*(log(p/q))
         }
@@ -264,8 +264,8 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
  */
 class NgramMatchingCandidateInstFactory[Co](value: String) extends
     NgramByNgramCandidateInstFactory[Co] {
-  def get_ngram_feature(word: Ngram, count: Double, docdist: NgramWordDist,
-    celldist: NgramWordDist) = {
+  def get_ngram_feature(word: Ngram, count: Double, doclm: NgramLangModel,
+    celldist: NgramLangModel) = {
     val qcount = celldist.model.get_item(word)
     if (qcount == 0.0)
       None
@@ -290,10 +290,10 @@ abstract class PointwiseGridReranker[Co](ranker_name: String,
   grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid)
   with PointwiseClassifyingReranker[GridDoc[Co], GridCell[Co]] {
-    def return_ranked_cells(word_dist: WordDist,
+    def return_ranked_cells(lang_model: LangModel,
         include: Iterable[GridCell[Co]]) =
       initial_ranker.asInstanceOf[GridRanker[Co]].return_ranked_cells(
-        word_dist, include)
+        lang_model, include)
 }
 
 /**
@@ -356,6 +356,6 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       asInstanceOf[PointwiseGridReranker[Co]]
 
   override def format_query_item(item: GridDoc[Co]) = {
-    "%s, dist=%s" format (item, item.rerank_dist.debug_string)
+    "%s, lm=%s" format (item, item.rerank_lm.debug_string)
   }
 }
