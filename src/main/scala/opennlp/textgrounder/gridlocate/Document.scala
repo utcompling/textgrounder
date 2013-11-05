@@ -35,7 +35,7 @@ import util.print._
 import util.Serializer
 import util.text.capfirst
 
-import worddist.{WordDist,WordDistFactory,DistributionCreationException}
+import langmodel.{LangModel,LangModelFactory,LangModelCreationException}
 
 import util.debug._
 
@@ -219,25 +219,25 @@ case class RawDocument(schema: Schema, fields: IndexedSeq[String])
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * A class holding the word distributions associated with a document.
+ * A class holding the language models associated with a document.
  * There may be a separate one needed for reranking (e.g. holding n-grams
  * when the main ranker uses unigrams).
  */
-class DocWordDist(
-  val grid_dist: WordDist,
-  val rerank_dist: WordDist
-) extends Iterable[WordDist] {
+class DocLangModel(
+  val grid_lm: LangModel,
+  val rerank_lm: LangModel
+) extends Iterable[LangModel] {
   def iterator =
-    if (grid_dist != rerank_dist)
-      Iterator(grid_dist, rerank_dist)
+    if (grid_lm != rerank_lm)
+      Iterator(grid_lm, rerank_lm)
     else
-      Iterator(grid_dist)
+      Iterator(grid_lm)
 
-  def add_word_distribution(other: DocWordDist, partial: Double = 1.0) {
+  def add_language_model(other: DocLangModel, partial: Double = 1.0) {
     assert(this.size == other.size)
     (this zip other).map {
-      case (thisdist, otherdist) =>
-        thisdist.add_word_distribution(otherdist, partial)
+      case (thislm, otherlm) =>
+        thislm.add_language_model(otherlm, partial)
     }
   }
 
@@ -253,32 +253,32 @@ class DocWordDist(
 }
 
 /**
- * A class holding the word distribution factories associated with a document.
+ * A class holding the language model factories associated with a document.
  * There may be a separate one needed for reranking (e.g. holding n-grams
  * when the main ranker uses unigrams).
  */
-class DocWordDistFactory(
-  val grid_word_dist_factory: WordDistFactory,
-  val rerank_word_dist_factory: WordDistFactory
-) extends Iterable[WordDistFactory] {
+class DocLangModelFactory(
+  val grid_lang_model_factory: LangModelFactory,
+  val rerank_lang_model_factory: LangModelFactory
+) extends Iterable[LangModelFactory] {
   def iterator =
-    if (grid_word_dist_factory != rerank_word_dist_factory)
-      Iterator(grid_word_dist_factory, rerank_word_dist_factory)
+    if (grid_lang_model_factory != rerank_lang_model_factory)
+      Iterator(grid_lang_model_factory, rerank_lang_model_factory)
     else
-      Iterator(grid_word_dist_factory)
+      Iterator(grid_lang_model_factory)
 
-  def create_word_dist = {
-    val grid_dist = grid_word_dist_factory.create_word_dist
-    new DocWordDist(grid_dist,
-      if (grid_word_dist_factory != rerank_word_dist_factory)
-        rerank_word_dist_factory.create_word_dist
+  def create_lang_model = {
+    val grid_lm = grid_lang_model_factory.create_lang_model
+    new DocLangModel(grid_lm,
+      if (grid_lang_model_factory != rerank_lang_model_factory)
+        rerank_lang_model_factory.create_lang_model
       else
-        grid_dist
+        grid_lm
     )
   }
 
-  def finish_global_distribution() {
-    foreach(_.finish_global_distribution())
+  def finish_global_backoff_stats() {
+    foreach(_.finish_global_backoff_stats())
   }
 }
 
@@ -293,7 +293,7 @@ class DocWordDistFactory(
  */
 abstract class GridDocFactory[Co : Serializer](
   val driver: GridLocateDriver[Co],
-  val word_dist_factory: DocWordDistFactory
+  val lang_model_factory: DocLangModelFactory
 ) {
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
@@ -375,7 +375,7 @@ abstract class GridDocFactory[Co : Serializer](
    * in the main factory.
    */
   protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: DocWordDist,
+      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
       record_in_factory: Boolean
   ): Option[GridDoc[Co]]
 
@@ -417,25 +417,25 @@ abstract class GridDocFactory[Co : Serializer](
       }
     }
 
-    val grid_dist = catch_doc_validation {
+    val grid_lm = catch_doc_validation {
       val counts = schema.get_field(fieldvals,
         driver.grid_word_count_field)
-      word_dist_factory.grid_word_dist_factory.builder.
-        create_distribution(counts)
+      lang_model_factory.grid_lang_model_factory.builder.
+        create_lang_model(counts)
     }
-    val rerank_dist =
+    val rerank_lm =
       if (driver.rerank_word_count_field == driver.grid_word_count_field)
-        grid_dist
+        grid_lm
       else
         catch_doc_validation {
           val counts = schema.get_field(fieldvals,
             driver.rerank_word_count_field)
-          word_dist_factory.rerank_word_dist_factory.builder.
-            create_distribution(counts)
+          lang_model_factory.rerank_lang_model_factory.builder.
+            create_lang_model(counts)
         }
-    val dist = new DocWordDist(grid_dist, rerank_dist)
+    val lang_model = new DocLangModel(grid_lm, rerank_lm)
     val maybedoc = catch_doc_validation {
-      imp_create_and_init_document(schema, fieldvals, dist, record_in_factory)
+      imp_create_and_init_document(schema, fieldvals, lang_model, record_in_factory)
     }
     maybedoc match {
       case None => {
@@ -444,7 +444,7 @@ abstract class GridDocFactory[Co : Serializer](
       }
       case Some(doc) => {
         assert(doc.split == split)
-        val double_tokens = doc.dist.grid_dist.model.num_tokens
+        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
         assert(double_tokens == tokens)
@@ -511,18 +511,18 @@ abstract class GridDocFactory[Co : Serializer](
           }
           case Some(doc) => {
             if (note_globally) {
-              // Don't use the eval set's distributions in computing
+              // Don't use the eval set's language models in computing
               // global smoothing values and such, to avoid contaminating
               // the results (training on your eval set). In addition, if
               // this isn't the training or eval set, we shouldn't be
               // loading at all.
               //
-              // Add the distribution to the global stats before
+              // Add the language model to the global stats before
               // eliminating infrequent words through
               // `finish_before_global`.
-              doc.dist.foreach(lm => lm.factory.note_dist_globally(lm))
+              doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
             }
-            doc.dist.finish_before_global()
+            doc.lang_model.finish_before_global()
             (Some(doc), "processed", "", "")
           }
         }
@@ -531,7 +531,7 @@ abstract class GridDocFactory[Co : Serializer](
           warning("Line %s: %s", rawdoc.lineno, e.message)
           (None, "bad", "error validating document field", "")
         }
-        case e:DistributionCreationException => {
+        case e:LangModelCreationException => {
           val rd = rawdoc.maybedoc.get
           if (driver.grid_word_count_field ==
               driver.rerank_word_count_field)
@@ -546,7 +546,7 @@ abstract class GridDocFactory[Co : Serializer](
                 driver.grid_word_count_field, "(missing grid word-counts field)"),
               rd.schema.get_field_or_else(rd.fields,
                 driver.rerank_word_count_field, "(missing rerank word-counts field)"))
-          (None, "bad", "error creating document distribution", "")
+          (None, "bad", "error creating document language model", "")
         }
       }
     }
@@ -581,12 +581,11 @@ abstract class GridDocFactory[Co : Serializer](
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
-   *   (e.g. back-off) distribution statistics.  Normally false, but may be
-   *   true during bootstrapping of those statistics.
-   * @param finish_globally Whether to compute statistics of the documents'
-   *   distributions that depend on global (e.g. back-off) distribution
-   *   statistics.  Normally true, but may be false during bootstrapping of
-   *   those statistics.
+   *   backoff statistics.  Normally false, but may be true during
+   *   bootstrapping of those statistics.
+   * @param finish_globally Whether to compute global backoff statistics.
+   *   Normally true, but may be false during bootstrapping of those
+   *   statistics.
    * @return Iterator over document statuses.
    */
   def raw_documents_to_document_statuses(
@@ -604,7 +603,7 @@ abstract class GridDocFactory[Co : Serializer](
       docstats
     else
       docstats.map { stat =>
-        stat.maybedoc.foreach { doc => doc.dist.finish_after_global() }
+        stat.maybedoc.foreach { doc => doc.lang_model.finish_after_global() }
         stat
       }
   }
@@ -677,13 +676,11 @@ abstract class GridDocFactory[Co : Serializer](
    * @param record_in_subfactory Whether to record documents in any
    *   subfactories. (FIXME: See above.)
    * @param note_globally Whether to add each document's words to the global
-   *   smoothing statistics (e.g. for back-off or interpolation).  Normally
-   *   false, but may be true during bootstrapping of those statistics.
-   *   (FIXME: See above.)
-   * @param finish_globally Whether to compute statistics of the documents'
-   *   distributions that depend on global (e.g. back-off) distribution
-   *   statistics.  Normally true, but may be false during bootstrapping of
-   *   those statistics. (FIXME: See above.)
+   *   backoff statistics.  Normally false, but may be true during
+   *   bootstrapping of those statistics.
+   * @param finish_globally Whether to compute global backoff statistics.
+   *   Normally true, but may be false during bootstrapping of those
+   *   statistics.
    * @return Iterator over documents.
    */
   def raw_documents_to_documents(
@@ -707,12 +704,11 @@ abstract class GridDocFactory[Co : Serializer](
    * @param record_in_factory Whether to record documents in any subfactories.
    *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
-   *   (e.g. back-off) distribution statistics.  Normally false, but may be
-   *   true during bootstrapping of those statistics.
-   * @param finish_globally Whether to compute statistics of the documents'
-   *   distributions that depend on global (e.g. back-off) distribution
-   *   statistics.  Normally true, but may be false during bootstrapping of
-   *   those statistics.
+   *   backoff statistics.  Normally false, but may be true during
+   *   bootstrapping of those statistics.
+   * @param finish_globally Whether to compute global backoff statistics.
+   *   Normally true, but may be false during bootstrapping of those
+   *   statistics.
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
@@ -933,8 +929,8 @@ case class DocValidationException(
 ) extends RethrowableRuntimeException(message)
 
 /**
- * A document with an associated coordinate placing it in a grid, with a word
- * distribution describing the text of the document.  For a "coordinate"
+ * A document with an associated coordinate placing it in a grid, with a
+ * language model describing the text of the document.  For a "coordinate"
  * referring to a location on the Earth, documents can come from Wikipedia
  * articles, individual tweets, Twitter feeds (all tweets from a user), book
  * chapters from travel stories, etc.  For a "coordinate" referring to a
@@ -956,12 +952,12 @@ case class DocValidationException(
  *   stored as a fixed field in the schema.
  *
  * @param schema
- * @param word_dist_factory
- * @param dist Object containing word distribution of this document.
+ * @param lang_model_factory
+ * @param lang_model Object containing language model of this document.
  */
 abstract class GridDoc[Co : Serializer](
   val schema: Schema,
-  val dist: DocWordDist
+  val lang_model: DocLangModel
 ) {
 
   import util.Serializer._
@@ -1015,8 +1011,8 @@ abstract class GridDoc[Co : Serializer](
    */
   def incoming_links: Option[Int] = None
 
-  val grid_dist = dist.grid_dist
-  val rerank_dist = dist.rerank_dist
+  val grid_lm = lang_model.grid_lm
+  val rerank_lm = lang_model.rerank_lm
 
   def get_fields(fields: Iterable[String]) = fields map get_field
 

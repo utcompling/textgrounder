@@ -24,8 +24,8 @@ import collection.mutable
 import util.collection.{LRUCache, doublemap}
 import util.print.{errprint, warning}
 
-import worddist.{WordDist,Unigram,UnigramWordDist}
-import worddist.WordDist._
+import langmodel.{LangModel,Unigram,UnigramLangModel}
+import langmodel.LangModel._
 
 /**
  * A general distribution over cells, associating a probability with each
@@ -58,8 +58,8 @@ class CellDist[Co](
 /**
  * Distribution over cells that is associated with a word. This class knows
  * how to populate its own probabilities, based on the relative probabilities
- * of the word in the word distributions of the various cells.  That is,
- * if we have a set of cells, each with a word distribution, then we can
+ * of the word in the language models of the various cells.  That is,
+ * if we have a set of cells, each with a language model, then we can
  * imagine conceptually inverting the process to generate a cell distribution
  * over words.  Basically, for a given word, look to see what its probability
  * is in all cells; normalize, and we have a cell distribution.
@@ -79,14 +79,14 @@ class WordCellDist[Co](
   var normalized = false
 
   protected def init() {
-    // It's expensive to compute the value for a given word so we cache word
-    // distributions.
+    // It's expensive to compute the value for a given word so we cache
+    // language models.
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
     for (cell <- grid.iter_nonempty_cells) {
-      val word_dist =
-        Unigram.check_unigram_dist(cell.combined_dist.word_dist.grid_dist)
-      val prob = word_dist.lookup_word(word)
+      val lang_model =
+        Unigram.check_unigram_lang_model(cell.combined_lang_model.lang_model.grid_lm)
+      val prob = lang_model.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -114,8 +114,8 @@ class WordCellDist[Co](
 /**
  * Factory object for creating CellDists, i.e. objects describing a
  * distribution over cells.  You can create two types of CellDists, one for
- * a single word and one based on a distribution of words.  The former
- * process returns a WordCellDist, which initializes the probability
+ * a single word and one based on a distribution of words (language model).
+ * The former process returns a WordCellDist, which initializes the probability
  * distribution over cells as described for that class.  The latter process
  * returns a basic CellDist.  It works by retrieving WordCellDists for
  * each of the words in the distribution, and then averaging all of these
@@ -158,17 +158,17 @@ class CellDistFactory[Co](
   }
 
   /**
-   * Return a cell distribution over a distribution over words.  This works
-   * by adding up the distributions of the individual words, weighting by
-   * the count of the each word.
+   * Return a cell distribution over a language model.  This works
+   * by adding up the unsmoothed language models of the individual words,
+   * weighting by the count of the each word.
    */
-  def get_cell_dist_for_word_dist(grid: Grid[Co], xword_dist: WordDist) = {
-    // FIXME!!! Figure out what to do if distribution is not a unigram dist.
+  def get_cell_dist_for_lang_model(grid: Grid[Co], xlang_model: LangModel) = {
+    // FIXME!!! Figure out what to do if lang model is not a unigram model.
     // Can we break this up into smaller operations?  Or do we have to
-    // make it an interface for WordDist?
-    val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
+    // make it an interface for LangModel?
+    val lang_model = xlang_model.asInstanceOf[UnigramLangModel]
     val cellprobs = doublemap[GridCell[Co]]()
-    for ((word, count) <- word_dist.model.iter_items) {
+    for ((word, count) <- lang_model.model.iter_items) {
       val dist = get_cell_dist(grid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob

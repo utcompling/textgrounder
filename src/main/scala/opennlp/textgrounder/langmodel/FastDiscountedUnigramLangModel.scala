@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  FastDiscountedUnigramWordDist.scala
+//  FastDiscountedUnigramLangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,41 +17,41 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import scala.collection.mutable
 import math.{log, sqrt}
 
 import util.collection.DynamicArray
 
-import WordDist.Word
+import LangModel.Word
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
   for use with discounted smoothing.  This code was originally written
   for Pseudo-Good-Turing, but it isn't specific to this algorithm --
-  it works for any algorithm that involves discounting of a distribution
-  in order to interpolate the global distribution.
+  it works for any algorithm that involves discounting of a lang model
+  in order to interpolate the global lang model.
 
-  This code was originally broken out of WordDist (before the
+  This code was originally broken out of LangModel (before the
   pseudo-Good-Turing code was separated out) so that it could be
   rewritten in .pyc (Python with extra 'cdef' annotations that can be
   converted to C and compiled down to machine language).  With the
   pseudo-Good-Turing code extracted, this should properly be merged
-  into PseudoGoodTuringSmoothedWordDist.scala, but keep separated for
+  into PseudoGoodTuringSmoothedLangModel.scala, but keep separated for
   the moment in case we need to convert it to Java, C++, etc.
  */
 
 class DiscountedUnigramKLDivergenceCache(
-    val worddist: DiscountedUnigramWordDist
+    val langmodel: DiscountedUnigramLangModel
   ) extends KLDivergenceCache {
-  val self_size = worddist.model.num_types
-  val self_keys = worddist.model.iter_keys.toArray
-  val self_values = worddist.model.iter_items.map { case (k,v) => v}.toArray
+  val self_size = langmodel.model.num_types
+  val self_keys = langmodel.model.iter_keys.toArray
+  val self_values = langmodel.model.iter_items.map { case (k,v) => v}.toArray
 }
 
-object FastDiscountedUnigramWordDist {
-  type TDist = DiscountedUnigramWordDist
+object FastDiscountedUnigramLangModel {
+  type TDist = DiscountedUnigramLangModel
 
   def get_kl_divergence_cache(self: TDist) =
     new DiscountedUnigramKLDivergenceCache(self)
@@ -62,7 +62,7 @@ object FastDiscountedUnigramWordDist {
    copying arrays.
 
    In normal operation of grid location, we repeatedly do KL divergence
-   with the same `self` distribution and different `other` distributions,
+   with the same `self` lang model and different `other` lang models,
    and we have to iterate over all key/value pairs in `self`, so caching
    the `self` keys and values into arrays is useful.  `cache` can be
    null (no cache available) or a cache created using
@@ -78,7 +78,7 @@ object FastDiscountedUnigramWordDist {
         get_kl_divergence_cache(self)
       else
         cache
-    assert(the_cache.worddist == self)
+    assert(the_cache.langmodel == self)
     assert(the_cache.self_size == self.model.num_types)
     val pkeys = the_cache.self_keys
     val pvalues = the_cache.self_values

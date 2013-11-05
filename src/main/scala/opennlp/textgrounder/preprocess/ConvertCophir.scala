@@ -60,7 +60,7 @@ class ConvertCophirParams(ap: ArgParser) extends ScoobiProcessFilesParams(ap) {
 skipped.""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
-    help="""Largest size of n-grams to create.  Default 1, i.e. distribution
+    help="""Largest size of n-grams to create.  Default 1, i.e. language model
     only contains unigrams.""")
 }
 

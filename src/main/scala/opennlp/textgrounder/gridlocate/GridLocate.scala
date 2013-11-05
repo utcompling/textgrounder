@@ -31,7 +31,7 @@ import util.debug._
 
 import learning.{ArrayVector, Ranker}
 import learning.perceptron._
-import worddist._
+import langmodel._
 
 /*
 
@@ -126,7 +126,7 @@ documents -- as raw, word-split text; as unigram word counts; as n-gram word
 counts; etc.  Each such view has a schema file and one or more document files.
 The latter contains all the data for describing each document, including
 title, split (training, dev or test) and other metadata, as well as the text
-or word counts that are used to create the textual distribution of the
+or word counts that are used to create the language model of the
 document.  The document files are laid out in a very simple database format,
 consisting of one document per line, where each line is composed of a fixed
 number of fields, separated by TAB characters. (E.g. one field would list
@@ -169,9 +169,9 @@ the fields.""")
       help = """Number of nearest neighbor cells to output; default is %default;
 -1 means output all""")
 
-  var output_training_cell_dists =
-    ap.flag("output-training-cell-dists", "output-training-cells",
-      help = """Output the training cell distributions after they've been trained.""")
+  var output_training_cell_lang_models =
+    ap.flag("output-training-cell-lang-models", "output-training-cells",
+      help = """Output the training cell lang models after they've been trained.""")
 
   //// Options indicating which documents to train on or evaluate
   var eval_set =
@@ -205,23 +205,23 @@ process all.""")
   //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
   //      help = """Skip this many after each one processed.  Default 0.""")
 
-  //// Options used when creating word distributions
+  //// Options used when creating language models
   var jelinek_factor_default = 0.3
   var dirichlet_factor_default = 500.0
-  var word_dist =
-    ap.optionWithParams[String]("word-dist", "wd",
+  var lang_model =
+    ap.optionWithParams[String]("lang-model", "lm", "word-dist", "wd",
       default = ("pseudo-good-turing", ""),
       aliasedChoices = Seq(
         Seq("pseudo-good-turing", "pgt"),
         Seq("dirichlet"),
         Seq("jelinek-mercer", "jelinek"),
         Seq("unsmoothed-ngram")),
-      help = """Type of word distribution to use.  Possibilities are
+      help = """Type of language model to use.  Possibilities are
 'pseudo-good-turing' (a simplified version of Good-Turing smoothing over a
-unigram distribution), 'dirichlet' (Dirichlet smoothing over a unigram
-distribution), 'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over
-a unigram distribution), and 'unsmoothed-ngram' (an unsmoothed n-gram
-distribution). Default '%%default'.
+unigram language model), 'dirichlet' (Dirichlet smoothing over a unigram
+language model), 'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over
+a unigram language model), and 'unsmoothed-ngram' (an unsmoothed n-gram
+language model). Default '%%default'.
 
 For Dirichlet and Jelinek, an optional smoothing parameter can be given,
 following a colon, e.g. 'jelinek:0.2' or 'dirichlet:10000'. The higher
@@ -230,7 +230,7 @@ the value, the more smoothing is done. Default is %g for Jelinek and
 and >= 0.0 for Dirichlet. In both cases, a value of 0.0 means no smoothing
 (making both methods equivalent). See below for more explanation.
 
-An unsmoothed distribution is simply the maximum-likelihood (MLE)
+An unsmoothed language model is simply the maximum-likelihood (MLE)
 distribution, which assigns probability to words according to how often
 they have been observed in the document, with all words that do not occur
 in the document assigned 0 probability. These zero-value probabilities
@@ -239,7 +239,7 @@ not to have been seen so far can never be seen in the future) and
 practically, and so it is usually better to "smooth" an MLE distribution
 to ensure that all words have a non-zero probability (even if small).
 
-All of the implemented smoothed distributions operate by discounting, i.e.
+All of the implemented smoothed language models operate by discounting, i.e.
 taking away a certain amount of probability mass from the words in the MLE
 distribution and distributing it over the unseen words, in proportion to
 their probability across all documents (i.e. their global distribution).
@@ -268,8 +268,8 @@ is 1/2, and in general if |D| = n*m, then the discounting factor is
 distribution is weighted much more than the global distribution, while
 for for documents significantly smaller than m, the reverse is true.
 
-Note that the smoothing mostly affects the cell distributions rather
-than the test document distributions; hence the value of m should
+Note that the smoothing mostly affects the cell language models rather
+than the test document language models; hence the value of m should
 reflect this.
 
 Pseudo-Good-Turing has no smoothing parameter, and automatically sets
@@ -293,15 +293,16 @@ Possibilities are 'yes', 'no', and 'default' (which means 'yes' when doing
 Dirichlet or Jelinek-Mercer smoothing, 'no' when doing pseudo-Good-Turing
 smoothing).""")
 
-  var rerank_word_dist =
-    ap.optionWithParams[String]("rerank-word-dist", "rwd",
+  var rerank_lang_model =
+    ap.optionWithParams[String]("rerank-lang-model", "rerank-word-dist",
+        "rlm", "rwd",
       default = ("pseudo-good-turing", ""),
       aliasedChoices = Seq(
         Seq("pseudo-good-turing", "pgt"),
         Seq("dirichlet"),
         Seq("jelinek-mercer", "jelinek"),
         Seq("unsmoothed-ngram")),
-      help = """Word dist for reranking. See `--word-dist`.""")
+      help = """Language model for reranking. See `--lang-model`.""")
   var rerank_interpolate =
     ap.option[String]("rerank-interpolate",
       default = "default",
@@ -315,22 +316,22 @@ reranking. See `--interpolate`.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
-match against document distributions.  Note that in toponym resolution,
+match against document language models.  Note that in toponym resolution,
 this applies only to words in documents (currently used only in Naive Bayes
 matching), not to toponyms, which are always matched case-insensitively.""")
   var no_stopwords =
     ap.flag("no-stopwords",
-      help = """Don't remove any stopwords from word distributions.""")
+      help = """Don't remove any stopwords from language models.""")
   var minimum_word_count =
     ap.option[Int]("minimum-word-count", "mwc", metavar = "NUM",
       default = 1,
-      help = """Minimum count of words to consider in word
-distributions.  Words whose count is less than this value are ignored.""")
+      help = """Minimum count of words to consider in language models.
+Words whose count is less than this value are ignored.""")
   var max_ngram =
     ap.option[Int]("max-ngram", "mn", metavar = "NUM",
       default = 0,
-      help = """Maximum length of n-grams to include in an n-gram word
-distribution. Any larger n-grams included in the source (e.g. corpus)
+      help = """Maximum length of n-grams to include in an n-gram language
+model. Any larger n-grams included in the source (e.g. corpus)
 will be ignored. A value of 0 means don't filter any n-grams.  See
 also `--raw-text-max-ngram`, which controls the maximum length of n-grams
 generated from a raw document.""")
@@ -483,7 +484,7 @@ divergence.
 'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
 Bayes algorithm to match a test document against a training document (e.g.
 by assuming that the words of the test document are independent of each
-other, if we are using a unigram word distribution).  The variants with
+other, if we are using a unigram language model).  The variants with
 the "baseline" incorporate a prior probability into the calculations, while
 the non-baseline variants don't.  The baseline is currently derived from the
 number of documents in a cell.  See also 'naive-bayes-weighting' and
@@ -492,7 +493,7 @@ words are weighted against each other and how the baseline and word
 probabilities are weighted.
 
 'average-cell-probability' (or 'celldist') involves computing, for each word,
-a probability distribution over cells using the word distribution of each cell,
+a probability distribution over cells using the language model of each cell,
 and then combining the distributions over all words in a document, weighted by
 the count the word in the document.
 
@@ -731,18 +732,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Type of word dist used in the cell grid.
+   * Type of lang model used in the cell grid.
    */
-  protected def grid_word_dist_type = {
-    if (params.word_dist == (("unsmoothed-ngram", ""))) "ngram"
+  protected def grid_lang_model_type = {
+    if (params.lang_model == (("unsmoothed-ngram", ""))) "ngram"
     else "unigram"
   }
 
   /**
-   * Field in textdb corpus used to access proper type of word dist.
+   * Field in textdb corpus used to access proper type of lang model.
    */
   def grid_word_count_field = {
-    if (grid_word_dist_type == "ngram")
+    if (grid_lang_model_type == "ngram")
       "ngram-counts"
     else
       "unigram-counts"
@@ -793,24 +794,24 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   lazy protected val the_whitelist = read_whitelist()
 
-  /** Return a function that will create a WordDistBuilder object,
-   * given a WordDistFactory.
+  /** Return a function that will create a LangModelBuilder object,
+   * given a LangModelFactory.
    *
-   * Currently there are two factory-type objects for word distributions
-   * (language models): WordDistFactory (a lower-level factory to directly
-   * create WordDist objects and handle details of initializing smoothing
-   * models and such) and WordDistBuilder (a high-level factory that
-   * knows how to create and initialize WordDists from source data,
+   * Currently there are two factory-type objects for language models
+   * (language models): LangModelFactory (a lower-level factory to directly
+   * create LangModel objects and handle details of initializing smoothing
+   * models and such) and LangModelBuilder (a high-level factory that
+   * knows how to create and initialize LangModels from source data,
    * handling issues like stopwords, vocabulary filtering, etc.). The two
    * factory objects need pointers to each other, and to handle this
    * needing mutable vars, one needs to create the other in its builder
-   * function. So, rather than creating a WordDistBuilder ourselves, we
-   * pass in a function to create one when creating a WordDistFactory.
+   * function. So, rather than creating a LangModelBuilder ourselves, we
+   * pass in a function to create one when creating a LangModelFactory.
    */
-  protected def get_word_dist_builder_creator(dist_type: String) =
-    (factory: WordDistFactory) => {
-      if (dist_type == "ngram")
-        new DefaultNgramWordDistBuilder(
+  protected def get_lang_model_builder_creator(lang_model_type: String) =
+    (factory: LangModelFactory) => {
+      if (lang_model_type == "ngram")
+        new DefaultNgramLangModelBuilder(
           factory,
           ignore_case = !params.preserve_case_words,
           stopwords = the_stopwords,
@@ -819,7 +820,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           max_ngram = params.max_ngram,
           raw_text_max_ngram = params.raw_text_max_ngram)
       else
-        new DefaultUnigramWordDistBuilder(
+        new DefaultUnigramLangModelBuilder(
           factory,
           ignore_case = !params.preserve_case_words,
           stopwords = the_stopwords,
@@ -828,67 +829,66 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
 
   /**
-   * Create a WordDistFactory object of the appropriate kind given
-   * command-line parameters. This is a factory for creating word
-   * distributions, i.e. language models.
+   * Create a LangModelFactory object of the appropriate kind given
+   * command-line parameters. This is a factory for creating language models.
    */
-  protected def create_word_dist_factory(dist_type: String,
-      dist_spec: (String, String), interpolate: String) = {
-    val create_builder = get_word_dist_builder_creator(dist_type)
-    val (dist, distparams) = dist_spec
-    if (dist == "unsmoothed-ngram")
-      new UnsmoothedNgramWordDistFactory(create_builder)
-    else if (dist == "dirichlet") {
-      val dirichlet_factor = params.parser.parseSubParams(dist, distparams,
+  protected def create_lang_model_factory(lang_model_type: String,
+      lm_spec: (String, String), interpolate: String) = {
+    val create_builder = get_lang_model_builder_creator(lang_model_type)
+    val (lm, lmparams) = lm_spec
+    if (lm == "unsmoothed-ngram")
+      new UnsmoothedNgramLangModelFactory(create_builder)
+    else if (lm == "dirichlet") {
+      val dirichlet_factor = params.parser.parseSubParams(lm, lmparams,
         default = params.dirichlet_factor_default)
       if (dirichlet_factor < 0.0)
         param_error("Dirichlet factor must be >= 0, but is %g"
           format dirichlet_factor)
-      new DirichletUnigramWordDistFactory(create_builder,
+      new DirichletUnigramLangModelFactory(create_builder,
         interpolate, params.tf_idf, dirichlet_factor)
     }
-    else if (dist == "jelinek-mercer") {
-      val jelinek_factor = params.parser.parseSubParams(dist, distparams,
+    else if (lm == "jelinek-mercer") {
+      val jelinek_factor = params.parser.parseSubParams(lm, lmparams,
         default = params.jelinek_factor_default)
       if (jelinek_factor < 0.0 || jelinek_factor > 1.0)
         param_error("Jelinek factor must be between 0.0 and 1.0, but is %g"
           format jelinek_factor)
-      new JelinekMercerUnigramWordDistFactory(create_builder,
+      new JelinekMercerUnigramLangModelFactory(create_builder,
         interpolate, params.tf_idf, jelinek_factor)
     }
     else {
-      if (distparams.contains(':'))
+      if (lmparams.contains(':'))
         param_error("Parameters not allowed for pseudo-Good-Turing")
-      new PseudoGoodTuringUnigramWordDistFactory(create_builder,
+      new PseudoGoodTuringUnigramLangModelFactory(create_builder,
         interpolate, params.tf_idf)
     }
   }
 
   /**
-   * Create a DocWordDistFactory object holding the WordDistFactory
+   * Create a DocLangModelFactory object holding the LangModelFactory
    * objects needed by a document. Currently there may be two if
    * ranking and reranking require different dists.
    */
-  protected def create_doc_word_dist_factory = {
-    val grid_word_dist_factory =
-      create_word_dist_factory(grid_word_dist_type, params.word_dist,
+  protected def create_doc_lang_model_factory = {
+    val grid_lang_model_factory =
+      create_lang_model_factory(grid_lang_model_type, params.lang_model,
         params.interpolate)
-    val rerank_word_dist_factory =
-      if (grid_word_dist_type == rerank_word_dist_type)
-        grid_word_dist_factory
+    val rerank_lang_model_factory =
+      if (grid_lang_model_type == rerank_lang_model_type)
+        grid_lang_model_factory
       else
-        create_word_dist_factory(rerank_word_dist_type,
-          params.rerank_word_dist, params.rerank_interpolate)
-    new DocWordDistFactory(grid_word_dist_factory, rerank_word_dist_factory)
+        create_lang_model_factory(rerank_lang_model_type,
+          params.rerank_lang_model, params.rerank_interpolate)
+    new DocLangModelFactory(grid_lang_model_factory, rerank_lang_model_factory)
   }
 
   /**
    * Create a document factory (GridDocFactory) for creating documents
-   * (GridDoc), given factory for creating the word distributions (language
+   * (GridDoc), given factory for creating the language models (language
    * models) associated with the documents.
    */
   protected def create_document_factory(
-      word_dist_factory: DocWordDistFactory): GridDocFactory[Co]
+      lang_model_factory: DocLangModelFactory): GridDocFactory[Co]
 
   /**
    * Create an empty cell grid (Grid) given a document factory.
@@ -930,7 +930,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   /**
    * Create a cell grid that's populated with the specified training data.
-   * The resulting grid will have a word distribution (language model)
+   * The resulting grid will have a language model (language model)
    * associated with each cell.
    *
    * @param get_rawdocs Function to return an iterator over raw training
@@ -943,8 +943,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]
   ) = {
-    val word_dist_factory = create_doc_word_dist_factory
-    val docfact = create_document_factory(word_dist_factory)
+    val lang_model_factory = create_doc_lang_model_factory
+    val docfact = create_document_factory(lang_model_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
@@ -961,11 +961,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // System.exit(0)
     }
     grid.finish()
-    if(params.output_training_cell_dists) {
+    if(params.output_training_cell_lang_models) {
       for(cell <- grid.iter_nonempty_cells) {
         print(cell.shortstr+"\t")
-        val word_dist = cell.combined_dist.word_dist
-        println(word_dist.toString)
+        val lang_model = cell.combined_lang_model.lang_model
+        println(lang_model.toString)
       }
     }
     grid
@@ -977,9 +977,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def initialize_grid = create_grid_from_documents(read_raw_training_documents)
 
-  protected def rerank_word_dist_type = {
+  protected def rerank_lang_model_type = {
     if (params.rerank == "none")
-      grid_word_dist_type
+      grid_lang_model_type
     else if (params.rerank_features_matching_ngram_choices.contains(
         params.rerank_features))
       "ngram"
@@ -988,7 +988,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   def rerank_word_count_field = {
-    if (rerank_word_dist_type == "ngram")
+    if (rerank_lang_model_type == "ngram")
       "ngram-counts"
     else
       "unigram-counts"
@@ -998,9 +998,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * Create a ranker object corresponding to the given name. A ranker object
    * returns a ranking over potential grid cells, given a test document.
    * This is used to locate a test document in the grid (e.g. for
-   * geolocation), generally by comparing the test document's word
-   * distribution (language model) to the word distribution of each
-   * grid cell.
+   * geolocation), generally by comparing the test document's language model
+   * to the language model of each grid cell.
    */
   def create_named_ranker(ranker_name: String, grid: Grid[Co]) = {
     ranker_name match {

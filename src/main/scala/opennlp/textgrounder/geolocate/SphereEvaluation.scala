@@ -304,13 +304,13 @@ class RankedSphereDocEvalResult(
 //  }
 //
 //  def evaluate_document(doc: TitledDoc) = {
-//    val dist = grid.docfact.word_dist_factory.create_word_dist
+//    val lang_model = grid.docfact.lang_model_factory.create_lang_model
 //    for (text <- Seq(doc.title, doc.text))
-//      dist.add_document(split_text_into_words(text, ignore_punc = true))
-//    dist.finish_before_global()
-//    dist.finish_after_global()
+//      lang_model.add_document(split_text_into_words(text, ignore_punc = true))
+//    lang_model.finish_before_global()
+//    lang_model.finish_after_global()
 //    val cells =
-//      ranker.return_ranked_cells(dist, include = Iterable[SphereCell]())
+//      ranker.return_ranked_cells(lang_model, include = Iterable[SphereCell]())
 //    // FIXME: This should be output by a result object we return.
 //    errprint("")
 //    errprint("Document with title: %s", doc.title)

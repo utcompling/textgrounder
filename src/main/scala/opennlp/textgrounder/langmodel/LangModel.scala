@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  WordDist.scala
+//  LangModel.scala
 //
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
@@ -17,7 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package worddist
+package langmodel
 
 import math._
 import collection.mutable
@@ -30,14 +30,14 @@ import util.memoizer._
 
 import util.debug._
 
-import WordDist._
+import LangModel._
 
 // val use_sorted_list = false
 
 /**
- * An exception thrown to indicate an error during distribution creation
+ * An exception thrown to indicate an error during lang model creation
  */
-case class DistributionCreationException(
+case class LangModelCreationException(
   message: String,
   cause: Option[Throwable] = None
 ) extends RethrowableRuntimeException(message)
@@ -52,19 +52,19 @@ trait FastSlowKLDivergence {
 
   /**
    * This is a basic implementation of the computation of the KL-divergence
-   * between this distribution and another distribution, including possible
+   * between this lang model and another lang model, including possible
    * debug information.  Useful for checking against the other, faster
    * implementation in `fast_kl_divergence`.
    * 
-   * @param xother The other distribution to compute against.
+   * @param xother The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
-   *   that exist in our distribution; otherwise we also have to take into
-   *   account words in the other distribution even if we haven't seen them,
+   *   that exist in our lang model; otherwise we also have to take into
+   *   account words in the other lang model even if we haven't seen them,
    *   and often also (esp. in the presence of smoothing) the contribution
    *   of all other words in the vocabulary.
    * @param return_contributing_words If true, return a map listing
-   *   the words (or n-grams, or whatever) in both distributions (or, for a
-   *   partial KL-divergence, the words in our distribution) and the amount
+   *   the words (or n-grams, or whatever) in both lang models (or, for a
+   *   partial KL-divergence, the words in our lang model) and the amount
    *   of total KL-divergence they compute, useful for debugging.
    *   
    * @return A tuple of (divergence, word_contribs) where the first
@@ -72,7 +72,7 @@ trait FastSlowKLDivergence {
    *   of word contributions as described above; will be null if
    *   not requested.
    */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, WordCount])
 
@@ -81,7 +81,7 @@ trait FastSlowKLDivergence {
    * #slow_kl_divergence_debug, but without requesting or returning debug
    * info.
    */
-  def slow_kl_divergence(other: WordDist, partial: Boolean = false) = {
+  def slow_kl_divergence(other: LangModel, partial: Boolean = false) = {
     val (kldiv, contribs) =
       slow_kl_divergence_debug(other, partial, false)
     kldiv
@@ -91,13 +91,13 @@ trait FastSlowKLDivergence {
    * A fast, optimized implementation of KL-divergence.  See the discussion in
    * `slow_kl_divergence_debug`.
    */
-  def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false): Double
 
   /**
    * Check fast and slow KL-divergence versions against each other.
    */
-  def test_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  def test_kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false) = {
     val slow_kldiv = slow_kl_divergence(other, partial)
     val fast_kldiv = fast_kl_divergence(cache, other, partial)
@@ -115,7 +115,7 @@ trait FastSlowKLDivergence {
    * are more than a very small amount different (the small amount rather
    * than 0 to account for possible rounding error).
    */
-  protected def imp_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  protected def imp_kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean) = {
     if (debug("test-kl"))
       test_kl_divergence(cache, other, partial)
@@ -125,101 +125,101 @@ trait FastSlowKLDivergence {
 }
 
 /**
- * A class that controls how to build a word distribution, whether the
- * source comes from a data file, a document, another distribution, etc.
+ * A class that controls how to build a language model, whether the
+ * source comes from a data file, a document, another lang model, etc.
  * The actual words added can be transformed in various ways, e.g.
  * case-folding the words (typically by converting to all lowercase), ignoring
  * words seen in a stoplist, converting some words to a generic -OOV-,
  * eliminating words seen less than a minimum nmber of times, etc.
  */
-abstract class WordDistBuilder(factory: WordDistFactory) {
+abstract class LangModelBuilder(factory: LangModelFactory) {
   /**
    * Actual implementation of `add_document` by subclasses.
    * External callers should use `add_document`.
    */
-  protected def imp_add_document(dist: WordDist, words: Iterable[String])
+  protected def imp_add_document(lm: LangModel, words: Iterable[String])
 
   /**
-   * Actual implementation of `add_word_distribution` by subclasses.
-   * External callers should use `add_word_distribution`.
+   * Actual implementation of `add_language_model` by subclasses.
+   * External callers should use `add_language_model`.
    */
-  protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
+  protected def imp_add_language_model(lm: LangModel, other: LangModel,
     partial: WordCount = 1.0)
 
   /**
    * Actual implementation of `finish_before_global` by subclasses.
    * External callers should use `finish_before_global`.
    */
-  protected def imp_finish_before_global(dist: WordDist)
+  protected def imp_finish_before_global(lm: LangModel)
 
   /**
-   * Incorporate a document into the distribution.  The document is described
+   * Incorporate a document into the lang model.  The document is described
    * by a sequence of words.
    */
-  def add_document(dist: WordDist, words: Iterable[String]) {
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
-    imp_add_document(dist, words)
+  def add_document(lm: LangModel, words: Iterable[String]) {
+    assert(!lm.finished)
+    assert(!lm.finished_before_global)
+    imp_add_document(lm, words)
   }
 
   /**
-   * Incorporate the given distribution into our distribution.
+   * Incorporate the given lang model into our lang model.
    * `partial` is a scaling factor (between 0.0 and 1.0) used for
-   * interpolating multiple distributions.
+   * interpolating multiple lang models.
    */
-  def add_word_distribution(dist: WordDist, other: WordDist,
+  def add_language_model(lm: LangModel, other: LangModel,
       partial: WordCount = 1.0) {
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
+    assert(!lm.finished)
+    assert(!lm.finished_before_global)
     assert(partial >= 0.0 && partial <= 1.0)
-    imp_add_word_distribution(dist, other, partial)
+    imp_add_language_model(lm, other, partial)
   }
 
   /**
-   * Partly finish computation of distribution.  This is called when the
-   * distribution has been completely populated with words, and no more
-   * modifications (e.g. incorporation of words or other distributions) will
-   * be made to the distribution.  It should do any additional changes that
-   * depend on the distribution being complete, but which do not depend on
-   * the global word-distribution statistics having been computed. (These
-   * statistics can be computed only after *all* word distributions that
+   * Partly finish computation of lang model.  This is called when the
+   * lang model has been completely populated with words, and no more
+   * modifications (e.g. incorporation of words or other lang models) will
+   * be made to the lang model.  It should do any additional changes that
+   * depend on the lang model being complete, but which do not depend on
+   * the global language-model statistics having been computed. (These
+   * statistics can be computed only after *all* language models that
    * are used to create these global statistics have been completely
    * populated.)
    *
    * @see #finish_after_global
    * 
    */
-  def finish_before_global(dist: WordDist) {
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
-    imp_finish_before_global(dist)
-    if (dist.empty)
-      throw new DistributionCreationException(
-        "Attempt to create an empty distribution: %s" format dist)
-    dist.finished_before_global = true
+  def finish_before_global(lm: LangModel) {
+    assert(!lm.finished)
+    assert(!lm.finished_before_global)
+    imp_finish_before_global(lm)
+    if (lm.empty)
+      throw new LangModelCreationException(
+        "Attempt to create an empty lang model: %s" format lm)
+    lm.finished_before_global = true
   }
 
   /**
-   * Create the word distribution of a document, given the value of the field
-   * describing the distribution (typically called "unigram-counts" or
+   * Create the language model of a document, given the value of the field
+   * describing the lang model (typically called "unigram-counts" or
    * "ngram-counts" or "text").
    *
-   * @param doc Document to set the distribution of.
-   * @param diststr String from the document file, describing the distribution.
+   * @param doc Document to set the lang model of.
+   * @param diststr String from the document file, describing the lang model.
    */
-  def create_distribution(countstr: String): WordDist
+  def create_lang_model(countstr: String): LangModel
 }
 
 trait KLDivergenceCache {
 }
 
 /**
- * A factory object for WordDists (word distributions).  Currently, there is
+ * A factory object for LangModels (language models).  Currently, there is
  * only one factory object in a particular instance of the application
  * (i.e. it's a singleton), but the particular factory used depends on a
  * command-line parameter.
  */
-trait WordDistFactory {
+trait LangModelFactory {
   /**
    * Total number of word types seen (size of vocabulary)
    */
@@ -231,29 +231,28 @@ trait WordDistFactory {
   var total_num_word_tokens = 0
 
   /**
-   * Corresponding builder object for building up the word distribution
+   * Corresponding builder object for building up the language model
    */
-  val builder: WordDistBuilder
+  val builder: LangModelBuilder
 
   /**
-   * Create an empty word distribution.
+   * Create an empty language model.
    */
-  def create_word_dist: WordDist
+  def create_lang_model: LangModel
 
   /**
-   * Add the given distribution to the global word-distribution statistics,
+   * Add the given lang model to the global backoff statistics,
    * if any.
    */
-  def note_dist_globally(dist: WordDist) { }
+  def note_lang_model_globally(lm: LangModel) { }
 
   /**
-   * Finish computing any global word-distribution statistics, e.g. tables for
-   * doing back-off.  This is called after all of the relevant WordDists
-   * have been created.  In practice, the "relevant" distributions are those
-   * associated with training documents, which are read in
-   * during `read_word_counts`.
+   * Finish computing any global backoff statistics.  This is called after
+   * all of the relevant lang models have been created.  In practice, these
+   * are those associated with training documents, which are read in during
+   * `read_word_counts`.
    */
-  def finish_global_distribution()
+  def finish_global_backoff_stats()
 }
 
 /**
@@ -302,7 +301,7 @@ trait WordAsStringMemoizer {
  * strings) into integers, for faster and less space-intensive operations
  * on them).
  */
-object WordDist extends WordAsIntMemoizer {
+object LangModel extends WordAsIntMemoizer {
   // FIXME! This is present to handle partial counts but these weren't
   // ever really used because they didn't seem to help.
   type WordCount = Double
@@ -375,51 +374,51 @@ trait ItemStorage[Item] {
 }
 
 /**
- * A word distribution, i.e. a statistical distribution over words in
+ * A language model, i.e. a statistical distribution over words in
  * a document, cell, etc.
  */
-abstract class WordDist(val factory: WordDistFactory) {
+abstract class LangModel(val factory: LangModelFactory) {
   type Item
   val model: ItemStorage[Item]
 
   /**
-   * Whether we have finished computing the distribution, and therefore can
+   * Whether we have finished computing the lang model, and therefore can
    * reliably do probability lookups.
    */
   var finished = false
   /**
    * Whether we have already called `finish_before_global`.  If so, this
-   * means we can't modify the distribution any more.
+   * means we can't modify the lang model any more.
    */
   var finished_before_global = false
 
-  /** Is this distribution empty? */
+  /** Is this lang model empty? */
   def empty = model.empty
 
   /**
-   * Incorporate a document into the distribution.
+   * Incorporate a document into the lang model.
    */
   def add_document(words: Iterable[String]) {
     factory.builder.add_document(this, words)
   }
 
   /**
-   * Incorporate the given distribution into our distribution.
+   * Incorporate the given lang model into our lang model.
    * `partial` is a scaling factor (between 0.0 and 1.0) used for
-   * interpolating multiple distributions.
+   * interpolating multiple lang models.
    */
-  def add_word_distribution(other: WordDist, partial: WordCount = 1.0) {
-    factory.builder.add_word_distribution(this, other, partial)
+  def add_language_model(other: LangModel, partial: WordCount = 1.0) {
+    factory.builder.add_language_model(this, other, partial)
   }
 
   /**
-   * Partly finish computation of distribution.  This is called when the
-   * distribution has been completely populated with words, and no more
-   * modifications (e.g. incorporation of words or other distributions) will
-   * be made to the distribution.  It should do any additional changes that
-   * depend on the distribution being complete, but which do not depend on
-   * the global word-distribution statistics having been computed. (These
-   * statistics can be computed only after *all* word distributions that
+   * Partly finish computation of lang model.  This is called when the
+   * lang model has been completely populated with words, and no more
+   * modifications (e.g. incorporation of words or other lang models) will
+   * be made to the lang model.  It should do any additional changes that
+   * depend on the lang model being complete, but which do not depend on
+   * the global language-model statistics having been computed. (These
+   * statistics can be computed only after *all* language models that
    * are used to create these global statistics have been completely
    * populated.)
    *
@@ -437,10 +436,10 @@ abstract class WordDist(val factory: WordDistFactory) {
   protected def imp_finish_after_global()
 
   /**
-   * Completely finish computation of the word distribution.  This is called
-   * after finish_global_distribution() on the factory method, and can be
-   * used to compute values for the distribution that depend on the
-   * global word-distribution statistics.
+   * Completely finish computation of the language model.  This is called
+   * after finish_global_backoff_stats() on the factory method, and can be
+   * used to compute values for the lang model that depend on the
+   * global language-model statistics.
    */
   def finish_after_global() {
     assert(!finished)
@@ -472,7 +471,7 @@ abstract class WordDist(val factory: WordDistFactory) {
    * indicating how much more likely the item is in this corpus than the
    * other to be different.
    */
-  def dunning_log_likelihood_2x1(item: Item, other: WordDist) = {
+  def dunning_log_likelihood_2x1(item: Item, other: LangModel) = {
     val a = model.get_item(item).toDouble
     // This cast is kind of ugly but I don't see a way around it.
     val b = other.model.get_item(item.asInstanceOf[other.Item]).toDouble
@@ -486,8 +485,8 @@ abstract class WordDist(val factory: WordDistFactory) {
     val1
   }
 
-  def dunning_log_likelihood_2x2(item: Item, other_b: WordDist,
-      other_c: WordDist, other_d: WordDist) = {
+  def dunning_log_likelihood_2x2(item: Item, other_b: LangModel,
+      other_c: LangModel, other_d: LangModel) = {
     val a = model.get_item(item).toDouble
     // This cast is kind of ugly but I don't see a way around it.
     val b = other_b.model.get_item(item.asInstanceOf[other_b.Item]).toDouble
@@ -506,25 +505,25 @@ abstract class WordDist(val factory: WordDistFactory) {
    * External callers should use `kl_divergence`.
    */
   protected def imp_kl_divergence(cache: KLDivergenceCache,
-    other: WordDist, partial: Boolean): Double
+    other: LangModel, partial: Boolean): Double
 
   /**
-   * Compute the KL-divergence between this distribution and another
-   * distribution.
+   * Compute the KL-divergence between this lang model and another
+   * lang model.
    * 
-   * @param cache Cached information about this distribution, used to
+   * @param cache Cached information about this lang model, used to
    *   speed up computations.  Never needs to be supplied; null can always
    *   be given, to cause a new cache to be created.
-   * @param other The other distribution to compute against.
+   * @param other The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
-   *   that exist in our distribution; otherwise we also have to take
-   *   into account words in the other distribution even if we haven't
+   *   that exist in our lang model; otherwise we also have to take
+   *   into account words in the other lang model even if we haven't
    *   seen them, and often also (esp. in the presence of smoothing) the
    *   contribution of all other words in the vocabulary.
    *   
    * @return The KL-divergence value.
    */
-  def kl_divergence(cache: KLDivergenceCache, other: WordDist,
+  def kl_divergence(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false) = {
     assert(finished)
     assert(other.finished)
@@ -534,12 +533,12 @@ abstract class WordDist(val factory: WordDistFactory) {
   def get_kl_divergence_cache(): KLDivergenceCache = null
 
   /**
-   * Compute the symmetric KL-divergence between two distributions by averaging
+   * Compute the symmetric KL-divergence between two lang models by averaging
    * the respective one-way KL-divergences in each direction.
    * 
    * @param partial Same as in `kl_divergence`.
    */
-  def symmetric_kldiv(cache: KLDivergenceCache, other: WordDist,
+  def symmetric_kldiv(cache: KLDivergenceCache, other: LangModel,
       partial: Boolean = false) = {
     0.5*this.kl_divergence(cache, other, partial) +
     0.5*this.kl_divergence(cache, other, partial)
@@ -547,23 +546,23 @@ abstract class WordDist(val factory: WordDistFactory) {
 
   /**
    * Implementation of the cosine similarity between this and another
-   * distribution, using either unsmoothed or smoothed probabilities.
+   * lang model, using either unsmoothed or smoothed probabilities.
    *
    * @param partial Same as in `kl_divergence`.
    * @param smoothed If true, use smoothed probabilities, if smoothing exists;
    *   otherwise, do unsmoothed.
    */
-  def cosine_similarity(other: WordDist, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = false,
     smoothed: Boolean = false): Double
 
   /**
-   * For a document described by its distribution 'worddist', return the
-   * log probability log p(worddist|other worddist) using a Naive Bayes
+   * For a document described by its language model, return the
+   * log probability log p(langmodel|other langmodel) using a Naive Bayes
    * algorithm.
    *
-   * @param worddist Distribution of document.
+   * @param langmodel Language model of document.
    */
-  def get_nbayes_logprob(worddist: WordDist): Double
+  def get_nbayes_logprob(langmodel: LangModel): Double
 
   def debug_string: String = toString
 }

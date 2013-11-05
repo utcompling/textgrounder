@@ -19,7 +19,7 @@
 package opennlp.textgrounder
 package learning
 
-import worddist.WordDist._
+import langmodel.LangModel._
 import util.metering._
 import util.print._
 import learning._

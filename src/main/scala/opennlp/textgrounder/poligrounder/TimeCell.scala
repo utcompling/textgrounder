@@ -32,8 +32,8 @@ import util.experiment._
 
 import gridlocate._
 import util.debug._
-import worddist._
-import worddist.WordDist._
+import langmodel._
+import langmodel.LangModel._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
@@ -138,7 +138,7 @@ class TimeGrid(
       category <- categories
       pair = pairs(category)
       v <- List(pair.before_cell, pair.after_cell)
-      if (!v.combined_dist.is_empty)
+      if (!v.combined_lang_model.is_empty)
     } yield v
   }
 
@@ -149,52 +149,53 @@ class TimeGrid(
       pair.after_cell.finish()
       /* FIXME!!!  Computation of num_non_empty_cells should happen
          automatically!  */
-      if (!pair.before_cell.combined_dist.is_empty)
+      if (!pair.before_cell.combined_lang_model.is_empty)
         num_non_empty_cells += 1
-      if (!pair.after_cell.combined_dist.is_empty)
+      if (!pair.after_cell.combined_lang_model.is_empty)
         num_non_empty_cells += 1
       for ((cell, name) <-
           Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
-        val comdist = cell.combined_dist
+        val comdist = cell.combined_lang_model
         errprint("Number of documents in %s-chunk: %s", name,
           comdist.num_docs)
         errprint("Number of types in %s-chunk grid lm: %s", name,
-          comdist.word_dist.grid_dist.model.num_types)
+          comdist.lang_model.grid_lm.model.num_types)
         errprint("Number of tokens in %s-chunk grid lm: %s", name,
-          comdist.word_dist.grid_dist.model.num_tokens)
+          comdist.lang_model.grid_lm.model.num_tokens)
         errprint("Number of types in %s-chunk rerank lm: %s", name,
-          comdist.word_dist.rerank_dist.model.num_types)
+          comdist.lang_model.rerank_lm.model.num_types)
         errprint("Number of tokens in %s-chunk rerank lm: %s", name,
-          comdist.word_dist.rerank_dist.model.num_tokens)
+          comdist.lang_model.rerank_lm.model.num_tokens)
       }
     }
   }
 }
 
-abstract class DistributionComparer(min_prob: Double, max_items: Int) {
+abstract class LangModelComparer(min_prob: Double, max_items: Int) {
   type Item
-  type Dist <: WordDist
+  type LM <: LangModel
 
   def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
-  def get_dist(cell: TimeCell): Dist =
-    cell.combined_dist.word_dist.asInstanceOf[Dist]
-  def get_keys(dist: Dist) = dist.model.iter_keys.toSet
-  def lookup_item(dist: Dist, item: Item): Double
+  def get_lm(cell: TimeCell): LM =
+    cell.combined_lang_model.lang_model.asInstanceOf[LM]
+  def get_keys(lm: LM) = lm.model.iter_keys.toSet
+  def lookup_item(lm: LM, item: Item): Double
   def format_item(item: Item): String
 
   def compare_cells_2way(grid: TimeGrid, category: String) {
-    val before_dist = get_dist(get_pair(grid, category).before_cell)
-    val after_dist = get_dist(get_pair(grid, category).after_cell)
+    val before_lm = get_lm(get_pair(grid, category).before_cell)
+    val after_lm = get_lm(get_pair(grid, category).after_cell)
 
     val itemdiff =
       for {
-        rawitem <- get_keys(before_dist) ++ get_keys(after_dist)
+        rawitem <- get_keys(before_lm) ++ get_keys(after_lm)
         item = rawitem.asInstanceOf[Item]
-        p = lookup_item(before_dist, item)
-        q = lookup_item(after_dist, item)
+        p = lookup_item(before_lm, item)
+        q = lookup_item(after_lm, item)
         if p >= min_prob || q >= min_prob
-      } yield (item, before_dist.dunning_log_likelihood_2x1(item.asInstanceOf[before_dist.Item], after_dist), q - p)
+      } yield (item, before_lm.dunning_log_likelihood_2x1(
+        item.asInstanceOf[before_lm.Item], after_lm), q - p)
 
     println("Items by 2-way log-likelihood for category '%s':" format category)
     for ((item, dunning, prob) <-
@@ -203,8 +204,8 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         (format_float(dunning),
          format_item(item),
          if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(lookup_item(before_dist, item)),
-         format_float(lookup_item(after_dist, item))
+         format_float(lookup_item(before_lm, item)),
+         format_float(lookup_item(after_lm, item))
        ))
     }
     println("")
@@ -220,8 +221,8 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
           diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
         println("%s: %s - %s = %s%s (LL %s)" format
           (format_item(item),
-           format_float(lookup_item(before_dist, item)),
-           format_float(lookup_item(after_dist, item)),
+           format_float(lookup_item(before_lm, item)),
+           format_float(lookup_item(after_lm, item)),
            updown, format_float(prob),
            format_float(dunning)))
       }
@@ -234,10 +235,10 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 
   def compare_cells_4way(grid: TimeGrid, category1: String,
       category2: String) {
-    val before_dist_1 = get_dist(get_pair(grid, category1).before_cell)
-    val after_dist_1 = get_dist(get_pair(grid, category1).after_cell)
-    val before_dist_2 = get_dist(get_pair(grid, category2).before_cell)
-    val after_dist_2 = get_dist(get_pair(grid, category2).after_cell)
+    val before_lm_1 = get_lm(get_pair(grid, category1).before_cell)
+    val after_lm_1 = get_lm(get_pair(grid, category1).after_cell)
+    val before_lm_2 = get_lm(get_pair(grid, category2).before_cell)
+    val after_lm_2 = get_lm(get_pair(grid, category2).after_cell)
 
     val cat13 = category1.slice(0,3)
     val cat23 = category2.slice(0,3)
@@ -246,13 +247,13 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 
     val itemdiff =
       for {
-        rawitem <- get_keys(before_dist_1) ++ get_keys(after_dist_1) ++
-          get_keys(before_dist_2) ++ get_keys(after_dist_2)
+        rawitem <- get_keys(before_lm_1) ++ get_keys(after_lm_1) ++
+          get_keys(before_lm_2) ++ get_keys(after_lm_2)
         item = rawitem.asInstanceOf[Item]
-        p1 = lookup_item(before_dist_1, item)
-        q1 = lookup_item(after_dist_1, item)
-        p2 = lookup_item(before_dist_2, item)
-        q2 = lookup_item(after_dist_2, item)
+        p1 = lookup_item(before_lm_1, item)
+        q1 = lookup_item(after_lm_1, item)
+        p2 = lookup_item(before_lm_2, item)
+        q2 = lookup_item(after_lm_2, item)
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
         abs1 = q1 - p1
         abs2 = q2 - p2
@@ -264,9 +265,9 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
           else if (pct1 < 0 && pct2 < 0) "-both"
           else "+both"
         }
-      } yield (item, before_dist_1.dunning_log_likelihood_2x2(
-          item.asInstanceOf[before_dist_1.Item],
-          after_dist_1, before_dist_2, after_dist_2),
+      } yield (item, before_lm_1.dunning_log_likelihood_2x2(
+          item.asInstanceOf[before_lm_1.Item],
+          after_lm_1, before_lm_2, after_lm_2),
           p1, q1, p2, q2, abs1, abs2, pct1, pct2, change
         )
 
@@ -317,34 +318,35 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 }
 
 class UnigramComparer(min_prob: Double, max_items: Int) extends
-    DistributionComparer(min_prob, max_items) {
+    LangModelComparer(min_prob, max_items) {
   type Item = Word
-  type Dist = UnigramWordDist
+  type LM = UnigramLangModel
 
-  def lookup_item(dist: Dist, item: Item) = dist.lookup_word(item)
+  def lookup_item(lm: LM, item: Item) = lm.lookup_word(item)
   def format_item(item: Item) = memoizer.unmemoize(item)
 }
 
 class NgramComparer(min_prob: Double, max_items: Int) extends
-    DistributionComparer(min_prob, max_items) {
+    LangModelComparer(min_prob, max_items) {
   import NgramStorage.Ngram
   type Item = Ngram
-  type Dist = NgramWordDist
+  type LM = NgramLangModel
 
-  def lookup_item(dist: Dist, item: Item) = dist.lookup_ngram(item)
+  def lookup_item(lm: LM, item: Item) = lm.lookup_ngram(item)
   def format_item(item: Item) = item mkString " "
 }
 
-object DistributionComparer {
+object LangModelComparer {
   def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) =
-    /* FIXME: What about rerank_dist? */
-    grid.pairs(category).before_cell.combined_dist.word_dist.grid_dist match {
-      case _: UnigramWordDist =>
+    /* FIXME: What about rerank_lm? */
+    grid.pairs(category).before_cell.combined_lang_model.lang_model.grid_lm match {
+      case _: UnigramLangModel =>
         new UnigramComparer(min_prob, max_items)
-      case _: NgramWordDist =>
+      case _: NgramLangModel =>
         new NgramComparer(min_prob, max_items)
-      case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
+      case _ => throw new IllegalArgumentException(
+        "Don't know how to compare this type of language model")
     }
 
   def compare_cells_2way(grid: TimeGrid, category: String, min_prob: Double,

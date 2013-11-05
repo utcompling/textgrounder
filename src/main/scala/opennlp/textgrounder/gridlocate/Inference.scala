@@ -25,7 +25,7 @@ import math._
 import util.print.errprint
 import util.debug._
 
-import worddist._
+import langmodel._
 
 /*
 
@@ -44,7 +44,7 @@ class RandomGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(word_dist: WordDist,
+  def return_ranked_cells(lang_model: LangModel,
       include: Iterable[GridCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
     val shuffled = (new Random()).shuffle(cells)
@@ -63,21 +63,21 @@ class MostPopularGridRanker[Co] (
   grid: Grid[Co],
   internal_link: Boolean
 ) extends GridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
+  def return_ranked_cells(lang_model: LangModel, include: Iterable[GridCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
       yield (cell,
         (if (internal_link)
-           cell.combined_dist.incoming_links
+           cell.combined_lang_model.incoming_links
          else
-           cell.combined_dist.num_docs).toDouble)).
+           cell.combined_lang_model.num_docs).toDouble)).
     toIndexedSeq sortWith (_._2 > _._2)
   }
 }
 
 /**
  * Abstract class that implements a ranker for grid location that
- * involves directly comparing the document distribution against each cell
+ * involves directly comparing the document language model against each cell
  * in turn and computing a score.
  */
 abstract class PointwiseScoreGridRanker[Co](
@@ -85,46 +85,46 @@ abstract class PointwiseScoreGridRanker[Co](
   grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
   /**
-   * Function to return the score of a document distribution against a
+   * Function to return the score of a document language model against a
    * cell.
    */
-  def score_cell(word_dist: WordDist, cell: GridCell[Co]): Double
+  def score_cell(lang_model: LangModel, cell: GridCell[Co]): Double
 
   /**
-   * Compare a word distribution (for a document, typically) against all
+   * Compare a language model (for a document, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_serially(word_dist: WordDist,
+  def return_ranked_cells_serially(lang_model: LangModel,
     include: Iterable[GridCell[Co]]) = {
       for (cell <- grid.iter_nonempty_cells_including(include)) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
             cell.describe_indices, cell.describe_location,
-            cell.combined_dist.num_docs)
+            cell.combined_lang_model.num_docs)
         }
-        (cell, score_cell(word_dist, cell))
+        (cell, score_cell(lang_model, cell))
       }
   }
 
   /**
-   * Compare a word distribution (for a document, typically) against all
+   * Compare a language model (for a document, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_parallel(word_dist: WordDist,
+  def return_ranked_cells_parallel(lang_model: LangModel,
     include: Iterable[GridCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
-    cells.par.map(c => (c, score_cell(word_dist, c)))
+    cells.par.map(c => (c, score_cell(lang_model, c)))
   }
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
+  def return_ranked_cells(lang_model: LangModel, include: Iterable[GridCell[Co]]) = {
     val parallel = !grid.driver.params.no_parallel
     val cell_buf = {
       if (parallel)
-        return_ranked_cells_parallel(word_dist, include)
+        return_ranked_cells_parallel(lang_model, include)
       else
-        return_ranked_cells_serially(word_dist, include)
+        return_ranked_cells_serially(lang_model, include)
     }
 
     val retval = cell_buf.toIndexedSeq sortWith (_._2 > _._2)
@@ -135,7 +135,7 @@ abstract class PointwiseScoreGridRanker[Co](
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
           cell.describe_indices, cell.describe_location,
-          cell.combined_dist.num_docs, score)
+          cell.combined_lang_model.num_docs, score)
     }
     retval
   }
@@ -144,12 +144,12 @@ abstract class PointwiseScoreGridRanker[Co](
 /**
  * Class that implements a ranker for document geolocation by computing
  * the KL-divergence between document and cell (approximately, how much
- * the word distributions differ).  Note that the KL-divergence as currently
- * implemented uses the smoothed word distributions.
+ * the language models differ).  Note that the KL-divergence as currently
+ * implemented uses the smoothed language models.
  *
  * @param partial If true (the default), only do "partial" KL-divergence.
  * This only computes the divergence involving words in the document
- * distribution, rather than considering all words in the vocabulary.
+ * language model, rather than considering all words in the vocabulary.
  * @param symmetric If true, do a symmetric KL-divergence by computing
  * the divergence in both directions and averaging the two values.
  * (Not by default; the comparison is fundamentally asymmetric in
@@ -165,14 +165,14 @@ class KLDivergenceGridRanker[Co](
   var self_kl_cache: KLDivergenceCache = null
   val slow = false
 
-  def call_kl_divergence(self: WordDist, other: WordDist) =
+  def call_kl_divergence(self: LangModel, other: LangModel) =
     self.kl_divergence(self_kl_cache, other, partial = partial)
 
-  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
-    val cell_word_dist = cell.combined_dist.word_dist.grid_dist
-    var kldiv = call_kl_divergence(word_dist, cell_word_dist)
+  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
+    val cell_lang_model = cell.combined_lang_model.lang_model.grid_lm
+    var kldiv = call_kl_divergence(lang_model, cell_lang_model)
     if (symmetric) {
-      val kldiv2 = cell_word_dist.kl_divergence(null, word_dist,
+      val kldiv2 = cell_lang_model.kl_divergence(null, lang_model,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
@@ -180,15 +180,15 @@ class KLDivergenceGridRanker[Co](
     -kldiv
   }
 
-  override def return_ranked_cells(word_dist: WordDist,
+  override def return_ranked_cells(lang_model: LangModel,
       include: Iterable[GridCell[Co]]) = {
     // This will be used by `score_cell` above.
-    self_kl_cache = word_dist.get_kl_divergence_cache()
+    self_kl_cache = lang_model.get_kl_divergence_cache()
 
-    val cells = super.return_ranked_cells(word_dist, include)
+    val cells = super.return_ranked_cells(lang_model, include)
 
-    if (debug("kldiv") && word_dist.isInstanceOf[FastSlowKLDivergence]) {
-      val fast_slow_dist = word_dist.asInstanceOf[FastSlowKLDivergence]
+    if (debug("kldiv") && lang_model.isInstanceOf[FastSlowKLDivergence]) {
+      val fast_slow_dist = lang_model.asInstanceOf[FastSlowKLDivergence]
       // Print out the words that contribute most to the KL divergence, for
       // the top-ranked cells
       val num_contrib_cells = 5
@@ -198,7 +198,7 @@ class KLDivergenceGridRanker[Co](
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           fast_slow_dist.slow_kl_divergence_debug(
-            cell.combined_dist.word_dist.grid_dist, partial = partial,
+            cell.combined_lang_model.lang_model.grid_lm, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
@@ -219,15 +219,15 @@ class KLDivergenceGridRanker[Co](
 
 /**
  * Class that implements a ranker for document geolocation by computing
- * the cosine similarity between the distributions of document and cell.
- * FIXME: We really should transform the distributions by TF/IDF before
- * doing this.
+ * the cosine similarity between the language models of document and cell.
+ * FIXME: We really should transform the language model counts by TF/IDF
+ * before doing this.
  *
- * @param smoothed If true, use the smoothed word distributions. (By default,
- * use unsmoothed distributions.)
+ * @param smoothed If true, use the smoothed language models. (By default,
+ * use unsmoothed language models.)
  * @param partial If true, only do "partial" cosine similarity.
  * This only computes the similarity involving words in the document
- * distribution, rather than considering all words in the vocabulary.
+ * language model, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityGridRanker[Co](
   ranker_name: String,
@@ -236,9 +236,9 @@ class CosineSimilarityGridRanker[Co](
   partial: Boolean = false
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
+  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val cossim =
-      word_dist.cosine_similarity(cell.combined_dist.word_dist.grid_dist,
+      lang_model.cosine_similarity(cell.combined_lang_model.lang_model.grid_lm,
         partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -254,7 +254,7 @@ class NaiveBayesGridRanker[Co](
   use_baseline: Boolean = true
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(word_dist: WordDist, cell: GridCell[Co]) = {
+  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val params = grid.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
@@ -262,14 +262,14 @@ class NaiveBayesGridRanker[Co](
         if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
           val bw = params.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / word_dist.model.num_tokens, bw)
+          ((1.0 - bw) / lang_model.model.num_tokens, bw)
         }
       } else (1.0, 0.0))
 
     val word_logprob =
-      cell.combined_dist.word_dist.grid_dist.get_nbayes_logprob(word_dist)
+      cell.combined_lang_model.lang_model.grid_lm.get_nbayes_logprob(lang_model)
     val baseline_logprob =
-      log(cell.combined_dist.num_docs.toDouble /
+      log(cell.combined_lang_model.num_docs.toDouble /
           grid.total_num_docs)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
@@ -287,9 +287,9 @@ class AverageCellProbabilityGridRanker[Co](
   val cdist_factory =
     create_cell_dist_factory(grid.driver.params.lru_cache_size)
 
-  def return_ranked_cells(word_dist: WordDist, include: Iterable[GridCell[Co]]) = {
+  def return_ranked_cells(lang_model: LangModel, include: Iterable[GridCell[Co]]) = {
     val celldist =
-      cdist_factory.get_cell_dist_for_word_dist(grid, word_dist)
+      cdist_factory.get_cell_dist_for_lang_model(grid, lang_model)
     celldist.get_ranked_cells(include)
   }
 }

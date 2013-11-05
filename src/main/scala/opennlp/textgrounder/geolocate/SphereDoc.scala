@@ -30,9 +30,9 @@ import gridlocate._
 
 abstract class RealSphereDoc(
   schema: Schema,
-  dist: DocWordDist,
+  lang_model: DocLangModel,
   val coord: SphereCoord
-) extends GridDoc[SphereCoord](schema, dist) {
+) extends GridDoc[SphereCoord](schema, lang_model) {
   def has_coord = coord != null
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
@@ -52,7 +52,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean
+      lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean
     ): Option[TDoc]
 
   /**
@@ -70,9 +70,9 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
  */
 class SphereDocFactory(
   override val driver: GeolocateDriver,
-  word_dist_factory: DocWordDistFactory
+  lang_model_factory: DocLangModelFactory
 ) extends GridDocFactory[SphereCoord](
-  driver, word_dist_factory
+  driver, lang_model_factory
 ) {
   val corpus_type_to_subfactory =
     mutable.Map[String, SphereDocSubfactory[_ <: SphereDoc]]()
@@ -91,11 +91,11 @@ class SphereDocFactory(
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
   override def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: DocWordDist,
+      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
       record_in_factory: Boolean) = {
     val coord = schema.get_value_or_else[SphereCoord](fieldvals, "coord", null)
     find_subfactory(schema, fieldvals).
-      create_and_init_document(schema, fieldvals, dist, coord, record_in_factory)
+      create_and_init_document(schema, fieldvals, lang_model, coord, record_in_factory)
   }
 
   /**
@@ -141,10 +141,10 @@ class SphereDocFactory(
  */
 class GenericSphereDoc(
   schema: Schema,
-  dist: DocWordDist,
+  lang_model: DocLangModel,
   coord: SphereCoord,
   val title: String
-) extends RealSphereDoc(schema, dist, coord) {
+) extends RealSphereDoc(schema, lang_model, coord) {
 
   def xmldesc =
     <GenericSphereDoc>
@@ -160,8 +160,8 @@ class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new GenericSphereDoc(schema, dist, coord,
+      lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new GenericSphereDoc(schema, lang_model, coord,
       schema.get_value_or_else[String](fieldvals, "title", "unknown"))
     )
 }

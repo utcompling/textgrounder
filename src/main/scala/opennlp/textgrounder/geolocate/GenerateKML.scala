@@ -30,8 +30,8 @@ import util.print.{errprint, warning}
  
 import gridlocate._
 
-import worddist._
-import WordDist._
+import langmodel._
+import LangModel._
 
 class KMLParameters {
   // Minimum and maximum colors
@@ -94,11 +94,11 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override protected def get_word_dist_builder_creator(dist_type: String) = {
-    if (grid_word_dist_type != "unigram")
-      param_error("Only unigram word distributions supported with GenerateKML")
-    (factory: WordDistFactory) =>
-      new FilterUnigramWordDistBuilder(
+  override protected def get_lang_model_builder_creator(lm_type: String) = {
+    if (grid_lang_model_type != "unigram")
+      param_error("Only unigram language models supported with GenerateKML")
+    (factory: LangModelFactory) =>
+      new FilterUnigramLangModelBuilder(
         factory,
         params.split_kml_words,
         ignore_case = !params.preserve_case_words,

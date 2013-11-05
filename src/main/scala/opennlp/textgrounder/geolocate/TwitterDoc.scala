@@ -26,10 +26,10 @@ import gridlocate._
 
 class TwitterTweetDoc(
   schema: Schema,
-  dist: DocWordDist,
+  lang_model: DocLangModel,
   coord: SphereCoord,
   val id: Long
-) extends RealSphereDoc(schema, dist, coord) {
+) extends RealSphereDoc(schema, lang_model, coord) {
   def title = id.toString
 
   def xmldesc =
@@ -46,18 +46,19 @@ class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new TwitterTweetDoc(schema, dist, coord,
+      lang_model: DocLangModel, coord: SphereCoord,
+      record_in_factory: Boolean) = Some(
+    new TwitterTweetDoc(schema, lang_model, coord,
       schema.get_value_or_else[Long](fieldvals, "title", 0L))
     )
 }
 
 class TwitterUserDoc(
   schema: Schema,
-  dist: DocWordDist,
+  lang_model: DocLangModel,
   coord: SphereCoord,
   val user: String
-) extends RealSphereDoc(schema, dist, coord) {
+) extends RealSphereDoc(schema, lang_model, coord) {
   def title = user
 
   def xmldesc =
@@ -74,8 +75,9 @@ class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      dist: DocWordDist, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new TwitterUserDoc(schema, dist, coord,
+      lang_model: DocLangModel, coord: SphereCoord,
+      record_in_factory: Boolean) = Some(
+    new TwitterUserDoc(schema, lang_model, coord,
         schema.get_value_or_else[String](fieldvals, "user", ""))
     )
 }

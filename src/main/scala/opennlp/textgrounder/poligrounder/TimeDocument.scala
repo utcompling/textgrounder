@@ -31,10 +31,10 @@ import gridlocate._
 
 class TimeDoc(
   schema: Schema,
-  dist: DocWordDist,
+  lang_model: DocLangModel,
   val coord: TimeCoord,
   val user: String
-) extends GridDoc[TimeCoord](schema, dist) {
+) extends GridDoc[TimeCoord](schema, lang_model) {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
@@ -65,14 +65,14 @@ class TimeDoc(
  */
 class TimeDocFactory(
   override val driver: PoligrounderDriver,
-  word_dist_factory: DocWordDistFactory
+  lang_model_factory: DocLangModelFactory
 ) extends GridDocFactory[TimeCoord](
-  driver, word_dist_factory
+  driver, lang_model_factory
 ) {
   def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], dist: DocWordDist,
+      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
       record_in_factory: Boolean) = Some(
-    new TimeDoc(schema, dist,
+    new TimeDoc(schema, lang_model,
       schema.get_value[TimeCoord](fieldvals, "min-timestamp"),
       schema.get_value[String](fieldvals, "user")
     ))
