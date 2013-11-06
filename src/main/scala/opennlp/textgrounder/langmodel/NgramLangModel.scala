@@ -263,7 +263,7 @@ abstract class NgramLangModel(
   override def toString = {
     val finished_str =
       if (!finished) ", unfinished" else ""
-    val num_words_to_print = 15
+    val num_words_to_print = LangModelConstants.lang_model_words_to_print
     val need_dots = model.num_types > num_words_to_print
     val items =
       for ((word, count) <- (model.iter_items.toSeq.sortWith(_._2 > _._2).

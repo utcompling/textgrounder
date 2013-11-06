@@ -101,12 +101,12 @@ object SphereWordCellDist {
             <open>1</open>
             <description>{ "Cell distribution for word '%s'" format memoizer.unmemoize(celldist.word) }</description>
             <LookAt>
-              <latitude>42</latitude>
-              <longitude>-102</longitude>
-              <altitude>0</altitude>
-              <range>5000000</range>
-              <tilt>53.454348562403</tilt>
-              <heading>0</heading>
+              <latitude>{ KMLConstants.look_at_latitude }</latitude>
+              <longitude>{ KMLConstants.look_at_longitude }</longitude>
+              <altitude>{ KMLConstants.look_at_altitude }</altitude>
+              <range>{ KMLConstants.look_at_range }</range>
+              <tilt>{ KMLConstants.look_at_tilt }</tilt>
+              <heading>{ KMLConstants.look_at_heading }</heading>
             </LookAt>
             { allcellkml }
           </Folder>

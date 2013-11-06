@@ -207,7 +207,7 @@ abstract class DiscountedUnigramLangModel(
           count*log(factory.num_documents/factory.document_freq(word)))
     }
     normalization_factor = model.num_tokens
-    //if (use_sorted_list)
+    //if (LangModelConstants.use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
       errprint("For lang model %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"

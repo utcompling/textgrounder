@@ -32,7 +32,15 @@ import util.debug._
 
 import LangModel._
 
-// val use_sorted_list = false
+/**
+ * Constants used in various places esp. debugging code, e.g. how many
+ * of the most-common words in a language model to output.
+ */
+object LangModelConstants {
+  val lang_model_words_to_print = 15
+  //val use_sorted_list = false
+}
+
 
 /**
  * An exception thrown to indicate an error during lang model creation
