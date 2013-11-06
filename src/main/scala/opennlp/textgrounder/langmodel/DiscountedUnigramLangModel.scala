@@ -177,7 +177,7 @@ abstract class DiscountedUnigramLangModel(
    */
   var overall_unseen_mass = 1.0
 
-  def innerToString = ", %.2f unseen mass" format unseen_mass
+  override def innerToString = ", %.2f unseen mass" format unseen_mass
 
   var normalization_factor = 0.0
 
@@ -306,7 +306,7 @@ abstract class DiscountedUnigramLangModel(
       val wordprob = mle_wordprob*(1.0 - unseen_mass) + owprob*unseen_mass
       if (debug("lots"))
         errprint("Word %s, seen in document, wordprob = %s",
-                 memoizer.unmemoize(word), wordprob)
+                 item_to_string(word), wordprob)
       // DO NOT simplify following expr, or it will fail on NaN
       if (! (wordprob >= 0)) {
         errprint("wordcount = %s, owprob = %s", wordcount, owprob)
@@ -331,7 +331,7 @@ abstract class DiscountedUnigramLangModel(
               val wordprob = 0.0
               if (debug("lots"))
                 errprint("Word %s, never seen at all, wordprob = %s",
-                         memoizer.unmemoize(word), wordprob)
+                         item_to_string(word), wordprob)
               wordprob
             }
             case Some(owprob) => {
@@ -343,7 +343,7 @@ abstract class DiscountedUnigramLangModel(
               }
               if (debug("lots"))
                 errprint("Word %s, seen but not in document, wordprob = %s",
-                         memoizer.unmemoize(word), wordprob)
+                         item_to_string(word), wordprob)
 
               wordprob
             }
@@ -363,7 +363,7 @@ abstract class DiscountedUnigramLangModel(
           }
           if (debug("lots"))
             errprint("Word %s, seen in document, wordprob = %s",
-                     memoizer.unmemoize(word), wordprob)
+                     item_to_string(word), wordprob)
           wordprob
         }
       // Info on word and probability printed in wrapper lookup_word()

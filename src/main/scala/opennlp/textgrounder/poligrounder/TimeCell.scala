@@ -172,7 +172,6 @@ class TimeGrid(
 }
 
 abstract class LangModelComparer(min_prob: Double, max_items: Int) {
-  type Item
   type LM <: LangModel
 
   def get_pair(grid: TimeGrid, category: String) =
@@ -180,8 +179,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
   def get_lm(cell: TimeCell): LM =
     cell.lang_model.asInstanceOf[LM]
   def get_keys(lm: LM) = lm.model.iter_keys.toSet
-  def lookup_item(lm: LM, item: Item): Double
-  def format_item(item: Item): String
+  def lookup_item(lm: LM)(item: lm.Item): Double
 
   def compare_cells_2way(grid: TimeGrid, category: String) {
     val before_lm = get_lm(get_pair(grid, category).before_cell)
@@ -190,29 +188,29 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
     val itemdiff =
       for {
         rawitem <- get_keys(before_lm) ++ get_keys(after_lm)
-        item = rawitem.asInstanceOf[Item]
-        p = lookup_item(before_lm, item)
-        q = lookup_item(after_lm, item)
+        item = rawitem.asInstanceOf[before_lm.Item]
+        p = lookup_item(before_lm)(item)
+        q = lookup_item(after_lm)(item.asInstanceOf[after_lm.Item])
         if p >= min_prob || q >= min_prob
       } yield (item, before_lm.dunning_log_likelihood_2x1(
-        item.asInstanceOf[before_lm.Item], after_lm), q - p)
+        item, after_lm), q - p)
 
     println("Items by 2-way log-likelihood for category '%s':" format category)
     for ((item, dunning, prob) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
       println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
         (format_float(dunning),
-         format_item(item),
+         before_lm.item_to_string(item),
          if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(lookup_item(before_lm, item)),
-         format_float(lookup_item(after_lm, item))
+         format_float(lookup_item(before_lm)(item)),
+         format_float(lookup_item(after_lm)(item.asInstanceOf[after_lm.Item]))
        ))
     }
     println("")
 
     val diff_up = itemdiff filter (_._3 > 0)
     val diff_down = itemdiff filter (_._3 < 0) map (x => (x._1, x._2, x._3.abs))
-    def print_diffs(diffs: Iterable[(Item, Double, Double)],
+    def print_diffs(diffs: Iterable[(before_lm.Item, Double, Double)],
         incdec: String, updown: String) {
       println("")
       println("Items that %s in probability:" format incdec)
@@ -220,9 +218,9 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
       for ((item, dunning, prob) <-
           diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
         println("%s: %s - %s = %s%s (LL %s)" format
-          (format_item(item),
-           format_float(lookup_item(before_lm, item)),
-           format_float(lookup_item(after_lm, item)),
+          (before_lm.item_to_string(item),
+           format_float(lookup_item(before_lm)(item)),
+           format_float(lookup_item(after_lm)(item.asInstanceOf[after_lm.Item])),
            updown, format_float(prob),
            format_float(dunning)))
       }
@@ -249,11 +247,11 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
       for {
         rawitem <- get_keys(before_lm_1) ++ get_keys(after_lm_1) ++
           get_keys(before_lm_2) ++ get_keys(after_lm_2)
-        item = rawitem.asInstanceOf[Item]
-        p1 = lookup_item(before_lm_1, item)
-        q1 = lookup_item(after_lm_1, item)
-        p2 = lookup_item(before_lm_2, item)
-        q2 = lookup_item(after_lm_2, item)
+        item = rawitem.asInstanceOf[before_lm_1.Item]
+        p1 = lookup_item(before_lm_1)(item)
+        q1 = lookup_item(after_lm_1)(item.asInstanceOf[after_lm_1.Item])
+        p2 = lookup_item(before_lm_2)(item.asInstanceOf[before_lm_2.Item])
+        q2 = lookup_item(after_lm_2)(item.asInstanceOf[after_lm_2.Item])
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
         abs1 = q1 - p1
         abs2 = q2 - p2
@@ -278,7 +276,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
       println("%7s: %-15.15s %6s: %7s%% (%9s) / %7s%% (%9s)" format
         (format_float(dunning),
-         format_item(item),
+         before_lm_1.item_to_string(item),
          change,
          fmt(pct1), fmt(abs1),
          fmt(pct2), fmt(abs2)
@@ -287,7 +285,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
     println("")
 
     type ItemDunProb =
-      (Item, Double, Double, Double, Double, Double, Double,
+      (before_lm_1.Item, Double, Double, Double, Double, Double, Double,
         Double, Double, Double, String)
     val diff_cat1 = itemdiff filter (_._11 == "+"+cat13)
     val diff_cat2 = itemdiff filter (_._11 == "+"+cat23)
@@ -301,7 +299,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
         for ((item, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
             diffs.toSeq.sortWith(comparefun).take(max_items)) {
           println("%-15.15s = LL %7s (%%chg-diff %7s%% = %7s%% - %7s%%)" format
-            (format_item(item), format_float(dunning),
+            (before_lm_1.item_to_string(item), format_float(dunning),
               fmt(pct1 - pct2), fmt(pct1), fmt(pct2)))
         }
       }
@@ -319,21 +317,17 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
 
 class UnigramComparer(min_prob: Double, max_items: Int) extends
     LangModelComparer(min_prob, max_items) {
-  type Item = Word
   type LM = UnigramLangModel
 
-  def lookup_item(lm: LM, item: Item) = lm.lookup_word(item)
-  def format_item(item: Item) = memoizer.unmemoize(item)
+  def lookup_item(lm: LM)(item: lm.Item) = lm.lookup_word(item)
 }
 
 class NgramComparer(min_prob: Double, max_items: Int) extends
     LangModelComparer(min_prob, max_items) {
   import NgramStorage.Ngram
-  type Item = Ngram
   type LM = NgramLangModel
 
-  def lookup_item(lm: LM, item: Item) = lm.lookup_ngram(item)
-  def format_item(item: Item) = item mkString " "
+  def lookup_item(lm: LM)(item: lm.Item) = lm.lookup_ngram(item)
 }
 
 object LangModelComparer {

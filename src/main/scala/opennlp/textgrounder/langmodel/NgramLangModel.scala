@@ -191,8 +191,6 @@ class OpenNLPNgramStorer extends NgramStorage {
 //  def num_word_tokens = num_tokens(1)
 //  def num_word_types = num_types(1)
 //
-//  def innerToString: String
-//
 //  /**
 //   * Ensure that we will be able to store an N-gram for a given N.
 //   */
@@ -258,21 +256,7 @@ abstract class NgramLangModel(
   type Item = Ngram
   val model = new OpenNLPNgramStorer
 
-  def innerToString: String
-
-  override def toString = {
-    val finished_str =
-      if (!finished) ", unfinished" else ""
-    val num_words_to_print = LangModelConstants.lang_model_words_to_print
-    val need_dots = model.num_types > num_words_to_print
-    val items =
-      for ((word, count) <- (model.iter_items.toSeq.sortWith(_._2 > _._2).
-                                   view(0, num_words_to_print)))
-        yield "%s=%s" format (word mkString " ", count) 
-    val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "NgramLangModel(%d types, %s tokens%s%s, %s)" format (
-        model.num_types, model.num_tokens, innerToString, finished_str, words)
-  }
+  def item_to_string(item: Item) = item mkString " "
 
   def lookup_ngram(ngram: Ngram): Double
 

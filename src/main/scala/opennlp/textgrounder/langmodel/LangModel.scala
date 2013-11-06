@@ -572,5 +572,51 @@ abstract class LangModel(val factory: LangModelFactory) {
    */
   def get_nbayes_logprob(langmodel: LangModel): Double
 
-  def debug_string: String = toString
+  /**
+   * Name of class, for `toString`.
+   */
+  def class_name: String
+
+  /**
+   * Convert an item (of type Item) to a string.
+   */
+  def item_to_string(item: Item): String
+
+  /**
+   * Extra text to add to the `toString` output, for extra class params.
+   */
+  def innerToString = ""
+
+  /**
+   * Convert to a readable string.
+   *
+   * @param num_items_to_print How many items (word, ngrams, etc.) to print.
+   */
+  def toString(num_items_to_print: Int) = {
+    val finished_str =
+      if (!finished) ", unfinished" else ""
+    val num_actual_items_to_print =
+      if (num_items_to_print < 0) model.num_types
+      else num_items_to_print
+    val need_dots = model.num_types > num_actual_items_to_print
+    val items =
+      for ((item, count) <-
+        model.iter_items.toSeq.sortWith(_._2 > _._2).
+          view(0, num_actual_items_to_print))
+      yield "%s=%s" format (item_to_string(item), count) 
+    val itemstr = (items mkString " ") + (if (need_dots) " ..." else "")
+    "%s(%d types, %s tokens%s%s, %s)" format (
+        class_name, model.num_types, model.num_tokens, innerToString,
+        finished_str, itemstr)
+  }
+
+  /**
+   * Convert to a readable string, with all words printed, for debug
+   * purposes.
+   */
+  def debug_string = toString(-1)
+
+  override def toString = toString(
+    LangModelConstants.lang_model_words_to_print
+  )
 }

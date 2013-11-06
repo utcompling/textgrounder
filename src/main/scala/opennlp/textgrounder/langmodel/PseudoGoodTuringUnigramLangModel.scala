@@ -107,4 +107,6 @@ class PseudoGoodTuringUnigramLangModel(
       else 0.5
     super.imp_finish_after_global()
   }
+
+  def class_name = "PseudoGoodTuringUnigramLangModel"
 }
