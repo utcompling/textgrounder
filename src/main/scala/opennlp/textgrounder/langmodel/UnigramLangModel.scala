@@ -144,7 +144,9 @@ abstract class UnigramLangModel(
 
   override def debug_string = toString(-1)
 
-  override def toString = toString(15)
+  override def toString = toString(
+    LangModelConstants.lang_model_words_to_print
+  )
 
   /**
    * This is a basic unigram implementation of the computation of the

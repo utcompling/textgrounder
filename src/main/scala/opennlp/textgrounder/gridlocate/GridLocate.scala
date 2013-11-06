@@ -53,6 +53,25 @@ over the Earth's surface (two-dimensional).
 */
 
 /**
+ * Constants used in various places esp. debugging code.
+ */
+object GridLocateConstants {
+  val default_gridranksize = 11
+  val kldiv_num_contrib_cells = 5
+  val kldiv_num_contrib_words = 25
+
+  // For outputting periodic result status when evaluating a test set
+  // of documents
+  val time_between_status = 300
+  val docs_between_status = 10
+
+  // For computing statistics about predictions during evaluation
+  val top_n_for_oracle_dists =
+    Seq(1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100)
+  val max_rank_for_exact_incorrect = 10
+}
+
+/**
  * General class retrieving command-line arguments or storing programmatic
  * configuration parameters for a cell-grid-based application. The
  * parameters in here are those necessary for initializing a cell grid
@@ -716,7 +735,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     //                This is a single number, and the grid will be a square
     //                centered on the correct cell.
     register_list_debug_param("gridrank")
-    debugval("gridranksize") = "11"
+    debugval("gridranksize") =
+      GridLocateConstants.default_gridranksize.toString
 
     if (params.debug != null)
       parse_debug_spec(params.debug)

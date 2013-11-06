@@ -100,8 +100,9 @@ abstract class PolygonalCell(
     // Interpolate colors
     val color = Array(0.0, 0.0, 0.0)
     for (i <- 0 until 3) {
-      color(i) = (params.kml_mincolor(i) +
-        fracprob * (params.kml_maxcolor(i) - params.kml_mincolor(i)))
+      color(i) = (KMLConstants.kml_mincolor(i) +
+        fracprob * (
+          KMLConstants.kml_maxcolor(i) - KMLConstants.kml_mincolor(i)))
     }
     // Original color dc0155ff
     //rgbcolor = "dc0155ff"
@@ -231,7 +232,7 @@ abstract class RectangularCell(
           <west>{ ((center.long + sw.long) / 2).toString }</west>
         </LatLonAltBox>
         <Lod>
-          <minLodPixels>16</minLodPixels>
+          <minLodPixels>{ KMLConstants.min_lod_pixels }</minLodPixels>
         </Lod>
       </Cell>
       <styleURL>#bar</styleURL>

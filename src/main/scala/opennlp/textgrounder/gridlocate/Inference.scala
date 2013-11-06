@@ -191,11 +191,10 @@ class KLDivergenceGridRanker[Co](
       val fast_slow_dist = lang_model.asInstanceOf[FastSlowKLDivergence]
       // Print out the words that contribute most to the KL divergence, for
       // the top-ranked cells
-      val num_contrib_cells = 5
-      val num_contrib_words = 25
       errprint("")
       errprint("KL-divergence debugging info:")
-      for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
+      for (((cell, _), i) <- cells.take(
+           GridLocateConstants.kldiv_num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           fast_slow_dist.slow_kl_divergence_debug(
             cell.lang_model.grid_lm, partial = partial,
@@ -206,7 +205,7 @@ class KLDivergenceGridRanker[Co](
         // sort by absolute value of second element of tuple, in reverse order
         val items =
           (contribs.toIndexedSeq sortWith ((x, y) => abs(x._2) > abs(y._2))).
-            take(num_contrib_words)
+            take(GridLocateConstants.kldiv_num_contrib_words)
         for ((word, contribval) <- items)
           errprint("    %30s  %s", word, contribval)
         errprint("")

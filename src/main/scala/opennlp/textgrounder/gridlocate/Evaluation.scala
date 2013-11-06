@@ -483,10 +483,11 @@ abstract class CorpusEvaluator(
     task.iterate(process_document_statuses(result_stats)).map { res =>
       val new_elapsed = task.elapsed_time
       val new_processed = task.num_processed
-      // If five minutes and ten documents have gone by,
-      // print out results
-      if ((new_elapsed - last_elapsed >= 300 &&
-        new_processed - last_processed >= 10)) {
+      // If enough time and documents have gone by, print out results
+      if ((new_elapsed - last_elapsed >=
+          GridLocateConstants.time_between_status &&
+        new_processed - last_processed >=
+          GridLocateConstants.docs_between_status)) {
         errprint("Results after %d documents (ranker %s):",
           task.num_processed, ranker_name)
         output_results(isfinal = false)
@@ -907,8 +908,9 @@ class RankedDocEvalStats[Co](
 ) extends EvalStats(driver_stats, prefix, Map[String, String]()
 ) with DocEvalStats[Co] {
   val top_n_for_oracle_dists =
-    Seq(1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100)
-  val max_rank_for_exact_incorrect = 10
+    GridLocateConstants.top_n_for_oracle_dists
+  val max_rank_for_exact_incorrect =
+    GridLocateConstants.max_rank_for_exact_incorrect
   val max_top_n = top_n_for_oracle_dists.max
   val incorrect_by_exact_rank = intmap[Int]()
   val correct_by_up_to_rank = intmap[Int]()

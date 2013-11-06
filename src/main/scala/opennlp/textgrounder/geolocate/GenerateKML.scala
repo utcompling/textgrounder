@@ -33,11 +33,31 @@ import gridlocate._
 import langmodel._
 import LangModel._
 
-class KMLParameters {
-  // Minimum and maximum colors
+object KMLConstants {
   // FIXME: Allow these to be specified by command-line options
+  // Minimum and maximum colors
   val kml_mincolor = Array(255.0, 255.0, 0.0) // yellow
   val kml_maxcolor = Array(255.0, 0.0, 0.0) // red
+
+  // Params for starting place to look at.
+  val look_at_latitude = 42
+  val look_at_longitude = -102
+  val look_at_altitude = 0
+  val look_at_range = 5000000
+  val look_at_tilt = 53.454348562403
+  val look_at_heading = 0
+
+  val min_lod_pixels = 16
+}
+
+class KMLParameters {
+  // FIXME! Don't hard-code.
+  val look_at_latitude = 42
+  val look_at_longitude = -102
+  val look_at_altitude = 0
+  val look_at_range = 5000000
+  val look_at_tilt = 53.454348562403
+  val look_at_heading = 0
 
   var kml_max_height: Double = _
 
