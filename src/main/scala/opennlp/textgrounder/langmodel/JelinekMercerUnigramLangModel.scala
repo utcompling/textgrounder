@@ -41,4 +41,6 @@ class JelinekMercerUnigramLangModel(
     unseen_mass = factory.jelinek_factor
     super.imp_finish_after_global()
   }
+
+  def class_name = "JelinekMercerUnigramLangModel"
 }

@@ -41,7 +41,6 @@ import util.debug._
 import gridlocate._
 
 import langmodel.{LangModel,LangModelFactory,Unigram}
-import langmodel.LangModel._
 
 /*
 
@@ -162,7 +161,7 @@ class LinkMostCommonToponymSphereGridRanker(
     val cands =
       if (maxword != None)
         wikipedia_fact.construct_candidates(
-          memoizer.unmemoize(maxword.get))
+          lang_model.item_to_string(maxword.get))
       else Seq[SphereDoc]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)

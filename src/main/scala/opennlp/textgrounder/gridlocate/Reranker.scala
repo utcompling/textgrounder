@@ -128,8 +128,10 @@ class CombiningCandidateInstFactory[Co](
       errprint("Cell: %s", cell)
     }
     subsidiary_facts.zipWithIndex flatMap { case (fact, index) =>
-      fact.get_features(doc, cell) map { case (word, count) =>
-        val featname = "%s$%s" format (memoizer.unmemoize(word), index)
+      fact.get_features(doc, cell) map { case (item, count) =>
+        val featname =
+          // FIXME! Use item_to_string to be more general.
+          "%s$%s" format (memoizer.unmemoize(item), index)
         if (debug("combined-features")) {
           errprint("%s = %s", featname, count)
         }

@@ -43,4 +43,6 @@ class DirichletUnigramLangModel(
         (model.num_tokens + factory.dirichlet_factor))
     super.imp_finish_after_global()
   }
+
+  def class_name = "DirichletUnigramLangModel"
 }

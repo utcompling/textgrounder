@@ -122,31 +122,7 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def innerToString: String
-
-  def toString(num_words_to_print: Int) = {
-    val finished_str =
-      if (!finished) ", unfinished" else ""
-    val num_actual_words_to_print =
-      if (num_words_to_print < 0) model.num_types
-      else num_words_to_print
-    val need_dots = model.num_types > num_actual_words_to_print
-    val items =
-      for ((word, count) <-
-        model.iter_items.toSeq.sortWith(_._2 > _._2).
-          view(0, num_actual_words_to_print))
-      yield "%s=%s" format (memoizer.unmemoize(word), count) 
-    val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "UnigramLangModel(%d types, %s tokens%s%s, %s)" format (
-        model.num_types, model.num_tokens, innerToString,
-        finished_str, words)
-  }
-
-  override def debug_string = toString(-1)
-
-  override def toString = toString(
-    LangModelConstants.lang_model_words_to_print
-  )
+  def item_to_string(item: Item) = memoizer.unmemoize(item)
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -184,7 +160,7 @@ abstract class UnigramLangModel(
       else {
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(memoizer.unmemoize(word)) = p*(log(p) - log(q))
+          contribs(item_to_string(word)) = p*(log(p) - log(q))
       }
     }
 
@@ -197,7 +173,7 @@ abstract class UnigramLangModel(
         val q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(memoizer.unmemoize(word)) = p*(log(p) - log(q))
+          contribs(item_to_string(word)) = p*(log(p) - log(q))
       }
 
       val retval = kldiv + kl_divergence_34(other)
@@ -236,7 +212,7 @@ abstract class UnigramLangModel(
     assert(finished)
     if (empty)
       throw new IllegalStateException("Attempt to lookup word %s in empty lang model %s"
-        format (memoizer.unmemoize(word), this))
+        format (item_to_string(word), this))
     val wordprob = imp_lookup_word(word)
     // Write this way because if negated as an attempt to catch bad values,
     // it won't catch NaN, which fails all comparisons.
@@ -244,7 +220,7 @@ abstract class UnigramLangModel(
       ()
     else {
       errprint("Out-of-bounds prob %s for word %s",
-        wordprob, memoizer.unmemoize(word))
+        wordprob, item_to_string(word))
       assert(false)
     }
     wordprob
@@ -259,7 +235,7 @@ abstract class UnigramLangModel(
    */
   def find_most_common_word(pred: String => Boolean): Option[Word] = {
     val filtered =
-      (for ((word, count) <- model.iter_items if pred(memoizer.unmemoize(word)))
+      (for ((word, count) <- model.iter_items if pred(item_to_string(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {

@@ -36,7 +36,7 @@ class UnsmoothedNgramLangModel(
 
   type TThis = UnsmoothedNgramLangModel
 
-  def innerToString = ""
+  def class_name = "UnsmoothedNgramLangModel"
 
   // For some reason, retrieving this value from the model is fantastically slow
   var num_tokens = 0.0
