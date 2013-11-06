@@ -91,7 +91,7 @@ abstract class PolygonalCell(
           coord.long, coord.lat, fracprob * params.kml_max_height)
         )).mkString("\n") + "\n"
     val name =
-      if (most_popular_document != null) most_popular_document.title
+      if (most_salient_document != null) most_salient_document.title
       else ""
 
     // Placemark indicating name

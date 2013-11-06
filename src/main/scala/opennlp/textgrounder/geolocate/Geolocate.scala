@@ -142,7 +142,7 @@ class CellDistMostCommonToponymSphereGridRanker(
   }
 }
 
-class LinkMostCommonToponymSphereGridRanker(
+class SalienceMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
@@ -165,29 +165,29 @@ class LinkMostCommonToponymSphereGridRanker(
       else Seq[SphereDoc]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
-    // Sort candidate list by number of incoming links
-    val candlinks =
+    // Sort candidate list by salience score
+    val cand_salience =
       (for (cand <- cands) yield (cand,
-        cand.asInstanceOf[WikipediaDoc].adjusted_incoming_links.toDouble)).
+        cand.asInstanceOf[WikipediaDoc].adjusted_salience)).
         // sort by second element of tuple, in reverse order
         sortWith(_._2 > _._2)
     if (debug("commontop"))
-      errprint("  sorted candidates = %s", candlinks)
+      errprint("  sorted candidates = %s", cand_salience)
 
     def find_good_cells_for_coord(cands: Iterable[(SphereDoc, Double)]) = {
       for {
-        (cand, links) <- candlinks
+        (cand, salience) <- cand_salience
         cell <- {
           val retval = sphere_grid.find_best_cell_for_document(cand, false)
           if (retval == None)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
         }
-      } yield (cell, links)
+      } yield (cell, salience)
     }
 
     // Convert to cells
-    val candcells = find_good_cells_for_coord(candlinks)
+    val candcells = find_good_cells_for_coord(cand_salience)
 
     if (debug("commontop"))
       errprint("  cell candidates = %s", candcells)
@@ -307,14 +307,14 @@ IMPLEMENTED.)
 //file as a document to evaluate.""")
 
   override protected def ranker_choices = super.ranker_choices ++ Seq(
-        Seq("link-most-common-toponym"),
+        Seq("salience-most-common-toponym"),
         Seq("cell-distribution-most-common-toponym",
             "celldist-most-common-toponym"))
 
   override protected def ranker_baseline_help =
     super.ranker_baseline_help +
-"""'link-most-common-toponym' means to look for the toponym that occurs the
-most number of times in the document, and then use the internal-link
+"""'salience-most-common-toponym' means to look for the toponym that
+occurs the most number of times in the document, and then use the salience
 baseline to match it to a location.
 
 'celldist-most-common-toponym' is similar, but uses the cell distribution
@@ -477,8 +477,8 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   override def create_named_ranker(ranker_name: String,
       grid: Grid[SphereCoord]) = {
     ranker_name match {
-      case "link-most-common-toponym" =>
-        new LinkMostCommonToponymSphereGridRanker(ranker_name, grid)
+      case "salience-most-common-toponym" =>
+        new SalienceMostCommonToponymSphereGridRanker(ranker_name, grid)
       case "celldist-most-common-toponym" =>
         new CellDistMostCommonToponymSphereGridRanker(ranker_name, grid)
       case other => super.create_named_ranker(other, grid)

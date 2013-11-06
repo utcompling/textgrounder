@@ -660,7 +660,7 @@ abstract class GridDocFactory[Co : Serializer](
    * can't do a single-pass algorithm.)
    *
    * (In actuality, the only information that actually needs to be
-   * propagated this way is internal-link counts, and this isn't even
+   * propagated this way is the salience, and this isn't even
    * used much currently.)
    *
    * The proper way to handle these redirects is to do all the needed
@@ -998,18 +998,23 @@ abstract class GridDoc[Co : Serializer](
    */
   def split = schema.get_fixed_field("split")
   /**
-   * If this document has an incoming-link value associated with it (i.e.
-   * number of links pointing to it in some sort of link structure), return
-   * Some(NUM-LINKS); else return None.
+   * Return the salience value associated with a document, if it exists;
+   * else return None. This value is intended to provide a relative
+   * measure of a document's salience, for use e.g. as a prior for the Naive
+   * Bayes raner. This might be, for example, the population of the city or
+   * region associated with a document or (e.g. for Wikipedia articles) the
+   * number of incoming links pointing to the article from other articles.
    *
-   * FIXME: This is used to establish a prior for the Naive Bayes ranker,
-   * and is computed on a cell level, which is why we have it here; but it
-   * seems too specific and tied to Wikipedia.  Also, perhaps we want to
-   * split it into has_incoming_links and incoming_links (without the Option[]
-   * wrapping).  We also need some comment of "corpus type" and a way to
-   * request whether a given corpus type has incoming links marked on it.
+   * The salience value is assumed to be additive, i.e. the combined
+   * salience value for a cell is computed by adding up the individual
+   * salience values of the documents in the cell.
+   *
+   * FIXME: Perhaps we want to split it into has_salience and salience
+   * (without the Option[] wrapping). We also might need some concept of
+   * "corpus type" and a way to request whether a given corpus type has
+   * salience values marked on it.
    */
-  def incoming_links: Option[Int] = None
+  def salience: Option[Double] = None
 
   val grid_lm = lang_model.grid_lm
   val rerank_lm = lang_model.rerank_lm

@@ -100,7 +100,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
   var kml_include_cell_names =
     ap.flag("kml-include-cell-names", "kicn", "kml-names",
       help = """Include name of each cell in KML. Name comes from
-"most popular document" within cell.""")
+most salient document within cell.""")
 }
 
 class GenerateKMLDriver extends
