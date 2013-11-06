@@ -35,11 +35,8 @@ import langmodel.LangModelFactory
 /**
  * Language model resulting from combining the individual language models
  * of a number of documents.  We track the number of documents making up
- * the language model, as well as the total incoming link count for all
- * of these documents.  Note that some documents contribute to the link
- * count but not the language model; hence, there are two concepts of
- * "empty", depending on whether all contributing documents or only those
- * that contributed to the language model are counted. (The primary reason
+ * the language model, as well as the combined salience for all of these
+ * documents. (The primary reason
  * for documents not contributing to the language model is that they're not
  * in the training set; see comments below.  However, some documents simply
  * don't have language models defined for them in the document file -- e.g.
@@ -58,8 +55,9 @@ class CombinedLangModel(factory: DocLangModelFactory) {
   val lang_model = factory.create_lang_model
   /** Number of documents used to create language model. */
   var num_docs = 0
-  /** Total number of incoming links. */
-  var incoming_links = 0
+  /** Combined salience score (computed by adding individual
+    * scores of documents). */
+  var salience = 0.0
 
   /** 
    * True if the object is empty.  This means no documents have been
@@ -74,19 +72,19 @@ class CombinedLangModel(factory: DocLangModelFactory) {
   def add_document(doc: GridDoc[_], partial: Double = 1.0) {
     /* Formerly, we arranged things so that we were passed in all documents,
        regardless of the split.  The reason for this was that the decision
-       was made to accumulate link counts from all documents, even in the
+       was made to accumulate saliences from all documents, even in the
        evaluation set.
        
        Strictly, this is a violation of the "don't train on your evaluation
        set" rule.  The reason motivating this was that
 
-       (1) The links are used only in Naive Bayes, and only in establishing
-       a prior probability.  Hence they aren't the main indicator.
-       (2) Often, nearly all the link count for a given cell comes from
+       (1) The salience isused only in Naive Bayes, and only in establishing
+       a prior probability.  Hence it isn' the main indicator.
+       (2) Often, nearly all the salience for a given cell comes from
        a particular document -- e.g. the Wikipedia article for the primary
-       city in the cell.  If we pull the link count for this document
+       city in the cell.  If we pull the salience for this document
        out of the cell because it happens to be in the evaluation set,
-       we will totally distort the link count for this cell.  In a "real"
+       we will totally distort the salience for this cell.  In a "real"
        usage case, we would be testing against an unknown document, not
        against a document in our training set that we've artificially
        removed so as to construct an evaluation set, and this problem
@@ -108,14 +106,14 @@ class CombinedLangModel(factory: DocLangModelFactory) {
        things, as it meant having to read all the sub-corpora.  Furthermore,
        passing in non-training documents into the K-d cell grid changes the
        grids in ways that are not easily predictable -- a significantly
-       greater effect than simply changing the link counts.  So (for the
+       greater effect than simply changing the salience.  So (for the
        moment at least) we don't do this any more. */
     assert (doc.split == "training")
 
-    /* Add link count of document to cell. */
-    doc.incoming_links match {
-      // Might be None, for unknown link count
-      case Some(x) => incoming_links += x
+    /* Add salience of document to cell. */
+    doc.salience match {
+      // Might be None, for unknown salience
+      case Some(x) => salience += x
       case _ =>
     }
 
@@ -140,8 +138,8 @@ abstract class GridCell[Co](
 ) {
   val combined_lang_model =
     new CombinedLangModel(grid.docfact.lang_model_factory)
-  var most_popular_document: GridDoc[Co] = _
-  var mostpopdoc_links = 0
+  var most_salient_document: GridDoc[Co] = _
+  var most_salient_doc_salience = 0.0
 
   /**
    * Return a string describing the location of the cell in its grid,
@@ -188,8 +186,8 @@ abstract class GridCell[Co](
   def num_docs = combined_lang_model.num_docs
   /** Whether the cell is empty. */
   def is_empty = combined_lang_model.is_empty
-  /** Total number of incoming links to all documents in cell. */
-  def incoming_links = combined_lang_model.incoming_links
+  /** Combined salience score of all documents in cell. */
+  def salience = combined_lang_model.salience
 
   /**
    * Return true if we have finished creating and populating the cell.
@@ -202,19 +200,19 @@ abstract class GridCell[Co](
   override def toString = {
     val unfinished = if (finished) "" else ", unfinished"
     val contains =
-      if (most_popular_document != null)
-        ", most-pop-doc %s(%d links)" format (
-          most_popular_document, mostpopdoc_links)
+      if (most_salient_document != null)
+        ", most-salient-doc %s(%s salience)" format (
+          most_salient_document, most_salient_doc_salience)
       else ""
 
-    "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %d links)" format (
+    "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
       describe_location, unfinished, contains,
       num_docs,
       lang_model.grid_lm.model.num_types,
       lang_model.grid_lm.model.num_tokens,
       lang_model.rerank_lm.model.num_types,
       lang_model.rerank_lm.model.num_tokens,
-      incoming_links)
+      salience)
   }
 
   // def __repr__() = {
@@ -235,12 +233,12 @@ abstract class GridCell[Co](
       lang_model.rerank_lm.model.num_types,
     "rerank-num-word-tokens" ->
       lang_model.rerank_lm.model.num_tokens,
-    "incoming-links" -> incoming_links,
-    "most-popular-document" -> (
-      if (most_popular_document != null)
-        Encoder.string(most_popular_document.title)
+    "salience" -> salience,
+    "most-salient-document" -> (
+      if (most_salient_document != null)
+        Encoder.string(most_salient_document.title)
       else ""),
-    "most-popular-document-incoming-links" -> mostpopdoc_links
+    "most-salient-document-salience" -> most_salient_doc_salience
   )
 
   /**
@@ -249,9 +247,8 @@ abstract class GridCell[Co](
    */
   def shortstr = {
     var str = "Cell %s" format describe_location
-    val mostpop = most_popular_document
-    if (mostpop != null)
-      str += ", most-popular %s" format mostpop.shortstr
+    if (most_salient_document != null)
+      str += ", most-salient %s" format most_salient_document.shortstr
     str
   }
 
@@ -264,12 +261,12 @@ abstract class GridCell[Co](
       <bounds>{ describe_location }</bounds>
       <finished>{ finished }</finished>
       {
-        if (most_popular_document != null)
-          (<mostPopularDocument>most_popular_document.xmldesc</mostPopularDocument>
-           <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
+        if (most_salient_document != null)
+          (<mostSalientDocument>most_salient_document.xmldesc</mostSalientDocument>
+           <mostSalientDocumentSalience>most_salient_doc_salience</mostSalientDocumentSalience>)
       }
       <numDocuments>{ num_docs }</numDocuments>
-      <incomingLinks>{ incoming_links }</incomingLinks>
+      <salience>{ salience }</salience>
     </GridCell>
 
   /**
@@ -278,10 +275,10 @@ abstract class GridCell[Co](
   def add_document(doc: GridDoc[Co]) {
     assert(!finished)
     combined_lang_model.add_document(doc)
-    if (doc.incoming_links != None &&
-      doc.incoming_links.get > mostpopdoc_links) {
-      mostpopdoc_links = doc.incoming_links.get
-      most_popular_document = doc
+    if (doc.salience != None &&
+      doc.salience.get > most_salient_doc_salience) {
+      most_salient_doc_salience = doc.salience.get
+      most_salient_document = doc
     }
   }
 

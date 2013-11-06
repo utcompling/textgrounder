@@ -55,20 +55,20 @@ class RandomGridRanker[Co](
 /**
  * Class that implements a simple baseline ranker -- pick the "most
  * popular" cell (the one either with the largest number of documents, or
- * the most number of links pointing to it, if `internal_link` is true).
+ * the highest salience, if `salience` is true).
  */
 
 class MostPopularGridRanker[Co] (
   ranker_name: String,
   grid: Grid[Co],
-  internal_link: Boolean
+  salience: Boolean
 ) extends GridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(lang_model: LangModel, include: Iterable[GridCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
       yield (cell,
-        (if (internal_link)
-           cell.incoming_links
+        (if (salience)
+           cell.salience
          else
            cell.num_docs).toDouble)).
     toIndexedSeq sortWith (_._2 > _._2)

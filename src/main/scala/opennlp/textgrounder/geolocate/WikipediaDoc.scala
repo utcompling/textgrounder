@@ -38,7 +38,7 @@ import gridlocate._
  * Defined fields for Wikipedia:
  *
  * id: Wikipedia article ID (for display purposes only).
- * incoming_links: Number of incoming links, or None if unknown.
+ * salience: Salience value (number of incoming links), or None if unknown.
  * redir: If this is a redirect, document title that it redirects to; else
  *          an empty string.
  *
@@ -59,15 +59,15 @@ class WikipediaDoc(
   val title: String,
   val redir: String,
   // FIXME! Make this a val.
-  var incoming_links_value: Option[Int] = None,
+  var salience_value: Option[Double] = None,
   val id: Long = 0L
 ) extends RealSphereDoc(schema, lang_model, coord) {
-  override def incoming_links = incoming_links_value
+  override def salience = salience_value
   override def get_field(field: String) = {
     field match {
       case "id" => id.toString
       case "redir" => redir
-      case "incoming_links" => put_int_or_none(incoming_links)
+      case "incoming_links" => put_int_or_none(salience.map { _.toInt })
       case _ => super.get_field(field)
     }
   }
@@ -92,8 +92,8 @@ class WikipediaDoc(
     "%s (id=%s%s)".format(super.toString, id, redirstr)
   }
 
-  def adjusted_incoming_links =
-    WikipediaDoc.adjust_incoming_links(incoming_links)
+  def adjusted_salience =
+    WikipediaDoc.adjust_salience(salience)
 }
 
 object WikipediaDoc {
@@ -112,23 +112,23 @@ object WikipediaDoc {
     }
   }
 
-  def log_adjust_incoming_links(links: Int) = {
-    if (links == 0) // Whether from unknown count or count is actually zero
+  def log_adjust_salience(salience: Double) = {
+    if (salience == 0) // Whether from unknown count or count is actually zero
       0.01 // So we don't get errors from log(0)
-    else links
+    else salience
   }
 
-  def adjust_incoming_links(incoming_links: Option[Int]) = {
+  def adjust_salience(salience: Option[Double]) = {
     val ail =
-      incoming_links match {
+      salience match {
         case None => {
           if (debug("some"))
-            warning("Strange, object has no link count")
-          0
+            warning("Strange, object has no salience value")
+          0.0
         }
         case Some(il) => {
           if (debug("some"))
-            errprint("--> Link count is %s", il)
+            errprint("--> Salience is %s", il)
           il
         }
       }
@@ -140,6 +140,10 @@ object WikipediaDoc {
  * Document subfactory for documents corresponding to Wikipedia articles.
  *
  * Handling of redirect articles:
+ *
+ * FIXME! Such articles should not appear at all. The stuff below should
+ * be done during preprocessing and then the redirect articles filtered
+ * out.
  *
  * (1) Documents that are redirects to articles without geotags (i.e.
  *     coordinates) should have been filtered out during preprocessing;
@@ -162,10 +166,11 @@ object WikipediaDoc {
  *     because we don't know the order in which we will load a redirecting
  *     vs. redirected-to article.
  * (6) The effect of the final `record_document` call for redirect articles
- *     is that (a) the incoming-link count of the redirecting article gets
- *     added to the redirected-to article, and (b) the name of the redirecting
- *     article gets recorded as an additional name of the redirected-to
- *     article.
+ *     is that (a) the salience (incoming-link count) of the redirecting
+ *     article gets added to the redirected-to article, and (b) the name
+ *     of the redirecting article gets recorded as an additional name of
+ *     the redirected-to article. (FIXME: This should be done as a
+ *     preprocessing step!)
  * (7) Note that currently we don't actually keep a mapping of all the names
  *     of a given WikipediaDoc; instead, we have tables that
  *     map names of various sorts to associated articles.  The articles
@@ -198,8 +203,9 @@ class WikipediaDocSubfactory(
         id = schema.get_value_or_else[Long](fieldvals, "id", 0L),
         redir = schema.get_value_or_else[String](fieldvals, "redir", ""),
         title = schema.get_value_or_else[String](fieldvals, "title", ""),
-        incoming_links_value =
-          schema.get_value_if[Int](fieldvals, "incoming_links"))
+        salience_value =
+          schema.get_value_if[Int](fieldvals, "incoming_links").map {
+            _.toDouble })
       if (doc.redir.length > 0) {
         if (record_in_factory)
           redirects += doc
@@ -226,10 +232,10 @@ class WikipediaDocSubfactory(
   val lower_toponym_to_document = bufmap[String, WikipediaDoc]()
 
   /**
-   * Total # of incoming links for all documents in each split.
+   * Total salience for all documents in each split.
    */
-  val incoming_links_by_split =
-    docfact.driver.countermap("incoming_links_by_split")
+  val salience_by_split =
+    docfact.driver.countermap("salience_by_split")
 
   /**
    * List of documents that are Wikipedia redirect articles, accumulated
@@ -282,16 +288,16 @@ class WikipediaDocSubfactory(
   def record_document(docfrom: WikipediaDoc, docto: WikipediaDoc) {
     record_document_name(docfrom.title, docto)
 
-    // Handle incoming links.
+    // Handle salience (i.e. incoming link count).
     val split = docto.split
-    val fromlinks = docfrom.adjusted_incoming_links
-    incoming_links_by_split(split) += fromlinks
-    if (docfrom.redir != "" && fromlinks != 0) {
-      // Add count of links pointing to a redirect to count of links
-      // pointing to the document redirected to, so that the total incoming
-      // link count of a document includes any redirects to that document.
-      docto.incoming_links_value =
-        Some(docto.adjusted_incoming_links + fromlinks)
+    val from_salience = docfrom.adjusted_salience
+    salience_by_split(split) += from_salience.toLong
+    if (docfrom.redir != "" && from_salience != 0) {
+      // Add salience pointing to a redirect to salience pointing to the
+      // document redirected to, so that the total salience of a document
+      // includes any redirects to that document.
+      docto.salience_value =
+        Some(docto.adjusted_salience + from_salience)
     }
   }
 

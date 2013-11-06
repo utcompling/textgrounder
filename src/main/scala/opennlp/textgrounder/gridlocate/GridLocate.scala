@@ -470,7 +470,7 @@ cell: Print out info on each cell of the Earth as it's generated.  Also
 triggers some additional info during toponym resolution. (Document me.)
 
 commontop: Extra info for debugging
- --baseline-ranker=link-most-common-toponym.
+ --baseline-ranker=salience-most-common-toponym.
 
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
@@ -493,7 +493,7 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
         Seq("naive-bayes-with-baseline", "nb-base"),
         Seq("naive-bayes-no-baseline", "nb-nobase"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
-        Seq("internal-link", "link"),
+        Seq("salience", "internal-link"),
         Seq("random"),
         Seq("num-documents", "numdocs", "num-docs"))
 
@@ -525,8 +525,10 @@ the count the word in the document.
 """
 
   protected def ranker_baseline_help =
-"""'internal-link' (or 'link') means use number of internal links pointing to the
-document or cell.
+"""'salience' means use combined salience value of a cell. This is computed
+by adding up the salience of the documents in a cell. Only some corpora
+provide salience values for documents; e.g. for Wikipedia, this is the
+number of incoming links pointing to a document (article) from other articles.
 
 'random' means choose randomly.
 
@@ -1031,7 +1033,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     ranker_name match {
       case "random" =>
         new RandomGridRanker[Co](ranker_name, grid)
-      case "internal-link" =>
+      case "salience" =>
         new MostPopularGridRanker[Co](ranker_name, grid, true)
       case "num-documents" =>
         new MostPopularGridRanker[Co](ranker_name, grid, false)
