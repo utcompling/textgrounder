@@ -84,8 +84,7 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
       if (params.input contains "/") params.input
       else "./" + params.input
     val (dir, base) = io.localfh.split_filename(input_file)
-    val (schema, field_iter) =
-      TextDB.read_textdb_with_schema(io.localfh, dir, prefix = base)
+    val rows = TextDB.read_textdb(io.localfh, dir, prefix = base)
 
     // FIXME!! Currently we're hard-coding a view on the SF bay. Need to
     // compute centroid and bounding box of points given.
@@ -229,10 +228,10 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
     val middle_code =
       if (params.path) {
         val lines =
-          for {fieldvals <- field_iter.flatten
-               position_field = schema.get_field(fieldvals, "positions")
+          for {row <- rows
+               position_field = row.gets("positions")
                if position_field != ""
-               user = schema.get_field(fieldvals, "user")
+               user = row.gets("user")
           } yield {
             val positions = decode_string_map(position_field)
             val position_text =
@@ -247,10 +246,10 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
         (path_code_data format path_text) + path_code_postlude
       } else {
         val markers =
-          for {fieldvals <- field_iter.flatten
-               coord = schema.get_field(fieldvals, "coord")
+          for {row <- rows
+               coord = row.gets("coord")
                if coord != ""
-               user = schema.get_field(fieldvals, "user")
+               user = row.gets("user")
           } yield "[ %s, '%s' ]" format (
               coord, single_quote_escape_string(user))
 

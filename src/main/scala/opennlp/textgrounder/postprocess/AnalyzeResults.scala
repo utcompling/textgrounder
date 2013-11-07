@@ -115,28 +115,23 @@ object AnalyzeResults extends ExperimentApp("classify") {
       if (params.input contains "/") params.input
       else "./" + params.input
     val (dir, base) = filehand.split_filename(input_file)
-    val (schema, field_iter) =
-      TextDB.read_textdb_with_schema(filehand, dir, prefix = base)
-    for (fieldvals <- field_iter.flatten) {
-      def get[T : Serializer](field: String) =
-        schema.get_value[T](fieldvals, field)
-      def gets(field: String) = schema.get_field(fieldvals, field)
-      val correct_cell = gets("correct-cell")
-      correct_cells(gets("correct-cell")) += 1
-      correct_cells(gets("pred-cell")) += 1
-      val correct_coord = get[SphereCoord]("correct-coord")
+    for (row <- TextDB.read_textdb(filehand, dir, prefix = base)) {
+      val correct_cell = row.gets("correct-cell")
+      correct_cells(row.gets("correct-cell")) += 1
+      correct_cells(row.gets("pred-cell")) += 1
+      val correct_coord = row.get[SphereCoord]("correct-coord")
       def dist_to(field: String) =
-        spheredist(correct_coord, get[SphereCoord](field))
+        spheredist(correct_coord, row.get[SphereCoord](field))
       oracle_dist_true_center :+= dist_to("correct-cell-true-center")
       oracle_dist_centroid :+= dist_to("correct-cell-centroid")
       oracle_dist_central_point :+= dist_to("correct-cell-central-point")
       error_dist_true_center :+= dist_to("pred-cell-true-center")
       error_dist_centroid :+= dist_to("pred-cell-centroid")
       error_dist_central_point :+= dist_to("pred-cell-central-point")
-      numtypes :+= get[Int]("numtypes")
-      numtokens :+= get[Double]("numtokens")
+      numtypes :+= row.get[Int]("numtypes")
+      numtokens :+= row.get[Double]("numtokens")
       numseen += 1
-      if (get[Int]("correct-rank") == 1)
+      if (row.get[Int]("correct-rank") == 1)
         numcorrect += 1
     }
     outprint("Accuracy: %.4f (%s/%s)" format

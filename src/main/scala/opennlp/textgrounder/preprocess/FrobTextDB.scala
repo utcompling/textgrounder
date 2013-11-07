@@ -278,9 +278,9 @@ class FrobTextDB(
                fixed field.  Create a new writer for this schema; write the
                schema out; and record the writer in `split_value_to_writer`.
              */
-            val field_map = Schema.to_map(fieldnames, fieldvals)
+            val field_map = Schema.make_map(fieldnames, fieldvals)
             field_map -= params.split_by_field
-            val (new_fieldnames, new_fieldvals) = Schema.from_map(field_map)
+            val (new_fieldnames, new_fieldvals) = Schema.unmake_map(field_map)
             val new_fixed_values =
               schema.fixed_values + (params.split_by_field -> split)
             val new_schema =
@@ -314,18 +314,18 @@ class FrobTextDB(
       } else {
         /* Remove the split field from the output, since it's constant
            for all rows and is moved to the fixed fields */
-        val field_map = Schema.to_map(new_fieldnames, new_fieldvals)
+        val field_map = Schema.make_map(new_fieldnames, new_fieldvals)
         field_map -= params.split_by_field
-        val (nosplit_fieldnames, nosplit_fieldvals) = Schema.from_map(field_map)
+        val (nosplit_fieldnames, nosplit_fieldvals) = Schema.unmake_map(field_map)
         assert(nosplit_fieldnames == writer.schema.fieldnames,
           "resulting fieldnames %s should be same as schema fieldnames %s"
             format (nosplit_fieldnames, writer.schema.fieldnames))
-        outstream.println(writer.schema.make_row(nosplit_fieldvals))
+        outstream.println(writer.schema.make_line(nosplit_fieldvals))
       }
     } else {
       val (writer, outstream) =
         get_unsplit_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
-      outstream.println(writer.schema.make_row(new_fieldvals))
+      outstream.println(writer.schema.make_line(new_fieldvals))
     }
     Some(())
   }

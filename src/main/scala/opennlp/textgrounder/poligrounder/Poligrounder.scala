@@ -66,9 +66,9 @@ import collection.mutable
 
 import util.argparser._
 import util.collection._
+import util.io
 import util.textdb._
 import util.experiment._
-import util.io.{FileHandler, LocalFileHandler}
 import util.print.{errprint, internal_error}
 import util.time._
 
@@ -164,14 +164,12 @@ class PoligrounderDriver extends
     to_chunk = parse_interval(params.to)
 
     if (params.ideological_user_corpus != null) {
-      val (schema, field_iter) =
-        TextDB.read_textdb_with_schema(new LocalFileHandler,
+      val rows = TextDB.read_textdb(io.localfh,
           params.ideological_user_corpus, suffix_re = "ideo-users")
       val users =
-        (for (fieldvals <- field_iter.flatten) yield {
-          val user = schema.get_field(fieldvals, "user")
-          val ideology =
-            schema.get_field(fieldvals, "ideology").toDouble
+        (for (row <- rows) yield {
+          val user = row.gets("user")
+          val ideology = row.get[Double]("ideology")
           (user, ideology)
         }).toMap
       params.ideological_users = users

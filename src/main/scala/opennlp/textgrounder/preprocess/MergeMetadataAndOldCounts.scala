@@ -154,7 +154,7 @@ class MMCUnigramLangModelHandler(
             values(i)))
         }). mkString(" ")
       val new_params = params ++ Seq(counts)
-      outstream.println(writer.schema.make_row(new_params))
+      outstream.println(writer.schema.make_line(new_params))
     }
     true
   }
@@ -190,7 +190,7 @@ counts file also containing the metadata.
         params.output_dir)
 
     val (schema, field_iter) =
-      TextDB.read_textdb_with_schema(filehand, params.input_dir)
+      TextDB.read_textdb_data(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {
       var (_, prefix, _, _) =

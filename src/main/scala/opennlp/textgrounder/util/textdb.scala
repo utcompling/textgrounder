@@ -73,10 +73,11 @@ import io._
  * multiple data files in a single directory, as well as multiple databases
  * to coexist in the same directory, as long as they have different suffixes.
  * This is often used to present different splits (e.g. training vs. dev
- * vs. test) of a corpus/database. It could conceivably be used to present
- * different "views" on a corpus (e.g. one containing raw text, one containing
- * unigram counts, etc.), but that is more commonly handled by simply
- * including all the fields for all the views into a single textdb database.
+ * vs. test) of a corpus stored as a textdb database. It could conceivably
+ * be used to present different "views" on a corpus (e.g. one containing raw
+ * text, one containing unigram counts, etc.), but that is more commonly
+ * handled by simply including all the fields for all the views into a
+ * single textdb database.
  *
  * There are many functions in `TextDB` for reading from textdb
  * databases.  Most generally, a schema needs to be read and then the data
@@ -92,9 +93,10 @@ package textdb {
    *
    * @param fieldnames List of the name of each field
    * @param fixed_values Map specifying additional fields possessing the
-   *   same value for every row.  This is optional, but usually at least
-   *   the "corpus-name" field should be given, with the name of the corpus
-   *   (currently used purely for identification purposes).
+   *   same value for every row.  This is optional, but often at least
+   *   the "corpus-type" field should be given, especially when a textdb is
+   *   used as a corpus. This is used when reading a corpus in, to know
+   *   which type of documents are stored.
    * @param field_description Map giving English description of field names,
    *   for display purposes.
    * @param split_text Text used for separating field values in a row;
@@ -123,16 +125,26 @@ package textdb {
             fieldnames.size, fieldvals.size, fieldvals))
     }
 
+    /**
+     * Retrieve a typed value from a raw row. Error if not found.
+     */
     def get_value[T : Serializer](fieldvals: IndexedSeq[String],
         key: String): T = {
       get_x[T](get_field(fieldvals, key))
     }
 
+    /**
+     * Retrieve a typed value that may be in a raw row.
+     */
     def get_value_if[T : Serializer](fieldvals: IndexedSeq[String],
         key: String): Option[T] = {
       get_field_if(fieldvals, key) flatMap { x => get_x_or_none[T](x) }
     }
 
+    /**
+     * Retrieve a typed value that may be in a raw row, substituting a default
+     * value if not.
+     */
     def get_value_or_else[T : Serializer](fieldvals: IndexedSeq[String],
         key: String, default: T): T = {
       get_value_if[T](fieldvals, key) match {
@@ -141,7 +153,10 @@ package textdb {
       }
     }
 
-    def get_field(fieldvals: IndexedSeq[String], key: String) = {
+    /**
+     * Retrieve a raw value from a raw row. Error if not found.
+     */
+    def get_field(fieldvals: IndexedSeq[String], key: String): String = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         fieldvals(field_indices(key))
@@ -149,7 +164,11 @@ package textdb {
         get_fixed_field(key)
     }
 
-    def get_field_if(fieldvals: IndexedSeq[String], key: String) = {
+    /**
+     * Retrieve a raw value that may be in a raw row.
+     */
+    def get_field_if(fieldvals: IndexedSeq[String], key: String
+        ): Option[String] = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         Some(fieldvals(field_indices(key)))
@@ -157,8 +176,12 @@ package textdb {
         get_fixed_field_if(key)
     }
 
+    /**
+     * Retrieve a raw value that may be in a raw row, substituting a default
+     * value if not.
+     */
     def get_field_or_else(fieldvals: IndexedSeq[String], key: String,
-        default: String) = {
+        default: String): String = {
       check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         fieldvals(field_indices(key))
@@ -166,20 +189,35 @@ package textdb {
         get_fixed_field_or_else(key, default)
     }
 
-    def get_fixed_field(key: String) =
+    /**
+     * Retrieve a raw fixed-field value. Error if not found.
+     */
+    def get_fixed_field(key: String): String =
       fixed_values(key)
 
-    def get_fixed_field_if(key: String) =
+    /**
+     * Retrieve a raw fixed-field value that may be present.
+     */
+    def get_fixed_field_if(key: String): Option[String] =
       fixed_values.get(key)
 
-    def get_fixed_field_or_else(key: String, default: String) =
+    /**
+     * Retrieve a raw fixed-field value that may be present,
+     * substituting a default value if not.
+     */
+    def get_fixed_field_or_else(key: String, default: String): String =
       fixed_values.getOrElse(key, default)
 
     /**
-     * Convert a list of items into a row to be output directly to a text file.
+     * Convert a list of items into a Row object for easier access.
+     */
+    def make_row(fieldvals: IndexedSeq[String]) = Row(this, fieldvals)
+
+    /**
+     * Convert a list of items into a line to be output directly to a text file.
      * (This does not include a trailing newline character.)
      */
-    def make_row(fieldvals: Iterable[String]) = {
+    def make_line(fieldvals: Iterable[String]) = {
       check_values_fit_schema(fieldvals)
       fieldvals mkString split_text
     }
@@ -189,7 +227,7 @@ package textdb {
      */
     def output_schema_file(filehand: FileHandler, schema_file: String) {
       val schema_outstream = filehand.openw(schema_file)
-      schema_outstream.println(make_row(fieldnames))
+      schema_outstream.println(make_line(fieldnames))
       for ((field, value) <- fixed_values) {
         if (field_description.contains(field))
           schema_outstream.println(
@@ -386,15 +424,72 @@ package textdb {
      * a field value results in the field getting moved to the end.)
      *
      */
-    def to_map(fieldnames: Iterable[String], fieldvals: IndexedSeq[String]) =
+    def make_map(fieldnames: Iterable[String], fieldvals: IndexedSeq[String]) =
       mutable.LinkedHashMap[String, String]() ++ (fieldnames zip fieldvals)
 
     /**
      * Convert from a map back to a tuple of lists of field names and values.
      */
-    def from_map(map: BaseMap[String, String]) =
+    def unmake_map(map: BaseMap[String, String]) =
       map.toSeq.unzip
 
+  }
+
+  /**
+   * An object describing a row in a textdb, including the schema of the
+   * textdb and the row values. This makes it easy to retrieve values from
+   * the row using `get` or related functions.
+   *
+   * @param schema Schema of the database from which the row was read.
+   * @param fieldvals Raw values of the fields in the row.
+   */
+  case class Row(
+    schema: Schema,
+    fieldvals: IndexedSeq[String]
+  ) {
+    import Serializer._
+
+    /**
+     * Retrieve a value from the row. Error if not found.
+     */
+    def get[T : Serializer](key: String): T =
+      schema.get_value[T](fieldvals, key)
+
+    /**
+     * Retrieve a value that may be in the row.
+     */
+    def get_if[T : Serializer](key: String): Option[T] =
+      schema.get_value_if[T](fieldvals, key)
+
+    /**
+     * Retrieve a value that may be in the row, substituting a default
+     * value if not.
+     */
+    def get_or_else[T : Serializer](key: String, default: T): T =
+      schema.get_value_or_else[T](fieldvals, key, default)
+
+    /**
+     * Retrieve a value from the row as a string. Error if not found.
+     */
+    def gets(key: String): String = get[String](key)
+
+    /**
+     * Retrieve a value that may be in the row, as a string.
+     */
+    def gets_if(key: String): Option[String] = get_if[String](key)
+
+    /**
+     * Retrieve a value that may be in the row, as a string, substituting
+     * a default value if not.
+     */
+    def gets_or_else(key: String, default: String): String =
+      get_or_else[String](key, default)
+
+    /**
+     * Convert into a line to be output directly to a text file.
+     * (This does not include a trailing newline character.)
+     */
+    def to_line = schema.make_line(fieldvals)
   }
 
   object TextDB {
@@ -496,7 +591,7 @@ package textdb {
     }
 
     /**
-     * Read a textdb corpus from a directory and return the schema and an
+     * Read a textdb database from a directory and return the schema and an
      * iterator over all data files.  This will recursively process any
      * subdirectories looking for data files.  The data files must have a suffix
      * in their names that matches the given suffix. (If you want more control
@@ -512,7 +607,7 @@ package textdb {
      *   during processing.
      *
      * @return A tuple `(schema, files)` where `schema` is the schema for the
-     *   corpus and `files` is an iterator over data files.
+     *   database and `files` is an iterator over data files.
      */
     def get_textdb_files(filehand: FileHandler, dir: String,
         prefix: String = "", suffix_re: String = "",
@@ -531,9 +626,10 @@ package textdb {
     }
 
     /**
-     * Read a corpus from a directory and return the result of processing the
-     * rows in the corpus. (If you want more control over the processing,
-     * call `read_schema_from_textdb` and use `NewTextDB`.)
+     * Read a database from a directory and return the rows in the database.
+     * If you want more control over the processing, use `read_textdb_data`.
+     * For even more control than that, use `get_textdb_files` and
+     * `read_textdb_file`.
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
@@ -542,18 +638,17 @@ package textdb {
      *   displayed as each file is processed and as each directory is visited
      *   during processing.
      *
-     * @return An iterator of iterators of values.  There is one inner iterator
-     *   per file read in, and each such iterator contains all the values
-     *   read from the file. (There may be fewer values than rows in a file
-     *   if some rows were badly formatted.)
+     * @return An iterator of Row objects, each one describing the data in
+     *   a row. This includes all the correctly-formatted rows in all
+     *   files in the database.
      */
     def read_textdb(filehand: FileHandler, dir: String,
         prefix: String = "", suffix_re: String = "",
         with_messages: Boolean = true) = {
       val (schema, fields) =
-        read_textdb_with_schema(filehand, dir, prefix,
+        read_textdb_data(filehand, dir, prefix,
           suffix_re, with_messages)
-      fields
+      fields.flatten.map { schema.make_row(_) }
     }
 
     /**
@@ -568,12 +663,26 @@ package textdb {
     }
 
     /**
-     * Same as `read_textdb` but return also return the schema.
+     * Read a database from a directory and return the raw rows in the
+     * database, for each separate file. This is meant for lower-level
+     * processing; use `read_textdb` for high-level access. If you want
+     * even more control over the processing than provided by this function,
+     * use `get_textdb_files` and `read_textdb_file`.
+     *
+     * @param filehand File handler object of the directory
+     * @param dir Directory to read
+     * @param suffix_re Suffix regexp picking out the correct data files
+     * @param with_message If true, "Processing ..." messages will be
+     *   displayed as each file is processed and as each directory is visited
+     *   during processing.
      *
      * @return A tuple `(schema, field_iter)` where `field_iter` is an
-     *   iterator of iterators of fields.
+     *   iterator of iterators of fields. The top-level iterator has
+     *   one sub-iterator per file. Each field is an IndexedSeq of strings,
+     *   one per value. The schema specifies the names of the values and
+     *   can be used to access values from the fields.
      */
-    def read_textdb_with_schema(filehand: FileHandler, dir: String,
+    def read_textdb_data(filehand: FileHandler, dir: String,
         prefix: String = "", suffix_re: String = "",
         with_messages: Boolean = true) = {
       val (schema, files) =
@@ -609,7 +718,7 @@ package textdb {
       textdb_file_matching_patterns(filehand, dir, suffix, data_ending_text)
 
     /**
-     * Output a textdb corpus. (If you want more control over the output,
+     * Output a textdb database. (If you want more control over the output,
      * e.g. to output multiple data files, use `TextDBWriter`.)
      *
      * @param filehand File handler object of the file system to write to
@@ -643,7 +752,7 @@ package textdb {
       val outfile = TextDB.construct_data_file(base)
       val outstr = filehand.openw(outfile)
       res2.foreach { res =>
-        outstr.println(schema.make_row(res.map("%s" format _._2)))
+        outstr.println(schema.make_line(res.map("%s" format _._2)))
       }
       outstr.close()
     }
@@ -854,8 +963,8 @@ package object textdb {
 
   /**
    * Serialize a sequence of (encoded-word, count) pairs into the format used
-   * in a corpus.  The word or ngram must already have been encoded using
-   * `encode_string_for_map_field` or `encode_ngram_for_map_field`.
+   * in a textdb database.  The word or ngram must already have been encoded
+   * using `encode_string_for_map_field` or `encode_ngram_for_map_field`.
    */
   def shallow_encode_count_map(seq: Iterable[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
@@ -866,7 +975,7 @@ package object textdb {
 
   /**
    * Serialize a sequence of (string, string) pairs into the format used
-   * in a corpus.  The strings must already have been encoded using
+   * in a textdb database.  The strings must already have been encoded using
    * `encode_string_for_map_field`.
    */
   def shallow_encode_string_map(seq: Iterable[(String, String)]) = {
@@ -876,7 +985,7 @@ package object textdb {
 
   /**
    * Serialize a sequence of (word, count) pairs into the format used
-   * in a corpus.
+   * in a textdb database.
    */
   def encode_count_map(seq: Iterable[(String, Int)]) = {
     shallow_encode_count_map(seq map {
@@ -886,7 +995,7 @@ package object textdb {
 
   /**
    * Serialize a sequence of (string, string) pairs into the format used
-   * in a corpus.
+   * in a textdb database.
    */
   def encode_string_map(seq: Iterable[(String, String)]) = {
     shallow_encode_string_map(seq map {
