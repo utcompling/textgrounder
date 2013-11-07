@@ -2172,8 +2172,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val opts = init_scoobi_app()
     val filehand = new HadoopFileHandler(configuration)
     if (opts.corpus_name == null) {
-      val (_, last_component) = filehand.split_filename(opts.input)
-      opts.corpus_name = last_component.replace("*", "_")
+      val (_, tail) = filehand.split_filename(opts.input)
+      opts.corpus_name = tail.replace("*", "_")
     }
     errprint("ParseTweets: " + (opts.grouping match {
       case "none" => "not grouping output"

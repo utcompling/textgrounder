@@ -158,9 +158,9 @@ class ConvertTwitterInfochimpsFileProcessor(
     for (file <- iter_files(filehand, files)) {
       val (lines, compression_type, realname) =
         filehand.openr_with_compression_info(file)
-      val (_, outname) = filehand.split_filename(realname)
+      val (_, tail) = filehand.split_filename(realname)
       val out_text_name =
-        "%s/twitter-infochimps-%s" format (params.output_dir, outname)
+        "%s/twitter-infochimps-%s" format (params.output_dir, tail)
       errprint("Text document file is %s..." format out_text_name)
       val outstream =
         filehand.openw(out_text_name, compression = compression_type)
@@ -481,13 +481,13 @@ class TwitterInfochimpsStatsFileProcessor(
   def process_files(filehand: FileHandler, files: Iterable[String]) {
     for (file <- iter_files(filehand, files)) {
       val lines = filehand.openr(file)
-      val (_, outname) = filehand.split_filename(file)
+      val (_, tail) = filehand.split_filename(file)
       val curfile_stats = new TwitterStatistics(params)
       for ((metadata, text) <- iter_fields(lines)) {
         curfile_stats.record_tweet(metadata, text)
         global_stats.record_tweet(metadata, text)
       }
-      print_msg_heading("Statistics for file %s:" format outname,
+      print_msg_heading("Statistics for file %s:" format tail,
         blank_lines_before = 6)
       curfile_stats.print_statistics()
       print_global_stats()

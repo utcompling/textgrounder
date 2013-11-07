@@ -77,8 +77,8 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
     val input_file =
       if (params.input contains "/") params.input
       else "./" + params.input
-    val (dir, base) = io.localfh.split_filename(input_file)
-    val rows = TextDB.read_textdb(io.localfh, dir, prefix = base)
+    val (dir, tail) = io.localfh.split_filename(input_file)
+    val rows = TextDB.read_textdb(io.localfh, dir, prefix = tail)
     val kml_placemarks =
       for {row <- rows
            coord = row.gets("coord")

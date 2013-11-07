@@ -409,7 +409,7 @@ package io {
     def get_raw_output_stream(filename: String, append: Boolean): OutputStream
     /**
      * Split a string naming a file into the directory it's in and the
-     * final component.
+     * final component (tail).
      */
     def split_filename(filename: String): (String, String)
     /**
@@ -517,7 +517,7 @@ package object io {
     files: Iterator[String]) = {
     var lastdir: String = null
     for (file <- files) yield {
-      var (dir, fname) = filehand.split_filename(file)
+      var (dir, _) = filehand.split_filename(file)
       if (dir != lastdir) {
         errprint("Processing directory %s..." format dir)
         lastdir = dir

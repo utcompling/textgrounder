@@ -114,8 +114,8 @@ object AnalyzeResults extends ExperimentApp("classify") {
     val input_file =
       if (params.input contains "/") params.input
       else "./" + params.input
-    val (dir, base) = filehand.split_filename(input_file)
-    for (row <- TextDB.read_textdb(filehand, dir, prefix = base)) {
+    val (dir, tail) = filehand.split_filename(input_file)
+    for (row <- TextDB.read_textdb(filehand, dir, prefix = tail)) {
       val correct_cell = row.gets("correct-cell")
       correct_cells(row.gets("correct-cell")) += 1
       correct_cells(row.gets("pred-cell")) += 1
