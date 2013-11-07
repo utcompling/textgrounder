@@ -31,8 +31,12 @@ import gridlocate._
 abstract class RealSphereDoc(
   schema: Schema,
   lang_model: DocLangModel,
-  val coord: SphereCoord
+  val coord: SphereCoord,
+  // FIXME! Should be 'val salience' but WikipediaDoc needs it to be var.
+  // Fix WikipediaDoc to avoid this.
+  salience_value: Option[Double]
 ) extends GridDoc[SphereCoord](schema, lang_model) {
+  override def salience = salience_value
   def has_coord = coord != null
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
@@ -143,8 +147,9 @@ class GenericSphereDoc(
   schema: Schema,
   lang_model: DocLangModel,
   coord: SphereCoord,
+  salience: Option[Double],
   val title: String
-) extends RealSphereDoc(schema, lang_model, coord) {
+) extends RealSphereDoc(schema, lang_model, coord, salience) {
 
   def xmldesc =
     <GenericSphereDoc>
@@ -162,6 +167,7 @@ class GenericSphereDocSubfactory(
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean) = Some(
     new GenericSphereDoc(schema, lang_model, coord,
+      schema.get_value_if[Double](fieldvals, "salience"),
       schema.get_value_or_else[String](fieldvals, "title", "unknown"))
     )
 }
