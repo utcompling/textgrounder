@@ -138,7 +138,7 @@ abstract class GridCell[Co](
 ) {
   val combined_lang_model =
     new CombinedLangModel(grid.docfact.lang_model_factory)
-  var most_salient_document: GridDoc[Co] = _
+  var most_salient_document: String = ""
   var most_salient_doc_salience = 0.0
 
   /**
@@ -200,7 +200,7 @@ abstract class GridCell[Co](
   override def toString = {
     val unfinished = if (finished) "" else ", unfinished"
     val contains =
-      if (most_salient_document != null)
+      if (most_salient_document != "")
         ", most-salient-doc %s(%s salience)" format (
           most_salient_document, most_salient_doc_salience)
       else ""
@@ -234,10 +234,8 @@ abstract class GridCell[Co](
     "rerank-num-word-tokens" ->
       lang_model.rerank_lm.model.num_tokens,
     "salience" -> salience,
-    "most-salient-document" -> (
-      if (most_salient_document != null)
-        Encoder.string(most_salient_document.title)
-      else ""),
+    "most-salient-document" ->
+      Encoder.string(most_salient_document),
     "most-salient-document-salience" -> most_salient_doc_salience
   )
 
@@ -247,8 +245,8 @@ abstract class GridCell[Co](
    */
   def shortstr = {
     var str = "Cell %s" format describe_location
-    if (most_salient_document != null)
-      str += ", most-salient %s" format most_salient_document.shortstr
+    if (most_salient_document != "")
+      str += ", most-salient %s" format most_salient_document
     str
   }
 
@@ -261,8 +259,8 @@ abstract class GridCell[Co](
       <bounds>{ describe_location }</bounds>
       <finished>{ finished }</finished>
       {
-        if (most_salient_document != null)
-          (<mostSalientDocument>most_salient_document.xmldesc</mostSalientDocument>
+        if (most_salient_document != "")
+          (<mostSalientDocument>most_salient_document</mostSalientDocument>
            <mostSalientDocumentSalience>most_salient_doc_salience</mostSalientDocumentSalience>)
       }
       <numDocuments>{ num_docs }</numDocuments>
@@ -278,7 +276,7 @@ abstract class GridCell[Co](
     if (doc.salience != None &&
       doc.salience.get > most_salient_doc_salience) {
       most_salient_doc_salience = doc.salience.get
-      most_salient_document = doc
+      most_salient_document = doc.title
     }
   }
 
