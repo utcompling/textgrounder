@@ -318,10 +318,10 @@ class RankedSphereDocEvalResult(
 //    for ((rank, cellval) <- (1 to num_cells_to_show) zip cells) {
 //      val (cell, vall) = cellval
 //      if (debug("pcl-travel")) {
-//        errprint("  Rank %d, goodness %g:", rank, vall)
+//        errprint("  Rank %s, goodness %g:", rank, vall)
 //        errprint(cell.xmldesc.toString) // indent=4
 //      } else
-//        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
+//        errprint("  Rank %s, goodness %g: %s", rank, vall, cell.shortstr)
 //    }
 //
 //    new TitledDocResult()

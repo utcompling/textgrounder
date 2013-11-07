@@ -205,7 +205,7 @@ abstract class GridCell[Co](
           most_salient_document, most_salient_doc_salience)
       else ""
 
-    "GridCell(%s%s%s, %d documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
+    "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
       describe_location, unfinished, contains,
       num_docs,
       lang_model.grid_lm.model.num_types,

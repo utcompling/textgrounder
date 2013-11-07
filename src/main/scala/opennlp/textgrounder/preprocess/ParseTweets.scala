@@ -1053,7 +1053,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
                 if (value.length == 0) {
                   bump_counter("zero length %s/%s seen" format (key, subkey))
                   warning(line,
-                    "Zero-length %s/%s in interval [%d,%d], skipped",
+                    "Zero-length %s/%s in interval [%s,%s], skipped",
                     key, subkey, start, end)
                   false
                 } else true
@@ -1234,7 +1234,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
               // Subtract one because of the initial @ in the index reference
               if (end - start - 1 != namelen) {
                 bump_counter("wrong length interval for screen name seen")
-                warning(line, "Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
+                warning(line, "Strange indices [%s,%s] for screen name %s, length %s != %s, text context is '%s'",
                   start, end, screen_name, end - start - 1, namelen,
                   raw_text.slice(start, end))
               }

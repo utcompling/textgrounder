@@ -605,7 +605,7 @@ abstract class LangModel(val factory: LangModelFactory) {
           view(0, num_actual_items_to_print))
       yield "%s=%s" format (item_to_string(item), count) 
     val itemstr = (items mkString " ") + (if (need_dots) " ..." else "")
-    "%s(%d types, %s tokens%s%s, %s)" format (
+    "%s(%s types, %s tokens%s%s, %s)" format (
         class_name, model.num_types, model.num_tokens, innerToString,
         finished_str, itemstr)
   }

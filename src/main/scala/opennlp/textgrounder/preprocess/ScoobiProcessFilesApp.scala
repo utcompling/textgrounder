@@ -87,7 +87,7 @@ trait ScoobiProcessFilesAction {
   lazy val logger = LogFactory.getLog(full_operation_category)
 
   def warning(line: String, fmt: String, args: Any*) {
-    logger.warn("Line %d: %s: %s" format
+    logger.warn("Line %s: %s: %s" format
       (lineno, fmt format (args: _*), line))
   }
 
@@ -174,7 +174,7 @@ trait ScoobiProcessFilesAction {
       fun(value)
     } catch {
       case e: Exception => {
-        logger.warn("Line %d: %s: %s\n%s" format
+        logger.warn("Line %s: %s: %s\n%s" format
           (wrapper.lineno, e, value, stack_trace_as_string(e)))
         default
       }

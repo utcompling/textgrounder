@@ -557,11 +557,11 @@ object FindPolitical extends
       TextDB.data_file_matching_patterns(filehand, opts.input)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 
-    errprint("Step 1, pass 0: %d ideological users on input",
+    errprint("Step 1, pass 0: %s ideological users on input",
       accounts.size)
     for (iter <- 1 to opts.iterations) {
       errprint(
-        "Step 1, pass %d: Filter corpus for conservatives/liberals, compute ideology."
+        "Step 1, pass %s: Filter corpus for conservatives/liberals, compute ideology."
         format iter)
       val last_pass = iter == opts.iterations
       ideo_users =
@@ -570,9 +570,9 @@ object FindPolitical extends
         accounts =
           persist(ideo_users.materialize).map(x =>
             (x.user.toLowerCase, x.ideology)).toMap
-        errprint("Step 1, pass %d: %d ideological users on input",
+        errprint("Step 1, pass %s: %s ideological users on input",
           iter, accounts.size)
-        errprint("Step 1, pass %d: done." format iter)
+        errprint("Step 1, pass %s: done." format iter)
       }
     }
 
@@ -602,7 +602,7 @@ object FindPolitical extends
     ideo_users_fixup()
     for (fixup <- ft_fixups)
       fixup()
-    errprint("Step 1, pass %d: done." format opts.iterations)
+    errprint("Step 1, pass %s: done." format opts.iterations)
     errprint("Step 2: done.")
 
     finish_scoobi_app(opts)
