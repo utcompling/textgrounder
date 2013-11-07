@@ -416,6 +416,35 @@ class DefaultUnigramLangModelBuilder(
   }
 }
 
+/* A builder that filters the language models to contain only the words we
+   care about, to save memory and time. */
+class FilterUnigramLangModelBuilder(
+    factory: LangModelFactory,
+    filter_words: Seq[String],
+    ignore_case: Boolean,
+    stopwords: Set[String],
+    whitelist: Set[String],
+    minimum_word_count: Int = 1
+  ) extends DefaultUnigramLangModelBuilder(
+    factory, ignore_case, stopwords, whitelist, minimum_word_count
+  ) {
+
+  override def finish_before_global(xlang_model: LangModel) {
+    super.finish_before_global(xlang_model)
+
+    val lang_model = xlang_model.asInstanceOf[UnigramLangModel]
+    val model = lang_model.model
+    val oov = memoizer.memoize("-OOV-")
+
+    // Filter the words we don't care about, to save memory and time.
+    for ((word, count) <- model.iter_items
+         if !(filter_words contains lang_model.item_to_string(word))) {
+      model.remove_item(word)
+      model.add_item(oov, count)
+    }
+  }
+}
+
 /**
  * General factory for UnigramLangModel language models.
  */ 
