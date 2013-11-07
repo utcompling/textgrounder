@@ -19,14 +19,10 @@
 package opennlp.textgrounder
 package geolocate
 
-import java.io.{FileSystem=>_,_}
-
-import org.apache.hadoop.io._
-
 import util.argparser._
 import util.spherical.SphereCoord
 import util.experiment._
-import util.print.{errprint, warning}
+import util.print.warning
 import util.textdb._
  
 import gridlocate._
@@ -53,34 +49,6 @@ by adding `WORD.data.txt` and `WORD.schema.txt` to the prefix, with the former
 storing the data as tab-separated fields and the latter naming the fields.""")
 }
 
-
-/* A builder that filters the language models to contain only the words we
-   care about, to save memory and time. */
-class FilterUnigramLangModelBuilder(
-    factory: LangModelFactory,
-    filter_words: Seq[String],
-    ignore_case: Boolean,
-    stopwords: Set[String],
-    whitelist: Set[String],
-    minimum_word_count: Int = 1
-  ) extends DefaultUnigramLangModelBuilder(
-    factory, ignore_case, stopwords, whitelist, minimum_word_count
-  ) {
-
-  override def finish_before_global(lang_model: LangModel) {
-    super.finish_before_global(lang_model)
-
-    val model = lang_model.asInstanceOf[UnigramLangModel].model
-    val oov = memoizer.memoize("-OOV-")
-
-    // Filter the words we don't care about, to save memory and time.
-    for ((word, count) <- model.iter_items
-         if !(filter_words contains memoizer.unmemoize(word))) {
-      model.remove_item(word)
-      model.add_item(oov, count)
-    }
-  }
-}
 
 class WriteCellDistDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
