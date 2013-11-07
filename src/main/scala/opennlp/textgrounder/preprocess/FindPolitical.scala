@@ -29,7 +29,7 @@ import com.nicta.scoobi.Scoobi._
 import util.argparser._
 import util.textdb._
 import util.hadoop._
-import util.io._
+import util.io
 import util.collection._
 import util.os._
 import util.print._
@@ -409,7 +409,7 @@ object FindPolitical extends
         """^([^ .]+)\. (.*?), (.*?) (-+ |(?:@[^ ]+ )+)([RDI?]) \((.*)\)$""".r
       val all_accounts =
         // Open the file and read line by line.
-        for ((line, lineind) <- (new LocalFileHandler).openr(filename).zipWithIndex
+        for ((line, lineind) <- io.localfh.openr(filename).zipWithIndex
              // Skip comments and blank lines
              if !line.startsWith("#") && !(line.trim.length == 0)) yield {
           lineno = lineind + 1
@@ -502,13 +502,11 @@ object FindPolitical extends
         ptp.politico_accounts_map_to_ideo_users_map(politico_accounts)
       }
       else {
-        val (schema, field_iter) =
-          TextDB.read_textdb_with_schema(filehand,
-            opts.political_twitter_accounts)
-        (for (fieldvals <- field_iter.flatten) yield {
-          val user = schema.get_field(fieldvals, "user")
-          val ideology =
-            schema.get_field(fieldvals, "ideology").toDouble
+        val rows =
+          TextDB.read_textdb(filehand, opts.political_twitter_accounts)
+        (for (row <- rows) yield {
+          val user = row.gets("user")
+          val ideology = row.get[Double]("ideology")
           (user.toLowerCase, ideology)
         }).toMap
       }

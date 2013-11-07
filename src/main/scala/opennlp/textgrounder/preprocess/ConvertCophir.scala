@@ -343,7 +343,7 @@ object ConvertCophir
       rawxmlfiles flatMap { case (fname, rawxml) => parse_xml(fname, rawxml) }
     // Convert property list into textdb line
     val outlines = id_props_lines.
-      map { im => (im.owner_id % 100, schema.make_row(im.props map (_._2))) }
+      map { im => (im.owner_id % 100, schema.make_line(im.props map (_._2))) }
     val training =
       outlines.filter { case (modid, row) => modid < 80 }.
                map    { case (modid, row) => row }

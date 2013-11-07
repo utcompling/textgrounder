@@ -2226,7 +2226,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         // from them, count them up and output results formatted into a record.
         val schema = ptd.create_schema
         val nicely_formatted = tweets.map { tw =>
-          schema.make_row(tfct.tokenize_count_and_format(tw)) }
+          schema.make_line(tfct.tokenize_count_and_format(tw)) }
         dlist_output_textdb(schema, nicely_formatted, filehand, opts.output,
           opts.corpus_name)
       }
@@ -2240,7 +2240,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           Map("corpus-name" -> opts.corpus_name,
               "corpus-type" -> "tweet-stats"))
         local_output_textdb(schema,
-          by_type.map(x => schema.make_row(x.to_row(opts))),
+          by_type.map(x => schema.make_line(x.to_row(opts))),
           filehand, opts.output + "-tweet-stats", opts.corpus_name)
         val userstat = by_type.filter(x =>
           x.ty == "user" && x.key2 == "user").toSeq(0)

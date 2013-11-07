@@ -78,13 +78,13 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
       if (params.input contains "/") params.input
       else "./" + params.input
     val (dir, base) = io.localfh.split_filename(input_file)
-    val (schema, field_iter) =
-      TextDB.read_textdb_with_schema(io.localfh, dir, prefix = base)
+    val rows = TextDB.read_textdb(io.localfh, dir, prefix = base)
     val kml_placemarks =
-      for {fieldvals <- field_iter.flatten
-           coord = schema.get_field(fieldvals, "coord")
-           if coord != ""} yield {
-        val user = schema.get_field(fieldvals, "user")
+      for {row <- rows
+           coord = row.gets("coord")
+           if coord != ""
+           user = row.gets("user")
+      } yield {
       <Placemark>
         <name>{ user }</name>
         <Point>
