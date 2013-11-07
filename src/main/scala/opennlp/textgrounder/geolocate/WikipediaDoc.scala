@@ -58,11 +58,11 @@ class WikipediaDoc(
   coord: SphereCoord,
   val title: String,
   val redir: String,
-  // FIXME! Make this a val.
+  // FIXME! Make this a val and rename directly to 'salience'.
+  // This requires handling all the redirect crap during preprocessing.
   var salience_value: Option[Double] = None,
   val id: Long = 0L
-) extends RealSphereDoc(schema, lang_model, coord) {
-  override def salience = salience_value
+) extends RealSphereDoc(schema, lang_model, coord, salience_value) {
   override def get_field(field: String) = {
     field match {
       case "id" => id.toString

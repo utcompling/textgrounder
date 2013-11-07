@@ -28,8 +28,9 @@ class TwitterTweetDoc(
   schema: Schema,
   lang_model: DocLangModel,
   coord: SphereCoord,
+  salience: Option[Double],
   val id: Long
-) extends RealSphereDoc(schema, lang_model, coord) {
+) extends RealSphereDoc(schema, lang_model, coord, salience) {
   def title = id.toString
 
   def xmldesc =
@@ -49,6 +50,7 @@ class TwitterTweetDocSubfactory(
       lang_model: DocLangModel, coord: SphereCoord,
       record_in_factory: Boolean) = Some(
     new TwitterTweetDoc(schema, lang_model, coord,
+      schema.get_value_if[Double](fieldvals, "salience"),
       schema.get_value_or_else[Long](fieldvals, "title", 0L))
     )
 }
@@ -57,8 +59,9 @@ class TwitterUserDoc(
   schema: Schema,
   lang_model: DocLangModel,
   coord: SphereCoord,
+  salience: Option[Double],
   val user: String
-) extends RealSphereDoc(schema, lang_model, coord) {
+) extends RealSphereDoc(schema, lang_model, coord, salience) {
   def title = user
 
   def xmldesc =
@@ -78,6 +81,7 @@ class TwitterUserDocSubfactory(
       lang_model: DocLangModel, coord: SphereCoord,
       record_in_factory: Boolean) = Some(
     new TwitterUserDoc(schema, lang_model, coord,
-        schema.get_value_or_else[String](fieldvals, "user", ""))
+      schema.get_value_if[Double](fieldvals, "salience"),
+      schema.get_value_or_else[String](fieldvals, "user", ""))
     )
 }
