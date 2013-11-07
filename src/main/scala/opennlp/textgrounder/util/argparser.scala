@@ -1371,7 +1371,7 @@ package argparser {
           if (specs(1) == "") default
           else convert(specs(1), argtype, this)
         case _ => throw new ArgParserConversionException(
-          """too many parameters for type "%s": %d seen, at most 1 allowed"""
+          """too many parameters for type "%s": %s seen, at most 1 allowed"""
           format (argtype, specs.tail.length))
       }
     }
@@ -1408,7 +1408,7 @@ package argparser {
           (t, u)
         }
         case _ => throw new ArgParserConversionException(
-          """too many parameters for type "%s": %d seen, at most 2 allowed"""
+          """too many parameters for type "%s": %s seen, at most 2 allowed"""
           format (argtype, specs.tail.length))
       }
     }

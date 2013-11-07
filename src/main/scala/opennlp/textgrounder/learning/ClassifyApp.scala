@@ -157,7 +157,7 @@ object ClassifyApp extends ExperimentApp("classify") {
         toIndexedSeq
     val numlabs = factory.number_of_labels
     if (numlabs < 2) {
-      println("Found %d different labels, when at least 2 are needed." format
+      println("Found %s different labels, when at least 2 are needed." format
         numlabs)
       System.exit(0)
     }

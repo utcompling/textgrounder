@@ -470,7 +470,7 @@ class MultiRegularGrid(
           record_created_cell = false).foreach { cell =>
             cell.finish()
             if (debug("cell"))
-              errprint("--> (%d,%d): %s", index.latind, index.longind, cell)
+              errprint("--> (%s,%s): %s", index.latind, index.longind, cell)
           }
       }
   }
@@ -512,7 +512,7 @@ class MultiRegularGrid(
         grid(cell.index) = (cell, -score, rank)
     }
 
-    errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
+    errprint("Grid ranking, gridsize %sx%s", grsize, grsize)
     errprint("NW corner: %s",
       multi_cell_index_to_nw_corner_coord(
         RegularCellIndex.coerce(this, max_latind, min_longind)))

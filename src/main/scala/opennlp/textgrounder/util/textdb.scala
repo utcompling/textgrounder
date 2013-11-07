@@ -119,7 +119,7 @@ package textdb {
     def check_values_fit_schema(fieldvals: Iterable[String]) {
       if (fieldvals.size != fieldnames.size)
         throw FileFormatException(
-          "Wrong-length line, expected %d fields, found %d: %s" format (
+          "Wrong-length line, expected %s fields, found %s: %s" format (
             fieldnames.size, fieldvals.size, fieldvals))
     }
 

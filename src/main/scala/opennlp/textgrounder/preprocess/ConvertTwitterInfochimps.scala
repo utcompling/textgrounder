@@ -134,8 +134,8 @@ trait TwitterInfochimpsFileProcessor {
           Some((metadata, text))
         }
         case _ => {
-          errprint("Bad line #%d: %s" format (lineno, line))
-          errprint("Line length: %d" format line.split("\t", -1).length)
+          errprint("Bad line #%s: %s" format (lineno, line))
+          errprint("Line length: %s" format line.split("\t", -1).length)
           None
         }
       }
@@ -399,12 +399,12 @@ class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
           slice(0, how_many_detail).
           zipWithIndex) {
         val index = index0 + 1
-        errprint("#%d: User %s (%d tweets %s, %d tweets %s):",
+        errprint("#%s: User %s (%s tweets %s, %s tweets %s):",
           index, user, count, _from, tweets_by_reply_user_map(user), _to)
         def output_table_for_user(header: String,
           table: mutable.Map[String, mutable.Map[String, Int]]) {
           if (table.size > 0) {
-            errprint("#%d: %s:" format (index, header))
+            errprint("#%s: %s:" format (index, header))
             output_reverse_sorted_table(table(user), indent = "   ")
           }
         }
@@ -434,7 +434,7 @@ class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
             yield (x, ys.size))
         for (((x, count), index) <-
              x_with_multi_y.toSeq.sortWith(_._2 > _._2).zipWithIndex) {
-          errprint("#%d: %s %s (%d different %s's): (listed by num tweets)",
+          errprint("#%s: %s %s (%s different %s's): (listed by num tweets)",
             index + 1, xdesc, x, count, ydesc)
           for ((y, count) <- x_to_y(x).toSeq.sortWith(_._2 > _._2)) {
             errprint("%s%s = %s (from %s to %s)" format

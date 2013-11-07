@@ -948,7 +948,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val sleep_at = debugval("sleep-at-docs")
       if (sleep_at != "") {
         if (task.num_processed == sleep_at.toInt) {
-          errprint("Reached %d documents, sleeping ...")
+          errprint("Reached %s documents, sleeping ...")
           Thread.sleep(5000)
         }
       }

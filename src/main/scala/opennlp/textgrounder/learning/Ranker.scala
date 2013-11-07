@@ -296,7 +296,7 @@ trait PointwiseClassifyingRerankerTrainer[
       errprint("%sTraining item: %s", prefix, format_query_item(query))
       errprint("%sTrue candidate: %s", prefix, format_candidate(correct))
       for (((candidate, score), candind) <- cand_scores.zipWithIndex) {
-        val instpref = "%s#%d: " format (prefix, candind)
+        val instpref = "%s#%s: " format (prefix, candind)
         val correctstr =
           if (correct == candidate) "CORRECT" else "INCORRECT"
         errprint("%s%s: (score %s) %s", instpref, correctstr, score, candidate)
@@ -417,11 +417,11 @@ trait PointwiseClassifyingRerankerTrainer[
     val query_candidate_pairs =
       external_instances_to_query_candidate_pairs(data, initial_ranker)
     val task = new Meter("generating",
-      "split-#%d rerank training instance" format splitnum)
+      "split-#%s rerank training instance" format splitnum)
     if (debug("rerank-training")) {
       query_candidate_pairs.zipWithIndex.mapMetered(task) {
         case ((query, correct), index) => {
-          val prefix = "#%d: " format (index + 1)
+          val prefix = "#%s: " format (index + 1)
           val query_training_data =
             get_query_training_data(query, correct, initial_ranker)
           query_training_data.debug_out(prefix)

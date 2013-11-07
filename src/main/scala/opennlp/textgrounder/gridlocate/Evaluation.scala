@@ -186,7 +186,7 @@ class DocEvalResult[Co](
   def print_result(doctag: String, driver: GridLocateDriver[Co]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document language model: %s", doctag, document.grid_lm)
-    errprint("%s:  %d types, %f tokens",
+    errprint("%s:  %s types, %f tokens",
       doctag, document.grid_lm.model.num_types,
       document.grid_lm.model.num_tokens)
 
@@ -463,7 +463,7 @@ abstract class CorpusEvaluator(
         // errprint("Processing document: %s", stat)
         statnum += 1
         stat.map_result { doc =>
-          val doctag = "#%d" format statnum
+          val doctag = "#%s" format statnum
           val (skip, reason) = would_skip_document(doc)
           if (skip)
             (None, "skipped", reason, doctag)
@@ -487,10 +487,10 @@ abstract class CorpusEvaluator(
           GridLocateConstants.time_between_status &&
         new_processed - last_processed >=
           GridLocateConstants.docs_between_status)) {
-        errprint("Results after %d documents (ranker %s):",
+        errprint("Results after %s documents (ranker %s):",
           task.num_processed, ranker_name)
         output_results(isfinal = false)
-        errprint("End of results after %d documents (ranker %s):",
+        errprint("End of results after %s documents (ranker %s):",
           task.num_processed, ranker_name)
         last_elapsed = new_elapsed
         last_processed = new_processed
@@ -498,7 +498,7 @@ abstract class CorpusEvaluator(
       res
     } ++ new SideEffectIterator( {
       errprint("")
-      errprint("Final results for ranker %s: All %d documents processed:",
+      errprint("Final results for ranker %s: All %s documents processed:",
         ranker_name, task.num_processed)
       errprint("Ending operation at %s", curtimehuman)
       output_results(isfinal = true)
@@ -800,7 +800,7 @@ class FullRankedDocEvalResult[Co](
   override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
-        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
+        errprint("%s: %6s: Cell at %s: score = %g", doctag, index + 1,
           cell.describe_indices, score)
       }
     }
@@ -1000,7 +1000,7 @@ class RankedDocEvalStats[Co](
         correct_by_up_to_rank(i), total_instances)
     }
     val possible_credit = max_top_n * total_instances
-    output_fraction("Percent correct with partial credit (rank <= %d)"
+    output_fraction("Percent correct with partial credit (rank <= %s)"
                     format max_top_n,
       total_credit, possible_credit)
   }
@@ -1011,7 +1011,7 @@ class RankedDocEvalStats[Co](
        "mean", "median")
     for (i <- top_n_for_oracle_dists) {
        errprint("Oracle true error distance at rank <= %-4s %10s %10s",
-         "%d:" format i,
+         "%s:" format i,
          output_result_with_units(mean(oracle_true_dists_at(i))),
          output_result_with_units(median(oracle_true_dists_at(i))))
     }

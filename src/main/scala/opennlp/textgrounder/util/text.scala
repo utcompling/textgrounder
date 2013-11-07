@@ -60,7 +60,7 @@ package object text {
         mx /= 1000
         result = ",%03d%s" format (r, result)
       }
-      "%d%s" format (mx, result)
+      "%s%s" format (mx, result)
     }
   }
   
