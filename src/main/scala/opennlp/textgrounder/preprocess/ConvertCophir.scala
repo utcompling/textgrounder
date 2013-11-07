@@ -283,17 +283,17 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
   def compute_corpus_name(filehand: FileHandler) = {
     if (opts.corpus_name != null) opts.corpus_name
     else {
-      val (_, last_component) = filehand.split_filename(opts.input)
+      val (_, tail) = filehand.split_filename(opts.input)
       val exts_to_remove = Seq(".tgz.seq", ".tar.gz.seq", ".seq")
       // Find the first matching suffix, if any, and strip it.  Don't
       // use fold() because we don't want to strip multiple suffixes in
       // general.
-      val stripped_component =
-        exts_to_remove find (last_component.endsWith(_)) match {
-          case Some(str) => last_component.stripSuffix(str)
-          case None => last_component
+      val stripped_tail =
+        exts_to_remove find (tail.endsWith(_)) match {
+          case Some(str) => tail.stripSuffix(str)
+          case None => tail
         }
-      stripped_component.replace("*", "_")
+      stripped_tail.replace("*", "_")
     }
   }
 

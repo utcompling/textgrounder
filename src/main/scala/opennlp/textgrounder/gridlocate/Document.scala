@@ -173,15 +173,15 @@ class DocCounterTracker[T](
  */
 class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
   def filename_to_counter_name(filehand: FileHandler, file: String) = {
-    var (_, base) = filehand.split_filename(file)
+    var (_, tail) = filehand.split_filename(file)
     breakable {
       while (true) {
-        val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
-        if (newbase == base) break
-        base = newbase
+        val newtail = """\.[a-z0-9]*$""".r.replaceAllIn(tail, "")
+        if (newtail == tail) break
+        tail = newtail
       }
     }
-    """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
+    """[^a-zA-Z0-9]""".r.replaceAllIn(tail, "_")
   }
 
   def create_tracker(shortname: String) =

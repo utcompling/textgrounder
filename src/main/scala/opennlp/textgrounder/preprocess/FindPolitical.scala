@@ -492,8 +492,8 @@ object FindPolitical extends
     val ptp = new FindPoliticalDriver(opts)
     val filehand = new HadoopFileHandler(configuration)
     if (opts.corpus_name == null) {
-      val (_, last_component) = filehand.split_filename(opts.input)
-      opts.corpus_name = last_component.replace("*", "_")
+      val (_, tail) = filehand.split_filename(opts.input)
+      opts.corpus_name = tail.replace("*", "_")
     }
     var accounts: Map[String, Double] =
       if (opts.political_twitter_accounts_format == "officeholders") {

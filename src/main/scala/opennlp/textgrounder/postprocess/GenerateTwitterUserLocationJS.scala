@@ -83,8 +83,8 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
     val input_file =
       if (params.input contains "/") params.input
       else "./" + params.input
-    val (dir, base) = io.localfh.split_filename(input_file)
-    val rows = TextDB.read_textdb(io.localfh, dir, prefix = base)
+    val (dir, tail) = io.localfh.split_filename(input_file)
+    val rows = TextDB.read_textdb(io.localfh, dir, prefix = tail)
 
     // FIXME!! Currently we're hard-coding a view on the SF bay. Need to
     // compute centroid and bounding box of points given.

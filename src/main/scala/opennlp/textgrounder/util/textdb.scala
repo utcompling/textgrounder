@@ -328,8 +328,8 @@ package textdb {
      * a blank string will be substituted. For example, if the suffix is
      * "-dev" and the file is named "foo/tweets-1-dev.schema.txt", the return
      * value will be ("foo", "tweets-1", "-dev", ".schema.txt"). By
-     * contatenating all parts of the basename together (all but the
-     * directory), the original basename is retrieved.
+     * concatenating all parts but the directory, the last component of the
+     * original filename is retrieved.
      */
     def split_schema_file(filehand: FileHandler, file: String,
         suffix_re: String = ""): Option[(String, String, String, String)] =
@@ -345,8 +345,8 @@ package textdb {
       val files =
         (for {
            file <- all_files
-           (_, base) = filehand.split_filename(file)
-           if base.startsWith(prefix) &&
+           (_, tail) = filehand.split_filename(file)
+           if tail.startsWith(prefix) &&
              schema_regex.findFirstMatchIn(file) != None
          } yield file).toSeq
       if (files.length == 0) {
@@ -543,17 +543,17 @@ package textdb {
      * and the file ending is ".data.txt", and the file is named
      * "foo/tweets-1-dev.data.txt.gz", the return value will be
      * ("foo", "tweets-1", "-dev", ".data.txt.gz"). By concatenating all parts
-     * of the basename together (all but the directory), the original basename
-     * is retrieved.
+     * but the directory, the last component of the original filename is
+     * retrieved.
      */
     def split_textdb_file(filehand: FileHandler, file: String,
       suffix_re: String, file_ending_re: String
     ): Option[(String, String, String, String)] = {
-      val (dir, base) = filehand.split_filename(file)
+      val (dir, tail) = filehand.split_filename(file)
       val full_suffix_re =
         make_textdb_file_suffix_regex(suffix_re, file_ending_re)
       val re = ("""^(.*)""" + full_suffix_re).r
-      base match {
+      tail match {
         case re(prefix, suffix, ending) =>
           Some((dir, prefix, suffix, ending))
         case _ => None
@@ -566,8 +566,8 @@ package textdb {
      * a blank string will be substituted. For example, if the suffix is
      * "-dev" and the file is named "foo/tweets-1-dev.data.txt.gz", the return
      * value will be ("foo", "tweets-1", "-dev", ".data.txt.gz"). By
-     * contatenating all parts of the basename together (all but the
-     * directory), the original basename is retrieved.
+     * concatenating all parts but the directory, the last component of the
+     * original filename is retrieved.
      */
     def split_data_file(filehand: FileHandler, file: String,
         suffix_re: String = ""): Option[(String, String, String, String)] =
@@ -586,8 +586,8 @@ package textdb {
      */
     def filter_file_by_prefix(filehand: FileHandler, file: String,
         prefix: String) = {
-      val (_, base) = filehand.split_filename(file)
-      base.startsWith(prefix)
+      val (_, tail) = filehand.split_filename(file)
+      tail.startsWith(prefix)
     }
 
     /**
