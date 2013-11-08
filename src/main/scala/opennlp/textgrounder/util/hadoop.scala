@@ -75,6 +75,11 @@ package hadoop {
     def join_filename(dir: String, file: String) =
       new Path(dir, file).toString
 
+    def exists(filename: String) = {
+      val status = get_file_system(filename).getFileStatus(new Path(filename))
+      status != null
+    }
+
     def is_directory(filename: String) = {
       val status = get_file_system(filename).getFileStatus(new Path(filename))
       if (status == null)

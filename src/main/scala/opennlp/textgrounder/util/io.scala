@@ -440,6 +440,10 @@ package io {
      */
     def join_filename(dir: String, file: String): String
     /**
+     * Does this file exist?
+     */
+    def exists(filename: String): Boolean
+    /**
      * Is this file a directory?
      */
     def is_directory(filename: String): Boolean
@@ -457,7 +461,7 @@ package io {
 
   class LocalFileHandler extends FileHandler {
     def check_exists(filename: String) {
-      if (!new File(filename).exists)
+      if (!exists(filename))
         throw new FileNotFoundException("%s (No such file or directory)"
           format filename)
     }
@@ -472,6 +476,8 @@ package io {
     }
     def join_filename(dir: String, file: String) =
       new File(dir, file).toString
+    def exists(filename: String) =
+      new File(filename).exists
     def is_directory(filename: String) = {
       check_exists(filename)
       new File(filename).isDirectory
@@ -489,6 +495,9 @@ package io {
     def not_found(filename: String) = {
       throw new FileNotFoundException("%s (No such file or directory)"
         format filename)
+    }
+    def exists(filename: String) = {
+      Seq("stdin", "stdout", "stderr") contains filename
     }
     def get_raw_input_stream(filename: String) =
       if (filename == "stdin") System.in
