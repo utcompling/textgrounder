@@ -322,8 +322,7 @@ abstract class GridCell[Co](
  *
  * The following operations are used to populate a cell grid:
  *
- * (1) Documents are added one-by-one to a grid by calling
- *     `add_document_to_cell`.
+ * (1) Documents are added by calling `add_training_documents_to_grid`.
  * (2) After all documents have been added, `initialize_cells` is called
  *     to generate the cells and create their language model.
  * (3) After this, it should be possible to list the cells by calling
@@ -342,7 +341,7 @@ abstract class Grid[Co](
   /**
    * Find the correct cell for the given document, based on the document's
    * coordinates and other properties.  If no such cell exists, return None
-   * if `create` is false.  Else, create an empty cell to hold the
+   * if `create_non_recorded` is false.  Else, create an empty cell to hold the
    * coordinates -- but do *NOT* record the cell or otherwise alter the
    * existing cell configuration.  This situation where such a cell is needed
    * is during evaluation.  The cell is needed purely for comparing it against
@@ -365,9 +364,9 @@ abstract class Grid[Co](
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
    * after all documents have been added to the cell grid by calling
-   * `add_document_to_cell`.  The generation happens internally; but after
-   * this, `iter_nonempty_cells` should work properly.  This is not meant
-   * to be called externally.
+   * `add_training_documents_to_grid`.  The generation happens internally;
+   * but after this, `iter_nonempty_cells` should work properly.  This is
+   * not meant to be called externally.
    */
   protected def initialize_cells()
 
