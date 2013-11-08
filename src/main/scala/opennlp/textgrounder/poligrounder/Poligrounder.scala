@@ -155,6 +155,8 @@ class PoligrounderDriver extends
   var from_chunk: (Long, Long) = _
   var to_chunk: (Long, Long) = _
 
+  def deserialize_coord(coord: String) = TimeCoord.deserialize(coord)
+
   override def handle_parameters() {
     def parse_interval(param: String) = {
       parse_date_interval(param) match {

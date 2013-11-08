@@ -273,10 +273,20 @@ abstract class GridCell[Co](
   def add_document(doc: GridDoc[Co]) {
     assert(!finished)
     combined_lang_model.add_document(doc)
-    if (doc.salience != None &&
-      doc.salience.get > most_salient_doc_salience) {
-      most_salient_doc_salience = doc.salience.get
-      most_salient_document = doc.title
+    if (doc.salience != None)
+      add_salient_point(doc.title, doc.salience.get)
+  }
+
+  /**
+   * Include a point (e.g. coordinate) with a given name and salience in
+   * a cell, if its salience is greater than any value seen so far.
+   * This allows a cell to be identified by e.g. the most populous city
+   * in the cell, even if there are no documents corresponding to a city.
+   */
+  def add_salient_point(name: String, salience: Double) {
+    if (salience > most_salient_doc_salience) {
+      most_salient_doc_salience = salience
+      most_salient_document = name
     }
   }
 
@@ -339,6 +349,25 @@ abstract class Grid[Co](
   var total_num_cells: Int
 
   /**
+   * Find the correct cell for the given coordinate. If no such cell exists,
+   * return None if `create_non_recorded` is false.  Else, create an empty
+   * cell to hold the coordinates -- but do *NOT* record the cell or otherwise
+   * alter the existing cell configuration.  This situation where such a cell
+   * is needed is during evaluation.  The cell is needed purely for comparing
+   * it against existing cells and determining its center.  The reason for not
+   * recording such cells is to make sure that future evaluation results
+   * aren't affected.
+   *
+   * This is used by `find_best_cell_for_document` and `add_salient_point`.
+   * If this operation doesn't make sense directly, because other properties
+   * of a document are needed to locate a cell in addition to the coordinate,
+   * then it get be given a null implementation using `???`, provided that
+   * both of the above functions are overridden.
+   */
+  def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean):
+    Option[GridCell[Co]]
+
+  /**
    * Find the correct cell for the given document, based on the document's
    * coordinates and other properties.  If no such cell exists, return None
    * if `create_non_recorded` is false.  Else, create an empty cell to hold the
@@ -348,8 +377,22 @@ abstract class Grid[Co](
    * existing cells and determining its center.  The reason for not recording
    * such cells is to make sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_document(doc: GridDoc[Co], create_non_recorded: Boolean):
-    Option[GridCell[Co]]
+  def find_best_cell_for_document(doc: GridDoc[Co],
+      create_non_recorded: Boolean) =
+    find_best_cell_for_coord(doc.coord, create_non_recorded)
+
+  /**
+   * Add a point (coordinate) with a given name and salience to the
+   * appropriate cell of the grid, if its salience is greater than any
+   * value seen so far for the cell. This allows a cell to be identified by
+   * e.g. the most populous city in the cell, even if there are no documents
+   * corresponding to a city.
+   */
+  def add_salient_point(coord: Co, name: String, salience: Double) {
+    find_best_cell_for_coord(coord, false) map { cell =>
+      cell.add_salient_point(name, salience)
+    }
+  }
 
   /**
    * Add the given training documents to the cell grid.

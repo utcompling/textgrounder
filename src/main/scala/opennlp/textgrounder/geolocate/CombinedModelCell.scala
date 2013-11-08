@@ -33,15 +33,15 @@ class CombinedModelGrid(
 
   override var total_num_cells: Int = models.map(_.total_num_cells).sum
 
-  def find_best_cell_for_document(doc: SphereDoc,
-                                  create_non_recorded: Boolean) = {
-      val candidates =
-        models.flatMap(_.find_best_cell_for_document(doc, create_non_recorded))
-      if (candidates.length == 0)
-        None
-      else
-        Some(candidates.minBy(
-          cell => spheredist(cell.get_central_point, doc.coord)))
+  def find_best_cell_for_coord(coord: SphereCoord,
+      create_non_recorded: Boolean) = {
+    val candidates =
+      models.flatMap(_.find_best_cell_for_coord(coord, create_non_recorded))
+    if (candidates.length == 0)
+      None
+    else
+      Some(candidates.minBy(
+        cell => spheredist(cell.get_central_point, coord)))
   }
 
   def add_training_documents_to_grid(

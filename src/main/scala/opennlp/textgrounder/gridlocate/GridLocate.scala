@@ -170,6 +170,25 @@ considered (but if an error occurs upon parsing a file, it will be ignored).
 Each file is read in and then disambiguation is performed.  Not used during
 document geolocation when --eval-format=internal (the default).""")
 
+  var salience_file =
+    ap.option[String]("salience-file", "sf",
+       metavar = "FILE",
+       help = """File containing a set of salient coordinates for identifying
+grid cells, in textdb format. These coordinates can be e.g. cities from a
+gazetteer with their population used as the salience value. For each grid
+cell, the most salient item in the cell will be noted, and when a particular
+grid cell is identified in diagnostic output (e.g. in `--print-results`), the
+salient item will be displayed along with the cell's coordinates to make it
+easier to identify the nature of the cell in question.
+
+The value can be any of the following: Either the data or schema file of
+the database; the common prefix of the two; or the directory containing
+them, provided there is only one textdb in the directory.
+
+The file should be in textdb format, with `name`, `coord` and `salience`
+fields. If omitted, cells will be identified by the most salient document
+in the cell, if documents have their own saliency values.""")
+
   var results =
     ap.option[String]("r", "results",
       metavar = "FILE",
@@ -718,6 +737,8 @@ noisy training data.  We choose C = 1 as a compromise.""")
 trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   override type TParam <: GridLocateParameters
 
+  def deserialize_coord(coord: String): Co
+
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
    * fields in this structure will be changed (canonicalized).  See above.
@@ -989,6 +1010,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // System.exit(0)
     }
     grid.finish()
+    if (params.salience_file != null) {
+      errprint("Reading salient points ...")
+      for (row <- TextDB.read_textdb(get_file_handler, params.salience_file)) {
+        val name = row.gets("name")
+        val coord = deserialize_coord(row.gets("coord"))
+        val salience = row.get[Double]("salience")
+        grid.add_salient_point(coord, name, salience)
+      }
+      errprint("Reading salient points ... done.")
+    }
     if(params.output_training_cell_lang_models) {
       for(cell <- grid.iter_nonempty_cells) {
         print(cell.shortstr+"\t")

@@ -115,8 +115,12 @@ class TimeGrid(
   }.toMap
   var total_num_cells = 2 * categories.length
 
-  def find_best_cell_for_document(doc: GridDoc[TimeCoord],
+  def find_best_cell_for_coord(coord: TimeCoord,
+      create_non_recorded: Boolean) = ???
+
+  override def find_best_cell_for_document(doc: GridDoc[TimeCoord],
       create_non_recorded: Boolean) = {
+    // Need to locate the cell in the document's category.
     assert(!create_non_recorded)
     val category = category_of_doc(doc.asInstanceOf[TimeDoc])
     if (category != null)
@@ -125,6 +129,16 @@ class TimeGrid(
       if (debug("cell"))
         errprint("Skipping document %s because not in any category", doc)
       None
+    }
+  }
+
+  override def add_salient_point(coord: TimeCoord, name: String,
+      salience: Double) {
+    // Need to add point to cells for all categories.
+    pairs.map { case (cat, pair) =>
+      pair.find_best_cell_for_coord(coord) map { cell =>
+        cell.add_salient_point(name, salience)
+      }
     }
   }
 
