@@ -574,6 +574,32 @@ package textdb {
       split_textdb_file(filehand, file, suffix_re, data_ending_re)
 
     /**
+     * Split the base name of an input textdb file into (DIR, PREFIX).
+     * The following can be given:
+     *
+     * 1. A directory or a name ending with /, in which case PREFIX will
+     *    be blank.
+     * 2. The name of a schema or data file, in which the appropriate
+     *    DIR and PREFIX will be extracted.
+     * 3. An actual base name, which will be split appropriately.
+     */
+    def split_input_base(filehand: FileHandler, base: String
+    ): (String, String) = {
+      if (filehand.exists(base)) {
+        if (filehand.is_directory(base)) (base, "")
+        else Schema.split_schema_file(filehand, base) match {
+          case Some((dir, prefix, _, _)) => (dir, prefix)
+          case None => {
+            split_data_file(filehand, base) match {
+              case Some((dir, prefix, _, _)) => (dir, prefix)
+              case None => filehand.split_filename(base)
+            }
+          }
+        }
+      } else filehand.split_filename(base)
+    }
+
+    /**
      * List only the data files of the appropriate suffix.
      */
     def filter_file_by_suffix(file: String, suffix_re: String = "") = {
@@ -626,32 +652,6 @@ package textdb {
     }
 
     /**
-     * Read a database from a directory and return the rows in the database.
-     * If you want more control over the processing, use `read_textdb_data`.
-     * For even more control than that, use `get_textdb_files` and
-     * `read_textdb_file`.
-     *
-     * @param filehand File handler object of the directory
-     * @param dir Directory to read
-     * @param suffix_re Suffix regexp picking out the correct data files
-     * @param with_message If true, "Processing ..." messages will be
-     *   displayed as each file is processed and as each directory is visited
-     *   during processing.
-     *
-     * @return An iterator of Row objects, each one describing the data in
-     *   a row. This includes all the correctly-formatted rows in all
-     *   files in the database.
-     */
-    def read_textdb(filehand: FileHandler, dir: String,
-        prefix: String = "", suffix_re: String = "",
-        with_messages: Boolean = true) = {
-      val (schema, fields) =
-        read_textdb_data(filehand, dir, prefix,
-          suffix_re, with_messages)
-      fields.flatten.map { schema.make_row(_) }
-    }
-
-    /**
      * Read the items from a given textdb file.  Returns an iterator
      * over a list of field values.
      */
@@ -661,6 +661,14 @@ package textdb {
         case (line, idx) => line_to_fields(line, idx + 1, schema)
       }
     }
+
+    /*
+    FIXME: Should be implemented.
+
+    def read_textdb_data_with_filenames(filehand: FileHandler, dir: String,
+        prefix: String = "", suffix_re: String = "",
+        with_messages: Boolean = true) = ...
+    */
 
     /**
      * Read a database from a directory and return the raw rows in the
@@ -691,11 +699,32 @@ package textdb {
       (schema, fields)
     }
 
-    /*
-    FIXME: Should be implemented.
-
-    def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
-    */
+    /**
+     * Read a database from a directory and return the rows in the database.
+     * If you want more control over the processing, use `read_textdb_data`.
+     * For even more control than that, use `get_textdb_files` and
+     * `read_textdb_file`.
+     *
+     * @param filehand File handler object of base
+     * @param base Base of textdb. Can be a directory, in which case any
+     *   files in the directory matching `suffix_re` will be considered.
+     * @param suffix_re Suffix regexp picking out the correct data files
+     * @param with_message If true, "Processing ..." messages will be
+     *   displayed as each file is processed and as each directory is visited
+     *   during processing.
+     *
+     * @return An iterator of Row objects, each one describing the data in
+     *   a row. This includes all the correctly-formatted rows in all
+     *   files in the database.
+     */
+    def read_textdb(filehand: FileHandler, base: String,
+        suffix_re: String = "", with_messages: Boolean = true) = {
+      val (dir, tail) = split_input_base(filehand, base)
+      val (schema, fields) =
+        read_textdb_data(filehand, dir, tail,
+          suffix_re, with_messages)
+      fields.flatten.map { schema.make_row(_) }
+    }
 
     /**
      * Return a list of shell-style wildcard patterns matching all the data

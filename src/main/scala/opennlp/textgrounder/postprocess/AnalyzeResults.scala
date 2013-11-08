@@ -38,13 +38,18 @@ class AnalyzeResultsParameters(ap: ArgParser) {
     metavar = "FILE",
     help="""Output Zipfian distribution of predicted cells,
 to see the extent to which they are balanced or unbalanced.""")
+
   var correct_cell_distribution = ap.option[String]("correct-cell-distribution",
     "correct-cell-distrib", "tcd",
     metavar = "FILE",
     help="""Output Zipfian distribution of correct cells,
 to see the extent to which they are balanced or unbalanced.""")
+
   var input = ap.positional[String]("input",
-    help = "Results file to analyze.")
+    help = """Results file to analyze, a textdb database. The value can be
+  any of the following: Either the data or schema file of the database;
+  the common prefix of the two; or the directory containing them, provided
+  there is only one textdb in the directory.""")
 
   var debug =
     ap.option[String]("d", "debug", metavar = "FLAGS",
@@ -111,11 +116,7 @@ object AnalyzeResults extends ExperimentApp("classify") {
     var error_dist_central_point = Vector[Double]()
 
     val filehand = io.localfh
-    val input_file =
-      if (params.input contains "/") params.input
-      else "./" + params.input
-    val (dir, tail) = filehand.split_filename(input_file)
-    for (row <- TextDB.read_textdb(filehand, dir, prefix = tail)) {
+    for (row <- TextDB.read_textdb(filehand, params.input)) {
       val correct_cell = row.gets("correct-cell")
       correct_cells(row.gets("correct-cell")) += 1
       correct_cells(row.gets("pred-cell")) += 1

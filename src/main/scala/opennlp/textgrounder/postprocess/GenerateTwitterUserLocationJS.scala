@@ -31,7 +31,10 @@ import util.debug._
 
 class GenerateTwitterUserLocationJSParameters(ap: ArgParser) {
   var input = ap.positional[String]("input",
-    help = "Results file to analyze.")
+    help = """Results file to analyze, a textdb database. The value can be
+  any of the following: Either the data or schema file of the database;
+  the common prefix of the two; or the directory containing them, provided
+  there is only one textdb in the directory.""")
 
   var path = ap.flag("path",
       help = """Generate paths showing movement of user instead of just
@@ -80,11 +83,7 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
 
   def single_quote_escape_string(str: String) = str.replace("'", "\\'")
   def run_program(args: Array[String]) = {
-    val input_file =
-      if (params.input contains "/") params.input
-      else "./" + params.input
-    val (dir, tail) = io.localfh.split_filename(input_file)
-    val rows = TextDB.read_textdb(io.localfh, dir, prefix = tail)
+    val rows = TextDB.read_textdb(io.localfh, params.input)
 
     // FIXME!! Currently we're hard-coding a view on the SF bay. Need to
     // compute centroid and bounding box of points given.
