@@ -122,8 +122,11 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
 
   var ideological_user_corpus = ap.option[String](
     "ideological-user-corpus", "iuc",
-    help="""File containing corpus output from FindPolitical, listing
-    users and associated ideologies.""")
+    help="""Textdb containing corpus output from FindPolitical,
+    listing users and associated ideologies. The value can be any of
+  the following: Either the data or schema file of the database;
+  the common prefix of the two; or the directory containing them, provided
+  there is only one textdb in the directory.""")
 
   var ideological_users: Map[String, Double] = _
   var ideological_users_liberal: Map[String, Double] = _

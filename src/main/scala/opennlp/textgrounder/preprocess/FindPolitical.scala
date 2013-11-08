@@ -38,13 +38,16 @@ class FindPoliticalParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var political_twitter_accounts = ap.option[String](
     "political-twitter-accounts", "pta",
-    help="""File containing list of politicians and associated twitter
-    accounts, for identifying liberal and conservative tweeters.""")
+    help="""Textdb database containing list of politicians and associated
+    twitter accounts, for identifying liberal and conservative tweeters.
+    The value can be any of the following: Either the data or schema file
+    of the database; the common prefix of the two; or the directory
+    containing them, provided there is only one textdb in the directory.""")
   var political_twitter_accounts_format = ap.option[String](
     "political-twitter-accounts-format", "ptaf",
     default = "officeholders",
     choices = Seq("officeholders", "ideo-users"),
-    help="""Format for file specified in --political-twitter-accounts.
+    help="""Format for textdb specified in --political-twitter-accounts.
     Possibilities: 'officeholders' (a file containing data gleaned from
     the Internet, specifying holders of political offices and their parties),
     'ideo-users' (output from a previous run of FindPolitical, in

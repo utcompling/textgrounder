@@ -31,7 +31,10 @@ import util.debug._
 
 class GenerateTwitterUserLocationKMLParameters(ap: ArgParser) {
   var input = ap.positional[String]("input",
-    help = "Results file to analyze.")
+    help = """Results file to analyze, a textdb database. The value can be
+  any of the following: Either the data or schema file of the database;
+  the common prefix of the two; or the directory containing them, provided
+  there is only one textdb in the directory.""")
 
   var debug =
     ap.option[String]("d", "debug", metavar = "FLAGS",
@@ -74,11 +77,7 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
   }
 
   def run_program(args: Array[String]) = {
-    val input_file =
-      if (params.input contains "/") params.input
-      else "./" + params.input
-    val (dir, tail) = io.localfh.split_filename(input_file)
-    val rows = TextDB.read_textdb(io.localfh, dir, prefix = tail)
+    val rows = TextDB.read_textdb(io.localfh, params.input)
     val kml_placemarks =
       for {row <- rows
            coord = row.gets("coord")
@@ -97,7 +96,7 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www
 .w3.org/2005/Atom">
   <Document>
-    <name>{ "Twitter user locations from " + input_file }</name>
+    <name>{ "Twitter user locations from " + params.input }</name>
     <open>1</open>
     <Folder>
       <name>Twitter user locations</name>
