@@ -1,19 +1,15 @@
 #!/bin/sh
 
-# USAGE: download-preprocess-wiki [--no-download] [--no-permute] WIKITAG
+# USAGE: download-preprocess-wiki WIKITAG [STEPS ...]
 #
-# where WIKITAG is something like 'dewiki-20120225', which names an existing
-# version of Wikipedia on http://dumps.wikipedia.org.  This downloads the
-# given Wikipedia dump into a subdirectory of the current directory
-# named WIKITAG, and then preprocesses it into a corpus of the format
-# needed by TextGrounder.  See README.preproces.
+# See usage note below.
 
-# Process options
+# Process options. (No current options.)
 
-PREPROCESS_OPTS=
+#PREPROCESS_OPTS=
 while true; do
   case "$1" in
-    --no-permute ) PREPROCESS_OPTS="$PREPROCESS_OPTS --no-permute"; shift ;;
+    #--no-permute ) PREPROCESS_OPTS="$PREPROCESS_OPTS --no-permute"; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
@@ -21,10 +17,25 @@ done
 
 if [ -z "$*" ]; then
   cat >&2 <<FOO
-Usage: $0 [--no-download] [--no-permute] WIKITAG
+Usage: $0 WIKITAG [STEPS ...]
 
 Download a Wikipedia dump from http://dumps.wikipedia.org and preprocess it
-into a TextGrounder corpus.  WIKITAG is something like 'dewiki-20120225'.
+into a TextGrounder corpus (textdb database format).  WIKITAG is something
+like 'dewiki-20120225', which names an existing version of Wikipedia on
+http://dumps.wikipedia.org.  The result of preprocessing is stored into a
+subdirectory of the current directory with the same name as WIKITAG.
+
+If STEPS is omitted or set to 'all', the entire process runs from start to
+finish. Otherwise, a list of one or more steps can be given, and only
+those steps will be executed, in the order given. The following are the
+steps followed by 'all':
+
+   download: Download Wikipedia corpus from the web
+   permute: Permute the corpus randomly
+   preprocess: Convert the corpus into preprocessed files
+   convert: Convert into a textdb corpus
+   set-permissions: Set permissions appropriately
+
 See README.preprocess and the comments in the source file for more details.
 
 FOO
@@ -37,14 +48,8 @@ if [ "$steps" = "" ]; then
   steps="all"
 fi
 
-# steps:
-#   download: Download Wikipedia corpus from the web
-#   preprocess: Convert the corpus into preprocessed files
-#   convert: Convert into a textdb corpus
-#   set-permissions: Set permissions appropriately
-
 if [ "$steps" = "all" ]; then
-  steps="download preprocess convert set-permissions"
+  steps="download permute preprocess convert set-permissions"
 fi
 
 mkdir -p $wikitag
@@ -57,9 +62,14 @@ for step in $steps; do
       wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2
       echo "Downloading Wikipedia corpus $wikitag ... done."
     ;;
+    permute )
+      echo "Permuting Wikipedia corpus $wikitag ..."
+      permute-dump $wikitag
+      echo "Permuting Wikipedia corpus $wikitag ... done."
+    ;;
     preprocess )
       echo "Preprocessing Wikipedia corpus $wikitag ..."
-      preprocess-dump $PREPROCESS_OPTS $wikitag wiki
+      preprocess-dump $wikitag wiki
       echo "Preprocessing Wikipedia corpus $wikitag ... done."
     ;;
     convert )

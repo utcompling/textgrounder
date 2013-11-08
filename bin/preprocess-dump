@@ -1,24 +1,15 @@
 #!/bin/sh
 
-# USAGE: preprocess-dump [--no-permute] WIKITAG [STEPS ...]
+# USAGE: preprocess-dump WIKITAG [STEPS ...]
 #
-# This script goes through a series of steps to preprocess a raw Wikipedia
-# dump (as downloaded from dumps.wikipedia.org) in a set of data files
-# describing a series of documents by their word counts and coordinates.
-# Formerly, this data served as the input to TextGrounder, but now an
-# additional step is needed to convert the data to the corpus format
-# currently used by TextGrounder.  A higher-level script
-# 'download-preprocess-wiki' can be used to directly download a dump,
-# preprocess it, and convert it into a TextGrounder corpus.
-#
-# See also README.preprocess.
+# See usage note below.
 
-# Process options
+# Process options. (No current options.)
 
-DONT_PERMUTE=no
+#DONT_PERMUTE=no
 while true; do
   case "$1" in
-    --no-permute ) DONT_PERMUTE=yes; shift ;;
+    #--no-permute ) DONT_PERMUTE=yes; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
@@ -26,12 +17,41 @@ done
 
 if [ -z "$*" ]; then
   cat >&2 <<FOO
-Usage: $0 [--no-permute] WIKITAG
+Usage: $0 WIKITAG [STEPS ...]
 
 Generate a set of preprocessed data files from a raw Wikipedia dump, as
 downloaded from dumps.wikipedia.org.  WIKITAG is something like
-'dewiki-20120225'.  See README.preprocess and the comments in the source file
-for more details.
+'dewiki-20120225'.
+
+This script goes through a series of steps to preprocess a raw Wikipedia
+dump (as downloaded from dumps.wikipedia.org) in a set of data files
+describing a series of documents by their word counts and coordinates.
+Formerly, this data served as the input to TextGrounder, but now an
+additional step is needed to convert the data to the corpus format
+currently used by TextGrounder.  A higher-level script
+'download-preprocess-wiki' can be used to directly download a dump,
+preprocess it, and convert it into a TextGrounder corpus.
+
+STEPS specifies which steps of the process to run. The following is the
+list of possible steps that can be given, in the order they are normally
+executed:
+
+   combined-article-data: Generate permuted combined article-data file
+   coord-counts: Generate word-count values for articles with coordinates
+   all-counts: Generate word-count values for all articles
+   coord-words: Generate actual words for articles with coordinates
+   all-words: Generate actual words for all articles
+
+If STEPS is omitted or given as 'wiki', the first two steps given above
+will be executed. This is what 'download-preprocess-wiki' does, and runs
+the steps necessary to generate the final TextGrounder corpus.
+
+If STEPS is given as 'all', all of the above steps are executed. This
+produces some additional files useful for some applications but not the
+primary TextGrounder application, and takes a lot of extra time; for this
+reason, these extra steps aren't normally run.
+
+See README.preprocess and the comments in the source file for more details.
 
 FOO
   exit 1
@@ -44,15 +64,8 @@ export WP_VERSION="$dumppref"
 
 steps="$*"
 if [ "$steps" = "" ]; then
-  steps="all"
+  steps="wiki"
 fi
-
-# steps:
-#   combined-article-data: Generate permuted combined article-data file
-#   coord-counts: Generate word-count values for articles with coordinates
-#   all-counts: Generate word-count values for all articles
-#   coord-words: Generate actual words for articles with coordinates
-#   all-words: Generate actual words for all articles
 
 if [ "$steps" = "all" ]; then
   steps="combined-article-data coord-counts all-counts coord-words all-words"
@@ -60,17 +73,13 @@ elif [ "$steps" = "wiki" ]; then
   steps="combined-article-data coord-counts"
 fi
 
-if [ "$DONT_PERMUTE" != yes ]; then
-  # Generate article-data file from orginal dump
-  USE_PERMUTED=no run-processwiki article-data
-
-  # Generate a permuted dump file; all future commands will operate on the
-  # permuted dump file, because we will set USE_PERMUTED appropriately.
-  run-permute all
-fi
-
-# Apparently there's a possible race condition in detection, so forcibly
-# use the permuted file.
+# Ensure that all future commands will operate on the permuted dump file
+# rather than the unpermuted one. Theoretically this can be omitted and
+# the code in 'run-processwiki' will check if the permuted dump file exists
+# to determine whether to operate on it, but apparently there's a possible
+# race condition in detection, because this detection isn't reliable when
+# everything is run from start to finish (probably something to do with
+# NFS delays in reporting changes). So forcibly set it to yes.
 export USE_PERMUTED=yes
 # Split the dump so we can faster afterwards
 run-processwiki split-dump
