@@ -385,6 +385,9 @@ Default '%default'.""")
 
 trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   override type TParam <: GeolocateParameters
+
+  def deserialize_coord(coord: String) = SphereCoord.deserialize(coord)
+
   override def handle_parameters() {
     super.handle_parameters()
 
