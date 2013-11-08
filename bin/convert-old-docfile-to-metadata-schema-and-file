@@ -140,10 +140,10 @@ do_dir() {
 
   mkdir -p "$output_dir"
 
-  schema_file="$output_dir/$prefix-schema.txt"
+  schema_file="$output_dir/$prefix.schema.txt"
   echo "Generating schema file $schema_file from $infile ..."
   uncompressfile $compression $infile | head -1 > $schema_file
-  metadata_file=`add_compression_extension $compression "$output_dir/$prefix-data.txt"`
+  metadata_file=`add_compression_extension $compression "$output_dir/$prefix.data.txt"`
   echo "Generating metadata file $metadata_file from $infile ..."
   uncompressfile $compression $infile | tail -n +2 | compressfile $compression > $metadata_file
   echo "Done."
