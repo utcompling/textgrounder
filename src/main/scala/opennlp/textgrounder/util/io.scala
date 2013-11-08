@@ -395,6 +395,28 @@ package io {
       new PrintStream(out, autoflush, encoding)
     }
 
+    /**
+     * Given a function to split a filename the way that Java does it
+     * (returning null when a root is specified), correctly handle
+     * cases where a blank is given, a directory is specified by
+     * ending a name with a slash, or a root is given.
+     */
+    def canonicalize_split_filename(filename: String,
+        splitter: String => (String, String)) = {
+      if (filename == "")
+        (".", "")
+      else if (filename != "/" && filename.endsWith("/"))
+        (filename.dropRight(1), "")
+      else {
+        splitter(filename) match {
+          case (null, "") | ("", "") => (filename, "")
+          case (null, tail) => (".", tail)
+          case ("", tail) => (".", tail)
+          case x => x
+        }
+      }
+    }
+
     /* ----------- Abstract functions below this line ----------- */
 
     /**
@@ -443,8 +465,10 @@ package io {
     def get_raw_output_stream(filename: String, append: Boolean) =
       new FileOutputStream(filename, append)
     def split_filename(filename: String) = {
-      val file = new File(filename)
-      (file.getParent, file.getName)
+      canonicalize_split_filename(filename, f => {
+        val file = new File(filename)
+        (file.getParent, file.getName)
+      })
     }
     def join_filename(dir: String, file: String) =
       new File(dir, file).toString

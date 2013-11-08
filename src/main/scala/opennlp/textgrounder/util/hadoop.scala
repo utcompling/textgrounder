@@ -64,8 +64,12 @@ package hadoop {
     }
 
     def split_filename(filename: String) = {
-      val path = new Path(filename)
-      (path.getParent.toString, path.getName)
+      canonicalize_split_filename(filename, f => {
+        val path = new Path(filename)
+        val (dir, tail) = (path.getParent, path.getName)
+        if (dir == null) (null: String, tail)
+        else (dir.toString, tail)
+      })
     }
 
     def join_filename(dir: String, file: String) =
