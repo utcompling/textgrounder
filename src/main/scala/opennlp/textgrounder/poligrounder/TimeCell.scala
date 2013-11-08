@@ -98,7 +98,9 @@ class TimeCellPair(
 }
 
 /**
- * Class for a "grid" of time intervals.
+ * Class for a "grid" of time intervals. We actually have a set of named
+ * categories and for each category we have two cells, corresponding to
+ * two intervals (before and after).
  */
 class TimeGrid(
   before_chunk: (Long, Long),
