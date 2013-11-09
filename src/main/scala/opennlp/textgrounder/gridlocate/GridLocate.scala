@@ -155,8 +155,7 @@ schema file lists the name of each expected field.  Some of these names
 (e.g. "title", "split", "text", "coord") have pre-defined meanings, but
 arbitrary names are allowed, so that additional corpus-specific information
 can be provided (e.g. retweet info for tweets that were retweeted from some
-other tweet, redirect info when a Wikipedia article is a redirect to another
-article, etc.).
+other tweet, article ID for a Wikipedia article, etc.).
 
 Multiple such files can be given by specifying the option multiple
 times.""")

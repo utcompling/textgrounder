@@ -32,11 +32,8 @@ abstract class RealSphereDoc(
   schema: Schema,
   lang_model: DocLangModel,
   val coord: SphereCoord,
-  // FIXME! Should be 'val salience' but WikipediaDoc needs it to be var.
-  // Fix WikipediaDoc to avoid this.
-  salience_value: Option[Double]
+  override val salience: Option[Double]
 ) extends GridDoc[SphereCoord](schema, lang_model) {
-  override def salience = salience_value
   def has_coord = coord != null
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
@@ -58,12 +55,6 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean
     ): Option[TDoc]
-
-  /**
-   * Do any subfactory-specific operations needed after all documents have
-   * been loaded.
-   */
-  def finish_document_loading() { }
 }
 
 /**
@@ -124,17 +115,6 @@ class SphereDocFactory(
       warning_once("Unrecognized corpus type: %s", cortype)
       corpus_type_to_subfactory("generic")
     }
-  }
-
-  /**
-   * Iterate over all the subfactories that exist.
-   */
-  def iter_subfactories = corpus_type_to_subfactory.values
-
-  override def finish_document_loading() {
-    for (subfactory <- iter_subfactories)
-      subfactory.finish_document_loading()
-    super.finish_document_loading()
   }
 }
 

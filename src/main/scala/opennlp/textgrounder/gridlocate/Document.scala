@@ -643,34 +643,7 @@ abstract class GridDocFactory[Co : Serializer](
    * `record_in_subfactory`, `note_globally`, and `finish_globally`.
    * Properly, the extra actions triggered by these arguments should be
    * handled externally, i.e. by separate functions called as necessary by
-   * one of the outermost callers. Currently, doing that is a bit tricky
-   * because of `record_in_subfactory`, which (as things currently stand)
-   * needs to be passed into the function that creates processed GridDoc
-   * objects (and in turn down into the appropriate factory function for
-   * creating these objects). This mechanism is *only* needed by Wikipedia
-   * objects, and only for handling redirects, which require a two-pass
-   * procedure whereby the redirects are recorded during iteration over
-   * raw documents and afterwards some information (e.g. coordinates) is
-   * propagated from the redirected-to documents to the corresponding
-   * redirecting documents. (E.g. document 'Tucson' in Wikipedia is
-   * actually a redirect to document 'Tucson, Arizona', and we might want
-   * things like geocoordinates that are associated with the latter to
-   * also be associated with the former. However, we might not encounter
-   * 'Tucson, Arizona' until we already have processed 'Tucson' so we
-   * can't do a single-pass algorithm.)
-   *
-   * (In actuality, the only information that actually needs to be
-   * propagated this way is the salience, and this isn't even
-   * used much currently.)
-   *
-   * The proper way to handle these redirects is to do all the needed
-   * propagation in the preprocessing step that generates the Wikipedia
-   * textdb corpus, so that the redirects don't need to be included in
-   * the corpus at all and the whole `record_in_subfactory` mechanism
-   * becomes unnecessary.
-   *
-   * The other two arguments `note_globally` and `finish_globally`, which
-   * relate to smoothing, can easily be handled by the callers.
+   * one of the outermost callers.
    *
    * @param rawdoc Raw document as directly read from a corpus.
    * @param record_in_subfactory Whether to record documents in any
