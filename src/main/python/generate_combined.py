@@ -14,7 +14,11 @@ import sys
 from nlputil import *
 from process_article_data import *
 
-def read_incoming_link_info(filename, articles_hash):
+# Read incoming-link info from FILENAME and add to the articles in
+# ARTICLES_HASH (a mapping from titles to Article objects), incorporating
+# links from redirect articles in REDIR_ARTICLES_HASH into the redirected-to
+# article.
+def read_incoming_link_info(filename, articles_hash, redir_articles_hash):
   errprint("Reading incoming link info from %s..." % filename)
   status = StatusMessage('article')
 
@@ -30,7 +34,19 @@ def read_incoming_link_info(filename, articles_hash):
       title = capfirst(title)
       art = articles_hash.get(title, None)
       if art:
-        art.incoming_links = int(links)
+        if art.incoming_links is None:
+          art.incoming_links = 0
+        art.incoming_links += links
+      art = redir_articles_hash.get(title, None)
+      if art:
+        artto_title = capfirst(art.redir)
+        artto = articles_hash.get(artto_title, None)
+        if artto:
+          if artto.incoming_links is None:
+            artto.incoming_links = 0
+          artto.incoming_links += links
+        else:
+          errprint("Found coordinates but no article for redirected-to article %s" % artto_title)
     if status.item_processed(maxtime=Opts.max_time_per_stage):
       break
 
@@ -49,9 +65,17 @@ def read_coordinates_file(filename):
         break
   return coords_hash
 
+# Given an article metadata file, a file listing article coordinates and
+# a file listing article incoming links (computed in three separate passes
+# over the dump file), produce a new article metadata file incorporating
+# the coordinates and incoming-link count, limited to those articles with
+# coordinates.
 def output_combined_article_data(filename, coords_file, links_file):
   coords_hash = read_coordinates_file(coords_file)
+  # Mapping from non-redir article titles to Article objects
   articles_hash = {}
+  # Mapping from redir article titles to Article objects
+  redir_articles_hash = {}
   articles_seen = []
 
   def process(art):
@@ -60,15 +84,14 @@ def output_combined_article_data(filename, coords_file, links_file):
     coord = coords_hash.get(art.title, None)
     if coord:
       art.coord = coord
-    elif art.redir and capfirst(art.redir) in coords_hash:
-      pass
-    else:
-      return
-    articles_hash[art.title] = art
-    articles_seen.append(art)
+    if art.redir and capfirst(art.redir) in coords_hash:
+      redir_articles_hash[art.title] = art
+    elif coord:
+      articles_hash[art.title] = art
+      articles_seen.append(art)
   read_article_data_file(filename, process, maxtime=Opts.max_time_per_stage)
 
-  read_incoming_link_info(links_file, articles_hash)
+  read_incoming_link_info(links_file, articles_hash, redir_articles_hash)
 
   errprint("Writing combined data to stdout ...")
   write_article_data_file(sys.stdout,
