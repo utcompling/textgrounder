@@ -53,8 +53,8 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean
-    ): Option[TDoc]
+      lang_model: DocLangModel, coord: SphereCoord,
+      record_in_factory: Boolean): Option[TDoc]
 }
 
 /**
@@ -87,10 +87,11 @@ class SphereDocFactory(
 
   override def imp_create_and_init_document(schema: Schema,
       fieldvals: IndexedSeq[String], lang_model: DocLangModel,
-      record_in_factory: Boolean) = {
+      record_in_subfactory: Boolean) = {
     val coord = schema.get_value_or_else[SphereCoord](fieldvals, "coord", null)
     find_subfactory(schema, fieldvals).
-      create_and_init_document(schema, fieldvals, lang_model, coord, record_in_factory)
+      create_and_init_document(schema, fieldvals, lang_model, coord,
+        record_in_subfactory)
   }
 
   /**

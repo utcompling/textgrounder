@@ -376,7 +376,7 @@ abstract class GridDocFactory[Co : Serializer](
    */
   protected def imp_create_and_init_document(schema: Schema,
       fieldvals: IndexedSeq[String], lang_model: DocLangModel,
-      record_in_factory: Boolean
+      record_in_subfactory: Boolean
   ): Option[GridDoc[Co]]
 
   /**
@@ -396,8 +396,7 @@ abstract class GridDocFactory[Co : Serializer](
   def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
       record_in_factory: Boolean) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
-    if (record_in_factory)
-      num_records_by_split(split) += 1
+    num_records_by_split(split) += 1
 
     def catch_doc_validation[T](body: => T) = {
       if (debug("rethrow"))
@@ -437,7 +436,7 @@ abstract class GridDocFactory[Co : Serializer](
     val maybedoc = catch_doc_validation {
       imp_create_and_init_document(schema, fieldvals, lang_model, record_in_factory)
     }
-    maybedoc match {
+    val retval = maybedoc match {
       case None => {
         num_non_error_skipped_records_by_split(split) += 1
         None
@@ -448,33 +447,44 @@ abstract class GridDocFactory[Co : Serializer](
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
         assert(double_tokens == tokens)
-        if (record_in_factory) {
-          num_documents_by_split(split) += 1
-          word_tokens_of_documents_by_split(split) += tokens
-        }
+        num_documents_by_split(split) += 1
+        word_tokens_of_documents_by_split(split) += tokens
         if (!doc.has_coord) {
           errprint("Document %s skipped because it has no coordinate", doc)
           num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
           word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          if (record_in_factory) {
-            num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-            word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          }
           None
         } else {
           num_documents_with_coordinates_by_split(split) += 1
           word_tokens_of_documents_with_coordinates_by_split(split) += tokens
-          if (record_in_factory) {
+          maybedoc
+        }
+      }
+    }
+
+    if (record_in_factory) {
+      maybedoc match {
+        case None => {}
+        case Some(doc) => {
+          val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+          val tokens = double_tokens.toInt
+          // Partial counts should not occur in training documents.
+          assert(double_tokens == tokens)
+          if (!doc.has_coord) {
+            num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+            word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+          } else {
             num_recorded_documents_by_split(split) += 1
             word_tokens_of_recorded_documents_by_split(split) += tokens
             num_recorded_documents_with_coordinates_by_split(split) += 1
             (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
               += tokens)
           }
-          maybedoc
         }
       }
     }
+
+    maybedoc
   }
 
   /**
@@ -563,16 +573,12 @@ abstract class GridDocFactory[Co : Serializer](
    * @param line The line itself.
    * @param lineno The line number of the line, for logging purposes.
    * @param schema Schema for textdb, indicating names of fields, etc.
-   * @param record_in_factory See `raw_documents_to_documents`.
-   * @param note_globally See `raw_documents_to_documents`.
    */
   def line_to_document_status(filehand: FileHandler, file: String,
-      line: String, lineno: Long, schema: Schema, record_in_factory: Boolean,
-      note_globally: Boolean
-    ): DocStatus[GridDoc[Co]] = {
+      line: String, lineno: Long, schema: Schema): DocStatus[GridDoc[Co]] = {
     raw_document_to_document_status(
       GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
-      record_in_factory, note_globally)
+      record_in_factory = false, note_globally = false)
   }
 
   /**
