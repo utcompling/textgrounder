@@ -229,7 +229,7 @@ package experiment {
     def note_counter(name: String) {
       if (!(counters_by_name contains name)) {
         counters_by_name += name
-        note_counter_by_group(name, true)
+        note_counter_by_group(name, is_counter = true)
       }
     }
 
@@ -257,7 +257,7 @@ package experiment {
       else
         counter_groups_by_group(group) += name
       if (group != "")
-        note_counter_by_group(group, false)
+        note_counter_by_group(group, is_counter = false)
     }
 
     /**
@@ -280,7 +280,7 @@ package experiment {
         if (!recursive)
           Iterable[String]()
         else
-          list_counter_groups(group, true)
+          list_counter_groups(group, recursive = true)
       val fq = (groups.view ++ subgroups) flatMap (counters_by_group(_))
       if (fully_qualified) fq
       else fq map (_.stripPrefix(group + "."))
@@ -311,7 +311,7 @@ package experiment {
         if (!recursive)
           groups
         else
-          groups ++ (groups flatMap (list_counter_groups(_, true)))
+          groups ++ (groups flatMap (list_counter_groups(_, recursive = true)))
       if (fully_qualified) fq
       else fq map (_.stripPrefix(group + "."))
     }

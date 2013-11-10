@@ -145,7 +145,8 @@ class TimeGrid(
   def add_training_documents_to_grid(
       get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
     default_add_training_documents_to_grid(get_rawdocs, doc =>
-      find_best_cell_for_document(doc, false) foreach (_.add_document(doc))
+      find_best_cell_for_document(doc,
+        create_non_recorded = false) foreach (_.add_document(doc))
     )
   }
 

@@ -389,7 +389,8 @@ abstract class Grid[Co](
    * corresponding to a city.
    */
   def add_salient_point(coord: Co, name: String, salience: Double) {
-    find_best_cell_for_coord(coord, false) map { cell =>
+    find_best_cell_for_coord(coord,
+      create_non_recorded = false) map { cell =>
       cell.add_salient_point(name, salience)
     }
   }

@@ -655,7 +655,8 @@ package argparser {
         else
           throw new ArgParserInvalidChoiceException(
             "Choice '%s' not one of the recognized choices: %s"
-            format (converted, choicesList(choices, aliasedChoices, true)))
+            format (converted, choicesList(choices, aliasedChoices,
+              includeAliases = true)))
       }
     }
   }
@@ -750,7 +751,7 @@ package argparser {
   protected class ArgFlag(
     parser: ArgParser,
     name: String
-  ) extends ArgAny[Boolean](parser, name, false) {
+  ) extends ArgAny[Boolean](parser, name, default = false) {
     var wrap: FlagOption[Boolean] = null
     def wrappedValue = wrap.value.get
     def specified = (wrap != null && wrap.value != None)
@@ -1009,8 +1010,10 @@ package argparser {
           (for (s <- helpsplit) yield {
             s match {
               case "%default" => default.toString
-              case "%choices" => choicesList(choices, aliasedChoices, false)
-              case "%allchoices" => choicesList(choices, aliasedChoices, true)
+              case "%choices" => choicesList(choices, aliasedChoices,
+                includeAliases = false)
+              case "%allchoices" => choicesList(choices, aliasedChoices,
+                includeAliases = true)
               case "%metavar" => canon_metavar
               case "%%" => "%"
               case "%prog" => this.prog
@@ -1207,8 +1210,10 @@ package argparser {
         arg.wrap = argot.flag[Boolean](name.toList, canon_help)
         arg
       }
-      handle_argument[Boolean,Boolean](name, false, null, Seq(true, false),
-        null, help, create_underlying _)
+      handle_argument[Boolean,Boolean](name, default = false,
+        metavar = null, choices = Seq(true, false),
+        aliasedChoices = null, help = help,
+        create_underlying = create_underlying _)
     }
 
     /**

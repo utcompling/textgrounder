@@ -178,7 +178,8 @@ class SalienceMostCommonToponymSphereGridRanker(
       for {
         (cand, salience) <- cand_salience
         cell <- {
-          val retval = sphere_grid.find_best_cell_for_document(cand, false)
+          val retval = sphere_grid.find_best_cell_for_document(cand,
+            create_non_recorded = false)
           if (retval == None)
             errprint("Strange, found no cell for candidate %s", cand)
           retval

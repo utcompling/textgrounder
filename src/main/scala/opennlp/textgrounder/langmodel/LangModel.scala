@@ -91,7 +91,8 @@ trait FastSlowKLDivergence {
    */
   def slow_kl_divergence(other: LangModel, partial: Boolean = false) = {
     val (kldiv, contribs) =
-      slow_kl_divergence_debug(other, partial, false)
+      slow_kl_divergence_debug(other, partial,
+        return_contributing_words = false)
     kldiv
   }
 
