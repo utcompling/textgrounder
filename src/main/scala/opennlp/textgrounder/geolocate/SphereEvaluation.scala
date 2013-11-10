@@ -51,7 +51,7 @@ import util.debug._
 class SphereDocEvalStats(
   driver_stats: ExperimentDriverStats,
   wrapped:DocEvalStats[SphereCoord]
-) extends EvalStats(driver_stats, null, null) with DocEvalStats[SphereCoord] {
+) extends EvalStats(driver_stats) with DocEvalStats[SphereCoord] {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val degree_dists = mutable.Buffer[Double]()

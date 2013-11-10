@@ -41,8 +41,8 @@ import util.debug._
 // them.
 class EvalStats(
   val driver_stats: ExperimentDriverStats,
-  prefix: String,
-  incorrect_reasons: Map[String, String]
+  prefix: String = "",
+  incorrect_reasons: Map[String, String] = Map()
 ) {
   def construct_counter_name(name: String) = {
     if (prefix == "") name
@@ -103,7 +103,7 @@ class EvalStats(
   }
 
   def output_other_stats() {
-    for (field <- driver_stats.list_local_counters("", true)) {
+    for (field <- driver_stats.list_local_counters("", recursive = true)) {
       val count = driver_stats.get_local_counter(field)
       driver_stats.note_result(field, count)
       errprint("%s = %s", field, count)
@@ -155,7 +155,8 @@ class DocEvalResult[Co](
   /**
    * Correct cell in the cell grid in which the document belongs
    */
-  val correct_cell = grid.find_best_cell_for_document(document, true).get
+  val correct_cell = grid.find_best_cell_for_document(document,
+    create_non_recorded = true).get
   /**
    * Number of documents in the correct cell
    */
@@ -282,7 +283,7 @@ class GroupedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   grid: Grid[Co],
   create_stats: (ExperimentDriverStats, String) => DocEvalStats[Co]
-) extends EvalStats(driver_stats, null, null) with DocEvalStats[Co] {
+) extends EvalStats(driver_stats) with DocEvalStats[Co] {
 
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(driver_stats, prefix + ".byrange." + range)
@@ -649,7 +650,8 @@ abstract class GridEvaluator[Co](
     assert(document.grid_lm.finished)
     assert(document.rerank_lm.finished)
     val maybe_correct_cell =
-      ranker.grid.find_best_cell_for_document(document, true)
+      ranker.grid.find_best_cell_for_document(document,
+        create_non_recorded = true)
     assert(maybe_correct_cell != None)
     val correct_cell = maybe_correct_cell.get
     if (debug("lots") || debug("commontop")) {
@@ -931,8 +933,7 @@ class RankedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   prefix: String,
   val output_result_with_units: Double => String
-) extends EvalStats(driver_stats, prefix, Map[String, String]()
-) with DocEvalStats[Co] {
+) extends EvalStats(driver_stats, prefix) with DocEvalStats[Co] {
   val top_n_for_oracle_dists =
     GridLocateConstants.top_n_for_oracle_dists
   val max_rank_for_exact_incorrect =
@@ -1078,15 +1079,14 @@ class CoordDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
   prefix: String,
   val output_result_with_units: Double => String
-) extends EvalStats(driver_stats, prefix, Map[String, String]()
-) with DocEvalStats[Co] {
+) extends EvalStats(driver_stats, prefix) with DocEvalStats[Co] {
   override def record_result(res: DocEvalResult[Co]) {
     super.record_result(res)
     // It doesn't really make sense to record a result as "correct" or
     // "incorrect" but we need to record something; just do "false"
     // FIXME: Fix the incorrect assumption here that "correct" or
     // "incorrect" always exists.
-    record_result(false)
+    record_result(correct = false)
   }
 }
 

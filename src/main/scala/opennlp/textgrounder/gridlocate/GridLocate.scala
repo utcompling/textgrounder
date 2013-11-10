@@ -1064,13 +1064,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "random" =>
         new RandomGridRanker[Co](ranker_name, grid)
       case "salience" =>
-        new MostPopularGridRanker[Co](ranker_name, grid, true)
+        new MostPopularGridRanker[Co](ranker_name, grid, salience = true)
       case "num-documents" =>
-        new MostPopularGridRanker[Co](ranker_name, grid, false)
+        new MostPopularGridRanker[Co](ranker_name, grid, salience = false)
       case "naive-bayes-no-baseline" =>
-        new NaiveBayesGridRanker[Co](ranker_name, grid, false)
+        new NaiveBayesGridRanker[Co](ranker_name, grid, use_baseline = false)
       case "naive-bayes-with-baseline" =>
-        new NaiveBayesGridRanker[Co](ranker_name, grid, true)
+        new NaiveBayesGridRanker[Co](ranker_name, grid, use_baseline = true)
       case "cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = false)
@@ -1267,7 +1267,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               // can't be found (i.e. there were no training docs in the
               // cell of this "test" doc), skip the entire instance rather
               // than end up trying to score a fake cell
-              grid.find_best_cell_for_document(doc, false) map ((doc, _))
+              grid.find_best_cell_for_document(doc,
+                create_non_recorded = false) map ((doc, _))
             }
           }
         }

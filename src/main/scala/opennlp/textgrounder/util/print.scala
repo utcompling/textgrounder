@@ -41,8 +41,10 @@ protected class PrintCollection {
 
   // This stuff sucks.  Need to create new Print streams to get the expected
   // UTF-8 output, since the existing System.out/System.err streams don't do it!
-  val stdout_stream = new PrintStream(System.out, true, "UTF-8") 
-  val stderr_stream = new PrintStream(System.err, true, "UTF-8") 
+  val stdout_stream = new PrintStream(System.out, /* autoFlush */ true,
+    "UTF-8")
+  val stderr_stream = new PrintStream(System.err, /* autoFlush */ true,
+    "UTF-8")
 
   /**
     Set Java System.out and System.err, and Scala Console.out and Console.err,
