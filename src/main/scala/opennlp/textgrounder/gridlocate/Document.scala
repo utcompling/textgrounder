@@ -613,9 +613,9 @@ abstract class GridDocFactory[Co : Serializer](
    */
   def raw_documents_to_document_statuses(
     rawdocs: Iterator[DocStatus[RawDocument]],
-    record_in_subfactory: Boolean = false,
-    note_globally: Boolean = false,
-    finish_globally: Boolean = true
+    record_in_subfactory: Boolean,
+    note_globally: Boolean,
+    finish_globally: Boolean
   ) = {
     val docstats =
       rawdocs map { rawdoc =>
@@ -715,15 +715,6 @@ abstract class GridDocFactory[Co : Serializer](
       GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
     raw_documents_to_document_statuses(rawdocs, record_in_subfactory,
       note_globally, finish_globally)
-  }
-
-  def read_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", record_in_subfactory: Boolean = false,
-      note_globally: Boolean = false,
-      finish_globally: Boolean = true) = {
-    val docstats = read_document_statuses_from_textdb(filehand, dir, suffix,
-      record_in_subfactory, note_globally, finish_globally)
-    document_statuses_to_documents(docstats)
   }
 
   def finish_document_loading() {
