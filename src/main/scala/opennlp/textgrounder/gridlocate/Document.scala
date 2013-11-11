@@ -394,10 +394,6 @@ abstract class GridDocFactory[Co : Serializer](
   /** # of records skipped in each split due to errors */
   val num_error_skipped_records_by_split =
     driver.countermap("num_error_skipped_records_by_split")
-  /** # of records skipped in each split, due to issues other than errors
-    * (e.g. for Wikipedia documents, not being in the Main namespace).  */
-  val num_non_error_skipped_records_by_split =
-    driver.countermap("num_non_error_skipped_records_by_split")
   /** # of documents seen in each split.  This does not include skipped
     * records (see above).  */
   val num_documents_by_split =
@@ -457,14 +453,14 @@ abstract class GridDocFactory[Co : Serializer](
 
   /**
    * Create, initialize and return a document from the given raw row.
-   * Return value may be None, meaning that the given record was skipped
-   * (e.g. due to erroneous field values or for some other reason --
-   * e.g. Wikipedia records not in the Main namespace are skipped).
+   * Throw an error if errors found.
    *
    * @param row Row describing record loaded from a corpus
+   * @param lang_model Language model(s) describing the document, as
+   *   computed from data in the row
    */
   protected def create_and_init_document(row: Row, lang_model: DocLangModel
-  ): Option[GridDoc[Co]]
+  ): GridDoc[Co]
 
   /* Record the document in any subsidiary factores, subclasses, etc.
    * Currently used only by Wikipedia documents. (Not the same as
@@ -536,47 +532,40 @@ abstract class GridDocFactory[Co : Serializer](
                 create_lang_model(counts)
             }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
-        val maybedoc = catch_doc_validation {
+        val doc = catch_doc_validation {
           create_and_init_document(row, lang_model)
         }
-        maybedoc match {
-          case None => {
-            num_non_error_skipped_records_by_split(split) += 1
-            (None, "skipped", "unable to create document",
-              row.gets_or_else("title", "unknown title??"))
+        // if (doc == None) // used to mean skipped
+        // num_non_error_skipped_records_by_split(split) += 1
+        assert(doc.split == split)
+        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+        val tokens = double_tokens.toInt
+        // Partial counts should not occur in training documents.
+        assert(double_tokens == tokens)
+        num_documents_by_split(split) += 1
+        word_tokens_of_documents_by_split(split) += tokens
+        if (!doc.has_coord) {
+          num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+          word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+          (Some((row, doc)), "skipped", "document has no coordinate",
+            doc.title)
+        } else {
+          num_documents_with_coordinates_by_split(split) += 1
+          word_tokens_of_documents_with_coordinates_by_split(split) += tokens
+          if (note_globally) {
+            // Don't use the eval set's language models in computing
+            // global smoothing values and such, to avoid contaminating
+            // the results (training on your eval set). In addition, if
+            // this isn't the training or eval set, we shouldn't be
+            // loading at all.
+            //
+            // Add the language model to the global stats before
+            // eliminating infrequent words through
+            // `finish_before_global`.
+            doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
           }
-          case Some(doc) => {
-            assert(doc.split == split)
-            val double_tokens = doc.lang_model.grid_lm.model.num_tokens
-            val tokens = double_tokens.toInt
-            // Partial counts should not occur in training documents.
-            assert(double_tokens == tokens)
-            num_documents_by_split(split) += 1
-            word_tokens_of_documents_by_split(split) += tokens
-            if (!doc.has_coord) {
-              num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-              word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-              (Some((row, doc)), "skipped", "document has no coordinate",
-                doc.title)
-            } else {
-              num_documents_with_coordinates_by_split(split) += 1
-              word_tokens_of_documents_with_coordinates_by_split(split) += tokens
-              if (note_globally) {
-                // Don't use the eval set's language models in computing
-                // global smoothing values and such, to avoid contaminating
-                // the results (training on your eval set). In addition, if
-                // this isn't the training or eval set, we shouldn't be
-                // loading at all.
-                //
-                // Add the language model to the global stats before
-                // eliminating infrequent words through
-                // `finish_before_global`.
-                doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
-              }
-              doc.lang_model.finish_before_global()
-              (Some((row, doc)), "processed", "", "")
-            }
-          }
+          doc.lang_model.finish_before_global()
+          (Some((row, doc)), "processed", "", "")
         }
       } catch {
         case e:DocValidationException => {
@@ -787,7 +776,6 @@ abstract class GridDocFactory[Co : Serializer](
 
     var total_num_records = 0L
     var total_num_error_skipped_records = 0L
-    var total_num_non_error_skipped_records = 0L
     var total_num_documents = 0L
     var total_num_documents_skipped_because_lacking_coordinates = 0L
     var total_num_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
@@ -812,12 +800,6 @@ abstract class GridDocFactory[Co : Serializer](
       errprint("  %s records skipped due to error seen",
         num_error_skipped_records)
       total_num_error_skipped_records += num_error_skipped_records
-
-      val num_non_error_skipped_records =
-        num_non_error_skipped_records_by_split(split).value
-      errprint("  %s records skipped due to other than error seen",
-        num_non_error_skipped_records)
-      total_num_non_error_skipped_records += num_non_error_skipped_records
 
       def print_line(documents: String, num_documents: Long,
           num_tokens: Long) {
@@ -895,9 +877,8 @@ abstract class GridDocFactory[Co : Serializer](
         word_tokens_of_recorded_documents_with_coordinates
     }
 
-    errprint("Total: %s records, %s skipped records (%s from error)",
+    errprint("Total: %s records, %s skipped records from error",
       total_num_records,
-      (total_num_error_skipped_records + total_num_non_error_skipped_records),
       total_num_error_skipped_records)
     errprint("Total: %s documents with %s total word tokens",
       total_num_documents, total_word_tokens_of_documents)
