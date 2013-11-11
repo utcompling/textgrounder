@@ -29,9 +29,11 @@ import ags.utils.KdTree
 import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
+import util.textdb.Row
 
 import langmodel.UnigramLangModel
-import gridlocate.{DocStatus, RawDocument}
+
+import gridlocate.DocStatus
 
 class KdTreeCell(
   cellgrid: KdTreeGrid,
@@ -76,7 +78,7 @@ class KdTreeGrid(
   val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+      get_rawdocs: String => Iterator[DocStatus[Row]]) {
     for (doc <- docfact.raw_documents_to_documents(
            get_rawdocs("preliminary pass to generate K-d tree: reading"),
            record_in_subfactory = false,

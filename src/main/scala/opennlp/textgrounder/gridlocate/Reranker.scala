@@ -9,6 +9,7 @@ import LangModel._
 import util.debug._
 import util.print._
 import util.metering._
+import util.textdb.Row
 import learning._
 
 /**
@@ -307,7 +308,7 @@ abstract class PointwiseGridReranker[Co](ranker_name: String,
 abstract class LinearClassifierGridRerankerTrainer[Co](
   val trainer: SingleWeightLinearClassifierTrainer[GridRankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GridDoc[Co], GridCell[Co], DocStatus[RawDocument], GridRankerInst[Co]
+    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
     data: Iterable[(GridRankerInst[Co], Int)]
@@ -353,7 +354,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   /**
    * Train a reranker, based on external training data.
    */
-  override def apply(training_data: Iterable[DocStatus[RawDocument]]) =
+  override def apply(training_data: Iterable[DocStatus[Row]]) =
     super.apply(training_data).
       asInstanceOf[PointwiseGridReranker[Co]]
 

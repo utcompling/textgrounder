@@ -34,6 +34,7 @@ import util.io._
 import util.print._
 import util.Serializer
 import util.text.capfirst
+import util.textdb.Row
 
 import langmodel.{LangModel,LangModelFactory,LangModelCreationException}
 
@@ -105,7 +106,7 @@ case class DocStatus[TDoc](
  * counting occurrences of events but not too much else.
  *
  * @tparam T type of the document being processed (usually either
- *   `RawDocument` or `GridDoc`)
+ *   `Row` or `GridDoc`)
  * @param shortfile A version of the source file name, used in logging
  *   messages; may omit directories or other information shared among
  *   multiple file names.
@@ -184,7 +185,7 @@ class DocCounterTracker[T](
  * See `DocCounterTracker` for more info, e.g. the concept of "counter".
  *
  * @tparam T type of the document being processed (usually either
- *   `RawDocument` or `GridDoc`)
+ *   `Row` or `GridDoc`)
  * @param driver Object used to transmit counters externally, e.g. to
  *   log files, to the Hadoop job tracker machine, etc.
  */
@@ -219,16 +220,6 @@ class DocCounterTrackerFactory[T](driver: ExperimentDriverStats) {
     }).flatten
   }
 }
-
-/**
- * An object encapsulating a "raw document", i.e. directly encapsulating
- * the fields of the document as read from a textdb database or similar.
- * We separate out raw and processed documents (class `GridDoc`) because
- * in some circumstances we may need to process the raw documents multiple
- * times in different ways, e.g. when creating splits for cross-validation
- * (as done when training a reranker).
- * */
-case class RawDocument(schema: Schema, fields: IndexedSeq[String])
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -383,126 +374,22 @@ abstract class GridDocFactory[Co : Serializer](
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
   /**
-   * Implementation of `create_and_init_document`.  Subclasses should
-   * override this if needed.  External callers should call
-   * `create_and_init_document`, not this.  Note also that the
-   * parameter `record_in_subfactory` has a different meaning here -- it only
-   * refers to recording in subsidiary factories, subclasses, etc.  The
-   * wrapping function `create_and_init_document` takes care of recording
-   * in the main factory.
+   * Create, initialize and return a document from the given raw row.
+   * Return value may be None, meaning that the given record was skipped
+   * (e.g. due to erroneous field values or for some other reason --
+   * e.g. Wikipedia records not in the Main namespace are skipped).
+   *
+   * @param row Row describing record loaded from a corpus
+   * @param record_in_subfactory If true, record the document in any
+   *   subsidiary factores, subclasses, etc. (Not the same as the
+   *   `record_in_factory` parameter of higher-level calls. Recording in
+   *   this factory -- i.e. keeping statistics for diagnostic purposes --
+   *   is done in `raw_document_to_document_status`, which calls this
+   *   function.)
    */
-  protected def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
+  protected def create_and_init_document(row: Row, lang_model: DocLangModel,
       record_in_subfactory: Boolean
   ): Option[GridDoc[Co]]
-
-  /**
-   * Create, initialize and return a document with the given fieldvals,
-   * loaded from a corpus with the given schema.  Return value may be
-   * None, meaning that the given record was skipped (e.g. due to erroneous
-   * field values or for some other reason -- e.g. Wikipedia records not
-   * in the Main namespace are skipped).
-   *
-   * @param schema Schema of the corpus from which the record was loaded
-   * @param fieldvals Field values, taken from the record
-   * @param record_in_factory If true, record the document in the factory and
-   *   in any subsidiary factores, subclasses, etc.  This does not record
-   *   the document in the cell grid; the caller needs to do that if
-   *   needed.
-   */
-  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      record_in_factory: Boolean) = {
-    val split = schema.get_field_or_else(fieldvals, "split", "unknown")
-    num_records_by_split(split) += 1
-
-    def catch_doc_validation[T](body: => T) = {
-      if (debug("rethrow"))
-        body
-      else {
-        try {
-          body
-        } catch {
-          case e:Exception => {
-            num_error_skipped_records_by_split(split) += 1
-            if (debug("stack-trace") || debug("stacktrace"))
-              e.printStackTrace
-            throw new DocValidationException(
-              "Bad value for field: %s" format e, Some(e))
-          }
-        }
-      }
-    }
-
-    val grid_lm = catch_doc_validation {
-      val counts = schema.get_field(fieldvals,
-        driver.grid_word_count_field)
-      lang_model_factory.grid_lang_model_factory.builder.
-        create_lang_model(counts)
-    }
-    val rerank_lm =
-      if (driver.rerank_word_count_field == driver.grid_word_count_field)
-        grid_lm
-      else
-        catch_doc_validation {
-          val counts = schema.get_field(fieldvals,
-            driver.rerank_word_count_field)
-          lang_model_factory.rerank_lang_model_factory.builder.
-            create_lang_model(counts)
-        }
-    val lang_model = new DocLangModel(grid_lm, rerank_lm)
-    val maybedoc = catch_doc_validation {
-      imp_create_and_init_document(schema, fieldvals, lang_model, record_in_factory)
-    }
-    val retval = maybedoc match {
-      case None => {
-        num_non_error_skipped_records_by_split(split) += 1
-        None
-      }
-      case Some(doc) => {
-        assert(doc.split == split)
-        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
-        val tokens = double_tokens.toInt
-        // Partial counts should not occur in training documents.
-        assert(double_tokens == tokens)
-        num_documents_by_split(split) += 1
-        word_tokens_of_documents_by_split(split) += tokens
-        if (!doc.has_coord) {
-          errprint("Document %s skipped because it has no coordinate", doc)
-          num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-          word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          None
-        } else {
-          num_documents_with_coordinates_by_split(split) += 1
-          word_tokens_of_documents_with_coordinates_by_split(split) += tokens
-          maybedoc
-        }
-      }
-    }
-
-    if (record_in_factory) {
-      maybedoc match {
-        case None => {}
-        case Some(doc) => {
-          val double_tokens = doc.lang_model.grid_lm.model.num_tokens
-          val tokens = double_tokens.toInt
-          // Partial counts should not occur in training documents.
-          assert(double_tokens == tokens)
-          if (!doc.has_coord) {
-            num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-            word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          } else {
-            num_recorded_documents_by_split(split) += 1
-            word_tokens_of_recorded_documents_by_split(split) += tokens
-            num_recorded_documents_with_coordinates_by_split(split) += 1
-            (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
-              += tokens)
-          }
-        }
-      }
-    }
-
-    maybedoc
-  }
 
   /**
    * Convert a raw document (directly describing the fields of the document,
@@ -516,43 +403,130 @@ abstract class GridDocFactory[Co : Serializer](
    * this way, we allow the logging to be delayed until the point where a
    * given document is actually consumed, for proper sequencing.
    *
+   * We separate out raw (class `Row`) and processed documents
+   * (class `GridDoc`) because in some circumstances we may need to
+   * process the raw documents multiple times in different ways, e.g. when
+   * creating splits for cross-validation (as done when training a reranker).
+   *
    * @param rawdoc Raw document as directly read from a corpus.
-   * @param record_in_factory Whether to record the document in the document
-   *  factory. (FIXME, this should be handled separately. See
+   * @param record_in_factory If true, record the document in the factory and
+   *   in any subsidiary factores, subclasses, etc.  This does not record
+   *   the document in the cell grid; the caller needs to do that if
+   *   needed. (FIXME, this should be handled separately. See
    *  `raw_documents_to_documents`.)
    * @param note_globally Whether to incorporate the document's word
    *  counts into the global smoothing statistics. (FIXME, this should be
    *  handled separately, as above.)
    * @return a DocStatus describing the document.
    */
-  def raw_document_to_document_status(rawdoc: DocStatus[RawDocument],
+  def raw_document_to_document_status(rawdoc: DocStatus[Row],
       record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GridDoc[Co]] = {
-    rawdoc map_result { rd =>
+    rawdoc map_result { row =>
       try {
-        create_and_init_document(rd.schema, rd.fields, record_in_factory) match {
-          case None => {
-            (None, "skipped", "unable to create document",
-              rd.schema.get_field_or_else(rd.fields, "title",
-                "unknown title??"))
-          }
-          case Some(doc) => {
-            if (note_globally) {
-              // Don't use the eval set's language models in computing
-              // global smoothing values and such, to avoid contaminating
-              // the results (training on your eval set). In addition, if
-              // this isn't the training or eval set, we shouldn't be
-              // loading at all.
-              //
-              // Add the language model to the global stats before
-              // eliminating infrequent words through
-              // `finish_before_global`.
-              doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
+        val split = row.gets_or_else("split", "unknown")
+        num_records_by_split(split) += 1
+
+        def catch_doc_validation[T](body: => T) = {
+          if (debug("rethrow"))
+            body
+          else {
+            try {
+              body
+            } catch {
+              case e:Exception => {
+                num_error_skipped_records_by_split(split) += 1
+                if (debug("stack-trace") || debug("stacktrace"))
+                  e.printStackTrace
+                throw new DocValidationException(
+                  "Bad value for field: %s" format e, Some(e))
+              }
             }
-            doc.lang_model.finish_before_global()
-            (Some(doc), "processed", "", "")
           }
         }
+
+        val grid_lm = catch_doc_validation {
+          val counts = row.gets(driver.grid_word_count_field)
+          lang_model_factory.grid_lang_model_factory.builder.
+            create_lang_model(counts)
+        }
+        val rerank_lm =
+          if (driver.rerank_word_count_field == driver.grid_word_count_field)
+            grid_lm
+          else
+            catch_doc_validation {
+              val counts = row.gets(driver.rerank_word_count_field)
+              lang_model_factory.rerank_lang_model_factory.builder.
+                create_lang_model(counts)
+            }
+        val lang_model = new DocLangModel(grid_lm, rerank_lm)
+        val maybedoc = catch_doc_validation {
+          create_and_init_document(row, lang_model, record_in_factory)
+        }
+        val retval = maybedoc match {
+          case None => {
+            num_non_error_skipped_records_by_split(split) += 1
+            (None, "skipped", "unable to create document",
+              row.gets_or_else("title", "unknown title??"))
+          }
+          case Some(doc) => {
+            assert(doc.split == split)
+            val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+            val tokens = double_tokens.toInt
+            // Partial counts should not occur in training documents.
+            assert(double_tokens == tokens)
+            num_documents_by_split(split) += 1
+            word_tokens_of_documents_by_split(split) += tokens
+            if (!doc.has_coord) {
+              errprint("Document %s skipped because it has no coordinate", doc)
+              num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+              word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+              (Some(doc), "skipped", "unable to create document",
+                doc.title)
+            } else {
+              num_documents_with_coordinates_by_split(split) += 1
+              word_tokens_of_documents_with_coordinates_by_split(split) += tokens
+              if (note_globally) {
+                // Don't use the eval set's language models in computing
+                // global smoothing values and such, to avoid contaminating
+                // the results (training on your eval set). In addition, if
+                // this isn't the training or eval set, we shouldn't be
+                // loading at all.
+                //
+                // Add the language model to the global stats before
+                // eliminating infrequent words through
+                // `finish_before_global`.
+                doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
+              }
+              doc.lang_model.finish_before_global()
+              (Some(doc), "processed", "", "")
+            }
+          }
+        }
+
+        if (record_in_factory) {
+          maybedoc match {
+            case None => {}
+            case Some(doc) => {
+              val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+              val tokens = double_tokens.toInt
+              // Partial counts should not occur in training documents.
+              assert(double_tokens == tokens)
+              if (!doc.has_coord) {
+                num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+                word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+              } else {
+                num_recorded_documents_by_split(split) += 1
+                word_tokens_of_recorded_documents_by_split(split) += tokens
+                num_recorded_documents_with_coordinates_by_split(split) += 1
+                (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+                  += tokens)
+              }
+            }
+          }
+        }
+
+        retval
       } catch {
         case e:DocValidationException => {
           warning("Line %s: %s", rawdoc.lineno, e.message)
@@ -564,15 +538,15 @@ abstract class GridDocFactory[Co : Serializer](
               driver.rerank_word_count_field)
             warning("Line %s: %s, word-counts field: %s",
               rawdoc.lineno, e.message,
-              rd.schema.get_field_or_else(rd.fields,
-                driver.grid_word_count_field, "(missing word-counts field)"))
+              row.gets_or_else(driver.grid_word_count_field,
+                "(missing word-counts field)"))
           else
             warning("Line %s: %s, grid word-counts field: %s, rerank word-counts field: %s",
               rawdoc.lineno, e.message,
-              rd.schema.get_field_or_else(rd.fields,
-                driver.grid_word_count_field, "(missing grid word-counts field)"),
-              rd.schema.get_field_or_else(rd.fields,
-                driver.rerank_word_count_field, "(missing rerank word-counts field)"))
+              row.gets_or_else(driver.grid_word_count_field,
+                "(missing word-counts field)"),
+              row.gets_or_else(driver.rerank_word_count_field,
+                "(missing rerank word-counts field)"))
           (None, "bad", "error creating document language model", "")
         }
       }
@@ -612,7 +586,7 @@ abstract class GridDocFactory[Co : Serializer](
    * @return Iterator over document statuses.
    */
   def raw_documents_to_document_statuses(
-    rawdocs: Iterator[DocStatus[RawDocument]],
+    rawdocs: Iterator[DocStatus[Row]],
     record_in_subfactory: Boolean,
     note_globally: Boolean,
     finish_globally: Boolean
@@ -680,7 +654,7 @@ abstract class GridDocFactory[Co : Serializer](
    * @return Iterator over documents.
    */
   def raw_documents_to_documents(
-    rawdocs: Iterator[DocStatus[RawDocument]],
+    rawdocs: Iterator[DocStatus[Row]],
     record_in_subfactory: Boolean = false,
     note_globally: Boolean = false,
     finish_globally: Boolean = true
@@ -869,10 +843,10 @@ object GridDocFactory {
    * @param schema Schema for textdb, indicating names of fields, etc.
    */
   def line_to_raw_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema): DocStatus[RawDocument] = {
+      lineno: Long, schema: Schema): DocStatus[Row] = {
     line_to_fields(line, lineno, schema) match {
       case Some(fields) =>
-        DocStatus(filehand, file, lineno, Some(RawDocument(schema, fields)),
+        DocStatus(filehand, file, lineno, Some(Row(schema, fields)),
           "processed", "", "")
       case None =>
         DocStatus(filehand, file, lineno, None, "bad",
@@ -890,7 +864,7 @@ object GridDocFactory {
    * @return Iterator over document statuses.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = ""): Iterator[DocStatus[RawDocument]] = {
+      suffix: String = ""): Iterator[DocStatus[Row]] = {
     val (schema, files) =
       TextDB.get_textdb_files(filehand, dir, suffix_re = suffix)
     files.flatMap { file =>

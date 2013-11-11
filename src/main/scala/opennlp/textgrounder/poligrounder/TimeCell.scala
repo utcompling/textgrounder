@@ -29,6 +29,7 @@ import util.text.format_float
 import util.time._
 import util.print.{errout, errprint}
 import util.experiment._
+import util.textdb.Row
 
 import gridlocate._
 import util.debug._
@@ -143,7 +144,7 @@ class TimeGrid(
   }
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+      get_rawdocs: String => Iterator[DocStatus[Row]]) {
     default_add_training_documents_to_grid(get_rawdocs, doc =>
       find_best_cell_for_document(doc,
         create_non_recorded = false) foreach (_.add_document(doc))

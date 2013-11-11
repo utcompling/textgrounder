@@ -27,7 +27,7 @@ import util.textdb.Schema
 import util.print.{errprint, warning}
 import util.Serializer._
 import util.text.capfirst
-
+import util.textdb.Row
 import util.debug._
 
 import gridlocate._
@@ -129,24 +129,22 @@ object WikipediaDoc {
 class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
-  override def create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
+  override def create_and_init_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord, record_in_factory: Boolean) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
-    val namespace = schema.get_field_or_else(fieldvals, "namepace", "")
+    val namespace = row.gets_or_else("namepace", "")
     if (namespace != "" && namespace != "Main") {
       errprint("Skipped document %s, namespace %s is not Main",
-        schema.get_field_or_else(fieldvals, "title", "unknown title??"),
+        row.gets_or_else("title", "unknown title??"),
         namespace)
       None
     } else {
-      val doc = new WikipediaDoc(schema, lang_model, coord,
-        id = schema.get_value_or_else[Long](fieldvals, "id", 0L),
-        title = schema.get_value_or_else[String](fieldvals, "title", ""),
-        salience =
-          schema.get_value_if[Int](fieldvals, "incoming_links").map {
-            _.toDouble })
+      val doc = new WikipediaDoc(row.schema, lang_model, coord,
+        id = row.get_or_else[Long]("id", 0L),
+        title = row.get_or_else[String]("title", ""),
+        salience = row.get_if[Int]("incoming_links").map { _.toDouble }
+      )
       if (record_in_factory)
         record_document(doc)
       Some(doc)

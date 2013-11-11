@@ -23,9 +23,9 @@ import util.spherical.spheredist
 import util.spherical.SphereCoord
 import util.experiment._
 import util.print.{errprint, warning}
+import util.textdb.Row
 
-import gridlocate.GridDocFactory
-import gridlocate.{DocStatus, RawDocument}
+import gridlocate.{GridDocFactory, DocStatus}
 
 class CombinedModelGrid(
   docfact: SphereDocFactory, models: Seq[SphereGrid]
@@ -45,7 +45,7 @@ class CombinedModelGrid(
   }
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[RawDocument]]) {
+      get_rawdocs: String => Iterator[DocStatus[Row]]) {
     // FIXME! This is broken because it ends up trying to compute the
     // smoothing statistics multiple times (each time it iterates over the
     // documents). We need to do this only once (probably after populating
