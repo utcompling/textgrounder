@@ -380,16 +380,17 @@ abstract class GridDocFactory[Co : Serializer](
    * e.g. Wikipedia records not in the Main namespace are skipped).
    *
    * @param row Row describing record loaded from a corpus
-   * @param record_in_subfactory If true, record the document in any
-   *   subsidiary factores, subclasses, etc. (Not the same as the
-   *   `record_in_factory` parameter of higher-level calls. Recording in
-   *   this factory -- i.e. keeping statistics for diagnostic purposes --
-   *   is done in `raw_document_to_document_status`, which calls this
-   *   function.)
    */
-  protected def create_and_init_document(row: Row, lang_model: DocLangModel,
-      record_in_subfactory: Boolean
+  protected def create_and_init_document(row: Row, lang_model: DocLangModel
   ): Option[GridDoc[Co]]
+
+  /* Record the document in any subsidiary factores, subclasses, etc.
+   * (Not the same as the `record_in_factory` parameter of higher-level
+   * calls. Recording in this factory -- i.e. keeping statistics for
+   * diagnostic purposes -- is done in `raw_document_to_document_status`,
+   * which calls this function.)
+   */
+  protected def record_document_in_subfactory(doc: GridDoc[Co]) { }
 
   /**
    * Convert a raw document (directly describing the fields of the document,
@@ -422,7 +423,7 @@ abstract class GridDocFactory[Co : Serializer](
   def raw_document_to_document_status(rawdoc: DocStatus[Row],
       record_in_factory: Boolean, note_globally: Boolean
     ): DocStatus[GridDoc[Co]] = {
-    rawdoc map_result { row =>
+    val retval = rawdoc map_result { row =>
       try {
         val split = row.gets_or_else("split", "unknown")
         num_records_by_split(split) += 1
@@ -461,9 +462,9 @@ abstract class GridDocFactory[Co : Serializer](
             }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
         val maybedoc = catch_doc_validation {
-          create_and_init_document(row, lang_model, record_in_factory)
+          create_and_init_document(row, lang_model)
         }
-        val retval = maybedoc match {
+        maybedoc match {
           case None => {
             num_non_error_skipped_records_by_split(split) += 1
             (None, "skipped", "unable to create document",
@@ -478,11 +479,9 @@ abstract class GridDocFactory[Co : Serializer](
             num_documents_by_split(split) += 1
             word_tokens_of_documents_by_split(split) += tokens
             if (!doc.has_coord) {
-              errprint("Document %s skipped because it has no coordinate", doc)
               num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
               word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-              (Some(doc), "skipped", "unable to create document",
-                doc.title)
+              (Some(doc), "skipped", "document has no coordinate", doc.title)
             } else {
               num_documents_with_coordinates_by_split(split) += 1
               word_tokens_of_documents_with_coordinates_by_split(split) += tokens
@@ -503,30 +502,6 @@ abstract class GridDocFactory[Co : Serializer](
             }
           }
         }
-
-        if (record_in_factory) {
-          maybedoc match {
-            case None => {}
-            case Some(doc) => {
-              val double_tokens = doc.lang_model.grid_lm.model.num_tokens
-              val tokens = double_tokens.toInt
-              // Partial counts should not occur in training documents.
-              assert(double_tokens == tokens)
-              if (!doc.has_coord) {
-                num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-                word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-              } else {
-                num_recorded_documents_by_split(split) += 1
-                word_tokens_of_recorded_documents_by_split(split) += tokens
-                num_recorded_documents_with_coordinates_by_split(split) += 1
-                (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
-                  += tokens)
-              }
-            }
-          }
-        }
-
-        retval
       } catch {
         case e:DocValidationException => {
           warning("Line %s: %s", rawdoc.lineno, e.message)
@@ -551,6 +526,31 @@ abstract class GridDocFactory[Co : Serializer](
         }
       }
     }
+
+    if (record_in_factory) {
+      retval.maybedoc map { doc =>
+        val split = rawdoc.maybedoc.get.gets_or_else("split", "unknown")
+        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+        val tokens = double_tokens.toInt
+        // Partial counts should not occur in training documents.
+        assert(double_tokens == tokens)
+        if (retval.status == "skipped") {
+          assert(!doc.has_coord)
+          num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+          word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+        } else {
+          assert(doc.has_coord)
+          num_recorded_documents_by_split(split) += 1
+          word_tokens_of_recorded_documents_by_split(split) += tokens
+          num_recorded_documents_with_coordinates_by_split(split) += 1
+          (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+            += tokens)
+          record_document_in_subfactory(doc)
+        }
+      }
+    }
+
+    retval
   }
 
   /**

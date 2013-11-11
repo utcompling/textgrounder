@@ -130,7 +130,7 @@ class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
   override def create_and_init_document(row: Row, lang_model: DocLangModel,
-      coord: SphereCoord, record_in_factory: Boolean) = {
+      coord: SphereCoord) = {
     /* FIXME: Perhaps we should filter the document file when we generate it,
        to remove stuff not in the Main namespace. */
     val namespace = row.gets_or_else("namepace", "")
@@ -145,8 +145,6 @@ class WikipediaDocSubfactory(
         title = row.get_or_else[String]("title", ""),
         salience = row.get_if[Int]("incoming_links").map { _.toDouble }
       )
-      if (record_in_factory)
-        record_document(doc)
       Some(doc)
     }
   }
@@ -161,7 +159,8 @@ class WikipediaDocSubfactory(
   /**
    * Add document to related lists mapping lowercased form, short form, etc.
    */ 
-  def record_document(doc: WikipediaDoc) {
+  override def record_document_in_subfactory(xdoc: SphereDoc) {
+    val doc = xdoc.asInstanceOf[WikipediaDoc]
     val name = doc.title
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))

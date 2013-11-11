@@ -53,7 +53,8 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * it will be recorded in the appropriate split.
    */
   def create_and_init_document(row: Row, lang_model: DocLangModel,
-      coord: SphereCoord, record_in_factory: Boolean): Option[TDoc]
+      coord: SphereCoord): Option[TDoc]
+  def record_document_in_subfactory(doc: SphereDoc) { }
 }
 
 /**
@@ -85,10 +86,15 @@ class SphereDocFactory(
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
   override def create_and_init_document(row: Row,
-     lang_model: DocLangModel, record_in_subfactory: Boolean) = {
+     lang_model: DocLangModel) = {
     val coord = row.get_or_else[SphereCoord]("coord", null)
     find_subfactory(row).
-      create_and_init_document(row, lang_model, coord, record_in_subfactory)
+      create_and_init_document(row, lang_model, coord)
+  }
+
+  override def record_document_in_subfactory(doc: SphereDoc) {
+    val cortype = doc.schema.get_fixed_field_or_else("corpus-type", "generic")
+    find_subfactory(cortype).record_document_in_subfactory(doc)
   }
 
   /**
@@ -142,7 +148,7 @@ class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
   def create_and_init_document(row: Row, lang_model: DocLangModel,
-      coord: SphereCoord, record_in_factory: Boolean) = Some(
+      coord: SphereCoord) = Some(
     new GenericSphereDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
       row.get_or_else[String]("title", "unknown"))
