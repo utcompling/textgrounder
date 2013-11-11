@@ -47,8 +47,10 @@ import util.debug._
 
 /**
  * Description of the status of attempting to read a document from some
- * external format in file `file` handled by `filehand`. `doc` is the document
- * (which will generally only be present when `status` == "processed");
+ * external format in file `file` handled by `filehand`. `maybedoc` is
+ * the document, if any. This will always be present when `status` ==
+ * "processed" and may be present when `status` == "skipped", depending
+ * on whether skipping happened at the most recent stage or not.
  * `status` is "bad", "skipped" or "processed"; `reason` is a string
  * indicating the reason why something is bad or skipped; and `docdesc`
  * is a description of the document, useful especially for bad or skipped
@@ -64,15 +66,27 @@ case class DocStatus[TDoc](
   reason: String,
   docdesc: String
 ) {
-  require((status == "processed") == (maybedoc != None))
+  require(status match {
+    case "processed" => maybedoc != None
+    case "bad" => maybedoc == None
+    case "skipped" => true
+  })
+
   def map_result[NewDoc](f: TDoc => (Option[NewDoc], String, String, String)) = {
-    maybedoc match {
-      case Some(doc) => {
-        val (doc2, status2, reason2, docdesc2) = f(doc)
+    status match {
+      case "processed" => {
+        val (doc2, status2, reason2, docdesc2) = f(maybedoc.get)
         DocStatus(filehand, file, lineno, doc2, status2, reason2, docdesc2)
       }
-      case None =>
+      case _ =>
         DocStatus[NewDoc](filehand, file, lineno, None, status, reason, docdesc)
+    }
+  }
+
+  def foreach(f: TDoc => Unit) {
+    status match {
+      case "processed" => f(maybedoc.get)
+      case _ => ()
     }
   }
 }
@@ -142,7 +156,10 @@ class DocCounterTracker[T](
   def handle_status(status: DocStatus[T]): Option[T] = {
     record_status(status)
     print_status(status)
-    status.maybedoc
+    status.status match {
+      case "processed" => status.maybedoc
+      case _ => None
+    }
   }
 
   def note_document_counters(file: String) {
@@ -609,7 +626,7 @@ abstract class GridDocFactory[Co : Serializer](
       docstats
     else
       docstats.map { stat =>
-        stat.maybedoc.foreach { doc => doc.lang_model.finish_after_global() }
+        stat.foreach { doc => doc.lang_model.finish_after_global() }
         stat
       }
   }
