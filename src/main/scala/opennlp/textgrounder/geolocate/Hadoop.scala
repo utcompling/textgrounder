@@ -278,7 +278,7 @@ class DocEvalMapper
           val docstat =
             ranker.grid.docfact.line_to_document_status(filehand, file, line,
                           lineno, schema)
-          docstat.maybedoc.foreach { doc => doc.lang_model.finish_after_global() }
+          docstat.foreach { doc => doc.lang_model.finish_after_global() }
           docstat
         }
       }
