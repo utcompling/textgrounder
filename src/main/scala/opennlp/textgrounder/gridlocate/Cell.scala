@@ -454,15 +454,20 @@ abstract class Grid[Co](
     // FIXME: The "finish_globally" flag needs to be tied into the
     // recording of global statistics in the language models.
     // In reality, all the glop handled by finish_before_global() and
-    // note_lang_model_globally() (as well as record_in_subfactory) and such
-    // should be handled by separate mapping stages onto the documents.
-    // See `raw_documents_to_documents`.
-    for (doc <- docfact.raw_documents_to_documents(get_rawdocs("reading"),
-           record_in_subfactory = true,
-           note_globally = true,
-           finish_globally = false)) {
-      add_document_to_grid(doc)
-    }
+    // note_lang_model_globally() and such should be handled by separate
+    // mapping stages onto the documents. See `raw_documents_to_documents`.
+    val docstats = docfact.raw_documents_to_document_statuses(
+        get_rawdocs("reading"),
+        note_globally = true,
+        finish_globally = false
+      ) map { stat =>
+        stat foreach_all {(_, _) => docfact.record_document_in_factory(stat)}
+        stat
+      }
+
+    val docs = docfact.document_statuses_to_documents(docstats)
+    docs foreach { doc => add_document_to_grid(doc) }
+
     // Compute overall backoff statistics.
     errprint("Finishing global backoff stats...")
     docfact.lang_model_factory.finish_global_backoff_stats()

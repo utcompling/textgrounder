@@ -31,6 +31,7 @@ import util.io.FileHandler
 import util.math._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.{errprint, warning, internal_error}
+import util.textdb.Row
 import util.debug._
 
 /////////////////////////////////////////////////////////////////////////////
@@ -457,13 +458,13 @@ abstract class CorpusEvaluator(
    *
    * @return Iterator over evaluation results.
    */
-  def evaluate_documents(docstats: Iterator[DocStatus[TEvalDoc]]) = {
+  def evaluate_documents(docstats: Iterator[DocStatus[(Row, TEvalDoc)]]) = {
     var statnum = 0
     val result_stats =
       for (stat <- docstats) yield {
         // errprint("Processing document: %s", stat)
         statnum += 1
-        stat.map_result { doc =>
+        stat.map_result { case (row, doc) =>
           val doctag = "#%s" format statnum
           val (skip, reason) = would_skip_document(doc)
           if (skip)

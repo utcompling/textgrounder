@@ -73,21 +73,103 @@ case class DocStatus[TDoc](
     case "skipped" => true
   })
 
-  def map_result[NewDoc](f: TDoc => (Option[NewDoc], String, String, String)) = {
+  /**
+   * Create a new DocStatus for a new type of document by mapping the
+   * existing wrapped document, if it exists, through a function `f`.
+   * Only maps an existing document if `status` == "processed". Otherwise,
+   * the new DocStatus will have None as the value of `maybedoc` (even
+   * if the existing one had `status` == "skipped" and a wrapped document).
+   */
+  def map_result[UDoc](f: TDoc => (Option[UDoc], String, String, String)) = {
     status match {
       case "processed" => {
         val (doc2, status2, reason2, docdesc2) = f(maybedoc.get)
         DocStatus(filehand, file, lineno, doc2, status2, reason2, docdesc2)
       }
       case _ =>
-        DocStatus[NewDoc](filehand, file, lineno, None, status, reason, docdesc)
+        DocStatus[UDoc](filehand, file, lineno, None, status, reason, docdesc)
     }
   }
 
+  /**
+   * Similar to `map_result` but also maps wrapped documents even when
+   * `status` == "skipped". The status is passed into the function.
+   */
+  def map_all_result[UDoc](
+    f: (String, TDoc) => (Option[UDoc], String, String, String)
+  ) = {
+    (status, maybedoc) match {
+      case (_, None) =>
+        DocStatus[UDoc](filehand, file, lineno, None, status, reason, docdesc)
+      case _ => {
+        val (doc2, status2, reason2, docdesc2) = f(status, maybedoc.get)
+        DocStatus(filehand, file, lineno, doc2, status2, reason2, docdesc2)
+      }
+    }
+  }
+
+  /**
+   * Create a new DocStatus for a new type of document by mapping the
+   * existing wrapped document, if it exists, through a function `f`.
+   * Only maps an existing document if `status` == "processed". Otherwise,
+   * the new DocStatus will have None as the value of `maybedoc` (even
+   * if the existing one had `status` == "skipped" and a wrapped document).
+   * This is a very simple function for mapping the document. Use
+   * `map_result` for more complicated mapping that allows the new wrapped
+   * document to have the value of None and new values for `status`,
+   * `reason` and `docdesc` to be given.
+   */
+  def map_processed[UDoc](f: TDoc => UDoc) = {
+    status match {
+      case "processed" => {
+        val doc2 = f(maybedoc.get)
+        DocStatus(filehand, file, lineno, Some(doc2), status, reason, docdesc)
+      }
+      case _ =>
+        DocStatus[UDoc](filehand, file, lineno, None, status, reason, docdesc)
+    }
+  }
+
+  /**
+   * Similar to `map_processed` but also maps wrapped documents even when
+   * `status` == "skipped". This is a very simple function for mapping the
+   * document. Use `map_all_result` for more complicated mapping that allows
+   * the new wrapped document to have the value of None and new values for
+   * `status`, `reason` and `docdesc` to be given.
+   */
+  def map_all[UDoc](f: TDoc => UDoc) = {
+    (status, maybedoc) match {
+      case (_, None) =>
+        DocStatus[UDoc](filehand, file, lineno, None, status, reason, docdesc)
+      case _ => {
+        val doc2 = f(maybedoc.get)
+        DocStatus(filehand, file, lineno, Some(doc2), status, reason, docdesc)
+      }
+    }
+  }
+
+  /**
+   * Do something side-effectual to a wrapped document, by calling `f`.
+   * As for `map_result`, this only processes wrapped documents when
+   * `status` = "processed", never when `status` = "skipped".
+   */
   def foreach(f: TDoc => Unit) {
     status match {
       case "processed" => f(maybedoc.get)
       case _ => ()
+    }
+  }
+
+  /**
+   * Do something side-effectual to any wrapped document, by calling `f`.
+   * This results to `foreach` as `map_all_result` relates to `map_result`,
+   * i.e. it will call `f` on all wrapped documents, even when
+   * status = "skipped".
+   */
+  def foreach_all(f: (String, TDoc) => Unit) {
+    (status, maybedoc) match {
+      case (_, None) => ()
+      case _ => f(status, maybedoc.get)
     }
   }
 }
@@ -385,10 +467,9 @@ abstract class GridDocFactory[Co : Serializer](
   ): Option[GridDoc[Co]]
 
   /* Record the document in any subsidiary factores, subclasses, etc.
-   * (Not the same as the `record_in_factory` parameter of higher-level
-   * calls. Recording in this factory -- i.e. keeping statistics for
-   * diagnostic purposes -- is done in `raw_document_to_document_status`,
-   * which calls this function.)
+   * Currently used only by Wikipedia documents. (Not the same as
+   * `record_document_in_factory`, which records diagnostic statistics
+   * in the factory itself about documents and errors seen.)
    */
   protected def record_document_in_subfactory(doc: GridDoc[Co]) { }
 
@@ -416,7 +497,7 @@ abstract class GridDocFactory[Co : Serializer](
    * @return a DocStatus describing the document.
    */
   def raw_document_to_document_status(rawdoc: DocStatus[Row],
-      note_globally: Boolean): DocStatus[GridDoc[Co]] = {
+      note_globally: Boolean): (DocStatus[(Row, GridDoc[Co])]) = {
     rawdoc map_result { row =>
       try {
         val split = row.gets_or_else("split", "unknown")
@@ -475,7 +556,8 @@ abstract class GridDocFactory[Co : Serializer](
             if (!doc.has_coord) {
               num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
               word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-              (Some(doc), "skipped", "document has no coordinate", doc.title)
+              (Some((row, doc)), "skipped", "document has no coordinate",
+                doc.title)
             } else {
               num_documents_with_coordinates_by_split(split) += 1
               word_tokens_of_documents_with_coordinates_by_split(split) += tokens
@@ -492,7 +574,7 @@ abstract class GridDocFactory[Co : Serializer](
                 doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
               }
               doc.lang_model.finish_before_global()
-              (Some(doc), "processed", "", "")
+              (Some((row, doc)), "processed", "", "")
             }
           }
         }
@@ -529,15 +611,14 @@ abstract class GridDocFactory[Co : Serializer](
    * This does not record the document in the cell grid; the caller needs
    * to do that if needed.
    */
-  def record_document_in_factory(rawdoc: DocStatus[Row],
-      docstat: DocStatus[GridDoc[Co]]) {
-    docstat.maybedoc map { doc =>
-      val split = rawdoc.maybedoc.get.gets_or_else("split", "unknown")
+  def record_document_in_factory(stat: DocStatus[(Row, GridDoc[Co])]) {
+    stat foreach_all { case (status, (row, doc)) =>
+      val split = row.gets_or_else("split", "unknown")
       val double_tokens = doc.lang_model.grid_lm.model.num_tokens
       val tokens = double_tokens.toInt
       // Partial counts should not occur in training documents.
       assert(double_tokens == tokens)
-      if (docstat.status == "skipped") {
+      if (status == "skipped") {
         assert(!doc.has_coord)
         num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
         word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
@@ -566,20 +647,16 @@ abstract class GridDocFactory[Co : Serializer](
    * @param schema Schema for textdb, indicating names of fields, etc.
    */
   def line_to_document_status(filehand: FileHandler, file: String,
-      line: String, lineno: Long, schema: Schema): DocStatus[GridDoc[Co]] = {
-    raw_document_to_document_status(
-      GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
-      note_globally = false)
+      line: String, lineno: Long, schema: Schema
+    ): DocStatus[(Row, GridDoc[Co])] = {
+    val rowstat =
+      GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema)
+    raw_document_to_document_status(rowstat, note_globally = false)
   }
 
   /**
    * Convert raw documents into document statuses.
    *
-   * @param record_in_factory Whether to record documents in the factory and
-   *   any subfactories, subclasses, etc. This does not record the document
-   *   in the cell grid; the caller needs to do that if needed. (FIXME:
-   *   This should be an add-on to the iterator. See
-   *   `raw_documents_to_documents`.)
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -590,25 +667,23 @@ abstract class GridDocFactory[Co : Serializer](
    */
   def raw_documents_to_document_statuses(
     rawdocs: Iterator[DocStatus[Row]],
-    record_in_subfactory: Boolean,
     note_globally: Boolean,
     finish_globally: Boolean
   ) = {
     val docstats =
       rawdocs map { rawdoc =>
-        val docstat = raw_document_to_document_status(rawdoc, note_globally)
-        if (record_in_subfactory)
-          record_document_in_factory(rawdoc, docstat)
-        docstat
+        raw_document_to_document_status(rawdoc, note_globally)
       }
+
     // NOTE!!! We *cannot* rewrite the following to use `foreach` instead of
-    // `map` on `docstats`, and then return `docstats`; this is because
-    // doing this will exhaust the iterator.
+    // `map` on `docstats`, and then return `docstats`; this is
+    // because doing this will exhaust the iterator.
     if (!finish_globally)
       docstats
     else
       docstats.map { stat =>
-        stat.foreach { doc => doc.lang_model.finish_after_global() }
+        stat.foreach {
+          case (row, doc) => doc.lang_model.finish_after_global() }
         stat
       }
   }
@@ -626,8 +701,10 @@ abstract class GridDocFactory[Co : Serializer](
    * @return Iterator directly over processed documents.
    */
   def document_statuses_to_documents(
-    docstats: Iterator[DocStatus[GridDoc[Co]]]
+    rowdocstats: Iterator[DocStatus[(Row, GridDoc[Co])]]
   ) = {
+    val docstats =
+      rowdocstats map { _ map_all { case (raw, cooked) => cooked } }
     new DocCounterTrackerFactory[GridDoc[Co]](driver).
       process_statuses(docstats)
   }
@@ -645,14 +722,17 @@ abstract class GridDocFactory[Co : Serializer](
    * given document is actually consumed, for proper sequencing.
    *
    * FIXME: This and many other functions are polluted by extra arguments
-   * `record_in_subfactory`, `note_globally`, and `finish_globally`.
-   * Properly, the extra actions triggered by these arguments should be
-   * handled externally, i.e. by separate functions called as necessary by
-   * one of the outermost callers.
+   * `note_globally` and `finish_globally`. Properly, the extra actions
+   * triggered by these arguments should be handled externally, i.e. by
+   * separate functions called as necessary by one of the outermost callers.
+   * There used to be a third such argument `record_in_factory` (sometimes
+   * `record_in_subfactory`), enabled only when processing training
+   * documens; now the recording code has been extracted into separate
+   * functions, which are called only in the Cell method
+   * `default_add_training_documents_to_grid`. Some approach like this
+   * should ideally be used for these remaining extra arguments.
    *
    * @param rawdoc Raw document as directly read from a corpus.
-   * @param record_in_subfactory Whether to record documents in any
-   *   subfactories. (FIXME: See above.)
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -663,12 +743,11 @@ abstract class GridDocFactory[Co : Serializer](
    */
   def raw_documents_to_documents(
     rawdocs: Iterator[DocStatus[Row]],
-    record_in_subfactory: Boolean = false,
     note_globally: Boolean = false,
     finish_globally: Boolean = true
   ) = {
     val docstats = raw_documents_to_document_statuses(rawdocs,
-      record_in_subfactory, note_globally, finish_globally)
+      note_globally, finish_globally)
     document_statuses_to_documents(docstats)
   }
 
@@ -679,8 +758,6 @@ abstract class GridDocFactory[Co : Serializer](
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying a particular corpus if many exist in
    *   the same dir (e.g. "-dev")
-   * @param record_in_factory Whether to record documents in any subfactories.
-   *   (FIXME: This should be an add-on to the iterator.)
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -690,13 +767,11 @@ abstract class GridDocFactory[Co : Serializer](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", record_in_subfactory: Boolean = false,
-      note_globally: Boolean = false,
+      suffix: String = "", note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val rawdocs =
       GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
-    raw_documents_to_document_statuses(rawdocs, record_in_subfactory,
-      note_globally, finish_globally)
+    raw_documents_to_document_statuses(rawdocs, note_globally, finish_globally)
   }
 
   def finish_document_loading() {
