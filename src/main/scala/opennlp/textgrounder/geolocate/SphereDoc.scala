@@ -22,7 +22,7 @@ package geolocate
 import collection.mutable
 
 import util.spherical._
-import util.textdb.Schema
+import util.textdb.{Row, Schema}
 import util.print.warning_once
 import util.Serializer._
 
@@ -48,13 +48,12 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
   val docfact: SphereDocFactory
 ) {
   /**
-   * Given the schema and field values read from a document file, create
-   * and return a document.  Return value can be None if the document is
-   * to be skipped; otherwise, it will be recorded in the appropriate split.
+   * Given a row read from a document file, create and return a document.
+   * Return value can be None if the document is to be skipped; otherwise,
+   * it will be recorded in the appropriate split.
    */
-  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      lang_model: DocLangModel, coord: SphereCoord,
-      record_in_factory: Boolean): Option[TDoc]
+  def create_and_init_document(row: Row, lang_model: DocLangModel,
+      coord: SphereCoord, record_in_factory: Boolean): Option[TDoc]
 }
 
 /**
@@ -85,13 +84,11 @@ class SphereDocFactory(
   def wikipedia_subfactory =
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
-  override def imp_create_and_init_document(schema: Schema,
-      fieldvals: IndexedSeq[String], lang_model: DocLangModel,
-      record_in_subfactory: Boolean) = {
-    val coord = schema.get_value_or_else[SphereCoord](fieldvals, "coord", null)
-    find_subfactory(schema, fieldvals).
-      create_and_init_document(schema, fieldvals, lang_model, coord,
-        record_in_subfactory)
+  override def create_and_init_document(row: Row,
+     lang_model: DocLangModel, record_in_subfactory: Boolean) = {
+    val coord = row.get_or_else[SphereCoord]("coord", null)
+    find_subfactory(row).
+      create_and_init_document(row, lang_model, coord, record_in_subfactory)
   }
 
   /**
@@ -100,9 +97,8 @@ class SphereDocFactory(
    * parameter and calls `find_subfactory(java.lang.String)` to find
    * the appropriate subfactory.
    */
-  def find_subfactory(schema: Schema, fieldvals: IndexedSeq[String]):
-      SphereDocSubfactory[_ <: SphereDoc]  = {
-    val cortype = schema.get_field_or_else(fieldvals, "corpus-type", "generic")
+  def find_subfactory(row: Row): SphereDocSubfactory[_ <: SphereDoc] = {
+    val cortype = row.gets_or_else("corpus-type", "generic")
     find_subfactory(cortype)
   }
 
@@ -145,10 +141,10 @@ class GenericSphereDoc(
 class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      lang_model: DocLangModel, coord: SphereCoord, record_in_factory: Boolean) = Some(
-    new GenericSphereDoc(schema, lang_model, coord,
-      schema.get_value_if[Double](fieldvals, "salience"),
-      schema.get_value_or_else[String](fieldvals, "title", "unknown"))
+  def create_and_init_document(row: Row, lang_model: DocLangModel,
+      coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new GenericSphereDoc(row.schema, lang_model, coord,
+      row.get_if[Double]("salience"),
+      row.get_or_else[String]("title", "unknown"))
     )
 }

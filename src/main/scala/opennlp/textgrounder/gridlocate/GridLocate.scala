@@ -956,7 +956,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @return Iterator over raw documents.
    */
   def read_raw_training_documents(operation: String):
-      Iterator[DocStatus[RawDocument]] = {
+      Iterator[DocStatus[Row]] = {
     val task = show_progress(operation, "training document",
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
@@ -989,7 +989,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   the grid cells.)
    */
   def create_grid_from_documents(
-      get_rawdocs: String => Iterator[DocStatus[RawDocument]]
+      get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
     val lang_model_factory = create_doc_lang_model_factory
     val docfact = create_document_factory(lang_model_factory)
@@ -1251,13 +1251,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
           /* Create the initial ranker from training data. */
           protected def create_initial_ranker(
-            data: Iterable[DocStatus[RawDocument]]
+            data: Iterable[DocStatus[Row]]
           ) = create_ranker_from_documents(_ => data.toIterator)
 
           /* Convert encapsulated raw documents into document-cell pairs.
            */
           protected def external_instances_to_query_candidate_pairs(
-            insts: Iterator[DocStatus[RawDocument]],
+            insts: Iterator[DocStatus[Row]],
             initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
           ) = {
             val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
@@ -1275,7 +1275,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
       /* Training data, in the form of an iterable over raw documents (suitably
        * wrapped in a DocStatus object). */
-      val training_data = new Iterable[DocStatus[RawDocument]] {
+      val training_data = new Iterable[DocStatus[Row]] {
         def iterator =
           read_raw_training_documents(
             "reading %s for generating reranker training data")
@@ -1291,7 +1291,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * references this grid.
    */
   def create_ranker_from_documents(
-    get_rawdocs: String => Iterator[DocStatus[RawDocument]]
+    get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
     val grid = create_grid_from_documents(get_rawdocs)
     create_named_ranker(params.ranker, grid)

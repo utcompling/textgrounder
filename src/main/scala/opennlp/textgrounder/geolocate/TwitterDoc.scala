@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package geolocate
 
 import util.spherical._
-import util.textdb.Schema
+import util.textdb.{Row, Schema}
 
 import gridlocate._
 
@@ -46,12 +46,11 @@ class TwitterTweetDoc(
 class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      lang_model: DocLangModel, coord: SphereCoord,
-      record_in_factory: Boolean) = Some(
-    new TwitterTweetDoc(schema, lang_model, coord,
-      schema.get_value_if[Double](fieldvals, "salience"),
-      schema.get_value_or_else[Long](fieldvals, "title", 0L))
+  def create_and_init_document(row: Row, lang_model: DocLangModel,
+      coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterTweetDoc(row.schema, lang_model, coord,
+      row.get_if[Double]("salience"),
+      row.get_or_else[Long]("title", 0L))
     )
 }
 
@@ -77,11 +76,10 @@ class TwitterUserDoc(
 class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
-  def create_and_init_document(schema: Schema, fieldvals: IndexedSeq[String],
-      lang_model: DocLangModel, coord: SphereCoord,
-      record_in_factory: Boolean) = Some(
-    new TwitterUserDoc(schema, lang_model, coord,
-      schema.get_value_if[Double](fieldvals, "salience"),
-      schema.get_value_or_else[String](fieldvals, "user", ""))
+  def create_and_init_document(row: Row, lang_model: DocLangModel,
+      coord: SphereCoord, record_in_factory: Boolean) = Some(
+    new TwitterUserDoc(row.schema, lang_model, coord,
+      row.get_if[Double]("salience"),
+      row.get_or_else[String]("user", ""))
     )
 }

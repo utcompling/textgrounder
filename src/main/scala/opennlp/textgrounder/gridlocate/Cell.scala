@@ -24,7 +24,7 @@ import collection.mutable
 
 import util.print.{errprint, warning}
 import util.experiment._
-import util.textdb.Encoder
+import util.textdb.{Encoder, Row}
 
 import langmodel.LangModelFactory
 
@@ -403,7 +403,7 @@ abstract class Grid[Co](
    *   during reading).
    */
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[RawDocument]])
+      get_rawdocs: String => Iterator[DocStatus[Row]])
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -448,7 +448,7 @@ abstract class Grid[Co](
    * @param add_document_to_grid Function to add a document to the grid.
    */
   protected def default_add_training_documents_to_grid(
-    get_rawdocs: String => Iterator[DocStatus[RawDocument]],
+    get_rawdocs: String => Iterator[DocStatus[Row]],
     add_document_to_grid: GridDoc[Co] => Unit
   ) {
     // FIXME: The "finish_globally" flag needs to be tied into the

@@ -193,7 +193,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  * computed from the subset of data used to create an initial ranker.
  *
  * `GridLocate` requires this facility, making `ExtInst` be the type
- * `DocStatus[RawDocument]`, describing the raw-data form of a document read
+ * `DocStatus[Row]`, describing the raw-data form of a document read
  * from an external corpus. Generating an initial ranker computes back-off
  * statistics from the set of initial-ranker training data used to initialize
  * the ranker, and in turn, conversion of a raw document to a query-candidate
