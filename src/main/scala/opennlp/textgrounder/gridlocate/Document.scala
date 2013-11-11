@@ -410,20 +410,14 @@ abstract class GridDocFactory[Co : Serializer](
    * creating splits for cross-validation (as done when training a reranker).
    *
    * @param rawdoc Raw document as directly read from a corpus.
-   * @param record_in_factory If true, record the document in the factory and
-   *   in any subsidiary factores, subclasses, etc.  This does not record
-   *   the document in the cell grid; the caller needs to do that if
-   *   needed. (FIXME, this should be handled separately. See
-   *  `raw_documents_to_documents`.)
    * @param note_globally Whether to incorporate the document's word
    *  counts into the global smoothing statistics. (FIXME, this should be
    *  handled separately, as above.)
    * @return a DocStatus describing the document.
    */
   def raw_document_to_document_status(rawdoc: DocStatus[Row],
-      record_in_factory: Boolean, note_globally: Boolean
-    ): DocStatus[GridDoc[Co]] = {
-    val retval = rawdoc map_result { row =>
+      note_globally: Boolean): DocStatus[GridDoc[Co]] = {
+    rawdoc map_result { row =>
       try {
         val split = row.gets_or_else("split", "unknown")
         num_records_by_split(split) += 1
@@ -526,31 +520,37 @@ abstract class GridDocFactory[Co : Serializer](
         }
       }
     }
+  }
 
-    if (record_in_factory) {
-      retval.maybedoc map { doc =>
-        val split = rawdoc.maybedoc.get.gets_or_else("split", "unknown")
-        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
-        val tokens = double_tokens.toInt
-        // Partial counts should not occur in training documents.
-        assert(double_tokens == tokens)
-        if (retval.status == "skipped") {
-          assert(!doc.has_coord)
-          num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-          word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-        } else {
-          assert(doc.has_coord)
-          num_recorded_documents_by_split(split) += 1
-          word_tokens_of_recorded_documents_by_split(split) += tokens
-          num_recorded_documents_with_coordinates_by_split(split) += 1
-          (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
-            += tokens)
-          record_document_in_subfactory(doc)
-        }
+  /* Record the document in the factory and any subfactories, subclasses,
+   * etc. Recording in the factory mainly involves computing statistics and
+   * such for diagnostic purposes, although the subfactory may record stuff
+   * for additional purposes (Wikipedia documents currently do this).
+   * This does not record the document in the cell grid; the caller needs
+   * to do that if needed.
+   */
+  def record_document_in_factory(rawdoc: DocStatus[Row],
+      docstat: DocStatus[GridDoc[Co]]) {
+    docstat.maybedoc map { doc =>
+      val split = rawdoc.maybedoc.get.gets_or_else("split", "unknown")
+      val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+      val tokens = double_tokens.toInt
+      // Partial counts should not occur in training documents.
+      assert(double_tokens == tokens)
+      if (docstat.status == "skipped") {
+        assert(!doc.has_coord)
+        num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+      } else {
+        assert(doc.has_coord)
+        num_recorded_documents_by_split(split) += 1
+        word_tokens_of_recorded_documents_by_split(split) += tokens
+        num_recorded_documents_with_coordinates_by_split(split) += 1
+        (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+          += tokens)
+        record_document_in_subfactory(doc)
       }
     }
-
-    retval
   }
 
   /**
@@ -569,14 +569,17 @@ abstract class GridDocFactory[Co : Serializer](
       line: String, lineno: Long, schema: Schema): DocStatus[GridDoc[Co]] = {
     raw_document_to_document_status(
       GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema),
-      record_in_factory = false, note_globally = false)
+      note_globally = false)
   }
 
   /**
    * Convert raw documents into document statuses.
    *
-   * @param record_in_factory Whether to record documents in any subfactories.
-   *   (FIXME: This should be an add-on to the iterator.)
+   * @param record_in_factory Whether to record documents in the factory and
+   *   any subfactories, subclasses, etc. This does not record the document
+   *   in the cell grid; the caller needs to do that if needed. (FIXME:
+   *   This should be an add-on to the iterator. See
+   *   `raw_documents_to_documents`.)
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -593,9 +596,14 @@ abstract class GridDocFactory[Co : Serializer](
   ) = {
     val docstats =
       rawdocs map { rawdoc =>
-        raw_document_to_document_status(rawdoc, record_in_subfactory,
-          note_globally)
+        val docstat = raw_document_to_document_status(rawdoc, note_globally)
+        if (record_in_subfactory)
+          record_document_in_factory(rawdoc, docstat)
+        docstat
       }
+    // NOTE!!! We *cannot* rewrite the following to use `foreach` instead of
+    // `map` on `docstats`, and then return `docstats`; this is because
+    // doing this will exhaust the iterator.
     if (!finish_globally)
       docstats
     else
