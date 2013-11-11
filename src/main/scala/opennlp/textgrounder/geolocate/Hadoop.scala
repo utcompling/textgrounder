@@ -274,13 +274,13 @@ class DocEvalMapper
     val lines = new HadoopIterator
     val docstats =
       lines.map {
-        case (filehand, file, line, lineno) => {
-          val docstat =
-            ranker.grid.docfact.line_to_document_status(filehand, file, line,
+        case (filehand, file, line, lineno) =>
+          ranker.grid.docfact.line_to_document_status(filehand, file, line,
                           lineno, schema)
-          docstat.foreach { doc => doc.lang_model.finish_after_global() }
-          docstat
-        }
+      } map { stat =>
+        stat.foreach {
+          case (row, doc) => doc.lang_model.finish_after_global() }
+        stat
       }
     val evalobj = driver.create_cell_evaluator(ranker)
     for (result <- evalobj.evaluate_documents(docstats)) {

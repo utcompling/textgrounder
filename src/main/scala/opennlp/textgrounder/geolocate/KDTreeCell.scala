@@ -81,7 +81,6 @@ class KdTreeGrid(
       get_rawdocs: String => Iterator[DocStatus[Row]]) {
     for (doc <- docfact.raw_documents_to_documents(
            get_rawdocs("preliminary pass to generate K-d tree: reading"),
-           record_in_subfactory = false,
            note_globally = false,
            finish_globally = false)) {
       kdtree.addPoint(Array(doc.coord.lat, doc.coord.long))
