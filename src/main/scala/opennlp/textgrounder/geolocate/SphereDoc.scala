@@ -53,7 +53,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * it will be recorded in the appropriate split.
    */
   def create_and_init_document(row: Row, lang_model: DocLangModel,
-      coord: SphereCoord): Option[TDoc]
+      coord: SphereCoord): TDoc
   def record_document_in_subfactory(doc: SphereDoc) { }
 }
 
@@ -148,9 +148,9 @@ class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
   def create_and_init_document(row: Row, lang_model: DocLangModel,
-      coord: SphereCoord) = Some(
+      coord: SphereCoord) =
     new GenericSphereDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
-      row.get_or_else[String]("title", "unknown"))
+      row.get_or_else[String]("title", "unknown")
     )
 }

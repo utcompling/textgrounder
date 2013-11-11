@@ -131,22 +131,14 @@ class WikipediaDocSubfactory(
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
   override def create_and_init_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord) = {
-    /* FIXME: Perhaps we should filter the document file when we generate it,
-       to remove stuff not in the Main namespace. */
     val namespace = row.gets_or_else("namepace", "")
-    if (namespace != "" && namespace != "Main") {
-      errprint("Skipped document %s, namespace %s is not Main",
-        row.gets_or_else("title", "unknown title??"),
-        namespace)
-      None
-    } else {
-      val doc = new WikipediaDoc(row.schema, lang_model, coord,
-        id = row.get_or_else[Long]("id", 0L),
-        title = row.get_or_else[String]("title", ""),
-        salience = row.get_if[Int]("incoming_links").map { _.toDouble }
-      )
-      Some(doc)
-    }
+    // docs with namespace != Main should be filtered during preproc
+    assert(namespace == "" || namespace == "Main")
+    new WikipediaDoc(row.schema, lang_model, coord,
+      id = row.get_or_else[Long]("id", 0L),
+      title = row.get_or_else[String]("title", ""),
+      salience = row.get_if[Int]("incoming_links").map { _.toDouble }
+    )
   }
 
   // val wikipedia_fields = Seq("incoming_links")
