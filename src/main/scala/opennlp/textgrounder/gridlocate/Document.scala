@@ -399,31 +399,28 @@ abstract class GridDocFactory[Co : Serializer](
   val num_documents_by_split =
     driver.countermap("num_documents_by_split")
   /** # of documents seen in each split skipped because lacking coordinates.
-    * Note that although most callers skip documents without coordinates,
-    * there are at least some cases where callers request to include such
-    * documents.  */
+    */
   val num_documents_skipped_because_lacking_coordinates_by_split =
     driver.countermap("num_documents_skipped_because_lacking_coordinates_by_split")
-  /** # of documents seen in each split skipped because lacking coordinates,
-    * but which otherwise would have been recorded.  Note that although most
-    * callers skip documents without coordinates, there are at least some
-    * cases where callers request to include such documents.  In addition,
-    * some callers do not ask for documents to be recorded (this happens
-    * particularly with eval-set documents). */
-  val num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split =
-    driver.countermap("num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split")
-  /** # of recorded documents seen in each split (i.e. those added to the
-    * cell grid).  Non-recorded documents are generally those in the eval set.
+  /** # of training documents seen in each split skipped because lacking
+    * coordinates. */
+  val num_would_be_training_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("num_would_be_training_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of training documents seen in each split. Note that some of the
+    * times where training documents are processed, they won't be recorded
+    * here. This happens specifically when a set of training documents need
+    * to be processed multiple times, e.g. during reranking or when
+    * handling a K-d grid.
     */
-  val num_recorded_documents_by_split =
-    driver.countermap("num_recorded_documents_by_split")
+  val num_training_documents_by_split =
+    driver.countermap("num_training_documents_by_split")
   /** # of documents in each split with coordinates. */
   val num_documents_with_coordinates_by_split =
     driver.countermap("num_documents_with_coordinates_by_split")
-  /** # of recorded documents in each split with coordinates.  Non-recorded
-    * documents are generally those in the eval set. */
-  val num_recorded_documents_with_coordinates_by_split =
-    driver.countermap("num_recorded_documents_with_coordinates_by_split")
+  /** # of training documents in each split with coordinates. See comments
+    * above about when training documents are recorded in these stats. */
+  val num_training_documents_with_coordinates_by_split =
+    driver.countermap("num_training_documents_with_coordinates_by_split")
   /** # of word tokens for documents seen in each split.  This does not
     * include skipped records (see above). */
   val word_tokens_of_documents_by_split =
@@ -432,24 +429,22 @@ abstract class GridDocFactory[Co : Serializer](
     * lacking coordinates (see above). */
   val word_tokens_of_documents_skipped_because_lacking_coordinates_by_split =
     driver.countermap("word_tokens_of_documents_skipped_because_lacking_coordinates_by_split")
-  /** # of word tokens for documents seen in each split skipped because
-    * lacking coordinates, but which otherwise would have been recorded
-    * (see above).  Non-recorded documents are generally those in the
-    * eval set. */
-  val word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split =
-    driver.countermap("word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split")
-  /** # of word tokens for recorded documents seen in each split (i.e.
-    * those added to the cell grid).  Non-recorded documents are generally
-    * those in the eval set. */
-  val word_tokens_of_recorded_documents_by_split =
-    driver.countermap("word_tokens_of_recorded_documents_by_split")
+  /** # of word tokens for training documents seen in each split skipped
+    * because lacking coordinates. */
+  val word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of word tokens for training documents seen in each split. See
+    * comments above about when training documents are recorded in these
+    * stats. */
+  val word_tokens_of_training_documents_by_split =
+    driver.countermap("word_tokens_of_training_documents_by_split")
   /** # of word tokens for documents in each split with coordinates. */
   val word_tokens_of_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_documents_with_coordinates_by_split")
-  /** # of word tokens for recorded documents in each split with coordinates.
-    * Non-recorded documents are generally those in the eval set. */
-  val word_tokens_of_recorded_documents_with_coordinates_by_split =
-    driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
+  /** # of word tokens for training documents in each split with coordinates.
+    */
+  val word_tokens_of_training_documents_with_coordinates_by_split =
+    driver.countermap("word_tokens_of_training_documents_with_coordinates_by_split")
 
   /**
    * Create, initialize and return a document from the given raw row.
@@ -462,12 +457,12 @@ abstract class GridDocFactory[Co : Serializer](
   protected def create_and_init_document(row: Row, lang_model: DocLangModel
   ): GridDoc[Co]
 
-  /* Record the document in any subsidiary factores, subclasses, etc.
+  /* Record a training document in any subsidiary factores, subclasses, etc.
    * Currently used only by Wikipedia documents. (Not the same as
-   * `record_document_in_factory`, which records diagnostic statistics
-   * in the factory itself about documents and errors seen.)
+   * `record_training_document_in_factory`, which records diagnostic
+   * statistics in the factory itself.)
    */
-  protected def record_document_in_subfactory(doc: GridDoc[Co]) { }
+  protected def record_training_document_in_subfactory(doc: GridDoc[Co]) { }
 
   /**
    * Convert a raw document (directly describing the fields of the document,
@@ -593,14 +588,15 @@ abstract class GridDocFactory[Co : Serializer](
     }
   }
 
-  /* Record the document in the factory and any subfactories, subclasses,
-   * etc. Recording in the factory mainly involves computing statistics and
-   * such for diagnostic purposes, although the subfactory may record stuff
-   * for additional purposes (Wikipedia documents currently do this).
-   * This does not record the document in the cell grid; the caller needs
-   * to do that if needed.
+  /* Record a training document in the factory and any subfactories,
+   * subclasses, etc. Recording in the factory mainly involves computing
+   * statistics and such for diagnostic purposes, although the subfactory
+   * may record stuff for additional purposes (Wikipedia documents currently
+   * do this). This does not record the document in the cell grid; the
+   * caller needs to do that if needed.
    */
-  def record_document_in_factory(stat: DocStatus[(Row, GridDoc[Co])]) {
+  def record_training_document_in_factory(stat: DocStatus[(Row, GridDoc[Co])]
+    ) {
     stat foreach_all { case (status, (row, doc)) =>
       val split = row.gets_or_else("split", "unknown")
       val double_tokens = doc.lang_model.grid_lm.model.num_tokens
@@ -609,16 +605,16 @@ abstract class GridDocFactory[Co : Serializer](
       assert(double_tokens == tokens)
       if (status == "skipped") {
         assert(!doc.has_coord)
-        num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
-        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+        num_would_be_training_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+        word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
       } else {
         assert(doc.has_coord)
-        num_recorded_documents_by_split(split) += 1
-        word_tokens_of_recorded_documents_by_split(split) += tokens
-        num_recorded_documents_with_coordinates_by_split(split) += 1
-        (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+        num_training_documents_by_split(split) += 1
+        word_tokens_of_training_documents_by_split(split) += tokens
+        num_training_documents_with_coordinates_by_split(split) += 1
+        (word_tokens_of_training_documents_with_coordinates_by_split(split)
           += tokens)
-        record_document_in_subfactory(doc)
+        record_training_document_in_subfactory(doc)
       }
     }
   }
@@ -778,16 +774,16 @@ abstract class GridDocFactory[Co : Serializer](
     var total_num_error_skipped_records = 0L
     var total_num_documents = 0L
     var total_num_documents_skipped_because_lacking_coordinates = 0L
-    var total_num_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
-    var total_num_recorded_documents = 0L
+    var total_num_would_be_training_documents_skipped_because_lacking_coordinates = 0L
+    var total_num_training_documents = 0L
     var total_num_documents_with_coordinates = 0L
-    var total_num_recorded_documents_with_coordinates = 0L
+    var total_num_training_documents_with_coordinates = 0L
     var total_word_tokens_of_documents = 0L
     var total_word_tokens_of_documents_skipped_because_lacking_coordinates = 0L
-    var total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
-    var total_word_tokens_of_recorded_documents = 0L
+    var total_word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates = 0L
+    var total_word_tokens_of_training_documents = 0L
     var total_word_tokens_of_documents_with_coordinates = 0L
-    var total_word_tokens_of_recorded_documents_with_coordinates = 0L
+    var total_word_tokens_of_training_documents_with_coordinates = 0L
     for (split <- num_records_by_split.keys) {
       errprint("For split '%s':", split)
 
@@ -812,19 +808,19 @@ abstract class GridDocFactory[Co : Serializer](
       val num_documents = num_documents_by_split(split).value
       val word_tokens_of_documents =
         word_tokens_of_documents_by_split(split).value
-      print_line("documents seen", num_documents, word_tokens_of_documents)
+      print_line("documents", num_documents, word_tokens_of_documents)
       total_num_documents += num_documents
       total_word_tokens_of_documents += word_tokens_of_documents
 
-      val num_recorded_documents =
-        num_recorded_documents_by_split(split).value
-      val word_tokens_of_recorded_documents =
-        word_tokens_of_recorded_documents_by_split(split).value
-      print_line("documents recorded", num_recorded_documents,
-        word_tokens_of_recorded_documents)
-      total_num_recorded_documents += num_recorded_documents
-      total_word_tokens_of_recorded_documents +=
-        word_tokens_of_recorded_documents
+      val num_training_documents =
+        num_training_documents_by_split(split).value
+      val word_tokens_of_training_documents =
+        word_tokens_of_training_documents_by_split(split).value
+      print_line("training documents", num_training_documents,
+        word_tokens_of_training_documents)
+      total_num_training_documents += num_training_documents
+      total_word_tokens_of_training_documents +=
+        word_tokens_of_training_documents
 
       val num_documents_skipped_because_lacking_coordinates =
         num_documents_skipped_because_lacking_coordinates_by_split(split).value
@@ -839,42 +835,42 @@ abstract class GridDocFactory[Co : Serializer](
       total_word_tokens_of_documents_skipped_because_lacking_coordinates +=
         word_tokens_of_documents_skipped_because_lacking_coordinates
 
-      val num_would_be_recorded_documents_skipped_because_lacking_coordinates =
-        num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(
+      val num_would_be_training_documents_skipped_because_lacking_coordinates =
+        num_would_be_training_documents_skipped_because_lacking_coordinates_by_split(
         split).value
-      val word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates =
-        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(
+      val word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates =
+        word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates_by_split(
           split).value
-      print_line("would-be-recorded documents skipped because lacking coordinates",
-        num_would_be_recorded_documents_skipped_because_lacking_coordinates,
-        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates)
-      total_num_would_be_recorded_documents_skipped_because_lacking_coordinates +=
-        num_would_be_recorded_documents_skipped_because_lacking_coordinates
-      total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates +=
-        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates
+      print_line("would-be training documents skipped because lacking coordinates",
+        num_would_be_training_documents_skipped_because_lacking_coordinates,
+        word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates)
+      total_num_would_be_training_documents_skipped_because_lacking_coordinates +=
+        num_would_be_training_documents_skipped_because_lacking_coordinates
+      total_word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates +=
+        word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates
 
       val num_documents_with_coordinates =
         num_documents_with_coordinates_by_split(split).value
       val word_tokens_of_documents_with_coordinates =
         word_tokens_of_documents_with_coordinates_by_split(split).value
-      print_line("documents having coordinates seen",
+      print_line("documents having coordinates",
         num_documents_with_coordinates,
         word_tokens_of_documents_with_coordinates)
       total_num_documents_with_coordinates += num_documents_with_coordinates
       total_word_tokens_of_documents_with_coordinates +=
         word_tokens_of_documents_with_coordinates
 
-      val num_recorded_documents_with_coordinates =
-        num_recorded_documents_with_coordinates_by_split(split).value
-      val word_tokens_of_recorded_documents_with_coordinates =
-        word_tokens_of_recorded_documents_with_coordinates_by_split(split).value
-      print_line("documents having coordinates recorded",
-        num_recorded_documents_with_coordinates,
-        word_tokens_of_recorded_documents_with_coordinates)
-      total_num_recorded_documents_with_coordinates +=
-        num_recorded_documents_with_coordinates
-      total_word_tokens_of_recorded_documents_with_coordinates +=
-        word_tokens_of_recorded_documents_with_coordinates
+      val num_training_documents_with_coordinates =
+        num_training_documents_with_coordinates_by_split(split).value
+      val word_tokens_of_training_documents_with_coordinates =
+        word_tokens_of_training_documents_with_coordinates_by_split(split).value
+      print_line("training documents having coordinates",
+        num_training_documents_with_coordinates,
+        word_tokens_of_training_documents_with_coordinates)
+      total_num_training_documents_with_coordinates +=
+        num_training_documents_with_coordinates
+      total_word_tokens_of_training_documents_with_coordinates +=
+        word_tokens_of_training_documents_with_coordinates
     }
 
     errprint("Total: %s records, %s skipped records from error",
@@ -885,17 +881,17 @@ abstract class GridDocFactory[Co : Serializer](
     errprint("Total: %s documents skipped because lacking coordinates,\n       with %s total word tokens",
       total_num_documents_skipped_because_lacking_coordinates,
       total_word_tokens_of_documents_skipped_because_lacking_coordinates)
-    errprint("Total: %s would-be-recorded documents skipped because lacking coordinates,\n       with %s total word tokens",
-      total_num_would_be_recorded_documents_skipped_because_lacking_coordinates,
-      total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates)
-    errprint("Total: %s recorded documents with %s total word tokens",
-      total_num_recorded_documents, total_word_tokens_of_recorded_documents)
+    errprint("Total: %s would-be training documents skipped because lacking coordinates,\n       with %s total word tokens",
+      total_num_would_be_training_documents_skipped_because_lacking_coordinates,
+      total_word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates)
+    errprint("Total: %s training documents with %s total word tokens",
+      total_num_training_documents, total_word_tokens_of_training_documents)
     errprint("Total: %s documents having coordinates with %s total word tokens",
       total_num_documents_with_coordinates,
       total_word_tokens_of_documents_with_coordinates)
-    errprint("Total: %s recorded documents having coordinates with %s total word tokens",
-      total_num_recorded_documents_with_coordinates,
-      total_word_tokens_of_recorded_documents_with_coordinates)
+    errprint("Total: %s training documents having coordinates with %s total word tokens",
+      total_num_training_documents_with_coordinates,
+      total_word_tokens_of_training_documents_with_coordinates)
   }
 }
 
