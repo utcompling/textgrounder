@@ -461,7 +461,7 @@ abstract class Grid[Co](
         note_globally = true,
         finish_globally = false
       ) map { stat =>
-        stat foreach_all {(_, _) => docfact.record_document_in_factory(stat)}
+        stat foreach_all {(_, _) => docfact.record_training_document_in_factory(stat)}
         stat
       }
 
@@ -501,10 +501,10 @@ abstract class Grid[Co](
       "%g" format (num_non_empty_cells.toDouble / total_num_cells),
       "Percent non-empty cells"
     )
-    val recorded_training_docs_with_coordinates =
-      docfact.num_recorded_documents_with_coordinates_by_split("training").value
+    val training_docs_with_coordinates =
+      docfact.num_training_documents_with_coordinates_by_split("training").value
     driver.note_print_result("training-documents-per-non-empty-cell",
-      "%g" format (recorded_training_docs_with_coordinates.toDouble /
+      "%g" format (training_docs_with_coordinates.toDouble /
         num_non_empty_cells),
       "Training documents per non-empty cell")
     driver.heartbeat

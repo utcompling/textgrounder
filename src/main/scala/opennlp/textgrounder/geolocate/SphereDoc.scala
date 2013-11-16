@@ -54,7 +54,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    */
   def create_and_init_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord): TDoc
-  def record_document_in_subfactory(doc: SphereDoc) { }
+  def record_training_document_in_subfactory(doc: SphereDoc) { }
 }
 
 /**
@@ -92,9 +92,9 @@ class SphereDocFactory(
       create_and_init_document(row, lang_model, coord)
   }
 
-  override def record_document_in_subfactory(doc: SphereDoc) {
+  override def record_training_document_in_subfactory(doc: SphereDoc) {
     val cortype = doc.schema.get_fixed_field_or_else("corpus-type", "generic")
-    find_subfactory(cortype).record_document_in_subfactory(doc)
+    find_subfactory(cortype).record_training_document_in_subfactory(doc)
   }
 
   /**
