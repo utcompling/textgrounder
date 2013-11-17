@@ -5,15 +5,19 @@ TextGrounder is open-source software, stored here:
 
 https://github.com/utcompling/textgrounder
 
-TextGrounder is a system for document-level and toponym-level geolocation,
-aka geotagging (i.e.  identification of the geographic location -- as a pair
-of latitude/longitude coordinates, somewhere on the Earth -- either of
-individual toponyms in a document or of the entire document).
+TextGrounder is a system for document-level geolocation, aka geotagging
+(i.e. identification of the geographic location -- as a pair of
+latitude/longitude coordinates, somewhere on the Earth -- either of
+individual toponyms in a document or of the entire document). Formerly
+it also included an application for toponym-level geolocation, but this
+has since been separated into the FieldSpring application:
 
-It also contains some political applications in the Poligrounder subproject,
-for identifying relevant features in a collection of tweets that change
-across the occurrence of an event (e.g. a policy announcement, presidential
-debate, etc.).
+https://github.com/utcompling/fieldspring
+
+TextGrounder also contains some political applications in the Poligrounder
+subproject, for identifying relevant features in a collection of tweets that
+change across the occurrence of an event (e.g. a policy announcement,
+presidential debate, etc.).
 
 There is also an out-of-date wiki, which may have more information:
 
@@ -42,8 +46,13 @@ Requirements
 
 Always required:
 ----------------
-* Version 1.6 of the Java 2 SDK (http://java.sun.com)
-* Appropriate data files, consisting of tweets (see below)
+* Version 6, or preferably version 7, of the Java SE JDK, for compiling
+  and running Java code
+  (http://www.oracle.com/technetwork/java/javase/downloads/index.html)
+* Appropriate data files, consisting of documents and associated word
+  counts and latitude/longitude locations, generated from various
+  input sources, e.g. tweets, Wikipedia articles or Flickr tags on
+  geolocated images (see below)
 
 Sometimes required:
 -------------------
@@ -56,17 +65,13 @@ Sometimes required:
 Subprojects
 ===========
 
-There are three subprojects:
+There are two subprojects:
 
 -- The Geolocate subproject primarily does document-level geolocation,
    but also includes some code to generate KML files.  This subproject
    uses a statistical model derived from a large corpus of already geolocated
    documents, such as Wikipedia or Twitter -- i.e. it is supervised (at least
    in some sense).
-
--- The Toponym subproject includes various algorithms for toponym-level
-   geolocation.  Some of these applications build on top of the Geolocate
-   subproject.
 
 -- The Poligrounder subproject contains some political applications for
    identifying relevant features in a collection of tweets that change
@@ -103,35 +108,71 @@ putational Linguistics: Human Language Technologies},
 }
 }}}
 
-There are two main apps, each of which does a different task:
+The main application is opennlp.textgrounder.geolocate.GeolocateApp,
+which does document geolocation. This identifies the location of a
+document.  Training documents are currently described simply by
+(smoothed) unigram or bigram distributions, i.e. counts of the
+words, or combinations of two words, seen in the document.  In
+addition, each document optionally can be tagged with a location
+(specified as a pair of latitude/longitude values), used for training
+and evaluation; some other per-document data exists as well, much
+of it currently underused or not used at all.  The documents
+themselves are often Wikipedia articles, but the source data can
+come from anywhere (e.g. Twitter feeds, i.e. concatenation of all
+tweets from a given user).  Evaluation is either on documents from
+the same source as the training documents, or from some other source,
+e.g.  chapters from books stored in PCL-Travel format.
 
-1. Document geolocation.  This identifies the location of a document.
-   Training documents are currently described simply by (smoothed) unigram
-   or bigram distributions, i.e. counts of the words, or combinations of
-   two words, seen in the document.  In addition, each document optionally
-   can be tagged with a location (specified as a pair of latitude/longitude
-   values), used for training and evaluation; some other per-document data
-   exists as well, much of it currently underused or not used at all.  The
-   documents themselves are often Wikipedia articles, but the source data
-   can come from anywhere (e.g. Twitter feeds, i.e. concatenation of all
-   tweets from a given user).  Evaluation is either on documents from the
-   same source as the training documents, or from some other source, e.g.
-   chapters from books stored in PCL-Travel format.
-
-2. KML generation.  This generates per-word cell distributions of the
-   sort used in the ACP strategy (--strategy=average-cell-probability),
-   then outputs KML files for given words showing the distribution of
-   the words across the Earth.
-
-A third, not-yet-written app is for simultaneous segmentation and
+It is eventually planned to implement simultaneous segmentation and
 geolocation.  This assumes that a document is composed of segments of
 unknown size, each of which refers to a different location, and
 simultaneously finds the best segmentation and best location of each
 segment.
 
------- Introduction to the Toponym Subproject ------
+A number of utility applications are also provided:
 
-WRITE ME.
+1. opennlp.textgrounder.postprocess.AnalyzeResults: This application can
+   be used to analyze the textdb-format results file outputted by the
+   main TextGrounder geolocate application and compute other sorts of
+   derived results.
+
+2. opennlp.textgrounder.geolocate.GenerateKMLApp: This generates per-word
+   cell distributions of the sort used in the ACP ranker
+   (--ranker=average-cell-probability), then outputs KML files for given
+   words showing the distribution of the words across the Earth.
+
+3. opennlp.textgrounder.geolocate.WriteCellDistApp: This generates the
+   same sort of per-work cell distributions as in `GenerateKMLApp`,
+   but then writes out the distributions directly as a set of words and
+   probabilities, so that they can later be read in by another program.
+   Data is written out in the textdb format (see `README.preprocess`).
+
+4. opennlp.textgrounder.geolocate.WriteGridApp: This writes out the
+   characteristics of the grid of cells over the Earth's surface that is
+   generated upon reading in a corpus of documents, describing all of the
+   non-empty cells by their bounding box, document centroid, most
+   "salient" document (if a measure of document saliency, e.g. population
+   or count of inward-pointing links, has been included in the corpus),
+   and other properties. It is written in a textdb format (see above).
+
+5. opennlp.textgrounder.preprocess.ParseTweets: This is a preprocessing
+   application that parses tweets in various ways, optionally filtering
+   and/or grouping them by user, time, etc.  Numerous options are provided.
+   It is used to read raw JSON-format tweets and generate the
+   textdb-formatted corpus needed as input to TextGrounder, although it
+   can also read and write other formats, so that (e.g.) it can both
+   read and write JSON tweets or a textdb corpus, or output raw text or
+   a list of filenames. See `README.preprocess` for more information, and
+   also try running `ParseTweets --help`.
+
+6. opennlp.textgrounder.preprocess.FrobTextDB: This application can
+   be used to modify a textdb database or corpus in various ways, e.g.
+   adding, deleting or renaming a field. It is used in particular during
+   preprocessing of data to split a corpus into training/dev/test
+   subcorpora.
+
+7. There are various other utility applications for preprocessing and
+   postprocessing data of various sorts.
 
 ------ Introduction to the Poligrounder Subproject ------
 
@@ -159,12 +200,20 @@ test that everything is in place and working.
 ------ I. Java  ------
 
 1. Make sure you have Java installed.  TextGrounder is developed and tested
-   on Java 6, but it might work on Java 5 (definitely not earlier).
+   on Java 6 and 7, but it might work on Java 5 (definitely not earlier).
 
 2. Set your JAVA_HOME environment variable to the top level of the Java
-   installation tree.  On Mac OS X it's probably /Library/Java/Home.  On
-   the University of Maryland (UMD) CLIP machines running Red Hat Enterprise
-   Linux, it's probably /usr/lib/jvm/jre-1.6.0-sun.x86_64.
+   installation tree.  This should reference a directory containing
+   `bin`, `lib`, `include` subdirectories. On Mac S OX it might be in
+   /Library/Java/Home (e.g. on older versions), or in a place like
+   /Library/Java/JavaVirtualMachines/jdk1.7.0_45.jdk/Contents/Home (on
+   newer versions, e.g. 10.7 or above), or possible in a place like
+   /System/Library/Frameworks/JavaVM.framework/Versions/Current. On
+   the UTexas TACC Longhorn system it might be somewhere like
+   /share/apps/teragrid/jdk64/jdk1.7.0_45/. On the University of Maryland
+   (UMD) CLIP machines running Red Hat Enterprise Linux, it might be
+   /usr/lib/jvm/jre-1.6.0-sun.x86_64. You can often figure this out by
+   running `which java` to see where the `java` executable is located.
 
 
 ------ II. Download and build TextGrounder ------
@@ -227,11 +276,7 @@ The data necessary for running depends on the intended application.
       corpora and can be set directly, or TG_GROUPS_DIR can be set if the
       TextGrounder corpora are held in a directory named `.../corpora`.
 
-2. For the Toponym subproject:
-
-WRITE ME.
-
-3. For the Poligrounder subproject:
+2. For the Poligrounder subproject:
 
 Poligrounder works with tweets.  Ben Wing has a very large collection of
 tweets that have been downloaded over the last year or so, but only some
@@ -335,11 +380,7 @@ to stdout, but after the program finishes, there should be a subdirectory
 called `output`, with the results stored in a file called `part-r-00000` or
 similar.
 
-2. For the Toponym subproject:
-
-WRITE ME.
-
-3. For the Poligrounder subproject:
+2. For the Poligrounder subproject:
 
 As described in an earlier section, there are three applications in this
 subproject, and as described above, some can use Hadoop while others are
