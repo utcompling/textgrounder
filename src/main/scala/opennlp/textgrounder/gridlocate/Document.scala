@@ -47,16 +47,30 @@ import util.debug._
 
 
 /**
- * Description of the status of attempting to read a document from some
- * external format in file `file` handled by `filehand`. `maybedoc` is
- * the document, if any. This will always be present when `status` ==
+ * Object encapsulating the result of attempting to read a document from
+ * some external source, or convert such a document to another format.
+ * If the processing is successful, there will be a document of type
+ * `TDoc` stored in `maybedoc`; otherwise, perhaps not. The original
+ * external source of the document is stored in `filehand`, `file` and
+ * `line`. The status of the operation is stored in `status`, and will
+ * be one of "processed" (i.e. successful), "skipped" (document was
+ * skipped at this or a preceding stage for reasons other than an error)
+ * or "bad" (an error occurred during processing, at this or a preceding
+ * stage). A document in `maybedoc` will always be present when `status` ==
  * "processed" and may be present when `status` == "skipped", depending
  * on whether skipping happened at the most recent stage or not.
- * `status` is "bad", "skipped" or "processed"; `reason` is a string
- * indicating the reason why something is bad or skipped; and `docdesc`
- * is a description of the document, useful especially for bad or skipped
- * documents, where it generally describes what the document looked like
- * at the point it was skipped or discovered bad.
+ * `reason` is a string indicating the reason why something is bad or
+ * skipped; and `docdesc` is a description of the document, useful
+ * especially for bad or skipped documents, where it generally describes
+ * what the document looked like at the point it was skipped or
+ * discovered bad.
+ *
+ * Note that this behaves somewhat like Option[TDoc], and similarly
+ * it can be converted to a different document format using
+ * `map_result` or `map_result_all`, which converts successfully-processed
+ * documents (and in the case of `map_result_all`, any document stored
+ * in `maybedoc`, including when `status` == "skipped"), and propagates
+ * the status and other properties.
  */
 case class DocStatus[TDoc](
   filehand: FileHandler,
