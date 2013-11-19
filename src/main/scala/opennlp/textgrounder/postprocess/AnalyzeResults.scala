@@ -117,7 +117,6 @@ object AnalyzeResults extends ExperimentApp("classify") {
 
     val filehand = io.localfh
     for (row <- TextDB.read_textdb(filehand, params.input)) {
-      val correct_cell = row.gets("correct-cell")
       correct_cells(row.gets("correct-cell")) += 1
       correct_cells(row.gets("pred-cell")) += 1
       val correct_coord = row.get[SphereCoord]("correct-coord")
