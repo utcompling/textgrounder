@@ -258,6 +258,20 @@ package textdb {
     def clone_with_changes(new_fixed_values: BaseMap[String, String]) =
       new Schema(fieldnames, fixed_values ++ new_fixed_values,
         field_description, split_text)
+
+    /**
+     * Create a clone of this Schema, with added variable fields as given.
+     */
+    def clone_with_added_fields(fields: Iterable[String]) =
+      new Schema(fieldnames ++ fields, fixed_values,
+        field_description, split_text)
+
+    /**
+     * Create a clone of this Schema, with removed variable fields as given.
+     */
+    def clone_with_removed_fields(fields: Iterable[String]) =
+      new Schema(fieldnames.toSeq diff fields.toSeq, fixed_values,
+        field_description, split_text)
   }
 
   class SchemaFromFile(
@@ -490,6 +504,17 @@ package textdb {
      * (This does not include a trailing newline character.)
      */
     def to_line = schema.make_line(fieldvals)
+
+    /**
+     * Return a new row with the added values. The schema will be modified
+     * appropriately.
+     */
+    def clone_with_added_values(values: Iterable[(String, Any)]) = {
+      val new_schema = schema.clone_with_added_fields(values.map(_._1))
+      val new_fieldvals = fieldvals ++
+        values.map(_._2).map("%s" format _)
+      Row(new_schema, new_fieldvals)
+    }
   }
 
   object TextDB {
