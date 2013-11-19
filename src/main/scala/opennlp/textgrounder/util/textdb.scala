@@ -777,6 +777,27 @@ package textdb {
      *
      * @param filehand File handler object of the file system to write to
      * @param base Prefix of schema and data files
+     * @param data Data to write out, as an iterator over rows.
+     */
+    def write_textdb(filehand: FileHandler, base: String,
+      data: Iterator[Row]
+    ) {
+      val first = data.next
+      val res2 = Iterator(first) ++ data
+      val schema = first.schema
+      schema.output_constructed_schema_file(filehand, base)
+      val outfile = TextDB.construct_data_file(base)
+      val outstr = filehand.openw(outfile)
+      res2.foreach { res => outstr.println(res.to_line) }
+      outstr.close()
+    }
+
+    /**
+     * Output a textdb database. (If you want more control over the output,
+     * e.g. to output multiple data files, use `TextDBWriter`.)
+     *
+     * @param filehand File handler object of the file system to write to
+     * @param base Prefix of schema and data files
      * @param data Data to write out. Each item is a sequence of (name,value)
      *   pairs. The field names must be the same for all data points, and in
      *   the same order. The values can be of arbitrary type (including null),
@@ -792,7 +813,7 @@ package textdb {
      *   normally a tab character. (FIXME: There may be dependencies elsewhere
      *   on the separator being a tab, e.g. in EncodeDecode.)
      */
-    def write_textdb(filehand: FileHandler, base: String,
+    def write_textdb_values(filehand: FileHandler, base: String,
       data: Iterator[Iterable[(String, Any)]],
       fixed_values: BaseMap[String, String] = Map[String, String](),
       field_description: BaseMap[String, String] = Map[String, String](),

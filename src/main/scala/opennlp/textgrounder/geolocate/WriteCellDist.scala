@@ -98,8 +98,8 @@ Not generating a cell-distribution file.""", word)
         note_result("cell-dist-word", Encoder.string(word))
         // note_result("corpus-name", opts.corpus_name)
         // note_result("generating-app", progname)
-        TextDB.write_textdb(util.io.localfh, base, cellprob_props.iterator,
-          results_to_output, field_description)
+        TextDB.write_textdb_values(util.io.localfh, base,
+          cellprob_props.iterator, results_to_output, field_description)
       }
     }
   }

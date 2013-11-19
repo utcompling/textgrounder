@@ -50,7 +50,7 @@ class WriteGridDriver extends
     note_result("corpus-type", "textgrounder-cell-dist")
     // note_result("corpus-name", opts.corpus_name)
     // note_result("generating-app", progname)
-    TextDB.write_textdb(util.io.localfh, params.output, rows.iterator,
+    TextDB.write_textdb_values(util.io.localfh, params.output, rows.iterator,
       results_to_output, field_description)
   }
 }
