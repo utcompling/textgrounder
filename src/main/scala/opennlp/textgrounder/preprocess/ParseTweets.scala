@@ -208,6 +208,13 @@ Look for any tweets containing the word "clinton" as well as either the words
   var cfilter_tweets = ap.option[String]("cfilter-tweets",
     help="""Boolean expression used to filter tweets to be output, with
     case-sensitive matching.  Format is identical to `--filter-tweets`.""")
+  var grouped_location_method = ap.option[String]("grouped-location-method",
+    "glm",
+    default = "centroid",
+    choices = Seq("earliest", "centroid"),
+    help="""Method for choosing the location to assign to a group of tweets
+    (e.g. for a given user). The possible values are `earliest` (choose the
+    earliest one) and `centroid` (choose the centroid).""")
   var output_fields = ap.option[String]("output-fields",
     default="default",
     help="""Fields to output in textdb format.  This should consist of one or
@@ -395,6 +402,24 @@ Look for any tweets containing the word "clinton" as well as either the words
      group-level filtering, check whether filter_grouping == "none". */
   var has_tweet_filtering: Boolean = _
 
+  /** Return whether we need to compute the given field. This is only
+    * accurate for fields that consist of sequences or maps.
+    */
+  def need_to_compute_field(field: String) = {
+    field match {
+      case "text" =>
+        (included_fields contains "text") ||
+        (included_fields contains "unigram-counts") ||
+        (included_fields contains "ngram-counts")
+      case "positions"  =>
+        (included_fields contains "positions") ||
+        grouped_location_method == "centroid"
+      case "user-mentions" | "retweets" | "hashtags" =>
+        included_fields contains field
+      case _ => true
+    }
+  }
+
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
     has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
@@ -423,6 +448,18 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   type Timestamp = Long
 
   def empty_map = Map[String, Int]()
+
+  implicit def SphereCoordFmt = new WireFormat[SphereCoord] {
+    def toWire(x: SphereCoord, out: DataOutput) {
+      out.writeDouble(x.lat)
+      out.writeDouble(x.long)
+    }
+    def fromWire(in: DataInput): SphereCoord = {
+      val lat = in.readDouble()
+      val long = in.readDouble()
+      SphereCoord(lat, long)
+    }
+  }
 
   /**
    * Data for a tweet or grouping of tweets.
@@ -464,7 +501,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     following: Int,
     lang: String,
     numtweets: Int,
-    positions: Map[Timestamp, String],
+    positions: Map[Timestamp, SphereCoord],
     user_mentions: Map[String, Int],
     retweets: Map[String, Int],
     hashtags: Map[String, Int],
@@ -495,7 +532,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       place
     }
 
-    def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) = {
+    def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams
+    ): Iterable[String] = {
       import Encoder.{long => elong, _}
       opts.included_fields map { field =>
         field match {
@@ -506,10 +544,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "max-timestamp" => timestamp(max_timestamp)
           case "geo-timestamp" => timestamp(geo_timestamp)
           case "coord" => {
-            // Latitude/longitude need to be combined into a single field,
-            // but only if both actually exist.
-            if (!isNaN(lat) && !isNaN(long)) "%s,%s" format (lat, long)
-            else ""
+            if (opts.grouped_location_method == "earliest") {
+              // Latitude/longitude need to be combined into a single field,
+              // but only if both actually exist.
+              if (!isNaN(lat) && !isNaN(long)) "%s,%s" format (lat, long)
+              else ""
+            } else {
+              if (positions.size == 0) ""
+              else SphereCoord.serialize(
+                SphereCoord.centroid(positions.map(_._2)))
+            }
           }
           case "followers" => int(followers)
           case "following" => int(following)
@@ -518,7 +562,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "positions" => {
             val strmap =
               positions.toSeq sortWith (_._1 < _._1) map {
-                case (timestamp, coord) => (timestamp.toString, coord)
+                case (timestamp, coord) => (timestamp.toString,
+                  SphereCoord.serialize(coord))
               }
             string_map_seq(strmap)
           }
@@ -584,7 +629,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var following = 0
       var lang = ""
       var numtweets = 1
-      var positions = Map[Timestamp, String]()
+      var positions = Map[Timestamp, SphereCoord]()
       var user_mentions = empty_map
       var retweets = empty_map
       var hashtags = empty_map
@@ -618,7 +663,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "positions"     => {
             val strmap = string_map(x)
             strmap map {
-              case (ts, coord) => (timestamp(x), coord)
+              case (ts, coord) => (timestamp(x),
+                SphereCoord.deserialize(coord))
             }
           }
           case "num-positions" =>
@@ -641,7 +687,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def from_raw_text(path: String, text: String) = {
       Tweet("", path, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
-        1, Map[Timestamp, String](), empty_map, empty_map,
+        1, Map[Timestamp, SphereCoord](), empty_map, empty_map,
         empty_map, empty_map)
     }
   }
@@ -959,7 +1005,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val tweet =
         Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
           timestamp, NaN, NaN, 0, 0, "unknown", 1,
-          Map[Timestamp, String](), empty_map, empty_map, empty_map, empty_map)
+          Map[Timestamp, SphereCoord](), empty_map, empty_map, empty_map, empty_map)
       test(args(0), tweet)
     }
   }
@@ -1168,9 +1214,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
             }
 
           val positions = if (lat.isNaN || long.isNaN)
-            Map[Timestamp, String]()
+            Map[Timestamp, SphereCoord]()
           else
-            Map(timestamp -> ("%s,%s" format (lat, long)))
+            Map(timestamp -> SphereCoord(lat, long))
 
           /////////////// HANDLE ENTITIES
 
@@ -1492,29 +1538,27 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val numtweets = t1.numtweets + t2.numtweets
       // Avoid computing stuff we will never use
       val text =
-        if ((opts.included_fields contains "text") ||
-            (opts.included_fields contains "unigram-counts") ||
-            (opts.included_fields contains "ngram-counts"))
+        if (opts.need_to_compute_field("text"))
           t1.text ++ t2.text
         else Seq[String]()
       val positions =
-        if (opts.included_fields contains "positions")
+        if (opts.need_to_compute_field("positions"))
           t1.positions ++ t2.positions
-        else Map[Timestamp,String]()
+        else Map[Timestamp,SphereCoord]()
       val user_mentions =
-        if (opts.included_fields contains "user-mentions")
+        if (opts.need_to_compute_field("user-mentions"))
           combine_maps(t1.user_mentions, t2.user_mentions)
         else empty_map
       val retweets =
-        if (opts.included_fields contains "retweets")
+        if (opts.need_to_compute_field("retweets"))
           combine_maps(t1.retweets, t2.retweets)
         else empty_map
       val hashtags =
-        if (opts.included_fields contains "hashtags")
+        if (opts.need_to_compute_field("hashtags"))
           combine_maps(t1.hashtags, t2.hashtags)
         else empty_map
       val urls =
-        if (opts.included_fields contains "urls")
+        if (opts.need_to_compute_field("urls"))
           combine_maps(t1.urls, t2.urls)
         else empty_map
 
