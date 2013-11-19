@@ -174,6 +174,28 @@ protected class SphericalImpl {
     }
     
     def serialize(foo: SphereCoord) = "%s,%s".format(foo.lat, foo.long)
+
+    /** Compute the centroid of a set of points.
+     *
+     * FIXME! This does not work correctly if the points span the 180th
+     * parallel longitude and will often not work correctly if the points
+     * span more than 180 degrees longitude. Properly, the way to average
+     * a series of longitudes is something like this:
+     *
+     * 1. Figure out the largest span between any two parallels that does
+     *    not cross any other parallels.
+     * 2. The more westward of the two parallels when moving along this span
+     *    needs to be the maximum, and the more eastward of the two
+     *    needs to be the minimum.
+     * 3. Shift the parallels that are numerically below the designated
+     *    minimum parallel up by 360 degrees, then compute the average
+     *    in the normal fashion.
+     */
+    def centroid(points: Iterable[SphereCoord]) = {
+      val lats = points.map(_.lat)
+      val longs = points.map(_.long)
+      SphereCoord(lats.sum / lats.size, longs.sum / longs.size)
+    }
   }
 
   // Compute spherical distance in km (along a great circle) between two
