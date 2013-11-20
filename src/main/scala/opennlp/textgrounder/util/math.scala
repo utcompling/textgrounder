@@ -58,10 +58,27 @@ package object math {
   }
   
   /**
+   *  Return the quantile value at the given fraction. The input sequence
+   *  must be sorted. If the quantile doesn't fall exactly at a point in
+   *  the array, we interpolate between the nearest two points.
+   */
+  def quantile_at(seq: IndexedSeq[Double], fraction: Double) = {
+    val len = seq.size
+    val leftind_float = (len - 1) * fraction
+    val leftind = leftind_float.toInt
+    if (leftind == leftind_float)
+      seq(leftind)
+    else {
+      val offset = leftind_float - leftind
+      seq(leftind) * (1.0 - offset) + seq(leftind + 1) * offset
+    }
+  }
+
+  /**
    *  Return the mean (average) of a list.
    */
-  def mean(list: Seq[Double]) = {
-    list.sum / list.length
+  def mean(list: Iterable[Double]) = {
+    list.sum / list.size
   }
 
   /**
@@ -71,12 +88,12 @@ package object math {
     (argmax(list.countItems) { _._2 })._1
   }
 
-  def variance(x: Seq[Double]) = {
+  def variance(x: Iterable[Double]) = {
     val m = mean(x)
     mean(for (y <- x) yield ((y - m) * (y - m)))
   }
 
-  def stddev(x: Seq[Double]) = sqrt(variance(x))
+  def stddev(x: Iterable[Double]) = sqrt(variance(x))
 }
 
 package math {
