@@ -196,6 +196,27 @@ protected class SphericalImpl {
       val longs = points.map(_.long)
       SphereCoord(lats.sum / lats.size, longs.sum / longs.size)
     }
+
+    /** Compute the southwest (min) bounding box corner of a set of points.
+     *
+     * FIXME! This does not work correctly if the points span the 180th
+     * parallel longitude and will often not work correctly if the points
+     * span more than 180 degrees longitude. See `centroid`; we need to do
+     * the same thing.
+     */
+    def bounding_box_sw(points: Iterable[SphereCoord]) =
+      SphereCoord(points.map(_.lat).min, points.map(_.long).min)
+
+    /** Compute the northeast (max) bounding box corner of a set of points.
+     *
+     * FIXME! This does not work correctly if the points span the 180th
+     * parallel longitude and will often not work correctly if the points
+     * span more than 180 degrees longitude. See `centroid`; we need to do
+     * the same thing.
+     */
+    def bounding_box_ne(points: Iterable[SphereCoord]) =
+      SphereCoord(points.map(_.lat).max, points.map(_.long).max)
+
   }
 
   // Compute spherical distance in km (along a great circle) between two
