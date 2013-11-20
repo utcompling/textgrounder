@@ -602,6 +602,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val possible_fields =
       all_fields ++ Seq("unigram-counts", "ngram-counts", "mapquest-place")
 
+    // Keep track of unknown fields we've already warned about so we don't
+    // warn on every single row. This may happen multiple times in different
+    // task servers, but not a problem, we just want to avoid huge numbers
+    // of warnings.
+    var warned_fields = mutable.Set[String]()
+
     def default_fields(opts: ParseTweetsParams) = {
       if (opts.input_format == "raw-lines")
         Seq("path", "numtweets", "text", "counts")
@@ -646,6 +652,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "min-timestamp" => min_timestamp = dlong(x)
           case "max-timestamp" => max_timestamp = dlong(x)
           case "geo-timestamp" => geo_timestamp = dlong(x)
+          case "timestamp"     => {
+            min_timestamp = dlong(x)
+            max_timestamp = min_timestamp
+            geo_timestamp = min_timestamp
+          }
           case "coord"         => {
             if (x == "")
               { lat = NaN; long = NaN }
@@ -674,11 +685,29 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "urls"          => urls = count_map(x)
           case "counts"        =>
             { } // We don't record counts as they're built from text
-          case _               =>
-          logger.warn("Unrecognized field %s with value %s" format
-            (name, x))
+          case _               => {
+            if (!(warned_fields contains name)) {
+              logger.warn("Unrecognized field %s with value %s" format
+                (name, x))
+              warned_fields += name
+            }
+          }
         }
       }
+      /* Synthesize missing timestamps and position list from other
+       * properties.
+       */
+      val timestamps =
+        List(min_timestamp, max_timestamp, geo_timestamp).filter(_ != 0)
+      if (timestamps.size > 0) {
+        val synth_timestamp = timestamps.min
+        if (min_timestamp == 0) min_timestamp = synth_timestamp
+        if (max_timestamp == 0) max_timestamp = synth_timestamp
+        if (geo_timestamp == 0) geo_timestamp = synth_timestamp
+      }
+      if (positions.size == 0 && !lat.isNaN && !long.isNaN)
+        positions = Map(geo_timestamp -> SphereCoord(lat, long))
+
       Tweet(json, path, text, user, id, min_timestamp, max_timestamp,
         geo_timestamp, lat, long, followers, following, lang, numtweets,
         positions, user_mentions, retweets, hashtags, urls)
