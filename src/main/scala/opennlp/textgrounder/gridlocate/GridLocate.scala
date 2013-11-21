@@ -120,14 +120,14 @@ English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   //// Input files
   var stopwords_file =
-    ap.option[String]("stopwords-file", "sf",
+    ap.option[String]("stopwords-file",
       metavar = "FILE",
       help = """File containing list of stopwords.  If not specified,
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
   var whitelist_file =
-    ap.option[String]("whitelist-file", "wf",
+    ap.option[String]("whitelist-file",
        metavar = "FILE",
        help = """File containing a whitelist of words. If specified, ONLY
 words on the list will be read from any corpora; other words will be ignored.
@@ -178,7 +178,7 @@ Each file is read in and then disambiguation is performed.  Not used during
 document geolocation when --eval-format=internal (the default).""")
 
   var salience_file =
-    ap.option[String]("salience-file", "sf",
+    ap.option[String]("salience-file",
        metavar = "FILE",
        help = """File containing a set of salient coordinates for identifying
 grid cells, in textdb format. These coordinates can be e.g. cities from a
@@ -194,7 +194,7 @@ them, provided there is only one textdb in the directory.
 
 The file should be in textdb format, with `name`, `coord` and `salience`
 fields. If omitted, cells will be identified by the most salient document
-in the cell, if documents have their own saliency values.""")
+in the cell, if documents have their own salience values.""")
 
   var results =
     ap.option[String]("r", "results",
