@@ -11,7 +11,13 @@ sort=
 avgsort=
 meansort=
 mediansort=
+accsort=
+numevalsort=
+numtrainsort=
+namesort=
+runtimesort=
 verbose=
+debug=
 while true; do
   case "$1" in
     --no-sort ) sort=no; shift ;;
@@ -19,7 +25,14 @@ while true; do
     --sort-mean ) sort=yes ; meansort=yes; shift ;;
     --sort-median ) sort=yes ; mediansort=yes; shift ;;
     --sort-accuracy | --sort-acc ) sort=yes ; accsort=yes; shift ;;
+    --sort-numeval ) sort=yes ; numevalsort=yes; shift ;;
+    --sort-numtrain ) sort=yes ; numtrainsort=yes; shift ;;
+    --sort-file | --sort-name ) sort=yes ; namesort=yes; shift ;;
+    --sort-runtime ) sort=yes ; runtimesort=yes; shift ;;
     --verbose ) verbose=yes ; shift ;;
+    --debug ) debug=yes ; shift ;;
+    -- ) shift ; break ;;
+    -*) echo "Unrecognized argument: $1"; exit 1 ;;
     * ) break ;;
   esac
 done
@@ -30,31 +43,58 @@ if [ -z "$sort" ]; then
 fi
 
 if [ "$verbose" != yes ]; then
-  echo "%Accur.	Mean	Median	Average	Runtime     RSS         File"
+  echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime      RSS       File"
 fi
 
 function output() {
 for x in ${1+"$@"}; do
-  #echo $x
-  #echo ""
-  args="`grep -m 1 '^Arguments:' $x`"
-  args="`echo $args | sed -e 's/^Arguments: //' -e 's/--input-corpus [^ ]*\///'`"
-  args="`echo $args | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/  *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`"
-  results="`sed -n '/^Final results/,/^Ending final results/p' $x`"
+  if [ -n "$debug" ]; then
+    echo "[$x]"
+    echo ""
+  fi
+  args=$(grep -m 1 '^Arguments:' $x)
+  args=$(echo $args | perl -pe 's/^Arguments: //;' -e 's/--input(-corpus)? [^ ]*\///')
+  args=$(echo $args | perl -pe 's/  *--*([^ ]*)  *([^-][^ ]*)/ $1=$2/g;' -e 's/  *--*([^ ]*)/ $1/g;' -e 's/ /./g;' -e 's/\//-/g;')
+  results=$(sed -n '/^Final results/,/^Ending final results/p' $x)
   mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
   median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
-  acc=$(echo "$results" | egrep 'Percent correct =' | perl -pe 's/.*= (.*?)%.*/$1/')
-  finalstats="`sed -n '/^Ending final results/,/^Program running time/p' $x`"
-  runtime=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours /:/;' -e 's/ minutes /:/;' -e 's/ seconds//;')
-  rss=$(echo "$finalstats" | egrep 'Memory usage, actual' | perl -pe 's/.*: (.*?) bytes/$1/')
-  #echo "Mean: $mean"
-  #echo "Median: $median"
-  #echo "%Accuracy: $acc"
-  #echo "Runtime: $runtime"
-  #echo "RSS: $rss"
   avg=
   if [ -n "$mean" -a -n "$median" ]; then
-    avg=`echo "2k $mean $median + 2/p" | dc`
+    avg=$(echo "2k $mean $median + 2/p" | dc)
+  fi
+  acc=$(echo "$results" | egrep 'Percent correct at rank <= 1 =' | perl -pe 's/.*= (.*?)%.*/$1/')
+  numeval=$(echo "$results" | egrep 'Number of instances' | perl -pe 's/.*= (.*?) *$/$1/')
+  numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
+  finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' $x)
+  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours /:/;' -e 's/ minutes /:/;' -e 's/ seconds//;')
+  if [ -n "$debug" ]; then
+    echo "Runtime0: [$runtime0]"
+  fi
+  runtime=$(echo "$runtime0" | perl -ne '
+    my ($hrs, $mins, $secs) = /^(.*?:)?(.*?):(.*?)$/;
+    $mins = sprintf("%02d", $mins);
+    $secs = sprintf("%04.1f", $secs);
+    print("$hrs$mins:$secs");
+  ')
+  rss=$(echo "$finalstats" | egrep 'Memory usage, actual' | perl -pe 's/.*: (.*?) bytes/$1/')
+  numeval=$(printf '%7s' "$numeval")
+  numtrain=$(printf '%8s' "$numtrain")
+  acc=$(printf '%6s' "$acc")
+  mean=$(printf '%7s' "$mean")
+  median=$(printf '%7s' "$median")
+  avg=$(printf '%7s' "$avg")
+  runtime=$(printf '%9s' "$runtime")
+  rss=$(printf '%14s' "$rss")
+  if [ -n "$debug" ]; then
+    echo "Args: [$args]"
+    echo "Mean: [$mean]"
+    echo "Median: [$median]"
+    echo "Average: [$avg]"
+    echo "%Accuracy: [$acc]"
+    echo "#Eval: [$numeval]"
+    echo "#Train: [$numtrain]"
+    echo "Runtime: [$runtime]"
+    echo "RSS: [$rss]"
   fi
   if [ "$verbose" = yes ]; then
     echo "$results" | grep 'true error' | perl -ne "print '$args', '  ', \$_"
@@ -63,20 +103,28 @@ for x in ${1+"$@"}; do
     fi
   else
     if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
-      echo "$acc	$mean	$median	$avg	$runtime    $rss        $args"
+      echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
     fi
   fi
 done
 }
 
-if [ "$avgsort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 4
+if [ "$namesort" = yes ]; then
+  output ${1+"$@"} | sort -k 9
+elif [ "$runtimesort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k 8
+elif [ "$avgsort" = yes ]; then
+  output ${1+"$@"} | sort -n -k 6
 elif [ "$meansort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 2
+  output ${1+"$@"} | sort -n -k 4
 elif [ "$mediansort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 3
+  output ${1+"$@"} | sort -n -k 5
 elif [ "$accsort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k 3
+elif [ "$numevalsort" = yes ]; then
   output ${1+"$@"} | sort -nr -k 1
+elif [ "$numtrainsort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k 2
 else
   output ${1+"$@"}
 fi
