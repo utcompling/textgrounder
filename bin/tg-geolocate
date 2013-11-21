@@ -16,10 +16,26 @@ description of these options.)
 
 Currently recognized values for CORPUS:
 
-wikipedia         Run on Wikipedia.
-twitter           Run on the GeoText twitter corpus.
-twitter-wiki      Run on a combination of both of the above corpora.
+Currently recognized:
+
+wikipedia         Run on Wikipedia (same as wikipedia/enwiki-20100905).
+wikipedia/enwiki-*  Run on some English Wikipedia dump.
+wikipedia/ptwiki-*  Run on some Portuguese Wikipedia dump.
+wikipedia/dewiki-*  Run on some German Wikipedia dump.
+wikipedia/*wiki-*  Run on some Wikipedia dump.
+docthresh-*       Run on the GeoText twitter corpus, with the given document
+                  threshold.
+twitter-geotext   Run on the GeoText twitter corpus, with document threshold 5.
+geotext           Synonym for 'twitter-geotext'.
+geotext-wiki      Run on a combination of the 'wikipedia' and 'geotext'
+                  corpora.
+gutonly-big       Run on the GeoTwitterUT big corpus.
 gutonly-small     Run on the GeoTwitterUT small corpus.
+/*, file:*        Run on some other corpus at the specified absolute location.
+./*, ../*         Run on some other corpus relative to the current dir.
+*                 Run on some other corpus in the corpus dir ($TG_CORPUS_DIR),
+                  if it exists; otherwise, run on some corpus relative to
+                  the current dir.
 
 The option '--hadoop' causes the application to be run using Hadoop
 (a package for large-scale parallel processing).  Before doing this,
