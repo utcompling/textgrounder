@@ -134,28 +134,36 @@ words on the list will be read from any corpora; other words will be ignored.
 If not specified, all words (except those on the stopword list) will be
 read.""")
 
-  var input_corpus =
-    ap.multiOption[String]("i", "input-corpus",
-      metavar = "DIR",
-      help = """Directory containing an input corpus.  Documents in the
-corpus can be Wikipedia articles, individual tweets in Twitter, the set of all
-tweets for a given user, etc.  The corpus generally contains one or more
-"views" on the raw data comprising the corpus, with different views
-corresponding to differing ways of representing the original text of the
-documents -- as raw, word-split text; as unigram word counts; as n-gram word
-counts; etc.  Each such view has a schema file and one or more document files.
-The latter contains all the data for describing each document, including
-title, split (training, dev or test) and other metadata, as well as the text
-or word counts that are used to create the language model of the
-document.  The document files are laid out in a very simple database format,
-consisting of one document per line, where each line is composed of a fixed
-number of fields, separated by TAB characters. (E.g. one field would list
-the title, another the split, another all the word counts, etc.) A separate
-schema file lists the name of each expected field.  Some of these names
-(e.g. "title", "split", "text", "coord") have pre-defined meanings, but
-arbitrary names are allowed, so that additional corpus-specific information
-can be provided (e.g. retweet info for tweets that were retweeted from some
-other tweet, article ID for a Wikipedia article, etc.).
+  var input =
+    ap.multiOption[String]("i", "input", "input-corpus",
+      metavar = "FILE",
+      help = """Input corpus, a textdb database (a type of flat-file
+database, with separate schema and data files). The value can be any of
+the following: Either the data or schema file of the database; the common
+prefix of the two; or the directory containing them, provided there is
+only one textdb in the directory.
+
+Documents in the corpus can be Wikipedia articles, individual tweets
+in Twitter, the set of all tweets for a given user, etc.  The corpus
+generally contains one or more "views" on the raw data comprising
+the corpus, with different views corresponding to differing ways
+of representing the original text of the documents -- as raw,
+word-split text; as unigram word counts; as n-gram word counts;
+etc.  Each such view has a schema file and one or more document
+files.  The latter contains all the data for describing each document,
+including title, split (training, dev or test) and other metadata,
+as well as the text or word counts that are used to create the
+language model of the document.  The document files are laid out
+in a very simple database format, consisting of one document per
+line, where each line is composed of a fixed number of fields,
+separated by TAB characters. (E.g. one field would list the title,
+another the split, another all the word counts, etc.) A separate
+schema file lists the name of each expected field.  Some of these
+names (e.g. "title", "split", "text", "coord") have pre-defined
+meanings, but arbitrary names are allowed, so that additional
+corpus-specific information can be provided (e.g. retweet info for
+tweets that were retweeted from some other tweet, article ID for a
+Wikipedia article, etc.).
 
 Multiple such files can be given by specifying the option multiple
 times.""")
@@ -769,7 +777,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     if (params.debug != null)
       parse_debug_spec(params.debug)
 
-    need_seq(params.input_corpus, "input-corpus")
+    need_seq(params.input, "input")
 
     if (params.perceptron_aggressiveness < 0)
       param_error("Perceptron aggressiveness value should be strictly greater than zero")
@@ -960,7 +968,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     val task = show_progress(operation, "training document",
         maxtime = params.max_time_per_stage,
         maxitems = params.num_training_docs)
-    val dociter = params.input_corpus.toIterator.flatMapMetered(task) { dir =>
+    val dociter = params.input.toIterator.flatMapMetered(task) { dir =>
         GridDocFactory.read_raw_documents_from_textdb(get_file_handler,
           dir, "-training")
     }

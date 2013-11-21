@@ -170,7 +170,7 @@ trait HadoopGeolocateTextDBMixin extends HadoopTextDBMixin {
   val driver: TDriver
 
   def corpus_suffix = driver.document_textdb_suffix
-  def corpus_dirs = driver.params.input_corpus
+  def corpus_dirs = driver.params.input
 }
 
 abstract class HadoopGeolocateApp(
@@ -249,7 +249,7 @@ class DocEvalMapper
       driver.params.parser.error(
         "For Hadoop, '--eval-format' must be 'internal'")
     else {
-      if (driver.params.input_corpus.length != 1) {
+      if (driver.params.input.length != 1) {
         driver.params.parser.error(
           "FIXME: For Hadoop, currently need exactly one corpus")
       }
