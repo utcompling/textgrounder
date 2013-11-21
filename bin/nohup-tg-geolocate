@@ -4,7 +4,20 @@
 # a file with a tag describing the args to tg-geolocate, and results saved
 # to a results file containing the same tag in its name.
 
+no_results=
+while true; do
+  case "$1" in
+    --no-results ) no_results=t; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
 set -e
 tag=`tg-geolocate --quiet --app 'run opennlp.textgrounder.geolocate.GeolocateDocumentTagApp' "$@"`
 dated_tag=`run-nohup -i "$tag" --output-full-id tg-geolocate`
-run-nohup --full-id "$dated_tag" tg-geolocate "$@" --results "results.$dated_tag"
+if [ "$no_results" = t ]; then
+  run-nohup --full-id "$dated_tag" tg-geolocate "$@"
+else
+  run-nohup --full-id "$dated_tag" tg-geolocate "$@" --results "results.$dated_tag"
+fi
