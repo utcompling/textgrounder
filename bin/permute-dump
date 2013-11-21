@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# USAGE: permute-dump WIKITAG
+#
+# See usage note below.
+
+if [ -z "$*" ]; then
+  cat >&2 <<FOO
+Usage: $0 WIKITAG
+
+This script creates a permuted article dump file from a raw (unpermuted)
+Wikipedia dump (as downloaded from dumps.wikipedia.org). WIKITAG is
+something like 'dewiki-20120225'.  The permuting is done so that the
+articles can be split into training/dev/test subsets in the obvious way
+without running into problems due to the non-random ordering of articles
+in the original dump file.
+
+This script is normally run by 'download-preprocess-wiki' and implements
+the 'permute' step.
+
+See README.preprocess and the comments in the source file for more details.
+
+FOO
+  exit 1
+fi
+
+dumppref="$1"; shift
+
+# This needs to be set for all subprocesses we call
+export WP_VERSION="$dumppref"
+
+# Generate article-data file from original dump
+USE_PERMUTED=no run-processwiki article-data
+
+# Generate a permuted dump file.
+run-permute all
+
