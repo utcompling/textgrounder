@@ -275,7 +275,8 @@ package object argparser {
    * for Int-type arguments.
    */
   implicit def convertInt(rawval: String, name: String, ap: ArgParser) = {
-    try { rawval.toInt }
+    val canonval = rawval.replace("_","").replace(",","")
+    try { canonval.toInt }
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
@@ -289,7 +290,8 @@ package object argparser {
    * for Double-type arguments.
    */
   implicit def convertDouble(rawval: String, name: String, ap: ArgParser) = {
-    try { rawval.toDouble }
+    val canonval = rawval.replace("_","").replace(",","")
+    try { canonval.toDouble }
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
