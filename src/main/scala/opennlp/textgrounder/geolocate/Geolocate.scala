@@ -563,7 +563,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 //          }
           case "internal" => {
             val docstats =
-              params.input_corpus.toIterator.flatMap(dir =>
+              params.input.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir, document_textdb_suffix))
             val evalobj = create_cell_evaluator(ranker)
@@ -698,7 +698,7 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
      * formatted as 'name=value'.
      */
     val param_handling = Seq[(String, Any => String)](
-      ("input-corpus", xs => xs.asInstanceOf[Seq[String]] map { x =>
+      ("input", xs => xs.asInstanceOf[Seq[String]] map { x =>
         val (dir, tail) = util.io.localfh.split_filename(x)
         if (dir.endsWith("twitter-geotext"))
           "geotext-" + tail.replace("docthresh-", "thresh")
