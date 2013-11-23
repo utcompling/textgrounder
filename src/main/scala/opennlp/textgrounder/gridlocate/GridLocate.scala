@@ -643,17 +643,23 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
+  val rerank_features_simple_word_choices =
+    Seq("unigram-binary", "unigram-count")
+
   val rerank_features_matching_word_choices =
     Seq("unigram-binary", "unigram-count", "unigram-count-product",
-        "unigram-probability", "unigram-prob-product", "kl")
+        "unigram-probability", "unigram-prob-product", "kl").map {
+      "matching" + _ }
 
   val rerank_features_matching_ngram_choices =
-    Seq("ngram-binary", "ngram-count", "ngram-count-product")
+    Seq("ngram-binary", "ngram-count", "ngram-count-product").map {
+      "matching" + _ }
 
   var rerank_features =
     ap.option[String]("rerank-features",
       default = "combined",
       choices = Seq("all-kl", "combined", "trivial") ++
+        rerank_features_simple_word_choices ++
         rerank_features_matching_word_choices ++
         rerank_features_matching_ngram_choices,
       help = """Which features to use in the reranker, to characterize the
@@ -663,32 +669,37 @@ serves as one of the features.  Possibilities are:
 
 'trivial' (no features beyond the original score, for testing purposes);
 
-'unigram-binary' (use the value 1 when a word exists in both document
+'unigram-binary' (use the value 1 when a word exists in the document,
+  0 otherwise);
+
+'unigram-count' (use the document word count when a word exists the document);
+
+'matching-unigram-binary' (use the value 1 when a word exists in both document
   and cell, 0 otherwise);
 
-'unigram-count' (use the document word count when a word exists in both
+'matching-unigram-count' (use the document word count when a word exists in both
 document and cell);
 
-'unigram-count-product' (use the product of the document and cell
+'matching-unigram-count-product' (use the product of the document and cell
   word count when a word exists in both document and cell);
 
-'unigram-probability' (use the document probability when a word exists
+'matching-unigram-probability' (use the document probability when a word exists
   in both document and cell);
 
-'unigram-prob-product' (use the product of both the document and cell
+'matching-unigram-prob-product' (use the product of both the document and cell
   probability when a word exists in both document and cell);
 
-'kl' (when a word exists in both document and cell, use the individual
+'matching-kl' (when a word exists in both document and cell, use the individual
   KL-divergence component score between document and cell for the word,
   else 0);
 
-'ngram-binary' (similar to 'unigram-binary' but include features for
+'matching-ngram-binary' (similar to 'unigram-binary' but include features for
   N-grams up to --max-rerank-ngram);
 
-'ngram-count' (similar to 'unigram-count' but include features for
+'matching-ngram-count' (similar to 'unigram-count' but include features for
   N-grams up to --max-rerank-ngram);
 
-'ngram-count-product' (similar to 'unigram-count-product' but include
+'matching-ngram-count-product' (similar to 'unigram-count-product' but include
   N-grams up to --max-rerank-ngram);
 
 'all-kl' (for all words in the document, use the KL-divergence score between
@@ -1246,7 +1257,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_candidate_instance_factory = {
     def create_fact(ty: String): CandidateInstFactory[Co] = {
-      if (params.rerank_features_matching_word_choices contains ty)
+      if (params.rerank_features_simple_word_choices contains ty)
+        new WordCandidateInstFactory[Co](ty)
+      else if (params.rerank_features_matching_word_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
         new NgramMatchingCandidateInstFactory[Co](ty)
@@ -1257,7 +1270,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           new KLDivCandidateInstFactory[Co]
         case "combined" =>
           new CombiningCandidateInstFactory[Co](
-            params.rerank_features_matching_word_choices.map(
+            (params.rerank_features_simple_word_choices ++
+             params.rerank_features_matching_word_choices).map(
               create_fact(_)))
       }
     }

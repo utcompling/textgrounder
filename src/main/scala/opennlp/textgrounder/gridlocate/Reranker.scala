@@ -213,6 +213,27 @@ class KLDivCandidateInstFactory[Co] extends
 
 /**
  * A simple factory for generating candidate instances for a document, using
+ * the presence of words in the document.
+ *
+ * @param value How to compute the value assigned to the words:
+ *
+ * - `unigram-binary`: always assign 1
+ * - `unigram-count`: use document word count
+ */
+class WordCandidateInstFactory[Co](value: String) extends
+    WordByWordCandidateInstFactory[Co] {
+  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
+      celldist: UnigramLangModel) = {
+    val wordval = value match {
+      case "unigram-binary" => 1
+      case "unigram-count" => count
+    }
+    Some(wordval)
+  }
+}
+
+/**
+ * A simple factory for generating candidate instances for a document, using
  * the presence of matching words between document and cell.
  *
  * @param value How to compute the value assigned to the words that are
