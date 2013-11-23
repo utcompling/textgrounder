@@ -337,7 +337,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
 /**
  * Mix-in for training a classifier that supports the possibility of multiple
- * multiple correct labels for a given training instance.
+ * correct labels for a given training instance.
  *
  * @tparam DI Type of data instance used in training the classifier.
  */
