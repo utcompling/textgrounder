@@ -52,21 +52,30 @@ for x in ${1+"$@"}; do
     echo "[$x]"
     echo ""
   fi
-  args=$(grep -m 1 '^Arguments:' $x)
-  args=$(echo $args | perl -pe 's/^Arguments: //;' -e 's/--input(-corpus)? [^ ]*\///')
-  args=$(echo $args | perl -pe 's/  *--*([^ ]*)  *([^-][^ ]*)/ $1=$2/g;' -e 's/  *--*([^ ]*)/ $1/g;' -e 's/ /./g;' -e 's/\//-/g;')
-  results=$(sed -n '/^Final results/,/^Ending final results/p' $x)
-  mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
-  median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
+  args=$(grep -m 1 '^Nohup script invoked as:.* --full-id ' "$x")
+  if [ -n "$args" ]; then
+    args=$(echo $args | perl -pe 's/^.*? --full-id (\S+) .*$/$1/')
+  else
+    args=$(grep -m 1 '^Arguments:' "$x")
+    args=$(echo $args | perl -pe 's/^Arguments: //;' -e 's/--input(-corpus)? [^ ]*\///')
+    args=$(echo $args | perl -pe 's/  *--*([^ ]*)  *([^-][^ ]*)/ $1=$2/g;' -e 's/  *--*([^ ]*)/ $1/g;' -e 's/ /./g;' -e 's/\//-/g;')
+  fi
+  results=$(sed -n '/^Final results/,/^Ending final results/p' "$x")
+  mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/^.*distance = +(\S+).*/$1/')
+  median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/^.*distance = +(\S+).*/$1/')
   avg=
   if [ -n "$mean" -a -n "$median" ]; then
+    if [ -n "$debug" ]; then
+      echo "Extracted mean: [$mean]"
+      echo "Extracted median: [$median]"
+    fi
     avg=$(echo "2k $mean $median + 2/p" | dc)
   fi
   acc=$(echo "$results" | egrep 'Percent correct at rank <= 1 =' | perl -pe 's/.*= (.*?)%.*/$1/')
   numeval=$(echo "$results" | egrep 'Number of instances' | perl -pe 's/.*= (.*?) *$/$1/')
   numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
-  finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' $x)
-  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours /:/;' -e 's/ minutes /:/;' -e 's/ seconds//;')
+  finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' "$x")
+  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours? /:/;' -e 's/ minutes? /:/;' -e 's/ seconds?//;')
   if [ -n "$debug" ]; then
     echo "Runtime0: [$runtime0]"
   fi
@@ -77,6 +86,11 @@ for x in ${1+"$@"}; do
     print("$hrs$mins:$secs");
   ')
   rss=$(echo "$finalstats" | egrep 'Memory usage, actual' | perl -pe 's/.*: (.*?) bytes/$1/')
+  if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
+    skip=no
+  else
+    skip=yes
+  fi
   numeval=$(printf '%7s' "$numeval")
   numtrain=$(printf '%8s' "$numtrain")
   acc=$(printf '%6s' "$acc")
@@ -101,10 +115,8 @@ for x in ${1+"$@"}; do
     if [ -n "$avg" ]; then
       echo "$args   Avg-mean-median true error distance = $avg km"
     fi
-  else
-    if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
-      echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
-    fi
+  elif [ "$skip" = no ]; then
+    echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
   fi
 done
 }
