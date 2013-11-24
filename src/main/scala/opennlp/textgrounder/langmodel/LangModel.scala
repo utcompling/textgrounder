@@ -140,6 +140,19 @@ trait FastSlowKLDivergence {
  * case-folding the words (typically by converting to all lowercase), ignoring
  * words seen in a stoplist, converting some words to a generic -OOV-,
  * eliminating words seen less than a minimum nmber of times, etc.
+ *
+ * In this case, the difference between a builder and a factory is that
+ * the factory handles the creation of the LangModel object and stores
+ * global values needed by the language model during its use. Currently
+ * this consists of back-off statistics and word weights. On the other
+ * hand, the builder handles the population of the language model from
+ * external sources. For each subclass of LangModel, there is a
+ * corresponding factory class, but that isn't the case for builders.
+ * For example, there is one default builder class for all unigram
+ * language models and another builder class that allows for filtering
+ * out all but a specified set of words. (FIXME: There isn't a clear
+ * conceptual distinction between a whitelist of words and the set of
+ * words allowed through the filter. They should be merged.)
  */
 abstract class LangModelBuilder(factory: LangModelFactory) {
   /**
@@ -154,12 +167,6 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    */
   protected def imp_add_language_model(lm: LangModel, other: LangModel,
     partial: WordCount = 1.0)
-
-  /**
-   * Actual implementation of `finish_before_global` by subclasses.
-   * External callers should use `finish_before_global`.
-   */
-  protected def imp_finish_before_global(lm: LangModel)
 
   /**
    * Incorporate a document into the lang model.  The document is described
@@ -185,28 +192,12 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
   }
 
   /**
-   * Partly finish computation of lang model.  This is called when the
-   * lang model has been completely populated with words, and no more
-   * modifications (e.g. incorporation of words or other lang models) will
-   * be made to the lang model.  It should do any additional changes that
-   * depend on the lang model being complete, but which do not depend on
-   * the global language-model statistics having been computed. (These
-   * statistics can be computed only after *all* language models that
-   * are used to create these global statistics have been completely
-   * populated.)
-   *
-   * @see #finish_after_global
-   * 
+   * Partly finish computation of lang model.  This is called from
+   * the lang model's `finish_before_global`, to handle builder-
+   * specific changes to the lang model (e.g. implementing
+   * `--minimum-word-count`).
    */
-  def finish_before_global(lm: LangModel) {
-    assert(!lm.finished)
-    assert(!lm.finished_before_global)
-    imp_finish_before_global(lm)
-    if (lm.empty)
-      throw new LangModelCreationException(
-        "Attempt to create an empty lang model: %s" format lm)
-    lm.finished_before_global = true
-  }
+  def finish_before_global(lm: LangModel)
 
   /**
    * Create the language model of a document, given the value of the field
@@ -421,6 +412,20 @@ abstract class LangModel(val factory: LangModelFactory) {
   }
 
   /**
+   * Actual implementation of `finish_before_global` by subclasses.
+   * External callers should use `finish_before_global`.
+   */
+  protected def imp_finish_before_global() {
+    factory.builder.finish_before_global(this)
+  }
+
+  /**
+   * Actual implementation of `finish_after_global` by subclasses.
+   * External callers should use `finish_after_global`.
+   */
+  protected def imp_finish_after_global()
+
+  /**
    * Partly finish computation of lang model.  This is called when the
    * lang model has been completely populated with words, and no more
    * modifications (e.g. incorporation of words or other lang models) will
@@ -435,14 +440,14 @@ abstract class LangModel(val factory: LangModelFactory) {
    * 
    */
   def finish_before_global() {
-    factory.builder.finish_before_global(this)
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_finish_before_global()
+    if (empty)
+      throw new LangModelCreationException(
+        "Attempt to create an empty lang model: %s" format this)
+    finished_before_global = true
   }
-
-  /**
-   * Actual implementation of `finish_after_global` by subclasses.
-   * External callers should use `finish_after_global`.
-   */
-  protected def imp_finish_after_global()
 
   /**
    * Completely finish computation of the language model.  This is called

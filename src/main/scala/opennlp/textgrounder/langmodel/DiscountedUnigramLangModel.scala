@@ -30,9 +30,11 @@ import LangModel._
 
 abstract class DiscountedUnigramLangModelFactory(
   create_builder: LangModelFactory => LangModelBuilder,
+  word_weights: collection.Map[Word, Double],
+  missing_word_weight: Double,
   val interpolate: Boolean,
   val tf_idf: Boolean
-) extends UnigramLangModelFactory {
+) extends UnigramLangModelFactory(word_weights, missing_word_weight) {
   val builder = create_builder(this)
 
   // Estimate of number of unseen word types for all documents

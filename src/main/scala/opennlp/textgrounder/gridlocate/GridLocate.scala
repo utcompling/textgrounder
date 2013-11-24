@@ -19,19 +19,22 @@
 package opennlp.textgrounder
 package gridlocate
 
+import collection.mutable
+
 import util.argparser._
 import util.spherical._
 import util.experiment._
 import util.io.FileHandler
 import util.metering._
 import util.os.output_resource_usage
-import util.print.errprint
+import util.print._
 import util.textdb._
 import util.debug._
 
 import learning.{ArrayVector, Ranker}
 import learning.perceptron._
 import langmodel._
+import LangModel._
 
 /*
 
@@ -195,6 +198,27 @@ them, provided there is only one textdb in the directory.
 The file should be in textdb format, with `name`, `coord` and `salience`
 fields. If omitted, cells will be identified by the most salient document
 in the cell, if documents have their own salience values.""")
+
+  var weights_file =
+    ap.option[String]("weights-file",
+       metavar = "FILE",
+       help = """File containing a set of word weights for weighting words
+non-uniformly (e.g. so that more geographically informative words are weighted
+higher). The file should be in textdb format, with `word` and `weight` fields.
+The weights do not need to be normalized.
+
+The parameter value can be any of the following: Either the data or schema
+file of the database; the common prefix of the two; or the directory containing
+them, provided there is only one textdb in the directory.""")
+
+  var missing_word_weight =
+    ap.option[Double]("missing-word-weight", "mww",
+       metavar = "WEIGHT",
+       help = """Weight to use for words not given in the word-weight
+file, when `--weights-file` is given. If negative (the default), use
+the average of all weights in the file, which treats them as if they
+have no special weight. It is possible to set this value to zero, in
+which case unspecified words will be ignored.""")
 
   var results =
     ap.option[String]("r", "results",
@@ -889,7 +913,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * command-line parameters. This is a factory for creating language models.
    */
   protected def create_lang_model_factory(lang_model_type: String,
-      lm_spec: (String, String), interpolate: String) = {
+      lm_spec: (String, String), interpolate: String,
+      word_weights: collection.Map[Word, Double],
+      missing_word_weight: Double
+  ) = {
     val create_builder = get_lang_model_builder_creator(lang_model_type)
     val (lm, lmparams) = lm_spec
     if (lm == "unsmoothed-ngram")
@@ -901,7 +928,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Dirichlet factor must be >= 0, but is %g"
           format dirichlet_factor)
       new DirichletUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf, dirichlet_factor)
+        word_weights, missing_word_weight, interpolate, params.tf_idf,
+        dirichlet_factor)
     }
     else if (lm == "jelinek-mercer") {
       val jelinek_factor = params.parser.parseSubParams(lm, lmparams,
@@ -910,13 +938,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Jelinek factor must be between 0.0 and 1.0, but is %g"
           format jelinek_factor)
       new JelinekMercerUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf, jelinek_factor)
+        word_weights, missing_word_weight, interpolate, params.tf_idf,
+        jelinek_factor)
     }
     else {
       if (lmparams.contains(':'))
         param_error("Parameters not allowed for pseudo-Good-Turing")
       new PseudoGoodTuringUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf)
+        word_weights, missing_word_weight, interpolate, params.tf_idf)
     }
   }
 
@@ -925,16 +954,20 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * objects needed by a document. Currently there may be two if
    * ranking and reranking require different dists.
    */
-  protected def create_doc_lang_model_factory = {
+  protected def create_doc_lang_model_factory(
+      word_weights: collection.Map[Word, Double],
+      missing_word_weight: Double
+  ) = {
     val grid_lang_model_factory =
       create_lang_model_factory(grid_lang_model_type, params.lang_model,
-        params.interpolate)
+        params.interpolate, word_weights, missing_word_weight)
     val rerank_lang_model_factory =
       if (grid_lang_model_type == rerank_lang_model_type)
         grid_lang_model_factory
       else
         create_lang_model_factory(rerank_lang_model_type,
-          params.rerank_lang_model, params.rerank_interpolate)
+          params.rerank_lang_model, params.rerank_interpolate,
+          word_weights, missing_word_weight)
     new DocLangModelFactory(grid_lang_model_factory, rerank_lang_model_factory)
   }
 
@@ -976,7 +1009,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val sleep_at = debugval("sleep-at-docs")
       if (sleep_at != "") {
         if (task.num_processed == sleep_at.toInt) {
-          errprint("Reached %s documents, sleeping ...")
+          errprint("Reached %s documents, sleeping...")
           Thread.sleep(5000)
         }
       }
@@ -999,7 +1032,44 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
-    val lang_model_factory = create_doc_lang_model_factory
+    /**
+     * Map containing relative weights to assign to differing words. If
+     * this map is empty, all words have the same weights. Otherwise,
+     * we use the weights as given, normalizing as necessary. For words
+     * that aren't seen, we assign them the value of `missing_word_weight`,
+     * which by default is set to the average weight.
+     */
+    val word_weights = mutable.Map[Word,Double]()
+
+    var missing_word_weight = 0.0
+
+    if (params.weights_file != null) {
+      errprint("Reading word weights...")
+      for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
+        val word = row.gets("word")
+        val weight = row.get[Double]("weight")
+        val wordint = memoizer.memoize(word)
+        if (word_weights contains wordint)
+          warning("Word %s with weight %s already seen with weight %s",
+            word, weight, word_weights(wordint))
+        else if (weight < 0)
+          warning("Word %s with invalid negative weight %s",
+            word, weight)
+        else
+          word_weights(wordint) = weight
+      }
+      errprint("Reading word weights... done.")
+      missing_word_weight =
+        if (params.missing_word_weight >= 0)
+          params.missing_word_weight
+        else {
+          val values = word_weights.values
+          values.sum / values.size
+        }
+    }
+
+    val lang_model_factory = create_doc_lang_model_factory(word_weights,
+      missing_word_weight)
     val docfact = create_document_factory(lang_model_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables
@@ -1017,23 +1087,26 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // System.exit(0)
     }
     grid.finish()
+
     if (params.salience_file != null) {
-      errprint("Reading salient points ...")
+      errprint("Reading salient points...")
       for (row <- TextDB.read_textdb(get_file_handler, params.salience_file)) {
         val name = row.gets("name")
         val coord = deserialize_coord(row.gets("coord"))
         val salience = row.get[Double]("salience")
         grid.add_salient_point(coord, name, salience)
       }
-      errprint("Reading salient points ... done.")
+      errprint("Reading salient points... done.")
     }
-    if(params.output_training_cell_lang_models) {
-      for(cell <- grid.iter_nonempty_cells) {
-        print(cell.shortstr+"\t")
+
+    if (params.output_training_cell_lang_models) {
+      for (cell <- grid.iter_nonempty_cells) {
+        outout(cell.shortstr+"\t")
         val lang_model = cell.lang_model
-        println(lang_model.toString)
+        outprint("%s", lang_model.grid_lm.debug_string)
       }
     }
+
     grid
   }
 
