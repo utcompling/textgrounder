@@ -19,6 +19,8 @@
 package opennlp.textgrounder
 package langmodel
 
+import LangModel._
+
 import util.print.errprint
 
 import util.debug._
@@ -40,10 +42,13 @@ import util.debug._
  */ 
 class PseudoGoodTuringUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
+    word_weights: collection.Map[Word, Double],
+    missing_word_weight: Double,
     interpolate_string: String,
     tf_idf: Boolean
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, interpolate_string == "yes", tf_idf
+  create_builder, word_weights, missing_word_weight,
+  interpolate_string == "yes", tf_idf
 ) {
   // Total number of types seen once
   var total_num_types_seen_once = 0

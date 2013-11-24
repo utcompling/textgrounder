@@ -423,7 +423,7 @@ class DefaultNgramLangModelBuilder(
     //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
   } 
 
-  protected def imp_finish_before_global(lm: LangModel) {
+  def finish_before_global(lm: LangModel) {
     val model = lm.asInstanceOf[NgramLangModel].model
     // A table listing OOV ngrams, e.g. Seq(OOV, OOV), Seq(OOV, OOV, OOV), etc.
     val oov_hash = mutable.Map[Int, Ngram]()

@@ -122,6 +122,25 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
+  /**
+   * Sum of all word weights for all word tokens in the language model.
+   * This is used to normalize the computation in `get_nbayes_logprob`
+   * so that it computes a weighted average. This isn't strictly
+   * necessary for plain ranking, but ensures that the scores are
+   * more comparable across different documents when training a reranker.
+   */
+  var total_word_weight = 1.0
+
+  override def imp_finish_before_global() {
+    super.imp_finish_before_global()
+    if (factory.word_weights.size > 0) {
+      total_word_weight =
+        (for ((word, count) <- model.iter_items) yield
+          count * factory.word_weights.getOrElse(word,
+            factory.missing_word_weight)).sum
+    }
+  }
+
   def item_to_string(item: Item) = memoizer.unmemoize(item)
 
   /**
@@ -187,7 +206,7 @@ abstract class UnigramLangModel(
    */
   def kl_divergence_34(other: UnigramLangModel): Double
   
-  def get_nbayes_factor(word: Item, count: WordCount) = {
+  protected def get_nbayes_factor(word: Item, count: WordCount) = {
     val value = lookup_word(word)
     assert(value >= 0)
     // The probability returned will be 0 for words never seen in the
@@ -198,12 +217,42 @@ abstract class UnigramLangModel(
     else 0.0
   }
 
+  /**
+   * Return a Naive-Bayes score for comparing two language models.
+   * This returns log p(thismodel|othermodel). Note that, for the
+   * purposes of determining a ranking of a document over e.g. cells,
+   * which essentially involves computing p(othermodel|thismodel),
+   * the scores returned by this function can only be compared
+   * with other scores returned for the same value of 'thismodel';
+   * e.g. the scores can be used for ranking different cells with
+   * respect to a given document but cannot be used for comparing
+   * different documents. (FIXME: This can cause problems, e.g., in
+   * using the returned score as a feature in a reranking model,
+   * because that will compute a single weight to use in weighting
+   * the base ranking score for all test documents, relative to
+   * other features. In this case the problem is the additive
+   * factor -log p(doc) that is ignored when comparing different
+   * cells relative to a given document. Possibly it would be
+   * sufficient to add a factor to all scores so that the top-
+   * ranked cell always has a score of 0 (or any other fixed value).)
+   */
   def get_nbayes_logprob(xlangmodel: LangModel) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
-    // FIXME: Also use baseline (prior probability)
-    langmodel.model.iter_items.map {
-      case (word, count) => get_nbayes_factor(word, count)
-    }.sum
+    val weights = factory.word_weights
+    if (weights.size == 0)
+      langmodel.model.iter_items.map {
+        case (word, count) => get_nbayes_factor(word, count)
+      }.sum
+    else {
+      val sum =
+        langmodel.model.iter_items.map {
+          case (word, count) => {
+            val weight = weights.getOrElse(word, factory.missing_word_weight)
+            weight * get_nbayes_factor(word, count)
+          }
+        }.sum
+      sum / total_word_weight
+    }
   }
 
   def get_most_contributing_grams(xlangmodel: LangModel,
@@ -388,9 +437,8 @@ class DefaultUnigramLangModelBuilder(
     imp_add_keys_values(lm, keys, values, num_words)
   }
 
-  protected def imp_finish_before_global(gendist: LangModel) {
-    val lm = gendist.asInstanceOf[UnigramLangModel]
-    val model = lm.model
+  def finish_before_global(lm: LangModel) {
+    val model = lm.asInstanceOf[UnigramLangModel].model
     val oov = memoizer.memoize("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate words whose count
@@ -429,16 +477,16 @@ class FilterUnigramLangModelBuilder(
     factory, ignore_case, stopwords, whitelist, minimum_word_count
   ) {
 
-  override def finish_before_global(xlang_model: LangModel) {
-    super.finish_before_global(xlang_model)
+  override def finish_before_global(xlm: LangModel) {
+    super.finish_before_global(xlm)
 
-    val lang_model = xlang_model.asInstanceOf[UnigramLangModel]
-    val model = lang_model.model
+    val lm = xlm.asInstanceOf[UnigramLangModel]
+    val model = lm.model
     val oov = memoizer.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
     for ((word, count) <- model.iter_items
-         if !(filter_words contains lang_model.item_to_string(word))) {
+         if !(filter_words contains lm.item_to_string(word))) {
       model.remove_item(word)
       model.add_item(oov, count)
     }
@@ -448,4 +496,7 @@ class FilterUnigramLangModelBuilder(
 /**
  * General factory for UnigramLangModel language models.
  */ 
-trait UnigramLangModelFactory extends LangModelFactory { }
+abstract class UnigramLangModelFactory(
+    val word_weights: collection.Map[Word, Double],
+    val missing_word_weight: Double
+) extends LangModelFactory { }

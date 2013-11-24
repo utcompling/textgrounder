@@ -19,17 +19,22 @@
 package opennlp.textgrounder
 package langmodel
 
+import LangModel._
+
 /**
  * This class implements Jelinek-Mercer discounting, the simplest type of
  * discounting where we just use a constant discount factor.
  */ 
 class JelinekMercerUnigramLangModelFactory(
-  create_builder: LangModelFactory => LangModelBuilder,
-  interpolate_string: String,
-  tf_idf: Boolean,
-  val jelinek_factor: Double
+    create_builder: LangModelFactory => LangModelBuilder,
+    word_weights: collection.Map[Word, Double],
+    missing_word_weight: Double,
+    interpolate_string: String,
+    tf_idf: Boolean,
+    val jelinek_factor: Double
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, interpolate_string != "no", tf_idf
+  create_builder, word_weights, missing_word_weight,
+  interpolate_string != "no", tf_idf
 ) {
   def create_lang_model = new JelinekMercerUnigramLangModel(this)
 }
