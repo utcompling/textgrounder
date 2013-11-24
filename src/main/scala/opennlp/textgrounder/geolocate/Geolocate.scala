@@ -707,7 +707,9 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
       } mkString "+"
       ),
       ("ranker", valonly),
-      ("lang-model", valonly),
+      ("lang-model", xs => xs match {
+        case (x:String, y:String) => x + y
+      }),
       ("interpolate", x => x match {
         case "yes" => "interpolate"
         case "no" => "backoff"
