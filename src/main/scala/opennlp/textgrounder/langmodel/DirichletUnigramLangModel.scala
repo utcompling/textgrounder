@@ -19,17 +19,22 @@
 package opennlp.textgrounder
 package langmodel
 
+import LangModel._
+
 /**
  * This class implements Dirichlet discounting, where the discount factor
  * depends on the size of the document.
  */ 
 class DirichletUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
+    word_weights: collection.Map[Word, Double],
+    missing_word_weight: Double,
     interpolate_string: String,
     tf_idf: Boolean,
     val dirichlet_factor: Double
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, interpolate_string != "no", tf_idf
+  create_builder, word_weights, missing_word_weight,
+  interpolate_string != "no", tf_idf
 ) {
   def create_lang_model = new DirichletUnigramLangModel(this)
 }
