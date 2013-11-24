@@ -280,7 +280,7 @@ process all.""")
   var dirichlet_factor_default = 500.0
   var lang_model =
     ap.optionWithParams[String]("lang-model", "lm", "word-dist", "wd",
-      default = ("pseudo-good-turing", ""),
+      default = ("dirichlet", ":1,000,000"),
       aliasedChoices = Seq(
         Seq("pseudo-good-turing", "pgt"),
         Seq("dirichlet"),
@@ -294,7 +294,8 @@ a unigram language model), and 'unsmoothed-ngram' (an unsmoothed n-gram
 language model). Default '%%default'.
 
 For Dirichlet and Jelinek, an optional smoothing parameter can be given,
-following a colon, e.g. 'jelinek:0.2' or 'dirichlet:10000'. The higher
+following a colon, e.g. 'jelinek:0.2' or 'dirichlet:10000'. Commas and
+underscores can be used to make large numbers easier to read. The higher
 the value, the more smoothing is done. Default is %g for Jelinek and
 %g for Dirichlet. The parameter must be between 0.0 and 1.0 for Jelinek,
 and >= 0.0 for Dirichlet. In both cases, a value of 0.0 means no smoothing
@@ -527,7 +528,7 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 
   ////////////// Begin former GridLocateDocParameters
 
-  protected def ranker_default = "partial-kl-divergence"
+  protected def ranker_default = "naive-bayes-no-baseline"
   protected def ranker_choices = Seq(
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
         Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
