@@ -266,7 +266,7 @@ class NaiveBayesGridRanker[Co](
       } else (1.0, 0.0))
 
     val word_logprob =
-      cell.grid_lm.get_nbayes_logprob(lang_model)
+      cell.grid_lm.model_logprob(lang_model)
     val baseline_logprob =
       log(cell.num_docs.toDouble /
           grid.total_num_docs)

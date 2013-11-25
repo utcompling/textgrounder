@@ -571,12 +571,11 @@ abstract class LangModel(val factory: LangModelFactory) {
 
   /**
    * For a document described by its language model, return the
-   * log probability log p(langmodel|other langmodel) using a Naive Bayes
-   * algorithm.
+   * log probability log p(langmodel|other langmodel).
    *
    * @param langmodel Language model of document.
    */
-  def get_nbayes_logprob(langmodel: LangModel): Double
+  def model_logprob(langmodel: LangModel): Double
 
   /**
    * Name of class, for `toString`.
