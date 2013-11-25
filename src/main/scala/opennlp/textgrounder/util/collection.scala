@@ -810,7 +810,7 @@ protected class CollectionPackage {
   /**
    * Combine two maps, adding up the numbers where overlap occurs.
    */
-  def combine_maps[T, U <: Int](map1: Map[T, U], map2: Map[T, U]) = {
+  def combine_int_maps[T](map1: Map[T, Int], map2: Map[T, Int]) = {
       /* We need to iterate over one of the maps and add each element to the
          other map, checking first to see if it already exists.  Make sure
          to iterate over the smallest map, so that repeated combination of
@@ -819,6 +819,20 @@ protected class CollectionPackage {
         map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
       else
         map2 ++ map1.map { case (k,v) => k -> (v + map2.getOrElse(k,0)) }
+    }
+
+  /**
+   * Combine two maps, adding up the numbers where overlap occurs.
+   */
+  def combine_double_maps[T](map1: Map[T, Double], map2: Map[T, Double]) = {
+      /* We need to iterate over one of the maps and add each element to the
+         other map, checking first to see if it already exists.  Make sure
+         to iterate over the smallest map, so that repeated combination of
+         maps will have O(n) rather than worst-case O(N^2). */
+      if (map1.size > map2.size)
+        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0.0)) }
+      else
+        map2 ++ map1.map { case (k,v) => k -> (v + map2.getOrElse(k,0.0)) }
     }
 
   /**
