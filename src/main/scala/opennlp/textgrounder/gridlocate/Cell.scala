@@ -36,12 +36,11 @@ import langmodel.LangModelFactory
  * Language model resulting from combining the individual language models
  * of a number of documents.  We track the number of documents making up
  * the language model, as well as the combined salience for all of these
- * documents. (The primary reason
- * for documents not contributing to the language model is that they're not
- * in the training set; see comments below.  However, some documents simply
- * don't have language models defined for them in the document file -- e.g.
- * if there was a problem extracting the document's words in the
- * preprocessing stage.)
+ * documents. (The primary reason for documents not contributing to the
+ * language model is that they're not in the training set; see comments
+ * below.  However, some documents simply don't have language models
+ * defined for them in the document file -- e.g. if there was a problem
+ * extracting the document's words in the preprocessing stage.)
  *
  * Note that we embed the actual object describing the language model
  * as a field in this object, rather than extending (subclassing) LangModel.
@@ -180,8 +179,12 @@ abstract class GridCell[Co](
       get_centroid
   }
 
-  /** Language model of cell. */
+  /** Language model set of cell. */
   def lang_model = combined_lang_model.lang_model
+  /** Normal language model of cell. */
+  def grid_lm = combined_lang_model.lang_model.grid_lm
+  /** Language model of cell used during reranking. */
+  def rerank_lm = combined_lang_model.lang_model.rerank_lm
   /** Number of documents in cell. */
   def num_docs = combined_lang_model.num_docs
   /** Whether the cell is empty. */
@@ -208,10 +211,10 @@ abstract class GridCell[Co](
     "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
       describe_location, unfinished, contains,
       num_docs,
-      lang_model.grid_lm.model.num_types,
-      lang_model.grid_lm.model.num_tokens,
-      lang_model.rerank_lm.model.num_types,
-      lang_model.rerank_lm.model.num_tokens,
+      grid_lm.model.num_types,
+      grid_lm.model.num_tokens,
+      rerank_lm.model.num_types,
+      rerank_lm.model.num_tokens,
       salience)
   }
 
@@ -226,13 +229,13 @@ abstract class GridCell[Co](
     "central-point" -> get_central_point,
     "num-documents" -> num_docs,
     "grid-num-word-types" ->
-      lang_model.grid_lm.model.num_types,
+      grid_lm.model.num_types,
     "grid-num-word-tokens" ->
-      lang_model.grid_lm.model.num_tokens,
+      grid_lm.model.num_tokens,
     "rerank-num-word-types" ->
-      lang_model.rerank_lm.model.num_types,
+      rerank_lm.model.num_types,
     "rerank-num-word-tokens" ->
-      lang_model.rerank_lm.model.num_tokens,
+      rerank_lm.model.num_tokens,
     "salience" -> salience,
     "most-salient-document" ->
       Encoder.string(most_salient_document),

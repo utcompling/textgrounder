@@ -173,17 +173,16 @@ class TimeGrid(
         num_non_empty_cells += 1
       for ((cell, name) <-
           Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
-        val comdist = cell.combined_lang_model
         errprint("Number of documents in %s-chunk: %s", name,
-          comdist.num_docs)
+          cell.num_docs)
         errprint("Number of types in %s-chunk grid lm: %s", name,
-          comdist.lang_model.grid_lm.model.num_types)
+          cell.grid_lm.model.num_types)
         errprint("Number of tokens in %s-chunk grid lm: %s", name,
-          comdist.lang_model.grid_lm.model.num_tokens)
+          cell.grid_lm.model.num_tokens)
         errprint("Number of types in %s-chunk rerank lm: %s", name,
-          comdist.lang_model.rerank_lm.model.num_types)
+          cell.rerank_lm.model.num_types)
         errprint("Number of tokens in %s-chunk rerank lm: %s", name,
-          comdist.lang_model.rerank_lm.model.num_tokens)
+          cell.rerank_lm.model.num_tokens)
       }
     }
   }
@@ -352,7 +351,7 @@ object LangModelComparer {
   def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) =
     /* FIXME: What about rerank_lm? */
-    grid.pairs(category).before_cell.lang_model.grid_lm match {
+    grid.pairs(category).before_cell.grid_lm match {
       case _: UnigramLangModel =>
         new UnigramComparer(min_prob, max_items)
       case _: NgramLangModel =>
