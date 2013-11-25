@@ -124,7 +124,7 @@ abstract class UnigramLangModel(
 
   /**
    * Sum of all word weights for all word tokens in the language model.
-   * This is used to normalize the computation in `get_nbayes_logprob`
+   * This is used to normalize the computation in `model_logprob`
    * so that it computes a weighted average. This isn't strictly
    * necessary for plain ranking, but ensures that the scores are
    * more comparable across different documents when training a reranker.
@@ -134,6 +134,8 @@ abstract class UnigramLangModel(
   override def imp_finish_before_global() {
     super.imp_finish_before_global()
     if (factory.word_weights.size > 0) {
+      // We multiply each weight by the word count because logically we
+      // are weighting each word.
       total_word_weight =
         (for ((word, count) <- model.iter_items) yield
           count * factory.word_weights.getOrElse(word,
@@ -206,50 +208,59 @@ abstract class UnigramLangModel(
    */
   def kl_divergence_34(other: UnigramLangModel): Double
   
-  protected def get_nbayes_factor(word: Item, count: WordCount) = {
+  /**
+   * Return the log-probability of a word, taking into account the
+   * possibility that the probability is zero (in which case the
+   * log-probability is defined to be zero also).
+   *
+   * @see #lookup_word
+   */
+  @inline final def word_logprob(word: Item) = {
     val value = lookup_word(word)
     assert(value >= 0)
     // The probability returned will be 0 for words never seen in the
     // training data at all, i.e. we don't even have any global values to
     // back off to. General practice is to ignore such words.
     if (value > 0)
-      count * log(value)
+      log(value)
     else 0.0
   }
 
   /**
-   * Return a Naive-Bayes score for comparing two language models.
-   * This returns log p(thismodel|othermodel). Note that, for the
-   * purposes of determining a ranking of a document over e.g. cells,
-   * which essentially involves computing p(othermodel|thismodel),
-   * the scores returned by this function can only be compared
-   * with other scores returned for the same value of 'thismodel';
-   * e.g. the scores can be used for ranking different cells with
-   * respect to a given document but cannot be used for comparing
+   * Return `log p(thismodel|othermodel)`. This implements a log-linear
+   * model, i.e. it is similar to a standard Naive-Bayes model that
+   * assumes independence of the words in `thismodel` but allows for
+   * the different words to be weighted differently, as specified in
+   * `factory.word_weights`. (Essentially, this allows for standard
+   * discriminative training using a log-linear model, e.g. maxent /
+   * logistic regression.)
+   *
+   * Note that, for the purposes of determining a ranking of a document
+   * over e.g. cells, which essentially involves computing
+   * `p(othermodel|thismodel)`, the scores returned by this function can
+   * only be compared with other scores returned for the same value of
+   * `thismodel`; e.g. the scores can be used for ranking different cells
+   * with respect to a given document but cannot be used for comparing
    * different documents. (FIXME: This can cause problems, e.g., in
    * using the returned score as a feature in a reranking model,
    * because that will compute a single weight to use in weighting
    * the base ranking score for all test documents, relative to
    * other features. In this case the problem is the additive
-   * factor -log p(doc) that is ignored when comparing different
+   * factor `-log p(doc)` that is ignored when comparing different
    * cells relative to a given document. Possibly it would be
    * sufficient to add a factor to all scores so that the top-
    * ranked cell always has a score of 0 (or any other fixed value).)
    */
-  def get_nbayes_logprob(xlangmodel: LangModel) = {
+  def model_logprob(xlangmodel: LangModel) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val weights = factory.word_weights
     if (weights.size == 0)
-      langmodel.model.iter_items.map {
-        case (word, count) => get_nbayes_factor(word, count)
-      }.sum
+      langmodel.model.iter_keys.map(word_logprob(_)).sum
     else {
       val sum =
-        langmodel.model.iter_items.map {
-          case (word, count) => {
-            val weight = weights.getOrElse(word, factory.missing_word_weight)
-            weight * get_nbayes_factor(word, count)
-          }
+        langmodel.model.iter_keys.map { word =>
+          val weight = weights.getOrElse(word, factory.missing_word_weight)
+          weight * word_logprob(word)
         }.sum
       sum / total_word_weight
     }
@@ -259,26 +270,21 @@ abstract class UnigramLangModel(
       xrelative_to: Iterable[LangModel] = Iterable()) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val relative_to = xrelative_to.map(_.asInstanceOf[UnigramLangModel])
-    val itemcounts = langmodel.model.iter_items
+    val words = langmodel.model.iter_keys
     val weights =
       if (relative_to.isEmpty)
-        itemcounts.map {
-          case (word, count) => (word, get_nbayes_factor(word, count))
-        }
+        words.map { word => (word, word_logprob(word)) }
       else if (relative_to.size == 1) {
         val othermodel = relative_to.head
-        itemcounts.map {
-          case (word, count) => (word, get_nbayes_factor(word, count) -
-            othermodel.get_nbayes_factor(word, count))
+        words.map { word =>
+          (word, word_logprob(word) - othermodel.word_logprob(word))
         }
       } else {
-        itemcounts.map {
-          case (word, count) => {
-            val factor = get_nbayes_factor(word, count)
-            val relcontribs =
-              relative_to.map { factor - _.get_nbayes_factor(word, count) }
-            (word, relcontribs maxBy { _.abs})
-          }
+        words.map { word =>
+          val factor = word_logprob(word)
+          val relcontribs =
+            relative_to.map { factor - _.word_logprob(word) }
+          (word, relcontribs maxBy { _.abs})
         }
       }
     weights.toSeq.sortWith { _._2.abs > _._2.abs }

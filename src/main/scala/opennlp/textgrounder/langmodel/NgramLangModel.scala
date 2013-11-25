@@ -289,7 +289,7 @@ abstract class NgramLangModel(
    */
   def kl_divergence_34(other: NgramLangModel): Double
   
-  def get_nbayes_logprob(xlangmodel: LangModel) = ???
+  def model_logprob(xlangmodel: LangModel) = ???
 
   def find_most_common_word(pred: String => Boolean): Option[Word] = ???
 
