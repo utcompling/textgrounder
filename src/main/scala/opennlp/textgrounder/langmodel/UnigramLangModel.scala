@@ -90,7 +90,14 @@ class UnigramStorage extends ItemStorage[Word] {
 
   def iter_items = counts.toIterable
 
-  def iter_keys = counts.keys
+  // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some]
+  // reason; if not, the accuracy of computations that loop over the keys drops
+  // dramatically. (On the order of 10-15% when computing smoothing in
+  // DiscountedUnigramLangModelFactory.imp_finish_after_global, a factor of
+  // 2 when computing a model probability in `model_logprob`. I have no idea
+  // why; I suspect a Scala bug. (SCALABUG) This bug was present back in Scala
+  // 2.8 and 2.9 as well.
+  def iter_keys = counts.keys.toSeq
 
   def num_tokens = {
     if (!tokens_accurate) {
