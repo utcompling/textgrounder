@@ -320,6 +320,15 @@ abstract class UnigramLangModel(
     wordprob
   }
   
+  def mle_word_prob(word: Word): Double = {
+    assert(finished)
+    if (empty)
+      throw new IllegalStateException("Attempt to lookup word %s in empty lang model %s"
+        format (item_to_string(word), this))
+    val wordcount = if (model contains word) model.get_item(word) else 0.0
+    wordcount.toDouble/model.num_tokens
+  }
+
   /**
    * Look for the most common word matching a given predicate.
    * @param pred Predicate, passed the raw (unmemoized) form of a word.
