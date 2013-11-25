@@ -547,7 +547,7 @@ abstract class GridDocFactory[Co : Serializer](
         // if (doc == None) // used to mean skipped
         // num_non_error_skipped_records_by_split(split) += 1
         assert(doc.split == split)
-        val double_tokens = doc.lang_model.grid_lm.model.num_tokens
+        val double_tokens = doc.grid_lm.model.num_tokens
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
         assert(double_tokens == tokens)

@@ -502,6 +502,11 @@ class FilterUnigramLangModelBuilder(
 
 /**
  * General factory for UnigramLangModel language models.
+ *
+ * @param word_weights Weights to assign to each word, in the case where
+ *   unequal weighting is desired. If empty, do equal weighting.
+ * @param missing_word_weight Weight to assign to words not seen in
+ *   `word_weight`.
  */ 
 abstract class UnigramLangModelFactory(
     val word_weights: collection.Map[Word, Double],

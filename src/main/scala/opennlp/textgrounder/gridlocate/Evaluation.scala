@@ -852,12 +852,12 @@ class FullRankedDocEvalResult[Co](
         errprint("%s: Words contributing most to %s %s%s", doctag, celltag,
           cell, compared_string)
         val items =
-          document.lang_model.grid_lm.get_most_contributing_grams(
-            cell.lang_model.grid_lm, others.map { _.lang_model.grid_lm })
+          document.grid_lm.get_most_contributing_grams(
+            cell.grid_lm, others.map { _.grid_lm })
         for ((item, count) <-
              items.take(GridLocateConstants.relcontribwords_to_print))
           errprint("%s: %s = %s", doctag,
-            document.lang_model.grid_lm.item_to_string(item), count)
+            document.grid_lm.item_to_string(item), count)
       }
 
       output_relcontribwords("predicted cell", pred_cell, "", Iterable())
