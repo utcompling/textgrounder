@@ -196,12 +196,7 @@ abstract class DiscountedUnigramLangModel(
       overall_unseen_mass = 1.0
     else
       overall_unseen_mass = 1.0 - (
-        // NOTE NOTE NOTE! The toSeq needs to be added for some reason; if not,
-        // the computation yields different values, which cause a huge loss of
-        // accuracy (on the order of 10-15%).  I have no idea why; I suspect a
-        // Scala bug. (SCALABUG) (Or, it used to occur when the code read
-        // 'counts.keys.toSeq'; who knows now.)
-        (for (ind <- model.iter_keys.toSeq)
+        (for (ind <- model.iter_keys)
           yield factory.overall_word_probs(ind)) sum)
     if (factory.tf_idf) {
       for ((word, count) <- model.iter_items)
