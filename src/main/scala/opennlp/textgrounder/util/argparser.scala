@@ -813,7 +813,7 @@ package argparser {
   /**
    * Main class for parsing arguments from a command line.
    *
-   * @param prog Name of program being run, for the usage mssage.
+   * @param prog Name of program being run, for the usage message.
    * @param description Text describing the operation of the program.  It is
    *   placed between the line "Usage: ..." and the text describing the
    *   options and positional arguments; hence, it should not include either
@@ -822,7 +822,7 @@ package argparser {
    *   a copyright and/or version string).
    * @param postUsage Optional text placed after the usage message.
    * @param return_defaults If true, field values in field-based value
-   *  access always return the default value, even aft3r parsing.
+   *  access always return the default value, even after parsing.
    */
   class ArgParser(prog: String,
       description: String = "",
@@ -853,39 +853,56 @@ package argparser {
     protected val argpositional = mutable.Set[String]()
     /* Set specifying arguments that are flag options. */
     protected val argflag = mutable.Set[String]()
+    /* Map from argument aliases to canonical argument name. Note that
+     * currently this isn't actually used when looking up an argument name;
+     * that lookup is handled internally to Argot, which has its own
+     * tables. */
+    protected val arg_to_canon = mutable.Map[String, String]()
+
+    protected var parsed = false
 
     /* NOTE NOTE NOTE: Currently we don't provide any programmatic way of
        accessing the ArgAny-subclass object by name.  This is probably
        a good thing -- these objects can be viewed as internal
     */
+
     /**
-     * Return the value of an argument, or the default if not specified.
+     * Return the canonical name of an argument. If the name is already
+     * canonical, the same value will be returned. Return value is an
+     * `Option`; if the argument name doesn't exist, `None` will be returned.
      *
-     * @param arg The canonical name of the argument, i.e. the first
-     *   non-single-letter alias given.
-     * @return The value, of type Any.  It must be cast to the appropriate
-     *   type.
-     * @see #get[T]
+     * @param arg The name of the argument.
      */
-    def apply(arg: String) = argmap(arg).value
+    def argToCanon(arg: String): Option[String] = arg_to_canon.get(arg)
+
+    // Look the argument up in `argmap`, converting to canonical as needed.
+    protected def get_arg(arg: String) = argmap(arg_to_canon(arg))
 
     /**
      * Return the value of an argument, or the default if not specified.
      *
-     * @param arg The canonical name of the argument, i.e. the first
-     *   non-single-letter alias given.
+     * @param arg The name of the argument.
+     * @return The value, of type Any.  It must be cast to the appropriate
+     *   type.
+     * @see #get[T]
+     */
+    def apply(arg: String) = get_arg(arg).value
+
+    /**
+     * Return the value of an argument, or the default if not specified.
+     *
+     * @param arg The name of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
      *   
      * @return The value, of type T.
      */
-    def get[T](arg: String) = argmap(arg).asInstanceOf[ArgAny[T]].value
+    def get[T](arg: String) = get_arg(arg).asInstanceOf[ArgAny[T]].value
 
     /**
      * Explicitly set the value of an argument.
      *
-     * @param arg The canonical name of the argument, i.e. the first
-     *   non-single-letter alias given.
+     * @param arg The name of the argument.
      * @param value The new value of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
@@ -893,70 +910,78 @@ package argparser {
      * @return The value, of type T.
      */
     def set[T](arg: String, value: T) {
-      argmap(arg).asInstanceOf[ArgAny[T]].setValue(value)
+      get_arg(arg).asInstanceOf[ArgAny[T]].setValue(value)
     }
 
     /**
      * Return the default value of an argument.
      *
-     * @param arg The canonical name of the argument, i.e. the first
-     *   non-single-letter alias given.
+     * @param arg The name of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
      *   
      * @return The value, of type T.
      */
     def defaultValue[T](arg: String) =
-      argmap(arg).asInstanceOf[ArgAny[T]].default
+      get_arg(arg).asInstanceOf[ArgAny[T]].default
+
+    /**
+     * Return whether an argument (either option or positional argument)
+     * exists with the given name.
+     */
+    def exists(arg: String) = arg_to_canon contains arg
 
     /**
      * Return whether an argument (either option or positional argument)
      * exists with the given canonical name.
      */
-    def exists(arg: String) = argmap contains arg
+    def existsCanon(arg: String) = argmap contains arg
 
     /**
-     * Return whether an argument exists with the given canonical name.
+     * Return whether an argument exists with the given name.
      */
     def isOption(arg: String) = exists(arg) && !isPositional(arg)
 
     /**
      * Return whether a positional argument exists with the given name.
      */
-    def isPositional(arg: String) = argpositional contains arg
+    def isPositional(arg: String) =
+      argToCanon(arg).map(argpositional contains _) getOrElse false
 
     /**
-     * Return whether a flag option exists with the given canonical name.
+     * Return whether a flag option exists with the given name.
      */
-    def isFlag(arg: String) = argflag contains arg
+    def isFlag(arg: String) =
+      argToCanon(arg).map(argflag contains _) getOrElse false
 
     /**
      * Return whether a multi argument (either option or positional argument)
      * exists with the given canonical name.
      */
-    def isMulti(arg: String) = argtype_multi contains arg
+    def isMulti(arg: String) =
+      argToCanon(arg).map(argtype_multi contains _) getOrElse false
 
     /**
      * Return whether the given argument's value was specified.  If not,
      * fetching the argument's value returns its default value instead.
      */
-    def specified(arg: String) = argmap(arg).specified
+    def specified(arg: String) = get_arg(arg).specified
 
     /**
      * Return the type of the given argument.  For multi arguments, the
      * type will be Seq, and the type of the individual arguments can only
      * be retrieved using `getMultiType`, due to type erasure.
      */
-    def getType(arg: String) = argtype(arg)
+    def getType(arg: String) = argtype(arg_to_canon(arg))
 
     /**
      * Return the type of an individual argument value of a multi argument.
      * The actual type of the multi argument is a Seq of the returned type.
      */
-    def getMultiType(arg: String) = argtype_multi(arg)
+    def getMultiType(arg: String) = argtype_multi(arg_to_canon(arg))
 
     /**
-     * Return an Iterable over the names of all defined arguments.
+     * Return an Iterable over the canonical names of all defined arguments.
      * Values of the arguments can be retrieved using `apply` or `get[T]`.
      * Properties of the arguments can be retrieved using `getType`,
      * `specified`, `defaultValue`, `isFlag`, etc.
@@ -966,8 +991,8 @@ package argparser {
     }
 
     /**
-     * Return an Iterable over pairs of arguments and values (of type Any).
-     * The values need to be cast as appropriate.
+     * Return an Iterable over pairs of canonically-named arguments and values
+     * (of type Any). The values need to be cast as appropriate.
      *
      * @see #argNames, #get[T], #apply
      */
@@ -976,9 +1001,9 @@ package argparser {
     }
 
     /**
-     * Return an Iterable over pairs of arguments and values (of type Any),
-     * only including arguments whose values were specified on the command
-     * line. The values need to be cast as appropriate.
+     * Return an Iterable over pairs of canonically-named arguments and values
+     * (of type Any), only including arguments whose values were specified on
+     * the command line. The values need to be cast as appropriate.
      *
      * @see #argNames, #argValues, #get[T], #apply
      */
@@ -987,6 +1012,43 @@ package argparser {
         yield (name, argobj.value)
     }
 
+    /**
+     * Underlying function to implement the handling of all different types
+     * of arguments. Normally this will be called twice for each argument,
+     * once before and once after parsing. When before parsing, it records
+     * the argument and its properties. When after parsing, it returns the
+     * value of the argument as parsed from the command line.
+     *
+     * @tparam U Type of the argument. The variable holding an argument's
+     *   value will always have this type.
+     * @tparam T Type of a single argument value. This will be different from
+     *   `U` in the case of multi-arguments and arguments with parameters
+     *   (in such case, `U` will consist of a tuple `(T, String)` or a
+     *   sequence of such tuples). The elements in `choices` are of type `T`.
+     *
+     * @param Names of the argument.
+     * @param default Default value of argument.
+     * @param metavar User-visible argument type, in usage string. See
+     *   `option` for more information.
+     * @param choices Set of allowed choices, when an argument allows only
+     *   a limited set of choices.
+     * @param aliasedChoices List of allowed aliases for the choices specified
+     *   in `choices`.
+     * @param help Help string, to be displayed in the usage message.
+     * @param create_underlying Function to create the underlying object
+     *   (of a subclass of `ArgAny`) that wraps the argument. The function
+     *   arguments are the canonicalized name, metavar and help. The
+     *   canonicalized help has %-sequences subsituted appropriately; the
+     *   canonical name is the first non-single-letter name listed; the
+     *   canonical metavar is computed from the canonical name, in all-caps,
+     *   if not specified.
+     * @param is_multi Whether this is a multi-argument (allowing the argument
+     *   to occur multiple times).
+     * @param is_positional Whether this is a positional argument rather than
+     *   an option.
+     * @param is_flag Whether this is a flag (a Boolean option with no value
+     *   specified).
+     */
     protected def handle_argument[T : Manifest, U : Manifest](
       name: Seq[String],
       default: U,
@@ -1002,9 +1064,12 @@ package argparser {
       val canon = canonName(name)
       if (return_defaults)
         default
-      else if (argmap contains canon)
-        argmap(canon).asInstanceOf[ArgAny[U]].value
-      else {
+      else if (parsed) {
+        if (argmap contains canon)
+          argmap(canon).asInstanceOf[ArgAny[U]].value
+        else
+          throw new ArgParserCodingError("Can't define new arguments after parsing")
+      } else {
         val canon_metavar = computeMetavar(metavar, name)
         val helpsplit = """(%%|%default|%choices|%allchoices|%metavar|%prog|%|[^%]+)""".r.findAllIn(
           help.replaceAll("""\s+""", " "))
@@ -1023,6 +1088,11 @@ package argparser {
             }
           }) mkString ""
         val underobj = create_underlying(canon, canon_metavar, canon_help)
+        for (nam <- name) {
+          if (arg_to_canon contains nam)
+            throw new ArgParserCodingError("Attempt to redefine existing argument '%s'" format nam)
+          arg_to_canon(nam) = canon
+        }
         argmap(canon) = underobj
         argtype(canon) = manifest[U].runtimeClass
         if (is_multi)
@@ -1436,13 +1506,21 @@ package argparser {
      *   through, and the application should catch them.
      */
     def parse(args: Seq[String], catchErrors: Boolean = true) = {
+      // FIXME: Should we allow this? Not sure if Argot can tolerate this.
+      if (parsed)
+        throw new ArgParserCodingError("Command-line arguments already parsed.")
+
       if (argmap.size == 0)
         throw new ArgParserCodingError("No arguments initialized.  If you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
       
+      // Call the underlying Argot parsing function and wrap Argot usage
+      // errors in our own ArgParserUsageException.
       def call_parse() {
         // println(argmap)
         try {
-          argot.parse(args.toList)
+          val retval = argot.parse(args.toList)
+          parsed = true
+          retval
         } catch {
           case e: ArgotUsageException => {
             throw new ArgParserUsageException(e.message, Some(e))
