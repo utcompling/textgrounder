@@ -661,7 +661,8 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
      * version of the param's name). Normally used for options with
      * string values.
      */
-    def full(name: String, noequals: Boolean = false) =
+    def full(name: String, handler: Any => String = valonly,
+        noequals: Boolean = false) =
       (value: Any) => value match {
         // If the value somehow is null or false, no output at all
         case null | false => ""
@@ -670,7 +671,7 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
         case _ => "%s%s%s" format (
           name,
           if (noequals) "" else "=",
-          valonly(value)
+          handler(value)
         )
       }
 
@@ -688,6 +689,23 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
      * Ignore this param.
      */
     def omit = echo("")
+    /**
+     * Return tail of filename.
+     */
+    def filetail = (value: Any) => value match {
+      case x:String => {
+        val (dir, tail) = util.io.localfh.split_filename(x)
+        tail
+      }
+      case _ => valonly(value)
+    }
+    /**
+     * Return tail of sequence of filenames, concatenated with +.
+     */
+    def filetail_seq = (value: Any) => {
+      val xs = value.asInstanceOf[Seq[String]]
+      xs map { x => filetail(x) } mkString "+"
+    }
 
     /////// How to handle params.
     
@@ -706,6 +724,11 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
           tail
       } mkString "+"
       ),
+      ("weights-file", full("weights", filetail)),
+      ("stopwords-file", full("stopwords", filetail)),
+      ("salience-file", full("salience", filetail)),
+      ("whitelist-file", full("whitelist", filetail)),
+      ("eval-file", full("eval-file", filetail_seq)),
       ("ranker", valonly),
       ("lang-model", xs => xs match {
         case (x:String, y:String) => x + y
@@ -773,7 +796,9 @@ object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
           full(name)(value)
       }) filter { _ != "" } mkString "."
 
-    outprint("%s", tag)
+    // Output tag, but convert any slashes to underscores; otherwise attempts
+    // to use tags with slashes will fail.
+    outprint("%s", tag.replace("/", "_"))
     0
   }
 }
