@@ -126,14 +126,16 @@ elif [ "$step" = frob-geotext ]; then
   textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \
     -o "$output_dir" -i "$input_dir" \
     --rename-field title=user \
-    -a corpus=twitter-geotext-$dirbase -a corpus-type=twitter-user \
+    -a corpus-name=twitter-geotext-$dirbase -a corpus-type=twitter-user \
+    -a textdb-type=textgrounder-corpus \
     -r id -r redir -r namespace -r is_list_of -r is_disambig \
     -r is_list -r incoming_links
 
 elif [ "$step" = frob-wikipedia ]; then
   textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \
     -o "$output_dir" -i "$input_dir" \
-    -a corpus=$dirbase -a corpus-type=wikipedia
+    -a corpus-name=$dirbase -a corpus-type=wikipedia \
+    -a textdb-type=textgrounder-corpus
 
 elif [ "$step" = split-by-training ]; then
   textgrounder --verbose run opennlp.textgrounder.preprocess.FrobTextDB \

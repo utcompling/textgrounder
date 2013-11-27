@@ -1398,11 +1398,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def write_results_file(results: Iterator[DocEvalResult[Co]],
       filehand: FileHandler, base: String) {
-    note_result("corpus-type", "textgrounder-results")
-    // note_result("corpus-name", opts.corpus_name)
-    // note_result("generating-app", progname)
-    TextDB.write_textdb_values(filehand, base, results.map(_.to_row),
-      results_to_output, field_description)
+    note_result("textdb-type", "textgrounder-results")
+    write_textdb_values_with_results(filehand, base, results.map(_.to_row))
   }
 }
 

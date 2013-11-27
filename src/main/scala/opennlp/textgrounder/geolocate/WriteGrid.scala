@@ -47,11 +47,9 @@ class WriteGridDriver extends
   def run() {
     val grid = initialize_grid
     val rows = for (cell <- grid.iter_nonempty_cells) yield cell.to_row
-    note_result("corpus-type", "textgrounder-cell-dist")
-    // note_result("corpus-name", opts.corpus_name)
-    // note_result("generating-app", progname)
-    TextDB.write_textdb_values(util.io.localfh, params.output, rows.iterator,
-      results_to_output, field_description)
+    note_result("textdb-type", "textgrounder-grid")
+    write_textdb_values_with_results(util.io.localfh, params.output,
+      rows.iterator)
   }
 }
 

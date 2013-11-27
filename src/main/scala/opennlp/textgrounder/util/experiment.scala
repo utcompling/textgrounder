@@ -28,7 +28,7 @@ import metering._
 import os._
 import print.{errprint, set_stdout_stderr_utf_8}
 import text._
-import textdb.Encoder
+import textdb.{Encoder, TextDB}
 import time.format_minutes_seconds
 
 package experiment {
@@ -141,16 +141,30 @@ package experiment {
     def heartbeat() {
     }
 
-    /******************* Stuff for results file **************/
+    /********************************************************************/
+    /*          Note results to include in a textdb output file         */
+    /********************************************************************/
 
-    val results_to_output = mutable.LinkedHashMap[String, String]()
-    var field_description = Map[String, String]()
+    /** The purpose of this mechanism is to allow a running "experiment"
+     * (which is a very general concept, see above) to make note, at various
+     * points in the execution of the experiment, of results that should be
+     * included later on in a textdb file that is outputted to record the
+     * result of running the experiment. The textdb file itself is written
+     * using a call to `write_textdb_values_with_results`. The results that
+     * are noted here are stored in the fixed fields of the textdb. The
+     * parameters used to invoke the application that runs the experiment are
+     * automatically recorded in this fashion (see
+     * `output_command_line_parameters` in `ExperimentDriverApp`).
+     */
+
+    protected val results_to_output = mutable.LinkedHashMap[String, String]()
+    protected var field_description = Map[String, String]()
 
     /**
-     * Note a result to be stored in the schema of the results file
-     * (--results), where the result has already been encoded for
-     * storage in a textdb field (requires special handling e.g. of
-     * newlines and tab characters).
+     * Note a result to be stored in the schema of a textdb output file
+     * (e.g. the results file specified using --results), where the result
+     * has already been encoded for storage in a textdb field (requires
+     * special handling e.g. of newlines and tab characters).
      */
     def note_raw_result(field: String, value: String, desc: String = "") {
       results_to_output += (field -> value)
@@ -159,8 +173,8 @@ package experiment {
     }
 
     /**
-     * Note a result to be stored in the schema of the results file
-     * (--results).
+     * Note a result to be stored in the schema of a textdb output file
+     * (e.g. the results file specified using --results).
      */
     def note_result(field: String, value: Any, desc: String = "") {
       // Not .toString because that can't handle null
@@ -169,13 +183,33 @@ package experiment {
     }
 
     /**
-     * Note a result to be stored in the schema of the results file
-     * (--results), and also print it to stderr.
+     * Note a result to be stored in the schema of a textdb output file
+     * (e.g. the results file specified using --results), and also print
+     * it to stderr.
      */
     def note_print_result(field: String, value: Any, desc: String) {
       note_result(field, value, desc)
       errprint("%s: %s", desc, value)
     }
+
+    /**
+     * Output a textdb database, including the fixed fields that were
+     * specified using `note_result` and related functions.
+     *
+     * @param filehand File handler object of the file system to write to
+     * @param base Prefix of schema and data files
+     * @param data Data to write out. Each item is a sequence of (name,value)
+     *   pairs. The field names must be the same for all data points, and in
+     *   the same order. The values can be of arbitrary type (including null),
+     *   and will be converted to strings using "%s".format(_). The resulting
+     *   strings must not fall afoul of the restrictions on characters (i.e.
+     *   no tabs or newlines). If necessary, pre-convert the object to a
+     *   string and encode it properly.
+     */
+    def write_textdb_values_with_results(filehand: FileHandler, base: String,
+      data: Iterator[Iterable[(String, Any)]]) =
+        TextDB.write_textdb_values(filehand, base, data, results_to_output,
+          field_description)
 
     /********************************************************************/
     /*                 Function to override below this line             */
@@ -751,6 +785,8 @@ package experiment {
             case (arg, value) => params.parser.specified(arg)
           }),
         "Non-default parameters")
+      driver.note_result("generating-app", appname,
+        "Application generating this textdb")
     }
 
     def initialize_parameters() {
