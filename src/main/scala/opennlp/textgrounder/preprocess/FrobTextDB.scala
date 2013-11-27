@@ -410,8 +410,7 @@ class FrobTextDBDriver extends
   }
 }
 
-object FrobTextDB extends
-    ExperimentDriverApp("FrobTextDB") {
+object FrobTextDB extends ExperimentDriverApp("FrobTextDB") {
   type TDriver = FrobTextDBDriver
 
   override def description =

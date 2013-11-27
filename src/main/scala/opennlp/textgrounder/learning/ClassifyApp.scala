@@ -1,4 +1,4 @@
-//  ClassifyApp.scala
+//  Classify.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
 //
@@ -114,7 +114,7 @@ multiple times, or by separating values by a comma.
  * instances, trains a Naive Bayes model, and then outputs the predictions
  * on a second set of instances (ignoring the labels).
  */
-object ClassifyApp extends ExperimentApp("classify") {
+object Classify extends ExperimentApp("Classify") {
 
   type TParam = ClassifyParameters
 

@@ -105,7 +105,7 @@ Not generating a cell-distribution file.""", word)
   }
 }
 
-object WriteCellDistApp extends GeolocateApp("WriteCellDist") {
+object WriteCellDist extends GeolocateApp("WriteCellDist") {
   type TDriver = WriteCellDistDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)

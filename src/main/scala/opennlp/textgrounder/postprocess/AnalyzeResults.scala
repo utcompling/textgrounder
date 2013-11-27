@@ -66,7 +66,7 @@ multiple times, or by separating values by a comma.
  * An application to analyze the results from a TextGrounder run,
  * as output using --results.
  */
-object AnalyzeResults extends ExperimentApp("classify") {
+object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
 
   type TParam = AnalyzeResultsParameters
 
