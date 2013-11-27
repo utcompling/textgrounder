@@ -234,7 +234,7 @@ class DocEvalMapper
     extends Mapper[Object, Text, Text, DoubleWritable]
        with HadoopExperimentMapReducer
        with HadoopGeolocateTextDBMixin {
-  def progname = HadoopGeolocateDocumentApp.progname
+  def progname = HadoopGeolocateDocument.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
   type TDriver = HadoopGeolocateDocumentDriver
   // more type erasure crap
@@ -312,8 +312,8 @@ class DocResultReducer extends
   }
 }
 
-object HadoopGeolocateDocumentApp extends
-    HadoopGeolocateApp("TextGrounder geolocate-document") {
+object HadoopGeolocateDocument extends
+    HadoopGeolocateApp("HadoopGeolocateDocument") {
   type TDriver = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)

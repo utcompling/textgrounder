@@ -308,14 +308,14 @@ else
       # pass (through --textgrounder-dir here, and also through corpora
       # paths in 'tg-geolocate').
       if [ -n "$HADOOP" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
       elif [ -n "$HADOOP_NONDIST" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
       else
-        CLASS=$TGGEOLOCATE.GeolocateDocumentApp
+        CLASS=$TGGEOLOCATE.GeolocateDocument
       fi
     ;;
-    generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
+    generate-kml) CLASS=$TGGEOLOCATE.GenerateKML;;
 
     # Misc
     run) CLASS="$1"; shift;;

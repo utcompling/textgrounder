@@ -153,7 +153,7 @@ Not generating an empty KML file.""", word)
   }
 }
 
-object GenerateKMLApp extends GeolocateApp("generate-kml") {
+object GenerateKML extends GeolocateApp("GenerateKML") {
   type TDriver = GenerateKMLDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)

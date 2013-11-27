@@ -55,7 +55,7 @@ class WriteGridDriver extends
   }
 }
 
-object WriteGridApp extends GeolocateApp("generate-kml") {
+object WriteGrid extends GeolocateApp("WriteGrid") {
   type TDriver = WriteGridDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)

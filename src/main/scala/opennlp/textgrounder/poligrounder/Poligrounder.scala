@@ -221,7 +221,7 @@ class PoligrounderDriver extends
   }
 }
 
-object PoligrounderApp extends GridLocateApp("poligrounder") {
+object Poligrounder extends GridLocateApp("Poligrounder") {
   type TDriver = PoligrounderDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)

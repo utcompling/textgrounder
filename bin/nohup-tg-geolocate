@@ -14,7 +14,7 @@ while true; do
 done
 
 set -e
-tag=`tg-geolocate --quiet --app 'run opennlp.textgrounder.geolocate.GeolocateDocumentTagApp' "$@"`
+tag=`tg-geolocate --quiet --app 'run opennlp.textgrounder.geolocate.GeolocateDocumentTag' "$@"`
 dated_tag=`run-nohup -i "$tag" --output-full-id tg-geolocate`
 if [ "$no_results" = t ]; then
   run-nohup --full-id "$dated_tag" tg-geolocate "$@"

@@ -54,20 +54,24 @@ that code for Geolocate is split between `textgrounder.geolocate` and
 
 The Geolocate code works as follows:
 
--- The main entry class is GeolocateDocApp.  This is hooked into
-   GeolocateDocDriver.  The driver classes implement the logic for
-   running the program -- in fact, this logic in the superclass
-   GeolocateDocTypeDriver so that a separate Hadoop driver can be
-   provided.  The separate driver class is provided so that we can run
-   the geolocate app and other TextGrounder apps programmatically as well
-   as from the command line, and the complication of multiple driver
-   classes is (at least partly) due to supporting various apps, e.g.
-   GenerateKML (a separate app for generating KML files graphically
-   illustrating the corpus).  The mechanism that implements the driver
-   class is in textgrounder.util.experiment.  The actual entry point is
-   in ExperimentApp.main(), although the entire implementation is in
-   ExperimentApp.implement_main().
--- The class GeolocateDocParameters holds descriptions of all of the
+-- The main entry class is GeolocateDocument.  This is hooked into
+   GeolocateDocumentDriver.  The driver classes implement the logic for
+   running the program. There is a superclass GeolocateDriver that provides
+   all the logic of building the grid but doesn't evaluate documents; this is
+   so that other supporting apps (e.g. GenerateKML, WriteGrid) can use the
+   same logic. There are also specialized subclasses
+   StandaloneGeolocateDocumentDriver and HadoopGeolocateDocumentDriver so that
+   we can run both standalone and from Hadoop. (FIXME: We should probably
+   switch to using Scoobi instead of raw Hadoop.) The distinction between
+   App and Driver classes stems from the experiment-application framework in
+   textgrounder.util.experiment and was originally designed to allow for
+   separate invocation programmatically and from the command line. (FIXME:
+   This never quite worked as intended and should be merged.) The actual entry
+   point that is invoked from the JVM is `ExperimentApp.main`, which
+   immediately passes control to `ExperimentApp.implement_main` (this is so
+   that the same logic can be used for Hadoop, which has a different entry
+   point).
+-- The class GeolocateDocumentParameters holds descriptions of all of the
    various command-line parameters, as well as the values of those
    parameters when read from the command line (or alternatively, filled in
    by another program using the programmatic interface).  This inherits
@@ -75,12 +79,9 @@ The Geolocate code works as follows:
    TextGrounder apps.  Argument parsing is handled using
    textgrounder.util.argparser, a custom argument-parsing package built on
    top of Argot.
--- The driver class has three main methods. `handle_parameters` verifies
-   that valid combinations of parameters were specified. `setup_for_run`
-   creates some internal structures necessary for running, and
-   `run_after_setup` does the actual running.  The reason for the separation
-   of the two is that only the former is used by the Hadoop driver.
-   (FIXME: Perhaps there's a better way of handling this.)
+-- The driver class has two main methods. `handle_parameters` verifies
+   that valid combinations of parameters were specified. `run` implements
+   the actual program.
 
 In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
@@ -620,7 +621,8 @@ abstract class GeolocateApp(appname: String) extends
   }
 }
 
-class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document") {
+class GeolocateDocumentTypeApp(appname: String) extends
+    GeolocateApp(appname) {
   type TDriver = StandaloneGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
@@ -630,14 +632,16 @@ class GeolocateDocumentTypeApp extends GeolocateApp("geolocate-document") {
 /**
  * The normal application for geolocating a document.
  */
-object GeolocateDocumentApp extends GeolocateDocumentTypeApp { }
+object GeolocateDocument extends
+    GeolocateDocumentTypeApp("GeolocateDocument") { }
 
 /**
  * An application for generating a tag describing the command-line
  * parameters, for use as part of a filename. The only output is the tag
  * itself.
  */
-object GeolocateDocumentTagApp extends GeolocateDocumentTypeApp {
+object GeolocateDocumentTag extends
+    GeolocateDocumentTypeApp("GeolocateDocumentTag") {
   // Suppress normal output of command-line params
   override def output_command_line_parameters() { }
 

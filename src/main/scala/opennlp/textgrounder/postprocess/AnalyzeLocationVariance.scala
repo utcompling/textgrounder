@@ -54,7 +54,7 @@ storing the data as tab-separated fields and the latter naming the fields.""")
  * --output-fields 'default positions' so that a field is included that
  * contains all the locations in a user's tweets.
  */
-object AnalyzeLocationVariance extends ExperimentApp("classify") {
+object AnalyzeLocationVariance extends ExperimentApp("AnalyzeLocationVariance") {
 
   type TParam = AnalyzeLocationVarianceParameters
   type Timestamp = Long

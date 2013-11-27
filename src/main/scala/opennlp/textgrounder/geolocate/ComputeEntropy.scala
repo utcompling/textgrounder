@@ -131,7 +131,7 @@ class ComputeEntropyDriver extends
   }
 }
 
-object ComputeEntropyApp extends GeolocateApp("ComputeEntropy") {
+object ComputeEntropy extends GeolocateApp("ComputeEntropy") {
   type TDriver = ComputeEntropyDriver
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
