@@ -305,6 +305,7 @@ class ConvertCophirDriver(opts: ConvertCophirParams)
     val fixed_fields = Map(
         "corpus-name" -> opts.corpus_name,
         "generating-app" -> progname,
+        "textdb-type" -> "textgrounder-corpus",
         "corpus-type" -> "cophir") ++
       opts.non_default_params_string.toMap
     new Schema(fields, fixed_fields)

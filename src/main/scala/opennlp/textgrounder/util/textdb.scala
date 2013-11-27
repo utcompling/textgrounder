@@ -94,9 +94,9 @@ package textdb {
    * @param fieldnames List of the name of each field
    * @param fixed_values Map specifying additional fields possessing the
    *   same value for every row.  This is optional, but often at least
-   *   the "corpus-type" field should be given, especially when a textdb is
-   *   used as a corpus. This is used when reading a corpus in, to know
-   *   which type of documents are stored.
+   *   the "textdb-type" field should be given. Also, when a textdb is used as
+   *   a corpus, the "corpus-type" field indicate which types of documents
+   *   are stored, which is used when reading a corpus in.
    * @param field_description Map giving English description of field names,
    *   for display purposes.
    * @param split_text Text used for separating field values in a row;

@@ -94,12 +94,10 @@ Not generating a cell-distribution file.""", word)
               ("probability", prob)
             )
           }
-        note_result("corpus-type", "textgrounder-cell-dist")
+        note_result("textdb-type", "textgrounder-cell-dist")
         note_result("cell-dist-word", Encoder.string(word))
-        // note_result("corpus-name", opts.corpus_name)
-        // note_result("generating-app", progname)
-        TextDB.write_textdb_values(util.io.localfh, base,
-          cellprob_props.iterator, results_to_output, field_description)
+        write_textdb_values_with_results(util.io.localfh, base,
+          cellprob_props.iterator)
       }
     }
   }

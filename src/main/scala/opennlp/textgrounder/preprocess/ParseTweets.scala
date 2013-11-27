@@ -2207,6 +2207,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val fixed_fields = Map(
           "corpus-name" -> opts.corpus_name,
           "generating-app" -> "ParseTweets",
+          "textdb-type" -> "textgrounder-corpus",
           "corpus-type" -> ("twitter-%s" format
             (if (opts.grouping == "none") "tweets" else opts.grouping))) ++
         opts.non_default_params_string.toMap ++
@@ -2311,7 +2312,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
         val schema = new Schema(FeatureStats.row_fields,
           Map("corpus-name" -> opts.corpus_name,
-              "corpus-type" -> "tweet-stats"))
+              "textdb-type" -> "tweet-stats"))
         local_output_textdb(schema,
           by_type.map(x => schema.make_line(x.to_row(opts))),
           filehand, opts.output + "-tweet-stats", opts.corpus_name)

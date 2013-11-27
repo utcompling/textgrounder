@@ -123,11 +123,9 @@ class ComputeEntropyDriver extends
       )
     }
     errprint("Computing entropies ... done.")
-    TextDB.write_textdb_values(util.io.localfh, params.output,
-      props.iterator, fixed_values = Map(
-        "textdb-type" -> "word-entropies",
-        "generating-app" -> "ComputeEntropyApp"
-      ))
+    note_result("textdb-type", "word-entropies")
+    write_textdb_values_with_results(util.io.localfh, params.output,
+      props.iterator)
   }
 }
 
