@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //  UnigramLangModel.scala
 //
-//  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2010-2013 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2012 Mike Speriosu, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
