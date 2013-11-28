@@ -562,9 +562,6 @@ package experiment {
    *     actual behavior of the application.
    */
 
-  /* SCALABUG: If this param isn't declared with a 'val', we get an error
-     below on the line creating ArgParser when trying to access progname,
-     saying "no such field". */
   abstract class ExperimentApp(val progname: String) {
     // Things that must be implemented
 
