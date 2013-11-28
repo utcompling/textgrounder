@@ -30,11 +30,9 @@ import LangModel._
 
 abstract class DiscountedUnigramLangModelFactory(
   create_builder: LangModelFactory => LangModelBuilder,
-  word_weights: collection.Map[Word, Double],
-  missing_word_weight: Double,
   val interpolate: Boolean,
   val tf_idf: Boolean
-) extends UnigramLangModelFactory(word_weights, missing_word_weight) {
+) extends UnigramLangModelFactory {
   val builder = create_builder(this)
 
   // Estimate of number of unseen word types for all documents
@@ -204,6 +202,8 @@ abstract class DiscountedUnigramLangModel(
           count*log(factory.num_documents/factory.document_freq(word)))
     }
     normalization_factor = model.num_tokens
+    assert(normalization_factor > 0,
+      "Zero normalization factor for lm %s" format this)
     //if (LangModelConstants.use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))

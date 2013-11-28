@@ -27,14 +27,11 @@ import LangModel._
  */ 
 class DirichletUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
-    word_weights: collection.Map[Word, Double],
-    missing_word_weight: Double,
     interpolate_string: String,
     tf_idf: Boolean,
     val dirichlet_factor: Double
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, word_weights, missing_word_weight,
-  interpolate_string != "no", tf_idf
+  create_builder, interpolate_string != "no", tf_idf
 ) {
   def create_lang_model = new DirichletUnigramLangModel(this)
 }
