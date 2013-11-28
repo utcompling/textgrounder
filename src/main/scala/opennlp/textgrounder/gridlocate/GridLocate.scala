@@ -214,6 +214,7 @@ them, provided there is only one textdb in the directory.""")
   var missing_word_weight =
     ap.option[Double]("missing-word-weight", "mww",
        metavar = "WEIGHT",
+       default = -1.0,
        help = """Weight to use for words not given in the word-weight
 file, when `--weights-file` is given. If negative (the default), use
 the average of all weights in the file, which treats them as if they
@@ -900,7 +901,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * function. So, rather than creating a LangModelBuilder ourselves, we
    * pass in a function to create one when creating a LangModelFactory.
    */
-  protected def get_lang_model_builder_creator(lang_model_type: String) =
+  protected def get_lang_model_builder_creator(lang_model_type: String,
+      word_weights: collection.Map[Word, Double],
+      missing_word_weight: Double
+    ) =
     (factory: LangModelFactory) => {
       if (lang_model_type == "ngram")
         new DefaultNgramLangModelBuilder(
@@ -913,11 +917,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           raw_text_max_ngram = params.raw_text_max_ngram)
       else
         new DefaultUnigramLangModelBuilder(
-          factory,
-          ignore_case = !params.preserve_case_words,
-          stopwords = the_stopwords,
-          whitelist = the_whitelist,
-          minimum_word_count = params.minimum_word_count)
+          factory, !params.preserve_case_words, the_stopwords, the_whitelist,
+          params.minimum_word_count, word_weights, missing_word_weight)
     }
 
   /**
@@ -929,7 +930,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       word_weights: collection.Map[Word, Double],
       missing_word_weight: Double
   ) = {
-    val create_builder = get_lang_model_builder_creator(lang_model_type)
+    val create_builder = get_lang_model_builder_creator(lang_model_type,
+      word_weights, missing_word_weight)
     val (lm, lmparams) = lm_spec
     if (lm == "unsmoothed-ngram")
       new UnsmoothedNgramLangModelFactory(create_builder)
@@ -940,8 +942,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Dirichlet factor must be >= 0, but is %g"
           format dirichlet_factor)
       new DirichletUnigramLangModelFactory(create_builder,
-        word_weights, missing_word_weight, interpolate, params.tf_idf,
-        dirichlet_factor)
+        interpolate, params.tf_idf, dirichlet_factor)
     }
     else if (lm == "jelinek-mercer") {
       val jelinek_factor = params.parser.parseSubParams(lm, lmparams,
@@ -950,14 +951,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Jelinek factor must be between 0.0 and 1.0, but is %g"
           format jelinek_factor)
       new JelinekMercerUnigramLangModelFactory(create_builder,
-        word_weights, missing_word_weight, interpolate, params.tf_idf,
-        jelinek_factor)
+        interpolate, params.tf_idf, jelinek_factor)
     }
     else {
       if (lmparams.contains(':'))
         param_error("Parameters not allowed for pseudo-Good-Turing")
       new PseudoGoodTuringUnigramLangModelFactory(create_builder,
-        word_weights, missing_word_weight, interpolate, params.tf_idf)
+        interpolate, params.tf_idf)
     }
   }
 
@@ -1044,44 +1044,39 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_grid_from_documents(
       get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
-    /**
-     * Map containing relative weights to assign to differing words. If
-     * this map is empty, all words have the same weights. Otherwise,
-     * we use the weights as given, normalizing as necessary. For words
-     * that aren't seen, we assign them the value of `missing_word_weight`,
-     * which by default is set to the average weight.
-     */
-    val word_weights = mutable.Map[Word,Double]()
-
-    var missing_word_weight = 0.0
-
-    if (params.weights_file != null) {
-      errprint("Reading word weights...")
-      for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
-        val word = row.gets("word")
-        val weight = row.get[Double]("weight")
-        val wordint = memoizer.memoize(word)
-        if (word_weights contains wordint)
-          warning("Word %s with weight %s already seen with weight %s",
-            word, weight, word_weights(wordint))
-        else if (weight < 0)
-          warning("Word %s with invalid negative weight %s",
-            word, weight)
-        else
-          word_weights(wordint) = weight
-      }
-      errprint("Reading word weights... done.")
-      missing_word_weight =
-        if (params.missing_word_weight >= 0)
-          params.missing_word_weight
-        else {
-          val values = word_weights.values
-          values.sum / values.size
+    val (weights, mww) =
+      if (params.weights_file != null) {
+        val word_weights = mutable.Map[Word,Double]()
+        errprint("Reading word weights...")
+        for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
+          val word = row.gets("word")
+          val weight = row.get[Double]("weight")
+          val wordint = memoizer.memoize(word)
+          if (word_weights contains wordint)
+            warning("Word %s with weight %s already seen with weight %s",
+              word, weight, word_weights(wordint))
+          else if (weight < 0)
+            warning("Word %s with invalid negative weight %s",
+              word, weight)
+          else
+            word_weights(wordint) = weight
         }
-    }
-
-    val lang_model_factory = create_doc_lang_model_factory(word_weights,
-      missing_word_weight)
+        // Scale the word weights to have an average of 1.
+        val values = word_weights.values
+        val avg = values.sum / values.size
+        val scaled_word_weights = word_weights map {
+          case (word, weight) => (word, weight / avg)
+        }
+        val missing_word_weight =
+          if (params.missing_word_weight >= 0)
+            params.missing_word_weight
+          else
+            1.0
+        errprint("Reading word weights... done.")
+        (scaled_word_weights, missing_word_weight)
+      } else
+        (mutable.Map[Word,Double](), 0.0)
+    val lang_model_factory = create_doc_lang_model_factory(weights, mww)
     val docfact = create_document_factory(lang_model_factory)
     val grid = create_grid(docfact)
     // This accesses all the above items, either directly through the variables

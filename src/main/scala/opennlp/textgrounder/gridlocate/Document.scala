@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  GridDoc.scala
+//  Document.scala
 //
 //  Copyright (C) 2010-2013 Ben Wing, The University of Texas at Austin
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
@@ -616,7 +616,7 @@ abstract class GridDocFactory[Co : Serializer](
       val double_tokens = doc.lang_model.grid_lm.model.num_tokens
       val tokens = double_tokens.toInt
       // Partial counts should not occur in training documents.
-      assert(double_tokens == tokens)
+      // assert(double_tokens == tokens)
       if (status == "skipped") {
         assert(!doc.has_coord)
         num_would_be_training_documents_skipped_because_lacking_coordinates_by_split(split) += 1

@@ -90,7 +90,7 @@ class UnigramStorage extends ItemStorage[Word] {
 
   def iter_items = counts.toIterable
 
-  // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some]
+  // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some
   // reason; if not, the accuracy of computations that loop over the keys drops
   // dramatically. (On the order of 10-15% when computing smoothing in
   // DiscountedUnigramLangModelFactory.imp_finish_after_global, a factor of
@@ -128,27 +128,6 @@ abstract class UnigramLangModel(
   type Item = Word
   val pmodel = new UnigramStorage()
   val model = pmodel
-
-  /**
-   * Sum of all word weights for all word tokens in the language model.
-   * This is used to normalize the computation in `model_logprob`
-   * so that it computes a weighted average. This isn't strictly
-   * necessary for plain ranking, but ensures that the scores are
-   * more comparable across different documents when training a reranker.
-   */
-  var total_word_weight = 1.0
-
-  override def imp_finish_before_global() {
-    super.imp_finish_before_global()
-    if (factory.word_weights.size > 0) {
-      // We multiply each weight by the word count because logically we
-      // are weighting each word.
-      total_word_weight =
-        (for ((word, count) <- model.iter_items) yield
-          count * factory.word_weights.getOrElse(word,
-            factory.missing_word_weight)).sum
-    }
-  }
 
   def item_to_string(item: Item) = memoizer.unmemoize(item)
 
@@ -260,20 +239,9 @@ abstract class UnigramLangModel(
    */
   def model_logprob(xlangmodel: LangModel) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
-    val weights = factory.word_weights
-    if (weights.size == 0)
-      langmodel.model.iter_items.map {
-        case (word, count) => count * word_logprob(word)
-      }.sum
-    else {
-      val sum =
-        langmodel.model.iter_items.map {
-          case (word, count) =>
-            val weight = weights.getOrElse(word, factory.missing_word_weight)
-            weight * count * word_logprob(word)
-        }.sum
-      sum / total_word_weight
-    }
+    langmodel.model.iter_items.map {
+      case (word, count) => count * word_logprob(word)
+    }.sum
   }
 
   def get_most_contributing_grams(xlangmodel: LangModel,
@@ -356,12 +324,29 @@ abstract class UnigramLangModel(
   }
 }
 
+/**
+ * Default builder for unigram language models.
+ *
+ * @param factory Corresponding factory object for creating language models.
+ * @param ignore_case Whether to fold all words to lowercase.
+ * @param stopwords Set of stopwords to ignore.
+ * @param whitelist If non-empty, only allow the specified words to passs.
+ * @param minimum_word_count Remove words with total count less than this
+ *   (in each document). FIXME: This should work with the total count over
+ *   all documents, not each individual document.
+ * @param word_weights Weights to assign to each word, in the case where
+ *   unequal weighting is desired. If empty, do equal weighting.
+ * @param missing_word_weight Weight to assign to words not seen in
+ *   `word_weight`.
+ */
 class DefaultUnigramLangModelBuilder(
   factory: LangModelFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
   whitelist: Set[String],
-  minimum_word_count: Int = 1
+  minimum_word_count: Int,
+  word_weights: collection.Map[Word, Double],
+  missing_word_weight: Double
 ) extends LangModelBuilder(factory: LangModelFactory) {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.
@@ -473,12 +458,24 @@ class DefaultUnigramLangModelBuilder(
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
+    //
+    // FIXME: Can we modify a hash table like this when iterating on it?
     if (minimum_word_count > 1) {
       for ((word, count) <- model.iter_items if count < minimum_word_count) {
         model.remove_item(word)
         model.add_item(oov, count)
       }
     }
+
+    // Adjust the counts to track the specified weights.
+    //
+    // FIXME: Can we modify a hash table like this when iterating on it?
+    if (word_weights.size > 0)
+      for ((word, count) <- model.iter_items) {
+        val weight = word_weights.getOrElse(word, missing_word_weight)
+        model.set_item(word, count * weight)
+      }
+
   }
 
   def maybe_lowercase(word: String) =
@@ -502,9 +499,12 @@ class FilterUnigramLangModelBuilder(
     ignore_case: Boolean,
     stopwords: Set[String],
     whitelist: Set[String],
-    minimum_word_count: Int = 1
+    minimum_word_count: Int,
+    word_weights: collection.Map[Word, Double],
+    missing_word_weight: Double
   ) extends DefaultUnigramLangModelBuilder(
-    factory, ignore_case, stopwords, whitelist, minimum_word_count
+    factory, ignore_case, stopwords, whitelist, minimum_word_count,
+    word_weights, missing_word_weight
   ) {
 
   override def finish_before_global(xlm: LangModel) {
@@ -525,13 +525,5 @@ class FilterUnigramLangModelBuilder(
 
 /**
  * General factory for UnigramLangModel language models.
- *
- * @param word_weights Weights to assign to each word, in the case where
- *   unequal weighting is desired. If empty, do equal weighting.
- * @param missing_word_weight Weight to assign to words not seen in
- *   `word_weight`.
  */ 
-abstract class UnigramLangModelFactory(
-    val word_weights: collection.Map[Word, Double],
-    val missing_word_weight: Double
-) extends LangModelFactory { }
+trait UnigramLangModelFactory extends LangModelFactory { }

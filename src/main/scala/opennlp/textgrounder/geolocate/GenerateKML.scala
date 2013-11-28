@@ -114,17 +114,17 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override protected def get_lang_model_builder_creator(lm_type: String) = {
-    if (grid_lang_model_type != "unigram")
+  override protected def get_lang_model_builder_creator(lm_type: String,
+      word_weights: collection.Map[Word, Double],
+      missing_word_weight: Double
+    ) = {
+    if (lm_type != "unigram")
       param_error("Only unigram language models supported with GenerateKML")
     (factory: LangModelFactory) =>
       new FilterUnigramLangModelBuilder(
-        factory,
-        params.split_kml_words,
-        ignore_case = !params.preserve_case_words,
-        stopwords = the_stopwords,
-        whitelist = the_whitelist,
-        minimum_word_count = params.minimum_word_count)
+        factory, params.split_kml_words, !params.preserve_case_words,
+        the_stopwords, the_whitelist, params.minimum_word_count,
+        word_weights, missing_word_weight)
   }
 
   /**
