@@ -262,12 +262,15 @@ abstract class UnigramLangModel(
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val weights = factory.word_weights
     if (weights.size == 0)
-      langmodel.model.iter_keys.map(word_logprob(_)).sum
+      langmodel.model.iter_items.map {
+        case (word, count) => count * word_logprob(word)
+      }.sum
     else {
       val sum =
-        langmodel.model.iter_keys.map { word =>
-          val weight = weights.getOrElse(word, factory.missing_word_weight)
-          weight * word_logprob(word)
+        langmodel.model.iter_items.map {
+          case (word, count) =>
+            val weight = weights.getOrElse(word, factory.missing_word_weight)
+            weight * count * word_logprob(word)
         }.sum
       sum / total_word_weight
     }
@@ -277,21 +280,26 @@ abstract class UnigramLangModel(
       xrelative_to: Iterable[LangModel] = Iterable()) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val relative_to = xrelative_to.map(_.asInstanceOf[UnigramLangModel])
-    val words = langmodel.model.iter_keys
+    val words_counts = langmodel.model.iter_items
     val weights =
       if (relative_to.isEmpty)
-        words.map { word => (word, word_logprob(word)) }
+        words_counts.map {
+          case (word, count) => (word, count * word_logprob(word))
+        }
       else if (relative_to.size == 1) {
         val othermodel = relative_to.head
-        words.map { word =>
-          (word, word_logprob(word) - othermodel.word_logprob(word))
+        words_counts.map {
+          case (word, count) =>
+            (word, count *
+              (word_logprob(word) - othermodel.word_logprob(word)))
         }
       } else {
-        words.map { word =>
-          val factor = word_logprob(word)
-          val relcontribs =
-            relative_to.map { factor - _.word_logprob(word) }
-          (word, relcontribs maxBy { _.abs})
+        words_counts.map {
+          case (word, count) =>
+            val factor = word_logprob(word)
+            val relcontribs =
+              relative_to.map { factor - _.word_logprob(word) }
+            (word, count * (relcontribs maxBy { _.abs}))
         }
       }
     weights.toSeq.sortWith { _._2.abs > _._2.abs }
