@@ -46,12 +46,26 @@ as tab-separated fields and the latter naming the fields.""")
       metavar = "INT",
       default = 10,
       help = """Minimum total count of a word in order for it to be included
-in the list of words for which the entropy is computed.""")
+in the list of words for which the entropy is computed.  Default %default.""")
 
-  var include_normed_entropy =
-    ap.flag("include-normed-entropy", "ine",
-      help = """Include fields containing the entropy normed by the total
-number of word tokens and total number of cells containing the word.""")
+  var smoothed =
+    ap.flag("smoothed",
+      help = """Use smoothed probabilities when computing entropy. Default is
+to use unsmoothed (maximum-likelihood) probabilities.""")
+
+  var omit_normed_entropy =
+    ap.flag("omit-normed-entropy", "one",
+      help = """Do not include fields containing the entropy normed by the
+total number of word tokens and total number of cells containing the word
+and the logarithms of these two values.""")
+
+  var sort =
+    ap.option[String]("sort",
+      choices = Seq("entropy", "normed-log-wordcount", "normed-log-cellcount",
+        "normed-wordcount", "normed-cellcount"),
+      default = "entropy",
+      help = """Sort the entries by the given field, from lowest to highest.
+Allowed are %choices. Default %default.""")
 
   var verbose =
     ap.flag("verbose",
@@ -76,47 +90,100 @@ class ComputeEntropyDriver extends
     val grid = initialize_grid
     errprint("Computing set of words seen ...")
     val cells = grid.iter_nonempty_cells
+
+    // Compute the total word count across all cells for each word.
+    // Filter words with too small word count.
     val words_counts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
       lm.model.iter_items.toMap
     }.reduce[Map[Word,Double]](combine_double_maps _).
     filter { _._2 >= params.entropy_minimum_word_count }
+
+    // Compute the number of cells each word occurs in.
     val words_cellcounts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
       lm.model.iter_items.map {
         case (word, count) => (word, 1)
       }.toMap
     }.reduce[Map[Word,Int]](combine_int_maps _)
+
+    // Maybe print word and cell counts.
     if (params.verbose) {
       for ((word, count) <- words_counts)
-        errprint("Word: %s (%s) = %s / %s", word, memoizer.unmemoize(word), count,
-          words_cellcounts(word))
+        errprint("Word: %s (%s) = %s / %s", word, memoizer.unmemoize(word),
+          count, words_cellcounts(word))
     }
     errprint("Computing set of words seen ... done.")
+
     errprint("Computing entropies ...")
-    val entropies = for ((word, count) <- words_counts) yield {
+
+    // For each word, compute entropy. Return a tuple of
+    // (word, wordcount, cellcount, entropy, and entropy normed various ways).
+    val entropies = for ((word, wordcount) <- words_counts) yield {
+      // Compute p(word|cell) for each cell. Filter out 0's as they will
+      // cause problems otherwise when we take the log. (By definition, such
+      // 0's are ignored when computing entropy.)
       val probs = cells.map { cell =>
         val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
-        // lm.lookup_word(word)
-        lm.mle_word_prob(word)
+        if (params.smoothed)
+          lm.lookup_word(word)
+        else
+          lm.mle_word_prob(word)
       }.filter(_ != 0.0)
       val totalprob = probs.sum
+      // Normalize probabilities to get a distribution p(cell|word).
+      // NOTE NOTE NOTE: This is only mathematically correct if we assume that
+      // all cells have the same prior probability.
       val normprob = probs.map { _ / totalprob }
+
+      // Compute entropy by standard formula.
       val entropy = normprob.map { prob =>
         - prob * math.log(prob)
       }.sum
+
+      // Compute various kinds of "normed entropy". As the number of word
+      // tokens increases, it's observed that the entropy will tend to
+      // increase as well. This makes sense since the words will tend to be
+      // distributed over a larger number of cells. For a discrete distribution
+      // the maximal-entropy distribution is a uniform distribution, and for a
+      // uniform distribution with N choices, its entropy is log N. If we want
+      // to factor out the effect of number of word tokens, it seems we want
+      // to figure out the expected number of non-zero cells in a random
+      // distribution containing the given number of word tokens, and divide
+      // by the log of that number. Perhaps log(wordcount) is a good enough
+      // proxy?
       val cellcount = words_cellcounts(word)
-      (word, count, cellcount, entropy, entropy/count, entropy/cellcount)
+      assert(cellcount > 0)
+      assert(wordcount > 0)
+      val e_normed_log_wordcount =
+        if (wordcount == 1) 0.0
+        else entropy / math.log(wordcount)
+      val e_normed_log_cellcount =
+        if (cellcount == 1) 0.0
+        else entropy / math.log(cellcount)
+      (word, wordcount, cellcount, entropy, e_normed_log_wordcount,
+        e_normed_log_cellcount, entropy/wordcount, entropy/cellcount)
     }
-    val sorted_entropies = entropies.toSeq sortBy { _._4 }
+    val seqent = entropies.toSeq
+    val sorted_entropies = params.sort match {
+      case "entropy" => seqent sortBy { _._4 }
+      case "normed-log-wordcount" => seqent sortBy { _._5 }
+      case "normed-log-cellcount" => seqent sortBy { _._6 }
+      case "normed-wordcount" => seqent sortBy { _._7 }
+      case "normed-cellcount" => seqent sortBy { _._8 }
+    }
     val props = sorted_entropies map {
-      case (word, count, cellcount, entropy, normed_wordcount,
-          normed_cellcount) => Seq(
+      case (word, wordcount, cellcount, entropy,
+          normed_log_wordcount, normed_log_cellcount,
+          normed_wordcount, normed_cellcount
+        ) => Seq(
         "word" -> memoizer.unmemoize(word),
-        "wordcount" -> count,
+        "wordcount" -> wordcount,
         "cellcount" -> cellcount,
         "entropy" -> entropy
-        ) ++ (if (params.include_normed_entropy) Seq(
+        ) ++ (if (!params.omit_normed_entropy) Seq(
+        "normed-entropy-by-log-wordcount" -> normed_log_wordcount,
+        "normed-entropy-by-log-cellcount" -> normed_log_cellcount,
         "normed-entropy-by-wordcount" -> normed_wordcount,
         "normed-entropy-by-cellcount" -> normed_cellcount
         ) else Seq[(String, Any)]()
