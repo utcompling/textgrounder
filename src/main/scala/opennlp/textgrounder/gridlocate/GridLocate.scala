@@ -205,7 +205,10 @@ in the cell, if documents have their own salience values.""")
        help = """File containing a set of word weights for weighting words
 non-uniformly (e.g. so that more geographically informative words are weighted
 higher). The file should be in textdb format, with `word` and `weight` fields.
-The weights do not need to be normalized.
+The weights do not need to be normalized but must not be negative. They will
+be normalized so that the average is 1. Each time a word is read in, it will
+be given a count corresponding to its normalized weight rather than a count
+of 1.
 
 The parameter value can be any of the following: Either the data or schema
 file of the database; the common prefix of the two; or the directory containing
@@ -1064,12 +1067,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         // Scale the word weights to have an average of 1.
         val values = word_weights.values
         val avg = values.sum / values.size
+        assert(avg > 0, "Must have at least one non-ignored non-zero weight")
         val scaled_word_weights = word_weights map {
           case (word, weight) => (word, weight / avg)
         }
         val missing_word_weight =
           if (params.missing_word_weight >= 0)
-            params.missing_word_weight
+            params.missing_word_weight / avg
           else
             1.0
         errprint("Reading word weights... done.")
