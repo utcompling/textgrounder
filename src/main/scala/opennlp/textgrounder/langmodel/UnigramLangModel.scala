@@ -458,22 +458,25 @@ class DefaultUnigramLangModelBuilder(
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
-    //
-    // FIXME: Can we modify a hash table like this when iterating on it?
     if (minimum_word_count > 1) {
-      for ((word, count) <- model.iter_items if count < minimum_word_count) {
+      // Copy items iterating over to avoid a ConcurrentModificationException
+      for ((word, count) <- model.iter_items.toSeq
+           if count < minimum_word_count) {
         model.remove_item(word)
         model.add_item(oov, count)
       }
     }
 
     // Adjust the counts to track the specified weights.
-    //
-    // FIXME: Can we modify a hash table like this when iterating on it?
     if (word_weights.size > 0)
-      for ((word, count) <- model.iter_items) {
+      // Copy items iterating over to avoid a ConcurrentModificationException
+      for ((word, count) <- model.iter_items.toSeq) {
         val weight = word_weights.getOrElse(word, missing_word_weight)
-        model.set_item(word, count * weight)
+        assert(weight >= 0)
+        if (weight == 0)
+          model.remove_item(word)
+        else
+          model.set_item(word, count * weight)
       }
 
   }
