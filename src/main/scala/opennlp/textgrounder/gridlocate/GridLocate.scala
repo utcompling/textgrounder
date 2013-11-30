@@ -224,6 +224,15 @@ the average of all weights in the file, which treats them as if they
 have no special weight. It is possible to set this value to zero, in
 which case unspecified words will be ignored.""")
 
+  var ignore_weights_below =
+    ap.option[Double]("ignore-weights-below", "iwb",
+       metavar = "WEIGHT",
+       help = """If given, ignore words whose weights are below the given
+value. If you specify this, you might also want to specify
+`--missing-word-weight 0` so that words with a missing or ignored weight are
+assigned a weight of 0 rather than the average of the weights that have been
+seen.""")
+
   var results =
     ap.option[String]("r", "results",
       metavar = "FILE",
@@ -1061,7 +1070,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           else if (weight < 0)
             warning("Word %s with invalid negative weight %s",
               word, weight)
-          else
+          else if (weight >= params.ignore_weights_below)
             word_weights(wordint) = weight
         }
         // Scale the word weights to have an average of 1.
