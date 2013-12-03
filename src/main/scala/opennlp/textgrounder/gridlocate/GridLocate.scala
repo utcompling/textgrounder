@@ -663,11 +663,11 @@ For the perceptron classifiers, see also `--pa-variant`,
   val rerank_features_matching_word_choices =
     Seq("unigram-binary", "unigram-count", "unigram-count-product",
         "unigram-probability", "unigram-prob-product", "kl").map {
-      "matching" + _ }
+      "matching-" + _ }
 
   val rerank_features_matching_ngram_choices =
     Seq("ngram-binary", "ngram-count", "ngram-count-product").map {
-      "matching" + _ }
+      "matching-" + _ }
 
   var rerank_features =
     ap.option[String]("rerank-features",
