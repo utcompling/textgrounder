@@ -377,6 +377,14 @@ Possibilities are 'yes', 'no', and 'default' (which means 'yes' when doing
 Dirichlet or Jelinek-Mercer smoothing, 'no' when doing pseudo-Good-Turing
 smoothing).""")
 
+  /**
+   * Type of lang model used in the cell grid.
+   */
+  lazy val grid_lang_model_type = {
+    if (lang_model == (("unsmoothed-ngram", ""))) "ngram"
+    else "unigram"
+  }
+
   var rerank_lang_model =
     ap.optionWithParams[String]("rerank-lang-model", "rerank-word-dist",
         "rlm", "rwd",
@@ -657,10 +665,10 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
-  val rerank_features_simple_word_choices =
+  val rerank_features_simple_unigram_choices =
     Seq("unigram-binary", "unigram-count")
 
-  val rerank_features_matching_word_choices =
+  val rerank_features_matching_unigram_choices =
     Seq("unigram-binary", "unigram-count", "unigram-count-product",
         "unigram-probability", "unigram-prob-product", "kl").map {
       "matching-" + _ }
@@ -669,13 +677,14 @@ For the perceptron classifiers, see also `--pa-variant`,
     Seq("ngram-binary", "ngram-count", "ngram-count-product").map {
       "matching-" + _ }
 
+  val allowed_rerank_features = Seq("all-kl", "combined", "trivial") ++
+    rerank_features_simple_unigram_choices ++
+    rerank_features_matching_unigram_choices ++
+    rerank_features_matching_ngram_choices
+
   var rerank_features =
     ap.option[String]("rerank-features",
       default = "combined",
-      choices = Seq("all-kl", "combined", "trivial") ++
-        rerank_features_simple_word_choices ++
-        rerank_features_matching_word_choices ++
-        rerank_features_matching_ngram_choices,
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
 respective language models). The original ranking score for the cell always
@@ -722,10 +731,41 @@ document and cell);
 
 'combined' (use all of the features of all the previous methods).
 
+Multiple feature types can be specified, separated by spaces or commas.
+
 Default %default.
 
 Note that this only is used when --rerank=pointwise and --rerank-classifier
 specifies something other than 'trivial'.""")
+
+  lazy val rerank_feature_list = {
+    val features = rerank_features.split("[ ,]")
+    for (feature <- features) {
+      if (!(allowed_rerank_features contains feature))
+        ap.usageError("Unrecognized feature '%s' in --rerank-features" format
+          feature)
+    }
+    features.toSeq
+  }
+
+  lazy val rerank_lang_model_type = {
+    if (rerank == "none")
+      grid_lang_model_type
+    else {
+      val is_ngram =
+        (rerank_features_matching_ngram_choices.intersect(
+          rerank_feature_list).size != 0)
+      val is_unigram =
+        (rerank_features_matching_unigram_choices.intersect(
+          rerank_feature_list).size != 0)
+      if (is_ngram && is_unigram)
+        ap.usageError("Can't have both ngram and unigram features in --rerank-features")
+      else if (is_ngram)
+        "ngram"
+      else
+        "unigram"
+    }
+  }
 
   var pa_variant =
     ap.option[Int]("pa-variant",
@@ -837,18 +877,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Type of lang model used in the cell grid.
-   */
-  protected def grid_lang_model_type = {
-    if (params.lang_model == (("unsmoothed-ngram", ""))) "ngram"
-    else "unigram"
-  }
-
-  /**
    * Field in textdb corpus used to access proper type of lang model.
    */
   def grid_word_count_field = {
-    if (grid_lang_model_type == "ngram")
+    if (params.grid_lang_model_type == "ngram")
+      "ngram-counts"
+    else
+      "unigram-counts"
+  }
+
+  def rerank_word_count_field = {
+    if (params.rerank_lang_model_type == "ngram")
       "ngram-counts"
     else
       "unigram-counts"
@@ -983,13 +1022,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       missing_word_weight: Double
   ) = {
     val grid_lang_model_factory =
-      create_lang_model_factory(grid_lang_model_type, params.lang_model,
+      create_lang_model_factory(params.grid_lang_model_type, params.lang_model,
         params.interpolate, word_weights, missing_word_weight)
     val rerank_lang_model_factory =
-      if (grid_lang_model_type == rerank_lang_model_type)
+      if (params.grid_lang_model_type == params.rerank_lang_model_type)
         grid_lang_model_factory
       else
-        create_lang_model_factory(rerank_lang_model_type,
+        create_lang_model_factory(params.rerank_lang_model_type,
           params.rerank_lang_model, params.rerank_interpolate,
           word_weights, missing_word_weight)
     new DocLangModelFactory(grid_lang_model_factory, rerank_lang_model_factory)
@@ -1135,23 +1174,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def initialize_grid = create_grid_from_documents(read_raw_training_documents)
 
-  protected def rerank_lang_model_type = {
-    if (params.rerank == "none")
-      grid_lang_model_type
-    else if (params.rerank_features_matching_ngram_choices.contains(
-        params.rerank_features))
-      "ngram"
-    else
-      "unigram"
-  }
-
-  def rerank_word_count_field = {
-    if (rerank_lang_model_type == "ngram")
-      "ngram-counts"
-    else
-      "unigram-counts"
-  }
-
   /**
    * Create a ranker object corresponding to the given name. A ranker object
    * returns a ranking over potential grid cells, given a test document.
@@ -1265,9 +1287,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_candidate_instance_factory = {
     def create_fact(ty: String): CandidateInstFactory[Co] = {
-      if (params.rerank_features_simple_word_choices contains ty)
+      if (params.rerank_features_simple_unigram_choices contains ty)
         new WordCandidateInstFactory[Co](ty)
-      else if (params.rerank_features_matching_word_choices contains ty)
+      else if (params.rerank_features_matching_unigram_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
         new NgramMatchingCandidateInstFactory[Co](ty)
@@ -1278,13 +1300,21 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           new KLDivCandidateInstFactory[Co]
         case "combined" =>
           new CombiningCandidateInstFactory[Co](
-            (params.rerank_features_simple_word_choices ++
-             params.rerank_features_matching_word_choices).map(
+            (params.rerank_features_simple_unigram_choices ++
+             params.rerank_features_matching_unigram_choices).map(
               create_fact(_)))
       }
     }
 
-    create_fact(params.rerank_features)
+    val featlist = params.rerank_feature_list
+    if (featlist.size == 0)
+      params.parser.usageError("Can't specify empty --rerank-features")
+    else if (featlist.size == 1)
+      create_fact(featlist.head)
+    else {
+      val facts = featlist.map(create_fact)
+      new CombiningCandidateInstFactory[Co](facts)
+    }
   }
 
   /**
