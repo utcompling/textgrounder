@@ -255,13 +255,13 @@ class WordMatchingCandidateInstFactory[Co](value: String) extends
       None
     else {
       val wordval = value match {
-        case "unigram-binary" => 1
-        case "unigram-count" => count
-        case "unigram-count-product" => count * qcount
-        case "unigram-prob-product" =>
+        case "matching-unigram-binary" => 1
+        case "matching-unigram-count" => count
+        case "matching-unigram-count-product" => count * qcount
+        case "matching-unigram-prob-product" =>
           doclm.lookup_word(word) * celldist.lookup_word(word)
-        case "unigram-probability" => doclm.lookup_word(word)
-        case "kl" => {
+        case "matching-unigram-probability" => doclm.lookup_word(word)
+        case "matching-kl" => {
           val p = doclm.lookup_word(word)
           val q = celldist.lookup_word(word)
           p*(log(p/q))
@@ -295,9 +295,9 @@ class NgramMatchingCandidateInstFactory[Co](value: String) extends
       None
     else {
       val wordval = value match {
-        case "ngram-binary" => 1
-        case "ngram-count" => count
-        case "ngram-count-product" => count * qcount
+        case "matching-ngram-binary" => 1
+        case "matching-ngram-count" => count
+        case "matching-ngram-count-product" => count * qcount
       }
       Some(wordval)
     }
