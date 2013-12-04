@@ -29,105 +29,16 @@ import util.textdb.{Encoder, Row}
 import langmodel.LangModelFactory
 
 /////////////////////////////////////////////////////////////////////////////
-//                        Combined language models                         //
-/////////////////////////////////////////////////////////////////////////////
-
-/**
- * Language model resulting from combining the individual language models
- * of a number of documents.  We track the number of documents making up
- * the language model, as well as the combined salience for all of these
- * documents. (The primary reason for documents not contributing to the
- * language model is that they're not in the training set; see comments
- * below.  However, some documents simply don't have language models
- * defined for them in the document file -- e.g. if there was a problem
- * extracting the document's words in the preprocessing stage.)
- *
- * Note that we embed the actual object describing the language model
- * as a field in this object, rather than extending (subclassing) LangModel.
- * The reason for this is that there are multiple types of LangModels, and
- * so subclassing would require creating a different subclass for every
- * such type, along with extra boilerplate functions to create objects of
- * these subclasses.
- */
-class CombinedLangModel(factory: DocLangModelFactory) {
-  /** The combined language model itself. */
-  val lang_model = factory.create_lang_model
-  /** Number of documents used to create language model. */
-  var num_docs = 0
-  /** Combined salience score (computed by adding individual
-    * scores of documents). */
-  var salience = 0.0
-
-  /** 
-   * True if the object is empty.  This means no documents have been
-   * added using `add_document`. */
-  def is_empty = num_docs == 0
-
-  /**
-   *  Add the given document to the total language model seen so far.
-   *  `partial` is a scaling factor (between 0.0 and 1.0) used for
-   *  interpolating multiple language models.
-   */
-  def add_document(doc: GridDoc[_], partial: Double = 1.0) {
-    /* Formerly, we arranged things so that we were passed in all documents,
-       regardless of the split.  The reason for this was that the decision
-       was made to accumulate saliences from all documents, even in the
-       evaluation set.
-       
-       Strictly, this is a violation of the "don't train on your evaluation
-       set" rule.  The reason motivating this was that
-
-       (1) The salience isused only in Naive Bayes, and only in establishing
-       a prior probability.  Hence it isn' the main indicator.
-       (2) Often, nearly all the salience for a given cell comes from
-       a particular document -- e.g. the Wikipedia article for the primary
-       city in the cell.  If we pull the salience for this document
-       out of the cell because it happens to be in the evaluation set,
-       we will totally distort the salience for this cell.  In a "real"
-       usage case, we would be testing against an unknown document, not
-       against a document in our training set that we've artificially
-       removed so as to construct an evaluation set, and this problem
-       wouldn't arise, so by doing this we are doing a more realistic
-       evaluation.
-       
-       Note that we do NOT include word counts from dev-set or test-set
-       documents in the language model for a cell.  This keeps to the
-       above rule about only training on your training set, and is OK
-       because (1) each document in a cell contributes a similar amount of
-       word counts (assuming the documents are somewhat similar in size),
-       hence in a cell with multiple documents, each individual document
-       only computes a fairly small fraction of the total word counts;
-       (2) distributions are normalized in any case, so the exact number
-       of documents in a cell does not affect the language model.
-       
-       However, once the corpora were separated into sub-corpora based on
-       the training/dev/test split, passing in all documents complicated
-       things, as it meant having to read all the sub-corpora.  Furthermore,
-       passing in non-training documents into the K-d cell grid changes the
-       grids in ways that are not easily predictable -- a significantly
-       greater effect than simply changing the salience.  So (for the
-       moment at least) we don't do this any more. */
-    assert (doc.split == "training")
-
-    /* Add salience of document to cell. */
-    doc.salience match {
-      // Might be None, for unknown salience
-      case Some(x) => salience += x
-      case _ =>
-    }
-
-    lang_model.add_language_model(doc.lang_model, partial)
-    num_docs += 1
-  }
-}
-
-/////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
  * Abstract class for a general cell in a cell grid.
- * 
+ *
+ * This combines a number of documents into a combined language model.
+ * We track the number of documents making up the language model, as well as
+ * the combined salience for all of these documents.
+ *
  * @param grid The Grid object for the grid this cell is in.
  * @tparam Co The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
@@ -135,22 +46,34 @@ class CombinedLangModel(factory: DocLangModelFactory) {
 abstract class GridCell[Co](
     val grid: Grid[Co]
 ) {
-  val combined_lang_model =
-    new CombinedLangModel(grid.docfact.lang_model_factory)
+  /**************************** Basic properties ******************************/
+
+  /** The combined language model. */
+  val lang_model = grid.docfact.lang_model_factory.create_lang_model
+  /** Number of documents used to create language model. */
+  var num_docs = 0
+  /** Combined salience score (computed by adding individual
+    * scores of documents). */
+  var salience = 0.0
   var most_salient_document: String = ""
   var most_salient_doc_salience = 0.0
 
   /**
-   * Return a string describing the location of the cell in its grid,
-   * e.g. by its boundaries or similar.
-   */
-  def describe_location: String
+   * True if the object is empty.  This means no documents have been
+   * added using `add_document`. */
+  def is_empty = num_docs == 0
+
+  /** Normal language model of cell. */
+  def grid_lm = lang_model.grid_lm
+  /** Language model of cell used during reranking. */
+  def rerank_lm = lang_model.rerank_lm
 
   /**
-   * Return a string describing the indices of the cell in its grid.
-   * Only used for debugging.
+   * Return true if we have finished creating and populating the cell.
    */
-  def describe_indices: String
+  def finished = lang_model.finished
+
+  /***************************** Central point *****************************/
 
   /**
    * Return the coordinate of the true center of the cell.  This is sometimes
@@ -179,23 +102,20 @@ abstract class GridCell[Co](
       get_centroid
   }
 
-  /** Language model set of cell. */
-  def lang_model = combined_lang_model.lang_model
-  /** Normal language model of cell. */
-  def grid_lm = combined_lang_model.lang_model.grid_lm
-  /** Language model of cell used during reranking. */
-  def rerank_lm = combined_lang_model.lang_model.rerank_lm
-  /** Number of documents in cell. */
-  def num_docs = combined_lang_model.num_docs
-  /** Whether the cell is empty. */
-  def is_empty = combined_lang_model.is_empty
-  /** Combined salience score of all documents in cell. */
-  def salience = combined_lang_model.salience
+  /************************* External representation *************************/
 
   /**
-   * Return true if we have finished creating and populating the cell.
+   * Return a string describing the location of the cell in its grid,
+   * e.g. by its boundaries or similar.
    */
-  def finished = lang_model.finished
+  def describe_location: String
+
+  /**
+   * Return a string describing the indices of the cell in its grid.
+   * Only used for debugging.
+   */
+  def describe_indices: String
+
   /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
@@ -270,14 +190,62 @@ abstract class GridCell[Co](
       <salience>{ salience }</salience>
     </GridCell>
 
-  /**
-   * Add a document to the language model for the cell.
-   */
+  /************************* Building up the cell *************************/
+
   def add_document(doc: GridDoc[Co]) {
     assert(!finished)
-    combined_lang_model.add_document(doc)
-    if (doc.salience != None)
-      add_salient_point(doc.title, doc.salience.get)
+
+    /* Formerly, we arranged things so that we were passed in all documents,
+       regardless of the split.  The reason for this was that the decision
+       was made to accumulate saliences from all documents, even in the
+       evaluation set.
+
+       Strictly, this is a violation of the "don't train on your evaluation
+       set" rule.  The reason motivating this was that
+
+       (1) The salience isused only in Naive Bayes, and only in establishing
+       a prior probability.  Hence it isn' the main indicator.
+       (2) Often, nearly all the salience for a given cell comes from
+       a particular document -- e.g. the Wikipedia article for the primary
+       city in the cell.  If we pull the salience for this document
+       out of the cell because it happens to be in the evaluation set,
+       we will totally distort the salience for this cell.  In a "real"
+       usage case, we would be testing against an unknown document, not
+       against a document in our training set that we've artificially
+       removed so as to construct an evaluation set, and this problem
+       wouldn't arise, so by doing this we are doing a more realistic
+       evaluation.
+
+       Note that we do NOT include word counts from dev-set or test-set
+       documents in the language model for a cell.  This keeps to the
+       above rule about only training on your training set, and is OK
+       because (1) each document in a cell contributes a similar amount of
+       word counts (assuming the documents are somewhat similar in size),
+       hence in a cell with multiple documents, each individual document
+       only computes a fairly small fraction of the total word counts;
+       (2) distributions are normalized in any case, so the exact number
+       of documents in a cell does not affect the language model.
+
+       However, once the corpora were separated into sub-corpora based on
+       the training/dev/test split, passing in all documents complicated
+       things, as it meant having to read all the sub-corpora.  Furthermore,
+       passing in non-training documents into the K-d cell grid changes the
+       grids in ways that are not easily predictable -- a significantly
+       greater effect than simply changing the salience.  So (for the
+       moment at least) we don't do this any more. */
+    assert (doc.split == "training")
+
+    /* Add salience of document to cell. */
+    doc.salience.foreach { sal =>
+      salience += sal
+      add_salient_point(doc.title, sal)
+    }
+
+    /* Accumulate language model. `partial` is a scaling factor (between
+       0.0 and 1.0) used for interpolating multiple language models.
+       Not currently implemented completely. */
+    lang_model.add_language_model(doc.lang_model, partial = 1.0)
+    num_docs += 1
   }
 
   /**
@@ -302,6 +270,10 @@ abstract class GridCell[Co](
     lang_model.finish_after_global()
   }
 }
+
+/////////////////////////////////////////////////////////////////////////////
+//                               Grid of cells                             //
+/////////////////////////////////////////////////////////////////////////////
 
 /**
  * Abstract class for a general grid of cells.  The grid is defined over
@@ -421,7 +393,7 @@ abstract class Grid[Co](
    * Iterate over all non-empty cells.
    */
   def iter_nonempty_cells: Iterable[GridCell[Co]]
-  
+
   /*********************** Not meant to be overridden *********************/
 
   /* Sum of `num_docs` for each cell. */
@@ -430,7 +402,7 @@ abstract class Grid[Co](
   var all_cells_computed = false
   /* Number of non-empty cells. */
   var num_non_empty_cells = 0
-  
+
   /**
    * Iterate over all non-empty cells, making sure to include the given cells
    *  even if empty.
