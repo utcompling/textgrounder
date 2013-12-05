@@ -267,8 +267,6 @@ trait LangModelFactory {
 trait ItemAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
   val invalid_word: Gram = -1
 
-  val blank_memoized_string: Gram
-
   // These should NOT be declared to have a type of mutable.Map[Gram, Int]
   // or whatever.  Doing so ensures that we go through the Map[] interface,
   // which requires lots of boxing and unboxing.
@@ -283,7 +281,6 @@ trait ItemAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
  * Normal version of memoizer which maps words to Ints.
  */
 trait WordAsIntMemoizer extends ItemAsIntMemoizer[String] {
-  val blank_memoized_string = memoize("")
 }
 
 /**
@@ -294,8 +291,6 @@ trait WordAsStringMemoizer extends IdentityMemoizer[String] {
   type Gram = String
 
   val invalid_word: Gram = null
-
-  val blank_memoized_string = memoize("")
 
   def create_word_int_map = intmap[Gram]()
 
