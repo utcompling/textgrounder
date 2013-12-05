@@ -45,10 +45,10 @@ class UnsmoothedNgramLangModel(
     num_tokens = model.num_tokens
   }
 
-  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = ???
+  def fast_kl_divergence(other: LangModel, partial: Boolean = true,
+    cache: KLDivergenceCache = null) = ???
 
-  def cosine_similarity(other: LangModel, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = true,
       smoothed: Boolean = false) = ???
 
   def kl_divergence_34(other: NgramLangModel) = ???

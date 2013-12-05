@@ -166,13 +166,13 @@ class KLDivergenceGridRanker[Co](
   val slow = false
 
   def call_kl_divergence(self: LangModel, other: LangModel) =
-    self.kl_divergence(self_kl_cache, other, partial = partial)
+    self.kl_divergence(other, partial = partial, cache = self_kl_cache)
 
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val cell_lang_model = cell.grid_lm
     var kldiv = call_kl_divergence(lang_model, cell_lang_model)
     if (symmetric) {
-      val kldiv2 = cell_lang_model.kl_divergence(null, lang_model,
+      val kldiv2 = cell_lang_model.kl_divergence(lang_model,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
@@ -232,7 +232,7 @@ class CosineSimilarityGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co],
   smoothed: Boolean = false,
-  partial: Boolean = false
+  partial: Boolean = true
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {

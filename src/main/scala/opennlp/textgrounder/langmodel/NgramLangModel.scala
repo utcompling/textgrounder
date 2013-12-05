@@ -279,7 +279,7 @@ abstract class NgramLangModel(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = true,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, WordCount]) = ???
 

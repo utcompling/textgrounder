@@ -80,7 +80,7 @@ trait FastSlowKLDivergence {
    *   of word contributions as described above; will be null if
    *   not requested.
    */
-  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = true,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, WordCount])
 
@@ -89,7 +89,7 @@ trait FastSlowKLDivergence {
    * #slow_kl_divergence_debug, but without requesting or returning debug
    * info.
    */
-  def slow_kl_divergence(other: LangModel, partial: Boolean = false) = {
+  def slow_kl_divergence(other: LangModel, partial: Boolean = true) = {
     val (kldiv, contribs) =
       slow_kl_divergence_debug(other, partial,
         return_contributing_words = false)
@@ -100,16 +100,16 @@ trait FastSlowKLDivergence {
    * A fast, optimized implementation of KL-divergence.  See the discussion in
    * `slow_kl_divergence_debug`.
    */
-  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false): Double
+  def fast_kl_divergence(other: LangModel, partial: Boolean = true,
+    cache: KLDivergenceCache = null): Double
 
   /**
    * Check fast and slow KL-divergence versions against each other.
    */
-  def test_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = {
+  def test_kl_divergence(other: LangModel, partial: Boolean = true,
+    cache: KLDivergenceCache = null) = {
     val slow_kldiv = slow_kl_divergence(other, partial)
-    val fast_kldiv = fast_kl_divergence(cache, other, partial)
+    val fast_kldiv = fast_kl_divergence(other, partial, cache)
     if (abs(fast_kldiv - slow_kldiv) > 1e-8) {
       errprint("Fast KL-div=%s but slow KL-div=%s", fast_kldiv, slow_kldiv)
       assert(fast_kldiv == slow_kldiv)
@@ -124,12 +124,12 @@ trait FastSlowKLDivergence {
    * are more than a very small amount different (the small amount rather
    * than 0 to account for possible rounding error).
    */
-  protected def imp_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean) = {
+  protected def imp_kl_divergence(other: LangModel, partial: Boolean,
+      cache: KLDivergenceCache) = {
     if (debug("test-kl"))
-      test_kl_divergence(cache, other, partial)
+      test_kl_divergence(other, partial, cache)
     else
-      fast_kl_divergence(cache, other, partial)
+      fast_kl_divergence(other, partial, cache)
   }
 }
 
@@ -518,30 +518,30 @@ abstract class LangModel(val factory: LangModelFactory) {
    * Actual implementation of `kl_divergence` by subclasses.
    * External callers should use `kl_divergence`.
    */
-  protected def imp_kl_divergence(cache: KLDivergenceCache,
-    other: LangModel, partial: Boolean): Double
+  protected def imp_kl_divergence(other: LangModel, partial: Boolean,
+    cache: KLDivergenceCache): Double
 
   /**
    * Compute the KL-divergence between this lang model and another
    * lang model.
    * 
-   * @param cache Cached information about this lang model, used to
-   *   speed up computations.  Never needs to be supplied; null can always
-   *   be given, to cause a new cache to be created.
    * @param other The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
    *   that exist in our lang model; otherwise we also have to take
    *   into account words in the other lang model even if we haven't
    *   seen them, and often also (esp. in the presence of smoothing) the
    *   contribution of all other words in the vocabulary.
+   * @param cache Cached information about this lang model, used to
+   *   speed up computations.  Never needs to be supplied; null can always
+   *   be given, to cause a new cache to be created.
    *   
    * @return The KL-divergence value.
    */
-  def kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = {
+  def kl_divergence(other: LangModel, partial: Boolean = true,
+      cache: KLDivergenceCache = null) = {
     assert(finished)
     assert(other.finished)
-    imp_kl_divergence(cache, other, partial)
+    imp_kl_divergence(other, partial, cache)
   }
 
   def get_kl_divergence_cache(): KLDivergenceCache = null
@@ -552,10 +552,10 @@ abstract class LangModel(val factory: LangModelFactory) {
    * 
    * @param partial Same as in `kl_divergence`.
    */
-  def symmetric_kldiv(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = {
-    0.5*this.kl_divergence(cache, other, partial) +
-    0.5*this.kl_divergence(cache, other, partial)
+  def symmetric_kldiv(other: LangModel, partial: Boolean = true,
+    cache: KLDivergenceCache = null) = {
+    0.5*this.kl_divergence(other, partial, cache) +
+    0.5*this.kl_divergence(other, partial, cache)
   }
 
   /**
@@ -566,7 +566,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    * @param smoothed If true, use smoothed probabilities, if smoothing exists;
    *   otherwise, do unsmoothed.
    */
-  def cosine_similarity(other: LangModel, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = true,
     smoothed: Boolean = false): Double
 
   /**

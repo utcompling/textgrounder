@@ -150,7 +150,7 @@ abstract class UnigramLangModel(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = false,
+  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = true,
       return_contributing_words: Boolean = false) = {
     val other = xother.asInstanceOf[UnigramLangModel]
     var kldiv = 0.0

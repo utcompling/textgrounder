@@ -211,15 +211,15 @@ abstract class DiscountedUnigramLangModel(
         format (this, normalization_factor, model.num_tokens, unseen_mass))
   }
 
-  def fast_kl_divergence(cache: KLDivergenceCache, other: LangModel,
-      partial: Boolean = false) = {
+  def fast_kl_divergence(other: LangModel, partial: Boolean = true,
+      cache: KLDivergenceCache = null) = {
     FastDiscountedUnigramLangModel.fast_kl_divergence(
       this.asInstanceOf[TThis], cache.asInstanceOf[TKLCache],
       other.asInstanceOf[TThis], interpolate = factory.interpolate,
       partial = partial)
   }
 
-  def cosine_similarity(other: LangModel, partial: Boolean = false,
+  def cosine_similarity(other: LangModel, partial: Boolean = true,
       smoothed: Boolean = false) = {
     if (smoothed)
       FastDiscountedUnigramLangModel.fast_smoothed_cosine_similarity(
