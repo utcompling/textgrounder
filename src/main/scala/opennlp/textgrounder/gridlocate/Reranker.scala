@@ -94,11 +94,17 @@ trait CandidateInstFactory[Co] extends (
   val logarithmic_base = 2.0
 
   def bin_logarithmically(feat: String, value: Double) = {
-    assert(value >= 0)
-    // This should work even when value is 0, yielding -2147483648
-    // (Int.MinValue)
-    val log = logn(value, logarithmic_base).toInt
-    ("%s$%s" format (feat, log), 1.0)
+    // We create separate bins for negative values, using the same binning scheme
+    // as for positive values but with "$neg" appended to the feature name.
+    if (value >= 0) {
+      // This should work even when value is 0, yielding -2147483648
+      // (Int.MinValue)
+      val log = logn(value, logarithmic_base).toInt
+      ("%s$%s" format (feat, log), 1.0)
+    } else {
+      val log = logn(-value, logarithmic_base).toInt
+      ("%s$%s$neg" format (feat, log), 1.0)
+    }
   }
 
   def include_and_bin_logarithmically(feat: String, value: Double) = {
