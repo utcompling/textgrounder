@@ -114,7 +114,7 @@ class GenerateKMLDriver extends
   }
 
   override protected def get_lang_model_builder_creator(lm_type: String,
-      word_weights: collection.Map[Word, Double],
+      word_weights: collection.Map[Gram, Double],
       missing_word_weight: Double
     ) = {
     if (lm_type != "unigram")

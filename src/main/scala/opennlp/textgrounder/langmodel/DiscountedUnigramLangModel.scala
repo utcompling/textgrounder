@@ -287,7 +287,7 @@ abstract class DiscountedUnigramLangModel(
     kldiv
   }
 
-  protected def imp_lookup_word(word: Word) = {
+  protected def imp_item_prob(word: Gram) = {
     if (factory.interpolate) {
       val wordcount = if (model contains word) model.get_item(word) else 0.0
       // if (debug("some")) {
@@ -308,7 +308,7 @@ abstract class DiscountedUnigramLangModel(
         errprint("mle_wordprob = %s, normalization_factor = %s, unseen_mass = %s",
           mle_wordprob, normalization_factor, unseen_mass)
       }
-      // Info on word and probability printed in wrapper lookup_word()
+      // Info on word and probability printed in wrapper item_prob()
       // for bad probability, and assert(false) occurs there
       wordprob
     } else {
@@ -361,7 +361,7 @@ abstract class DiscountedUnigramLangModel(
                      item_to_string(word), wordprob)
           wordprob
         }
-      // Info on word and probability printed in wrapper lookup_word()
+      // Info on word and probability printed in wrapper item_prob()
       // for bad probability, and assert(false) occurs there
       retval
     }

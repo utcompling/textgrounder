@@ -998,7 +998,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * pass in a function to create one when creating a LangModelFactory.
    */
   protected def get_lang_model_builder_creator(lang_model_type: String,
-      word_weights: collection.Map[Word, Double],
+      word_weights: collection.Map[Gram, Double],
       missing_word_weight: Double
     ) =
     (factory: LangModelFactory) => {
@@ -1023,7 +1023,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_lang_model_factory(lang_model_type: String,
       lm_spec: (String, String), interpolate: String,
-      word_weights: collection.Map[Word, Double],
+      word_weights: collection.Map[Gram, Double],
       missing_word_weight: Double
   ) = {
     val create_builder = get_lang_model_builder_creator(lang_model_type,
@@ -1063,7 +1063,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * ranking and reranking require different dists.
    */
   protected def create_doc_lang_model_factory(
-      word_weights: collection.Map[Word, Double],
+      word_weights: collection.Map[Gram, Double],
       missing_word_weight: Double
   ) = {
     val grid_lang_model_factory =
@@ -1142,7 +1142,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   ) = {
     val (weights, mww) =
       if (params.weights_file != null) {
-        val word_weights = mutable.Map[Word,Double]()
+        val word_weights = mutable.Map[Gram,Double]()
         errprint("Reading word weights...")
         for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
           val word = row.gets("word")
@@ -1172,7 +1172,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         errprint("Reading word weights... done.")
         (scaled_word_weights, missing_word_weight)
       } else
-        (mutable.Map[Word,Double](), 0.0)
+        (mutable.Map[Gram,Double](), 0.0)
     val lang_model_factory = create_doc_lang_model_factory(weights, mww)
     val docfact = create_document_factory(lang_model_factory)
     val grid = create_grid(docfact)

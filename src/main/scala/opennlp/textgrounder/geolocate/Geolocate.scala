@@ -130,14 +130,14 @@ class CellDistMostCommonToponymSphereGridRanker(
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
-    var maxword = lang_model.find_most_common_word(
+    var maxword = lang_model.find_most_common_item(
       word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
-      maxword = lang_model.find_most_common_word(
+      maxword = lang_model.find_most_common_item(
         word => word(0).isUpper)
     }
     if (maxword == None)
-      maxword = lang_model.find_most_common_word(word => true)
+      maxword = lang_model.find_most_common_item(word => true)
     cdist_factory.get_cell_dist(sphere_grid, maxword.get).
       get_ranked_cells(include)
   }
@@ -151,10 +151,10 @@ class SalienceMostCommonToponymSphereGridRanker(
     val lang_model = Unigram.check_unigram_lang_model(_lang_model)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
-    var maxword = lang_model.find_most_common_word(
+    var maxword = lang_model.find_most_common_item(
       word => word(0).isUpper && wikipedia_fact.word_is_toponym(word))
     if (maxword == None) {
-      maxword = lang_model.find_most_common_word(
+      maxword = lang_model.find_most_common_item(
         word => wikipedia_fact.word_is_toponym(word))
     }
     if (debug("commontop"))

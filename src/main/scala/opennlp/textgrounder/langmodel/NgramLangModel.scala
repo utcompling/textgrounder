@@ -58,7 +58,7 @@ object NgramStorage {
 /**
  * An interface for storing and retrieving ngrams.
  */
-trait NgramStorage extends ItemStorage[Word] {
+trait NgramStorage extends ItemStorage {
 }
 
 /**
@@ -70,7 +70,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 
   val model = new NGramModel()
 
-  protected def get_sl_ngram(ngram: Ngram) =
+  protected def get_sl_ngram(ngram: Gram) =
     new StringList(Ngram.unmemoize(ngram).toSeq: _*)
 
   /**************************** Abstract functions ***********************/
@@ -79,7 +79,7 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Add an n-gram with the given count.  If the n-gram exists already,
    * add the count to the existing value.
    */
-  def add_item(ngram: Ngram, count: WordCount) {
+  def add_item(ngram: Gram, count: WordCount) {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
@@ -93,7 +93,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     }
   }
 
-  def set_item(ngram: Ngram, count: WordCount) {
+  def set_item(ngram: Gram, count: WordCount) {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
@@ -107,7 +107,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Remove an n-gram, if it exists.
    */
-  def remove_item(ngram: Ngram) {
+  def remove_item(ngram: Gram) {
     val sl_ngram = get_sl_ngram(ngram)
     model.remove(sl_ngram)
   }
@@ -115,7 +115,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Return whether a given n-gram is stored.
    */
-  def contains(ngram: Ngram) = {
+  def contains(ngram: Gram) = {
     val sl_ngram = get_sl_ngram(ngram)
     model.contains(sl_ngram)
   }
@@ -123,7 +123,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Return whether a given n-gram is stored.
    */
-  def get_item(ngram: Ngram) = {
+  def get_item(ngram: Gram) = {
     val sl_ngram = get_sl_ngram(ngram)
     model.getCount(sl_ngram)
   }
@@ -184,7 +184,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   * counts (in particular, when the K-d tree code does interpolation on
 //   * cells).  FIXME: This seems ugly, perhaps there is a better way?
 //   *
-//   * FIXME: Currently we store ngrams using a Word, which is simply an index
+//   * FIXME: Currently we store ngrams using a Gram, which is simply an index
 //   * into a string table, where the ngram is shoehorned into a string using
 //   * the format of the TextGrounder corpus (words separated by colons, with
 //   * URL-encoding for embedded colons).  This is very wasteful of space,
@@ -241,12 +241,12 @@ class OpenNLPNgramStorer extends NgramStorage {
  * Name                             Short name   Scala type
  * -------------------------------------------------------------------------
  * Unencoded, unmemoized ngram      ngram        Iterable[String]
- * Unencoded ngram, memoized words  mwgram       Iterable[Word]
+ * Unencoded ngram, memoized words  mwgram       Iterable[Gram]
  * Encoded, unmemoized ngram        egram        String
- * Encoded, memoized ngram          mgram        Word
+ * Encoded, memoized ngram          mgram        Gram
  *
  * Note that "memoizing", in its general sense, simply converts an ngram
- * into a single number (of type "Word") to identify the ngram.  There is
+ * into a single number (of type "Gram") to identify the ngram.  There is
  * no theoretical reason why we have to encode the ngram into a single string
  * and then "memoize" the encoded string in this fashion.  Memoizing could
  * involve e.g. creating some sort of trie, with a pointer to the appropriate
@@ -263,9 +263,7 @@ abstract class NgramLangModel(
   ) extends LangModel(factory) with FastSlowKLDivergence {
   val model = new OpenNLPNgramStorer
 
-  def item_to_string(item: Item) = Ngram.unmemoize(item) mkString " "
-
-  def lookup_ngram(ngram: Ngram): Double
+  def item_to_string(item: Gram) = Ngram.unmemoize(item) mkString " "
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -296,11 +294,7 @@ abstract class NgramLangModel(
    */
   def kl_divergence_34(other: NgramLangModel): Double
   
-  def model_logprob(xlangmodel: LangModel) = ???
-
-  def find_most_common_word(pred: String => Boolean): Option[Word] = ???
-
-  def get_most_contributing_grams(xlangmodel: LangModel,
+  def get_most_contributing_items(xlangmodel: LangModel,
       xrelative_to: Iterable[LangModel] = Iterable()) = ???
 }
 
@@ -432,7 +426,7 @@ class DefaultNgramLangModelBuilder(
   def finish_before_global(lm: LangModel) {
     val model = lm.asInstanceOf[NgramLangModel].model
     // A table listing OOV ngrams, e.g. Seq(OOV), Seq(OOV, OOV), etc.
-    val oov_hash = mutable.Map[Int, Ngram]()
+    val oov_hash = mutable.Map[Int, Gram]()
 
     // If 'minimum_word_count' was given, then eliminate n-grams whose count
     // is too small by replacing them with -OOV-.

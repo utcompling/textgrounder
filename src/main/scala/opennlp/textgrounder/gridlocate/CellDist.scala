@@ -24,7 +24,7 @@ import collection.mutable
 import util.collection.{LRUCache, doublemap}
 import util.print.{errprint, warning}
 
-import langmodel.{Word,LangModel,Unigram,UnigramLangModel}
+import langmodel.{Gram,LangModel,Unigram,UnigramLangModel}
 
 /**
  * A general distribution over cells, associating a probability with each
@@ -73,7 +73,7 @@ class CellDist[Co](
 
 class WordCellDist[Co](
   grid: Grid[Co],
-  val word: Word
+  val word: Gram
 ) extends CellDist[Co](grid) {
   var normalized = false
 
@@ -85,7 +85,7 @@ class WordCellDist[Co](
     for (cell <- grid.iter_nonempty_cells) {
       val lang_model =
         Unigram.check_unigram_lang_model(cell.grid_lm)
-      val prob = lang_model.lookup_word(word)
+      val prob = lang_model.item_prob(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -134,16 +134,16 @@ class CellDistFactory[Co](
   val lru_cache_size: Int
 ) {
   def create_word_cell_dist(
-    grid: Grid[Co], word: Word
+    grid: Grid[Co], word: Gram
   ) = new WordCellDist[Co](grid, word)
 
-  var cached_dists: LRUCache[Word, WordCellDist[Co]] = null
+  var cached_dists: LRUCache[Gram, WordCellDist[Co]] = null
 
   /**
    * Return a cell distribution over a single word, using a least-recently-used
    * cache to optimize access.
    */
-  def get_cell_dist(grid: Grid[Co], word: Word) = {
+  def get_cell_dist(grid: Grid[Co], word: Gram) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {

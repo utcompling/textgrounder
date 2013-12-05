@@ -49,6 +49,8 @@ class UnsmoothedNgramLangModel(
   def cosine_similarity(other: LangModel, partial: Boolean = true,
       smoothed: Boolean = false) = ???
 
+  def model_logprob(langmodel: LangModel) = ???
+
   def kl_divergence_34(other: NgramLangModel) = ???
  
   /**
@@ -58,6 +60,5 @@ class UnsmoothedNgramLangModel(
   def inner_kl_divergence_34(other: TThis,
       overall_probs_diff_words: Double) = ???
 
-  def lookup_ngram(ngram: Ngram) =
-    model.get_item(ngram).toDouble / num_tokens
+  def imp_item_prob(gram: Gram) = mle_item_prob(gram)
 }
