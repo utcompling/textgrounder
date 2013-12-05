@@ -94,6 +94,10 @@ package object math {
   }
 
   def stddev(x: Iterable[Double]) = sqrt(variance(x))
+
+  private val log2_value = log(2)
+  def log2(x: Double) = log(x) / log2_value
+  def logn(x: Double, base: Double) = log(x) / log(base)
 }
 
 package math {
