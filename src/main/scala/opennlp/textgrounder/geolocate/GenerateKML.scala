@@ -144,7 +144,7 @@ Not generating an empty KML file.""", word)
         kmlparams.kml_max_height = params.kml_max_height
         kmlparams.kml_transform = params.kml_transform
         kmlparams.kml_include_cell_names = params.kml_include_cell_names
-        SphereWordCellDist.generate_kml_file(celldist,
+        SphereGramCellDist.generate_kml_file(celldist,
           "%s%s.kml" format (params.kml_prefix, word),
           kmlparams)
       }
