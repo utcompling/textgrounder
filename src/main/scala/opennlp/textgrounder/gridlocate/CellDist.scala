@@ -85,7 +85,7 @@ class WordCellDist[Co](
     for (cell <- grid.iter_nonempty_cells) {
       val lang_model =
         Unigram.check_unigram_lang_model(cell.grid_lm)
-      val prob = lang_model.item_prob(word)
+      val prob = lang_model.gram_prob(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -167,7 +167,7 @@ class CellDistFactory[Co](
     // make it an interface for LangModel?
     val lang_model = xlang_model.asInstanceOf[UnigramLangModel]
     val cellprobs = doublemap[GridCell[Co]]()
-    for ((word, count) <- lang_model.model.iter_items) {
+    for ((word, count) <- lang_model.model.iter_grams) {
       val dist = get_cell_dist(grid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob

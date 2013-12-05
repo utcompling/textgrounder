@@ -843,30 +843,30 @@ class FullRankedDocEvalResult[Co](
     if (avg_dist_of_neighbors < pred_truedist)
       driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
 
-    if (debug("relcontribwords")) {
-      def output_relcontribwords(celltag: String, cell: GridCell[Co],
+    if (debug("relcontribgrams")) {
+      def output_relcontribgrams(celltag: String, cell: GridCell[Co],
           othertag: String, others: Iterable[GridCell[Co]]) {
         val compared_string =
           if (others.isEmpty) ""
           else " compared to %s" format othertag
         errprint("%s: Words contributing most to %s %s%s", doctag, celltag,
           cell, compared_string)
-        val items =
-          document.grid_lm.get_most_contributing_items(
+        val grams =
+          document.grid_lm.get_most_contributing_grams(
             cell.grid_lm, others.map { _.grid_lm })
-        for ((item, count) <-
-             items.take(GridLocateConstants.relcontribwords_to_print))
+        for ((gram, count) <-
+             grams.take(GridLocateConstants.relcontribgrams_to_print))
           errprint("%s: %s = %s", doctag,
-            document.grid_lm.item_to_string(item), count)
+            document.grid_lm.gram_to_string(gram), count)
       }
 
-      output_relcontribwords("predicted cell", pred_cell, "", Iterable())
-      output_relcontribwords("correct cell", correct_cell, "", Iterable())
-      output_relcontribwords("predicted cell", pred_cell,
+      output_relcontribgrams("predicted cell", pred_cell, "", Iterable())
+      output_relcontribgrams("correct cell", correct_cell, "", Iterable())
+      output_relcontribgrams("predicted cell", pred_cell,
         "correct cell %s" format correct_cell, Iterable(correct_cell))
-      output_relcontribwords("predicted cell", pred_cell,
+      output_relcontribgrams("predicted cell", pred_cell,
         "all others", pred_cells.map(_._1).tail)
-      output_relcontribwords("correct cell", correct_cell,
+      output_relcontribgrams("correct cell", correct_cell,
         "all others", pred_cells.map(_._1).filter(_ != correct_cell))
     }
   }

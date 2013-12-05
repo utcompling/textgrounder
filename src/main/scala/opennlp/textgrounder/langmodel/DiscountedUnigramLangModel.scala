@@ -44,9 +44,9 @@ abstract class DiscountedUnigramLangModelFactory(
    * the value in 'globally_unseen_word_prob'.  We start out by storing raw
    * counts, then adjusting them.
    */
-  var overall_word_probs = Unigram.create_word_double_map
+  var overall_word_probs = Unigram.create_gram_double_map
   var owp_adjusted = false
-  var document_freq = Unigram.create_word_double_map
+  var document_freq = Unigram.create_gram_double_map
   var num_documents = 0
   var global_normalization_factor = 0.0
 
@@ -54,7 +54,7 @@ abstract class DiscountedUnigramLangModelFactory(
     val udist = lm.asInstanceOf[DiscountedUnigramLangModel]
     super.note_lang_model_globally(lm)
     assert(!owp_adjusted)
-    for ((word, count) <- udist.model.iter_items) {
+    for ((word, count) <- udist.model.iter_grams) {
       if (!(overall_word_probs contains word))
         total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
@@ -195,8 +195,8 @@ abstract class DiscountedUnigramLangModel(
         (for (ind <- model.iter_keys)
           yield factory.overall_word_probs(ind)) sum)
     if (factory.tf_idf) {
-      for ((word, count) <- model.iter_items)
-        model.set_item(word,
+      for ((word, count) <- model.iter_grams)
+        model.set_gram(word,
           count*log(factory.num_documents/factory.document_freq(word)))
     }
     normalization_factor = model.num_tokens
@@ -287,9 +287,9 @@ abstract class DiscountedUnigramLangModel(
     kldiv
   }
 
-  protected def imp_item_prob(word: Gram) = {
+  protected def imp_gram_prob(word: Gram) = {
     if (factory.interpolate) {
-      val wordcount = if (model contains word) model.get_item(word) else 0.0
+      val wordcount = if (model contains word) model.get_gram(word) else 0.0
       // if (debug("some")) {
       //   errprint("Found counts for document %s, num word types = %s",
       //            doc, wordcounts(0).length)
@@ -301,14 +301,14 @@ abstract class DiscountedUnigramLangModel(
       val wordprob = mle_wordprob*(1.0 - unseen_mass) + owprob*unseen_mass
       if (debug("lots"))
         errprint("Word %s, seen in document, wordprob = %s",
-                 item_to_string(word), wordprob)
+                 gram_to_string(word), wordprob)
       // DO NOT simplify following expr, or it will fail on NaN
       if (! (wordprob >= 0)) {
         errprint("wordcount = %s, owprob = %s", wordcount, owprob)
         errprint("mle_wordprob = %s, normalization_factor = %s, unseen_mass = %s",
           mle_wordprob, normalization_factor, unseen_mass)
       }
-      // Info on word and probability printed in wrapper item_prob()
+      // Info on word and probability printed in wrapper gram_prob()
       // for bad probability, and assert(false) occurs there
       wordprob
     } else {
@@ -326,7 +326,7 @@ abstract class DiscountedUnigramLangModel(
               val wordprob = 0.0
               if (debug("lots"))
                 errprint("Word %s, never seen at all, wordprob = %s",
-                         item_to_string(word), wordprob)
+                         gram_to_string(word), wordprob)
               wordprob
             }
             case Some(owprob) => {
@@ -338,13 +338,13 @@ abstract class DiscountedUnigramLangModel(
               }
               if (debug("lots"))
                 errprint("Word %s, seen but not in document, wordprob = %s",
-                         item_to_string(word), wordprob)
+                         gram_to_string(word), wordprob)
 
               wordprob
             }
           }
         } else {
-          val wordcount = model.get_item(word)
+          val wordcount = model.get_gram(word)
           //if (wordcount <= 0 or model.num_tokens <= 0 or unseen_mass >= 1.0)
           //  warning("Bad values; wordcount = %s, unseen_mass = %s",
           //          wordcount, unseen_mass)
@@ -358,10 +358,10 @@ abstract class DiscountedUnigramLangModel(
           }
           if (debug("lots"))
             errprint("Word %s, seen in document, wordprob = %s",
-                     item_to_string(word), wordprob)
+                     gram_to_string(word), wordprob)
           wordprob
         }
-      // Info on word and probability printed in wrapper item_prob()
+      // Info on word and probability printed in wrapper gram_prob()
       // for bad probability, and assert(false) occurs there
       retval
     }

@@ -45,7 +45,7 @@ class DiscountedUnigramKLDivergenceCache(
   ) extends KLDivergenceCache {
   val self_size = langmodel.model.num_types
   val self_keys = langmodel.model.iter_keys.toArray
-  val self_values = langmodel.model.iter_items.map { case (k,v) => v}.toArray
+  val self_values = langmodel.model.iter_grams.map { case (k,v) => v}.toArray
 }
 
 object FastDiscountedUnigramLangModel {
@@ -99,7 +99,7 @@ object FastDiscountedUnigramLangModel {
     val psize = self.model.num_types
 
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
-    // on this item, so we could cache it.  Not clear it would save much
+    // on this gram, so we could cache it.  Not clear it would save much
     // time, though.
     var kldiv = 0.0
     /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
@@ -126,7 +126,7 @@ object FastDiscountedUnigramLangModel {
       while (i < psize) {
         val word = pkeys(i)
         val pcount = pvalues(i)
-        val qcount = qmodel.get_item(word)
+        val qcount = qmodel.get_gram(word)
         val owprob = owprobs(word)
         val p: Double = pcount * pfact + owprob * pfact_unseen
         val q: Double = qcount * qfact + owprob * qfact_unseen
@@ -148,7 +148,7 @@ object FastDiscountedUnigramLangModel {
         val pcount = pvalues(i)
         val p = pcount * pfact
         val q = {
-          val qcount = qmodel.get_item(word)
+          val qcount = qmodel.get_gram(word)
           if (qcount != 0) qcount * qfact
           else {
             val owprob = owprobs(word)
@@ -181,7 +181,7 @@ object FastDiscountedUnigramLangModel {
 
     // 2.
     var overall_probs_diff_words = 0.0
-    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
+    for ((word, qcount) <- qmodel.iter_grams if !(pmodel contains word)) {
       val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
@@ -219,15 +219,15 @@ object FastDiscountedUnigramLangModel {
     // 1.
 
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
-    // on this item, so we could cache it.  Not clear it would save much
+    // on this gram, so we could cache it.  Not clear it would save much
     // time, though.
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0
-    for ((word, pcount) <- pmodel.iter_items) {
+    for ((word, pcount) <- pmodel.iter_grams) {
       val p = pcount * pfact
       val q = {
-        val qcount = qmodel.get_item(word)
+        val qcount = qmodel.get_gram(word)
         val owprob = owprobs(word)
         qcount * qfact + owprob * qfact_unseen
       }
@@ -249,7 +249,7 @@ object FastDiscountedUnigramLangModel {
     // 2.
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
-    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
+    for ((word, qcount) <- qmodel.iter_grams if !(pmodel contains word)) {
       val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
@@ -289,14 +289,14 @@ object FastDiscountedUnigramLangModel {
     val qmodel = other.model
 
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
-    // on this item, so we could cache it.  Not clear it would save much
+    // on this gram, so we could cache it.  Not clear it would save much
     // time, though.
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0
-    for ((word, pcount) <- pmodel.iter_items) {
+    for ((word, pcount) <- pmodel.iter_grams) {
       val p = pcount * pfact
-      val q = qmodel.get_item(word) * qfact
+      val q = qmodel.get_gram(word) * qfact
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
       //           word, qfact_globally_unseen_prob, qcount, qfact)
@@ -311,7 +311,7 @@ object FastDiscountedUnigramLangModel {
   
     // 2.
     if (!partial)
-    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
+    for ((word, qcount) <- qmodel.iter_grams if !(pmodel contains word)) {
       val q = qcount * qfact
       q2sum += q * q
     }

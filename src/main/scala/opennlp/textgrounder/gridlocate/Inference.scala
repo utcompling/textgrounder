@@ -203,10 +203,10 @@ class KLDivergenceGridRanker[Co](
         errprint("    %30s  %s", "Word", "KL-div contribution")
         errprint("    %s", "-" * 50)
         // sort by absolute value of second element of tuple, in reverse order
-        val items =
+        val grams =
           (contribs.toIndexedSeq sortWith ((x, y) => abs(x._2) > abs(y._2))).
             take(GridLocateConstants.kldiv_num_contrib_words)
-        for ((word, contribval) <- items)
+        for ((word, contribval) <- grams)
           errprint("    %30s  %s", word, contribval)
         errprint("")
       }
@@ -265,12 +265,12 @@ class NaiveBayesGridRanker[Co](
         }
       } else (1.0, 0.0))
 
-    val word_logprob =
+    val gram_logprob =
       cell.grid_lm.model_logprob(lang_model)
     val baseline_logprob =
       log(cell.num_docs.toDouble /
           grid.total_num_docs)
-    val logprob = (word_weight * word_logprob +
+    val logprob = (word_weight * gram_logprob +
       baseline_weight * baseline_logprob)
     logprob
   }

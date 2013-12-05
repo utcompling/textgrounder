@@ -187,7 +187,7 @@ class TimeGrid(
   }
 }
 
-class LangModelComparer(min_prob: Double, max_items: Int) {
+class LangModelComparer(min_prob: Double, max_grams: Int) {
   def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
   def get_keys(lm: LangModel) = lm.model.iter_keys.toSet
@@ -197,42 +197,42 @@ class LangModelComparer(min_prob: Double, max_items: Int) {
     val before_lm = get_pair(grid, category).before_cell.grid_lm
     val after_lm = get_pair(grid, category).after_cell.grid_lm
 
-    val itemdiff =
+    val gramdiff =
       for {
-        rawitem <- get_keys(before_lm) ++ get_keys(after_lm)
-        item = rawitem
-        p = before_lm.item_prob(item)
-        q = after_lm.item_prob(item)
+        rawgram <- get_keys(before_lm) ++ get_keys(after_lm)
+        gram = rawgram
+        p = before_lm.gram_prob(gram)
+        q = after_lm.gram_prob(gram)
         if p >= min_prob || q >= min_prob
-      } yield (item, before_lm.dunning_log_likelihood_2x1(
-        item, after_lm), q - p)
+      } yield (gram, before_lm.dunning_log_likelihood_2x1(
+        gram, after_lm), q - p)
 
-    println("Items by 2-way log-likelihood for category '%s':" format category)
-    for ((item, dunning, prob) <-
-        itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
+    println("Grams by 2-way log-likelihood for category '%s':" format category)
+    for ((gram, dunning, prob) <-
+        gramdiff.toSeq.sortWith(_._2 > _._2).take(max_grams)) {
       println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
         (format_float(dunning),
-         before_lm.item_to_string(item),
+         before_lm.gram_to_string(gram),
          if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(before_lm.item_prob(item)),
-         format_float(after_lm.item_prob(item))
+         format_float(before_lm.gram_prob(gram)),
+         format_float(after_lm.gram_prob(gram))
        ))
     }
     println("")
 
-    val diff_up = itemdiff filter (_._3 > 0)
-    val diff_down = itemdiff filter (_._3 < 0) map (x => (x._1, x._2, x._3.abs))
+    val diff_up = gramdiff filter (_._3 > 0)
+    val diff_down = gramdiff filter (_._3 < 0) map (x => (x._1, x._2, x._3.abs))
     def print_diffs(diffs: Iterable[(Gram, Double, Double)],
         incdec: String, updown: String) {
       println("")
-      println("Items that %s in probability:" format incdec)
+      println("Grams that %s in probability:" format incdec)
       println("------------------------------------")
-      for ((item, dunning, prob) <-
-          diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
+      for ((gram, dunning, prob) <-
+          diffs.toSeq.sortWith(_._3 > _._3).take(max_grams)) {
         println("%s: %s - %s = %s%s (LL %s)" format
-          (before_lm.item_to_string(item),
-           format_float(before_lm.item_prob(item)),
-           format_float(after_lm.item_prob(item)),
+          (before_lm.gram_to_string(gram),
+           format_float(before_lm.gram_prob(gram)),
+           format_float(after_lm.gram_prob(gram)),
            updown, format_float(prob),
            format_float(dunning)))
       }
@@ -256,15 +256,15 @@ class LangModelComparer(min_prob: Double, max_items: Int) {
     val cat18 = category1.slice(0,8)
     val cat28 = category2.slice(0,8)
 
-    val itemdiff =
+    val gramdiff =
       for {
-        rawitem <- get_keys(before_lm_1) ++ get_keys(after_lm_1) ++
+        rawgram <- get_keys(before_lm_1) ++ get_keys(after_lm_1) ++
           get_keys(before_lm_2) ++ get_keys(after_lm_2)
-        item = rawitem
-        p1 = before_lm_1.item_prob(item)
-        q1 = after_lm_1.item_prob(item)
-        p2 = before_lm_2.item_prob(item)
-        q2 = after_lm_2.item_prob(item)
+        gram = rawgram
+        p1 = before_lm_1.gram_prob(gram)
+        q1 = after_lm_1.gram_prob(gram)
+        p2 = before_lm_2.gram_prob(gram)
+        q2 = after_lm_2.gram_prob(gram)
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
         abs1 = q1 - p1
         abs2 = q2 - p2
@@ -276,19 +276,19 @@ class LangModelComparer(min_prob: Double, max_items: Int) {
           else if (pct1 < 0 && pct2 < 0) "-both"
           else "+both"
         }
-      } yield (item, before_lm_1.dunning_log_likelihood_2x2(
-          item, after_lm_1, before_lm_2, after_lm_2),
+      } yield (gram, before_lm_1.dunning_log_likelihood_2x2(
+          gram, after_lm_1, before_lm_2, after_lm_2),
           p1, q1, p2, q2, abs1, abs2, pct1, pct2, change
         )
 
     println("%24s change %7s%% (+-%7.7s) / %7s%% (+-%7.7s)" format (
-      "Items by 4-way log-lhood:", cat13, cat18, cat23, cat28))
+      "Grams by 4-way log-lhood:", cat13, cat18, cat23, cat28))
     def fmt(x: Double) = format_float(x, include_plus = true)
-    for ((item, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
-        itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
+    for ((gram, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
+        gramdiff.toSeq.sortWith(_._2 > _._2).take(max_grams)) {
       println("%7s: %-15.15s %6s: %7s%% (%9s) / %7s%% (%9s)" format
         (format_float(dunning),
-         before_lm_1.item_to_string(item),
+         before_lm_1.gram_to_string(gram),
          change,
          fmt(pct1), fmt(abs1),
          fmt(pct2), fmt(abs2)
@@ -296,27 +296,27 @@ class LangModelComparer(min_prob: Double, max_items: Int) {
     }
     println("")
 
-    type ItemDunProb =
+    type GramDunProb =
       (Gram, Double, Double, Double, Double, Double, Double,
         Double, Double, Double, String)
-    val diff_cat1 = itemdiff filter (_._11 == "+"+cat13)
-    val diff_cat2 = itemdiff filter (_._11 == "+"+cat23)
-    def print_diffs(diffs: Iterable[ItemDunProb],
+    val diff_cat1 = gramdiff filter (_._11 == "+"+cat13)
+    val diff_cat2 = gramdiff filter (_._11 == "+"+cat23)
+    def print_diffs(diffs: Iterable[GramDunProb],
         category: String, updown: String) {
       def print_diffs_1(msg: String,
-          comparefun: (ItemDunProb, ItemDunProb) => Boolean) {
+          comparefun: (GramDunProb, GramDunProb) => Boolean) {
         println("")
         println("%s leaning towards %8s:" format (msg, category))
         println("----------------------------------------------------------")
-        for ((item, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
-            diffs.toSeq.sortWith(comparefun).take(max_items)) {
+        for ((gram, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
+            diffs.toSeq.sortWith(comparefun).take(max_grams)) {
           println("%-15.15s = LL %7s (%%chg-diff %7s%% = %7s%% - %7s%%)" format
-            (before_lm_1.item_to_string(item), format_float(dunning),
+            (before_lm_1.gram_to_string(gram), format_float(dunning),
               fmt(pct1 - pct2), fmt(pct1), fmt(pct2)))
         }
       }
-      print_diffs_1("Items by 4-way log-lhood with difference", _._2 > _._2)
-      // print_diffs_1("Items with greatest difference", _._3 > _._3)
+      print_diffs_1("Grams by 4-way log-lhood with difference", _._2 > _._2)
+      // print_diffs_1("Grams with greatest difference", _._3 > _._3)
     }
     print_diffs(diff_cat1, category1, "+")
     print_diffs(diff_cat2, category2, "-")
@@ -328,18 +328,18 @@ class LangModelComparer(min_prob: Double, max_items: Int) {
 }
 
 object LangModelComparer {
-  def get_comparer(min_prob: Double, max_items: Int) =
-    new LangModelComparer(min_prob, max_items)
+  def get_comparer(min_prob: Double, max_grams: Int) =
+    new LangModelComparer(min_prob, max_grams)
 
   def compare_cells_2way(grid: TimeGrid, category: String, min_prob: Double,
-      max_items: Int) {
-    val comparer = get_comparer(min_prob, max_items)
+      max_grams: Int) {
+    val comparer = get_comparer(min_prob, max_grams)
     comparer.compare_cells_2way(grid, category)
   }
 
   def compare_cells_4way(grid: TimeGrid, category1: String,
-      category2: String, min_prob: Double, max_items: Int) {
-    val comparer = get_comparer(min_prob, max_items)
+      category2: String, min_prob: Double, max_grams: Int) {
+    val comparer = get_comparer(min_prob, max_grams)
     comparer.compare_cells_4way(grid, category1, category2)
   }
 }

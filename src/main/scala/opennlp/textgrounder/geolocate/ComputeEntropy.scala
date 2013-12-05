@@ -94,14 +94,14 @@ class ComputeEntropyDriver extends
     // Filter words with too small word count.
     val words_counts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
-      lm.model.iter_items.toMap
+      lm.model.iter_grams.toMap
     }.reduce[Map[Gram,Double]](combine_double_maps _).
     filter { _._2 >= params.entropy_minimum_word_count }
 
     // Compute the number of cells each word occurs in.
     val words_cellcounts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
-      lm.model.iter_items.map {
+      lm.model.iter_grams.map {
         case (word, count) => (word, 1)
       }.toMap
     }.reduce[Map[Gram,Int]](combine_int_maps _)
@@ -125,9 +125,9 @@ class ComputeEntropyDriver extends
       val probs = cells.map { cell =>
         val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
         if (params.smoothed)
-          lm.item_prob(word)
+          lm.gram_prob(word)
         else
-          lm.mle_item_prob(word)
+          lm.mle_gram_prob(word)
       }.filter(_ != 0.0)
       val totalprob = probs.sum
       // Normalize probabilities to get a distribution p(cell|word).

@@ -161,19 +161,19 @@ class KdTreeGrid(
         val wd = cell.lang_model
         val model = wd.asInstanceOf[UnigramLangModel].model
 
-        for ((k,v) <- model.iter_items) {
-          model.set_item(k, (1 - interpolateWeight) * v)
+        for ((k,v) <- model.iter_grams) {
+          model.set_gram(k, (1 - interpolateWeight) * v)
         }
 
         val pcell = nodes_to_cell(node.parent)
         val pwd = pcell.lang_model
         val pmodel = pwd.asInstanceOf[UnigramLangModel].model
 
-        for ((k,v) <- pmodel.iter_items) {
-          val oldv = if (model contains k) model.get_item(k) else 0.0
+        for ((k,v) <- pmodel.iter_grams) {
+          val oldv = if (model contains k) model.get_gram(k) else 0.0
           val newv = oldv + interpolateWeight * v
           if (newv > interpolateWeight)
-            model.set_item(k, newv)
+            model.set_gram(k, newv)
         }
       }
     }
