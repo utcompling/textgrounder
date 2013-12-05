@@ -105,6 +105,11 @@ trait CandidateInstFactory[Co] extends (
     Seq(feat -> value, bin_logarithmically(feat, value))
   }
 
+  // Shorthand for include_and_bin_logarithmically, which may need to be
+  // called repeatedly.
+  def ib(feat: String, value: Double) =
+    include_and_bin_logarithmically(feat, value)
+
   val fractional_increment = 0.1
 
   def bin_fractionally(feat: String, value: Double) = {
@@ -118,6 +123,22 @@ trait CandidateInstFactory[Co] extends (
   }
 
   /**
+   * Generate a feature vector from a specified set of feature/value pairs.
+   *
+   * @param feats Iterable over feature/value pairs
+   * @param is_training Whether we are training or evaluating a model
+   *   (see above)
+   */
+  def make_feature_vector(feats: Iterable[(String, Double)],
+      is_training: Boolean) = {
+    val feats_with_score = feats.map {
+        case (word, value) =>
+          (Featurizer.memoize(word), value)
+      }
+    featvec_factory.make_feature_vector(feats_with_score, is_training)
+  }
+
+  /**
    * Generate a feature vector from a query-candidate (document-cell) pair.
    *
    * @param document Document serving as a query item
@@ -127,14 +148,8 @@ trait CandidateInstFactory[Co] extends (
    *   (see above)
    */
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
-    is_training: Boolean) = {
-    val feats_with_score =
-      (get_features(doc, cell) ++ Iterable(scoreword -> score)).map {
-        case (word, value) =>
-          (Featurizer.memoize(word), value)
-      }
-    featvec_factory.make_feature_vector(feats_with_score, is_training)
-  }
+      is_training: Boolean) =
+    make_feature_vector(get_features(doc, cell), is_training)
 }
 
 /**
@@ -214,9 +229,6 @@ abstract class UnigramCandidateInstFactory[Co] extends
  */
 class MiscCandidateInstFactory[Co] extends
     CandidateInstFactory[Co] {
-  protected def ib(feat: String, value: Double) =
-    include_and_bin_logarithmically(feat, value)
-
   protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
     val doctypes = doclm.iter_keys.toSeq
     val celltypes = celllm.iter_keys.toSeq
@@ -247,6 +259,25 @@ class MiscCandidateInstFactory[Co] extends
       ib("$nb-logprob", doclm.model_logprob(celllm))
     ).flatten
   }
+}
+
+/**
+ * A factory for generating candidate instances for a document, generating
+ * features for the original ranking score and binned equivalent.
+ */
+class ScoreCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  // We need to override `apply` rather than implementing `get_features`
+  // so that we can get access to the original ranking score.
+  override def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
+      is_training: Boolean) = {
+    val feats = Iterable(
+      ib("$score", score)
+    ).flatten
+    make_feature_vector(feats, is_training)
+  }
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = ???
 }
 
 /**
