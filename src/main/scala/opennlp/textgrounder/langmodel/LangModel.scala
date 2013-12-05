@@ -303,7 +303,9 @@ trait WordAsStringMemoizer {
  */
 object LangModel extends WordAsIntMemoizer {
   // FIXME! This is present to handle partial counts but these weren't
-  // ever really used because they didn't seem to help.
+  // ever really used because they didn't seem to help. However, it's also
+  // currently used to handle differently-weighted words, which (so far)
+  // also hasn't helped.
   type WordCount = Double
 }
 
