@@ -43,9 +43,9 @@ import util.collection.DynamicArray
 class DiscountedUnigramKLDivergenceCache(
     val langmodel: DiscountedUnigramLangModel
   ) extends KLDivergenceCache {
-  val self_size = langmodel.model.num_types
-  val self_keys = langmodel.model.iter_keys.toArray
-  val self_values = langmodel.model.iter_grams.map { case (k,v) => v}.toArray
+  val self_size = langmodel.num_types
+  val self_keys = langmodel.iter_keys.toArray
+  val self_values = langmodel.iter_grams.map { case (k,v) => v}.toArray
 }
 
 object FastDiscountedUnigramLangModel {
@@ -77,11 +77,11 @@ object FastDiscountedUnigramLangModel {
       else
         cache
     assert(the_cache.langmodel == self)
-    assert(the_cache.self_size == self.model.num_types)
+    assert(the_cache.self_size == self.num_types)
     val pkeys = the_cache.self_keys
     val pvalues = the_cache.self_values
-    val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.num_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.num_tokens
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val factory = self.factory
@@ -96,7 +96,7 @@ object FastDiscountedUnigramLangModel {
 
     // 1.
 
-    val psize = self.model.num_types
+    val psize = self.num_types
 
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
     // on this gram, so we could cache it.  Not clear it would save much
@@ -203,8 +203,8 @@ object FastDiscountedUnigramLangModel {
    */
   def fast_smoothed_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = true): Double = {
-    val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.num_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.num_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val factory = self.factory
     /* Not needed in the new way
@@ -282,8 +282,8 @@ object FastDiscountedUnigramLangModel {
    */
   def fast_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = true) = {
-    val pfact = 1.0/self.model.num_tokens
-    val qfact = 1.0/other.model.num_tokens
+    val pfact = 1.0/self.num_tokens
+    val qfact = 1.0/other.num_tokens
     // 1.
     val pmodel = self.model
     val qmodel = other.model

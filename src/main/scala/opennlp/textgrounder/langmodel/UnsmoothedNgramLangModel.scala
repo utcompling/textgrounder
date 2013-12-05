@@ -37,10 +37,12 @@ class UnsmoothedNgramLangModel(
   def class_name = "UnsmoothedNgramLangModel"
 
   // For some reason, retrieving this value from the model is fantastically slow
-  var num_tokens = 0.0
+  protected var cached_num_tokens = 0.0
+
+  override def num_tokens = cached_num_tokens
 
   protected def imp_finish_after_global() {
-    num_tokens = model.num_tokens
+    cached_num_tokens = model.num_tokens
   }
 
   def fast_kl_divergence(other: LangModel, partial: Boolean = true,

@@ -70,7 +70,7 @@ trait FastSlowKLDivergence {
    * debug information.  Useful for checking against the other, faster
    * implementation in `fast_kl_divergence`.
    * 
-   * @param xother The other lang model to compute against.
+   * @param other The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
    *   that exist in our lang model; otherwise we also have to take into
    *   account words in the other lang model even if we haven't seen them,
@@ -86,7 +86,7 @@ trait FastSlowKLDivergence {
    *   of word contributions as described above; will be null if
    *   not requested.
    */
-  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = true,
+  def slow_kl_divergence_debug(other: LangModel, partial: Boolean = true,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, GramCount])
 
@@ -302,11 +302,6 @@ trait StringGramAsStringMemoizer extends IdentityMemoizer[String] {
  * n-grams, etc.).
  */
 trait GramStorage {
-  // NOTE: Do not need to specialize the type on Int, given the current
-  // definition of UnigramStorage; in fact, doing so interferes with the
-  // ability of the compiler to inline what we ask it to inline in
-  // UnigramStorage.
-
   /**
    * Add a gram with the given count.  If the gram exists already,
    * add the count to the existing value.
@@ -378,6 +373,56 @@ abstract class LangModel(val factory: LangModelFactory) {
    * means we can't modify the lang model any more.
    */
   var finished_before_global = false
+
+  /**
+   * Add a gram with the given count.  If the gram exists already,
+   * add the count to the existing value.
+   */
+  def add_gram(gram: Gram, count: GramCount): Unit =
+    model.add_gram(gram, count)
+
+  /**
+   * Set the gram to the given count.  If the gram exists already,
+   * replace its value with the given one.
+   */
+  def set_gram(gram: Gram, count: GramCount): Unit =
+    model.set_gram(gram, count)
+
+  /**
+   * Remove a gram, if it exists.
+   */
+  def remove_gram(gram: Gram): Unit = model.remove_gram(gram)
+
+  /**
+   * Return whether a given gram is stored.
+   */
+  def contains(gram: Gram): Boolean = model.contains(gram)
+
+  /**
+   * Return the count of a given gram.
+   */
+  def get_gram(gram: Gram): GramCount = model.get_gram(gram)
+
+  /**
+   * Iterate over all grams that are stored.
+   */
+  def iter_grams: Iterable[(Gram, GramCount)] = model.iter_grams
+
+  /**
+   * Iterate over all keys that are stored.
+   */
+  def iter_keys: Iterable[Gram] = model.iter_keys
+
+  /**
+   * Total number of tokens stored.
+   */
+  def num_tokens: GramCount = model.num_tokens
+
+  /**
+   * Total number of gram types (i.e. number of distinct grams)
+   * stored.
+   */
+  def num_types: Int = model.num_types
 
   /** Is this lang model empty? */
   def empty = model.empty
@@ -473,10 +518,10 @@ abstract class LangModel(val factory: LangModelFactory) {
    * other to be different.
    */
   def dunning_log_likelihood_2x1(gram: Gram, other: LangModel) = {
-    val a = model.get_gram(gram).toDouble
-    val b = other.model.get_gram(gram).toDouble
-    val c = model.num_tokens.toDouble - a
-    val d = other.model.num_tokens.toDouble - b
+    val a = get_gram(gram).toDouble
+    val b = other.get_gram(gram).toDouble
+    val c = num_tokens.toDouble - a
+    val d = other.num_tokens.toDouble - b
     val val1 = dunning_log_likelihood_1(a, b, c, d)
     val val2 = dunning_log_likelihood_2(a, b, c, d)
     if (debug("dunning"))
@@ -487,10 +532,10 @@ abstract class LangModel(val factory: LangModelFactory) {
 
   def dunning_log_likelihood_2x2(gram: Gram, other_b: LangModel,
       other_c: LangModel, other_d: LangModel) = {
-    val a = model.get_gram(gram).toDouble
-    val b = other_b.model.get_gram(gram).toDouble
-    val c = other_c.model.get_gram(gram).toDouble
-    val d = other_d.model.get_gram(gram).toDouble
+    val a = get_gram(gram).toDouble
+    val b = other_b.get_gram(gram).toDouble
+    val c = other_c.get_gram(gram).toDouble
+    val d = other_d.get_gram(gram).toDouble
     val val1 = dunning_log_likelihood_1(a, b, c, d)
     val val2 = dunning_log_likelihood_2(a, b, c, d)
     if (debug("dunning"))
@@ -614,8 +659,8 @@ abstract class LangModel(val factory: LangModelFactory) {
     if (empty)
       throw new IllegalStateException("Attempt to lookup gram %s in empty lang model %s"
         format (gram_to_string(gram), this))
-    val count = if (model contains gram) model.get_gram(gram) else 0.0
-    count.toDouble/model.num_tokens
+    val count = if (contains(gram)) get_gram(gram) else 0.0
+    count.toDouble/num_tokens
   }
 
   /**
@@ -627,7 +672,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    */
   def find_most_common_gram(pred: String => Boolean): Option[Gram] = {
     val filtered =
-      (for ((gram, count) <- model.iter_grams if pred(gram_to_string(gram)))
+      (for ((gram, count) <- iter_grams if pred(gram_to_string(gram)))
         yield (gram, count)).toSeq
     if (filtered.length == 0) None
     else {
@@ -655,17 +700,16 @@ abstract class LangModel(val factory: LangModelFactory) {
     val finished_str =
       if (!finished) ", unfinished" else ""
     val num_actual_grams_to_print =
-      if (num_grams_to_print < 0) model.num_types
+      if (num_grams_to_print < 0) num_types
       else num_grams_to_print
-    val need_dots = model.num_types > num_actual_grams_to_print
+    val need_dots = num_types > num_actual_grams_to_print
     val grams =
-      for ((gram, count) <-
-        model.iter_grams.toSeq.sortWith(_._2 > _._2).
-          view(0, num_actual_grams_to_print))
+      for ((gram, count) <- iter_grams.toSeq.sortWith(_._2 > _._2).
+            view(0, num_actual_grams_to_print))
       yield "%s=%s" format (gram_to_string(gram), count) 
     val gramstr = (grams mkString " ") + (if (need_dots) " ..." else "")
     "%s(%s types, %s tokens%s%s, %s)" format (
-        class_name, model.num_types, model.num_tokens, innerToString,
+        class_name, num_types, num_tokens, innerToString,
         finished_str, gramstr)
   }
 

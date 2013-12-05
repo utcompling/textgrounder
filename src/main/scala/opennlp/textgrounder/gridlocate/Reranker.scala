@@ -218,8 +218,8 @@ class MiscCandidateInstFactory[Co] extends
     include_and_bin_logarithmically(feat, value)
 
   protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
-    val doctypes = doclm.model.iter_keys.toSeq
-    val celltypes = celllm.model.iter_keys.toSeq
+    val doctypes = doclm.iter_keys.toSeq
+    val celltypes = celllm.iter_keys.toSeq
     (doctypes intersect celltypes).size
   }
 
@@ -228,17 +228,17 @@ class MiscCandidateInstFactory[Co] extends
     val celllm = cell.rerank_lm
     Iterable(
       ib("$cell-numdocs", cell.num_docs),
-      ib("$cell-numtypes", celllm.model.num_types),
-      ib("$cell-numtokens", celllm.model.num_tokens),
+      ib("$cell-numtypes", celllm.num_types),
+      ib("$cell-numtokens", celllm.num_tokens),
       ib("$cell-salience", cell.salience),
-      ib("$doc-numtypes", doclm.model.num_types),
-      ib("$doc-numtokens", doclm.model.num_tokens),
+      ib("$doc-numtypes", doclm.num_types),
+      ib("$doc-numtokens", doclm.num_tokens),
       ib("$doc-salience", doc.salience.getOrElse(0.0)),
-      ib("$numtypes-quotient", celllm.model.num_types/doclm.model.num_types),
-      ib("$numtokens-quotient", celllm.model.num_tokens/doclm.model.num_tokens),
+      ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
+      ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
       ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0)),
-      ib("$numtypes-diff", celllm.model.num_types - doclm.model.num_types),
-      ib("$numtokens-diff", celllm.model.num_tokens - doclm.model.num_tokens),
+      ib("$numtypes-diff", celllm.num_types - doclm.num_types),
+      ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
       ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
       ib("$types-in-common", types_in_common(doclm, celllm)),
       ib("$kldiv", doclm.kl_divergence(celllm)),
@@ -265,7 +265,7 @@ abstract class WordByWordCandidateInstFactory[Co] extends
 
   def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
     cell: GridCell[Co], celllm: UnigramLangModel) = {
-    for ((word, count) <- doclm.model.iter_grams;
+    for ((word, count) <- doclm.iter_grams;
          (suff, featval) <- get_word_feature(word, count, doclm, celllm))
       yield ("%s$%s" format (doclm.gram_to_string(word), suff), featval)
   }
@@ -291,9 +291,9 @@ class WordCandidateInstFactory[Co](feattype: String) extends
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
     val wordval = basetype match {
-      case "unigram-binary" => 1
+      case "unigram-binary" => 1.0
       case "unigram-doc-count" => doccount
-      case "unigram-cell-count" => celllm.model.get_gram(word)
+      case "unigram-cell-count" => celllm.get_gram(word)
       case "unigram-doc-prob" => doclm.gram_prob(word)
       case "unigram-cell-prob" => celllm.gram_prob(word)
     }
@@ -327,14 +327,14 @@ class WordMatchingCandidateInstFactory[Co](feattype: String) extends
     WordByWordCandidateInstFactory[Co] {
   def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
       celllm: UnigramLangModel) = {
-    val cellcount = celllm.model.get_gram(word)
+    val cellcount = celllm.get_gram(word)
     if (cellcount == 0.0)
       None
     else {
       val binned = feattype.endsWith("-binned")
       val basetype = feattype.replace("-binned", "")
       val wordval = basetype match {
-        case "matching-unigram-binary" => 1
+        case "matching-unigram-binary" => 1.0
         case "matching-unigram-doc-count" => doccount
         case "matching-unigram-cell-count" => cellcount
         case "matching-unigram-count-product" => doccount * cellcount
@@ -382,7 +382,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
     val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
     val celllm =
       Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
-    for ((ngram, count) <- doclm.model.iter_grams;
+    for ((ngram, count) <- doclm.iter_grams;
          (suff, featval) <- get_ngram_feature(ngram, count, doclm, celllm))
       // Generate a feature name by concatenating the words. This may
       // conceivably lead to clashes if a word actually has the
@@ -413,9 +413,9 @@ class NgramCandidateInstFactory[Co](feattype: String) extends
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
     val ngramval = basetype match {
-      case "ngram-binary" => 1
+      case "ngram-binary" => 1.0
       case "ngram-doc-count" => doccount
-      case "ngram-cell-count" => celllm.model.get_gram(ngram)
+      case "ngram-cell-count" => celllm.get_gram(ngram)
       case "ngram-doc-prob" => doclm.gram_prob(ngram)
       case "ngram-cell-prob" => celllm.gram_prob(ngram)
     }
@@ -449,14 +449,14 @@ class NgramMatchingCandidateInstFactory[Co](feattype: String) extends
     NgramByNgramCandidateInstFactory[Co] {
   def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
       celllm: NgramLangModel) = {
-    val cellcount = celllm.model.get_gram(ngram)
+    val cellcount = celllm.get_gram(ngram)
     if (cellcount == 0.0)
       None
     else {
       val binned = feattype.endsWith("-binned")
       val basetype = feattype.replace("-binned", "")
       val ngramval = basetype match {
-        case "matching-ngram-binary" => 1
+        case "matching-ngram-binary" => 1.0
         case "matching-ngram-doc-count" => doccount
         case "matching-ngram-cell-count" => cellcount
         case "matching-ngram-count-product" => doccount * cellcount

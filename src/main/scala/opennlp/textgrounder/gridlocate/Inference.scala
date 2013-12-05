@@ -261,7 +261,7 @@ class NaiveBayesGridRanker[Co](
         if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
           val bw = params.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / lang_model.model.num_tokens, bw)
+          ((1.0 - bw) / lang_model.num_tokens, bw)
         }
       } else (1.0, 0.0))
 

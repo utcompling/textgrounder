@@ -175,13 +175,13 @@ class TimeGrid(
         errprint("Number of documents in %s-chunk: %s", name,
           cell.num_docs)
         errprint("Number of types in %s-chunk grid lm: %s", name,
-          cell.grid_lm.model.num_types)
+          cell.grid_lm.num_types)
         errprint("Number of tokens in %s-chunk grid lm: %s", name,
-          cell.grid_lm.model.num_tokens)
+          cell.grid_lm.num_tokens)
         errprint("Number of types in %s-chunk rerank lm: %s", name,
-          cell.rerank_lm.model.num_types)
+          cell.rerank_lm.num_types)
         errprint("Number of tokens in %s-chunk rerank lm: %s", name,
-          cell.rerank_lm.model.num_tokens)
+          cell.rerank_lm.num_tokens)
       }
     }
   }
@@ -190,7 +190,7 @@ class TimeGrid(
 class LangModelComparer(min_prob: Double, max_grams: Int) {
   def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
-  def get_keys(lm: LangModel) = lm.model.iter_keys.toSet
+  def get_keys(lm: LangModel) = lm.iter_keys.toSet
 
   def compare_cells_2way(grid: TimeGrid, category: String) {
     /* FIXME: What about rerank_lm? */

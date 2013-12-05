@@ -39,8 +39,8 @@ class DirichletUnigramLangModel(
 ) extends DiscountedUnigramLangModel(factory) {
   override protected def imp_finish_after_global() {
     unseen_mass = 1.0 -
-      (model.num_tokens.toDouble /
-        (model.num_tokens + factory.dirichlet_factor))
+      (num_tokens.toDouble /
+        (num_tokens + factory.dirichlet_factor))
     super.imp_finish_after_global()
   }
 

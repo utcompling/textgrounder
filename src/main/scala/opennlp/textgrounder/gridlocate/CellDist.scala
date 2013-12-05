@@ -167,7 +167,7 @@ class CellDistFactory[Co](
     // make it an interface for LangModel?
     val lang_model = xlang_model.asInstanceOf[UnigramLangModel]
     val cellprobs = doublemap[GridCell[Co]]()
-    for ((word, count) <- lang_model.model.iter_grams) {
+    for ((word, count) <- lang_model.iter_grams) {
       val dist = get_cell_dist(grid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob

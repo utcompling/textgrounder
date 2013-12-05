@@ -189,8 +189,8 @@ class DocEvalResult[Co](
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document language model: %s", doctag, document.grid_lm)
     errprint("%s:  %s types, %f tokens",
-      doctag, document.grid_lm.model.num_types,
-      document.grid_lm.model.num_tokens)
+      doctag, document.grid_lm.num_types,
+      document.grid_lm.num_tokens)
 
     errprint("%s:  Distance %s to correct cell central point at %s",
       doctag, document.output_distance(correct_truedist), correct_central_point)
@@ -203,10 +203,10 @@ class DocEvalResult[Co](
   def to_row = Seq(
     "document" -> document,
     "correct-coord" -> document.coord,
-    "numtypes" -> document.grid_lm.model.num_types,
-    "numtokens" -> document.grid_lm.model.num_tokens,
-    "rerank-lm-numtypes" -> document.rerank_lm.model.num_types,
-    "rerank-lm-numtokens" -> document.rerank_lm.model.num_tokens,
+    "numtypes" -> document.grid_lm.num_types,
+    "numtokens" -> document.grid_lm.num_tokens,
+    "rerank-lm-numtypes" -> document.rerank_lm.num_types,
+    "rerank-lm-numtokens" -> document.rerank_lm.num_tokens,
     "correct-cell" -> correct_cell.describe_location,
     "correct-cell-true-center" -> correct_cell.get_true_center,
     "correct-cell-centroid" -> correct_cell.get_centroid,

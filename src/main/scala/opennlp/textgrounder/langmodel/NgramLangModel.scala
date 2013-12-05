@@ -283,7 +283,7 @@ abstract class NgramLangModel(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: LangModel, partial: Boolean = true,
+  def slow_kl_divergence_debug(other: LangModel, partial: Boolean = true,
       return_contributing_words: Boolean = false):
       (Double, collection.Map[String, GramCount]) = ???
 
@@ -293,8 +293,8 @@ abstract class NgramLangModel(
    */
   def kl_divergence_34(other: NgramLangModel): Double
   
-  def get_most_contributing_grams(xlangmodel: LangModel,
-      xrelative_to: Iterable[LangModel] = Iterable()) = ???
+  def get_most_contributing_grams(langmodel: LangModel,
+      relative_to: Iterable[LangModel] = Iterable()) = ???
 }
 
 /**
@@ -358,15 +358,13 @@ class DefaultNgramLangModelBuilder(
       // FIXME: Not right with stopwords or whitelist
       //if (!stopwords.contains(lgram) &&
       //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-        lm.model.add_gram(Ngram.memoize(lgram.toArray), count)
+        lm.add_gram(Ngram.memoize(lgram.toArray), count)
         true
       //}
       //else
       //  false
     }
   }
-
-
 
   protected def imp_add_document(gendist: LangModel,
       words: Iterable[String], raw_text_max_ngram: Int) {
@@ -384,11 +382,11 @@ class DefaultNgramLangModelBuilder(
       genother: LangModel, partial: GramCount) {
     // FIXME: Implement partial!
     val lm = gendist.asInstanceOf[NgramLangModel]
-    val other = genother.asInstanceOf[NgramLangModel].model
+    val other = genother.asInstanceOf[NgramLangModel]
     for ((ngram, count) <- other.iter_grams)
       // FIXME: Possible slowdown because we are lowercasing a second
       // time when it's probably already been done. Currently done this
-      // way rather than directly calling lm.model.add_gram() to
+      // way rather than directly calling lm.add_gram() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
       add_ngram_with_count(lm, Ngram.unmemoize(ngram), count)
@@ -423,7 +421,6 @@ class DefaultNgramLangModelBuilder(
   } 
 
   def finish_before_global(lm: LangModel) {
-    val model = lm.asInstanceOf[NgramLangModel].model
     // A table listing OOV ngrams, e.g. Seq(OOV), Seq(OOV, OOV), etc.
     val oov_hash = mutable.Map[Int, Gram]()
 
@@ -432,8 +429,8 @@ class DefaultNgramLangModelBuilder(
     // FIXME!!! This should almost surely operate at the word level, not the
     // n-gram level.
     if (minimum_word_count > 1) {
-      for ((ngram, count) <- model.iter_grams if count < minimum_word_count) {
-        model.remove_gram(ngram)
+      for ((ngram, count) <- lm.iter_grams if count < minimum_word_count) {
+        lm.remove_gram(ngram)
         val siz = Ngram.unmemoize(ngram).size
         val oov = oov_hash.getOrElse(siz, {
           val newoov =
@@ -441,7 +438,7 @@ class DefaultNgramLangModelBuilder(
           oov_hash(siz) = newoov
           newoov
         } )
-        model.add_gram(oov, count)
+        lm.add_gram(oov, count)
       }
     }
   }
