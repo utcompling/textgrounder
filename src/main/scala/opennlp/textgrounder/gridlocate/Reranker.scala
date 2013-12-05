@@ -74,7 +74,7 @@ case class GridRankerInst[Co](
  * not evaluation.)
  */
 trait CandidateInstFactory[Co] extends (
-  (GridDoc[Co], GridCell[Co], Double, Boolean) => FeatureVector
+  (GridDoc[Co], GridCell[Co], Double, Int, Boolean) => FeatureVector
 ) {
   val featvec_factory =
     new SparseFeatureVectorFactory[Gram](word => Featurizer.unmemoize(word))
@@ -87,9 +87,11 @@ trait CandidateInstFactory[Co] extends (
    *
    * @param doc Document of document-cell pair.
    * @param cell Cell of document-cell pair.
+   * @param initial_score Initial ranking score for this cell.
+   * @param initial_rank Rank of this cell in the initial ranking (0-based).
    */
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]
-    ): Iterable[(String, Double)]
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int): Iterable[(String, Double)]
 
   val logarithmic_base = 2.0
 
@@ -154,16 +156,19 @@ trait CandidateInstFactory[Co] extends (
    *   (see above)
    */
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
-      is_training: Boolean) =
-    make_feature_vector(get_features(doc, cell), is_training)
+      initial_rank: Int, is_training: Boolean) =
+    make_feature_vector(get_features(doc, cell, score, initial_rank),
+      is_training)
 }
 
 /**
- * A simple factory for generating candidate instances for a document, using
- * nothing but the score passed in.
+ * A trivial factory for generating features for a doc-cell candidate,
+ * containing no features, for testing/debugging purposes.
  */
 class TrivialCandidateInstFactory[Co] extends CandidateInstFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = Iterable()
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) =
+    Iterable()
 }
 
 /**
@@ -172,7 +177,8 @@ class TrivialCandidateInstFactory[Co] extends CandidateInstFactory[Co] {
 class CombiningCandidateInstFactory[Co](
   val subsidiary_facts: Iterable[CandidateInstFactory[Co]]
 ) extends CandidateInstFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
     // For each subsidiary factory, retrieve its features, then add the
     // index of the factory to the feature's name to disambiguate, and
     // concatenate all features.
@@ -180,31 +186,132 @@ class CombiningCandidateInstFactory[Co](
       errprint("Document: %s", doc)
       errprint("Cell: %s", cell)
     }
-    subsidiary_facts.zipWithIndex flatMap { case (fact, index) =>
-      fact.get_features(doc, cell) map { case (item, count) =>
-        val featname =
-          // FIXME! Use gram_to_string to be more general.
-          // FIXME! May not be necessary to memoize like this. I don't think we
-          // need to unmemoize the feature names (except for debugging
-          // purposes), so it's enough just to OR the index onto the top bits
-          // of the word, which is already a low integer due to memoization
-          // (or if we change the memoization strategy in a way that generates
-          // spread-out integers, we can just XOR the index onto the top bits
-          // or hash the two numbers together; occasional feature clashes
-          // aren't a big deal).
-          "%s$%s" format (item, index)
-        if (debug("combined-features")) {
-          errprint("%s = %s", featname, count)
+    subsidiary_facts.zipWithIndex flatMap {
+      case (fact, index) => {
+        fact.get_features(doc, cell, initial_score, initial_rank) map {
+          case (item, count) => {
+            val featname =
+              // FIXME! Use gram_to_string to be more general.
+              // FIXME! May not be necessary to memoize like this. I don't
+              // think we need to unmemoize the feature names (except for
+              // debugging purposes), so it's enough just to OR the index
+              // onto the top bits of the word, which is already a low
+              // integer due to memoization (or if we change the memoization
+              // strategy in a way that generates spread-out integers, we
+              // can just XOR the index onto the top bits or hash the two
+              // numbers together; occasional feature clashes aren't a big
+              // deal).
+              "%s$%s" format (item, index)
+            if (debug("combined-features")) {
+              errprint("%s = %s", featname, count)
+            }
+            (featname, count)
+          }
         }
-        (featname, count)
       }
     }
   }
 }
 
 /**
- * A factory for generating candidate instances for a document, generating
- * separate features for each word.
+ * A factory for generating features for a doc-cell candidate, consisting of
+ * miscellaneous non-word-by-word features. Generally fairly fast.
+ */
+class MiscCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
+    val doctypes = doclm.iter_keys.toSeq
+    val celltypes = celllm.iter_keys.toSeq
+    (doctypes intersect celltypes).size
+  }
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
+    val doclm = doc.rerank_lm
+    val celllm = cell.rerank_lm
+    Iterable(
+      ib("$cell-numdocs", cell.num_docs),
+      ib("$cell-numtypes", celllm.num_types),
+      ib("$cell-numtokens", celllm.num_tokens),
+      ib("$cell-salience", cell.salience),
+      ib("$doc-numtypes", doclm.num_types),
+      ib("$doc-numtokens", doclm.num_tokens),
+      ib("$doc-salience", doc.salience.getOrElse(0.0)),
+      ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
+      ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
+      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0)),
+      ib("$numtypes-diff", celllm.num_types - doclm.num_types),
+      ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
+      ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0))
+      //FIXME: TOO SLOW!!!
+      // ib("$types-in-common", types_in_common(doclm, celllm)),
+      // ib("$kldiv", doclm.kl_divergence(celllm)),
+      // ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      // ib("$cossim", doclm.cosine_similarity(celllm)),
+      // ib("$nb-logprob", doclm.model_logprob(celllm))
+    ).flatten
+  }
+}
+
+/**
+ * A factory for generating features for a doc-cell candidate, specifically
+ * the $types-in-common feature, which is currently very slow. (FIXME!!
+ * Should be possible to implement in O(N log N) with sorting.)
+ */
+class TypesInCommonCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
+    val doctypes = doclm.iter_keys.toSeq
+    val celltypes = celllm.iter_keys.toSeq
+    (doctypes intersect celltypes).size
+  }
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
+    val doclm = doc.rerank_lm
+    val celllm = cell.rerank_lm
+    ib("$types-in-common", types_in_common(doclm, celllm))
+  }
+}
+
+/**
+ * A factory for generating features for a doc-cell candidate that consist
+ * of comparisons between the language models of the two (KL-divergence,
+ * symmetric KL, cosine similarity, Naive Bayes). Fairly slow.
+ */
+class ModelCompareCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
+    val doclm = doc.rerank_lm
+    val celllm = cell.rerank_lm
+    Iterable(
+      ib("$kldiv", doclm.kl_divergence(celllm)),
+      ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      ib("$cossim", doclm.cosine_similarity(celllm)),
+      ib("$nb-logprob", doclm.model_logprob(celllm))
+    ).flatten
+  }
+}
+
+/**
+ * A factory for generating features for a doc-cell candidate consisting of
+ * the original ranking score and binned equivalent.
+ */
+class ScoreCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
+    Iterable(
+      ib("$initial-score", initial_score),
+      ib("$initial-rank", initial_rank)
+    ).flatten
+  }
+}
+
+/**
+ * A factory for generating features for a doc-cell candidate, when the
+ * --rerank-lang-model specifies a unigram model.
  */
 abstract class UnigramCandidateInstFactory[Co] extends
     CandidateInstFactory[Co] {
@@ -221,7 +328,8 @@ abstract class UnigramCandidateInstFactory[Co] extends
   def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
     cell: GridCell[Co], celllm: UnigramLangModel): Iterable[(String, Double)]
 
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
     val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
     val celllm =
       Unigram.check_unigram_lang_model(cell.rerank_lm)
@@ -230,64 +338,7 @@ abstract class UnigramCandidateInstFactory[Co] extends
 }
 
 /**
- * A factory for generating candidate instances for a document, generating
- * non-word-by-word features.
- */
-class MiscCandidateInstFactory[Co] extends
-    CandidateInstFactory[Co] {
-  protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
-    val doctypes = doclm.iter_keys.toSeq
-    val celltypes = celllm.iter_keys.toSeq
-    (doctypes intersect celltypes).size
-  }
-
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val doclm = doc.rerank_lm
-    val celllm = cell.rerank_lm
-    Iterable(
-      ib("$cell-numdocs", cell.num_docs),
-      ib("$cell-numtypes", celllm.num_types),
-      ib("$cell-numtokens", celllm.num_tokens),
-      ib("$cell-salience", cell.salience),
-      ib("$doc-numtypes", doclm.num_types),
-      ib("$doc-numtokens", doclm.num_tokens),
-      ib("$doc-salience", doc.salience.getOrElse(0.0)),
-      ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
-      ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
-      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0)),
-      ib("$numtypes-diff", celllm.num_types - doclm.num_types),
-      ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
-      ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
-      ib("$types-in-common", types_in_common(doclm, celllm)),
-      ib("$kldiv", doclm.kl_divergence(celllm)),
-      ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
-      ib("$cossim", doclm.cosine_similarity(celllm)),
-      ib("$nb-logprob", doclm.model_logprob(celllm))
-    ).flatten
-  }
-}
-
-/**
- * A factory for generating candidate instances for a document, generating
- * features for the original ranking score and binned equivalent.
- */
-class ScoreCandidateInstFactory[Co] extends
-    CandidateInstFactory[Co] {
-  // We need to override `apply` rather than implementing `get_features`
-  // so that we can get access to the original ranking score.
-  override def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
-      is_training: Boolean) = {
-    val feats = Iterable(
-      ib("$score", score)
-    ).flatten
-    make_feature_vector(feats, is_training)
-  }
-
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = ???
-}
-
-/**
- * A factory for generating candidate instances for a document, generating
+ * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each word.
  */
 abstract class WordByWordCandidateInstFactory[Co] extends
@@ -309,8 +360,9 @@ abstract class WordByWordCandidateInstFactory[Co] extends
 }
 
 /**
- * A simple factory for generating candidate instances for a document, using
- * the presence of words in the document.
+ * A factory for generating features for a doc-cell candidate consisting of
+ * features for each word in the document that don't involve a comparison
+ * between the doc and cell's word probabilities.
  *
  * @param feattype How to compute the value assigned to the words:
  *
@@ -342,8 +394,9 @@ class WordCandidateInstFactory[Co](feattype: String) extends
 }
 
 /**
- * A simple factory for generating candidate instances for a document, using
- * the presence of matching words between document and cell.
+ * A factory for generating features for a doc-cell candidate consisting of
+ * features for each word in the document that involve a comparison
+ * between the doc and cell's word probabilities.
  *
  * @param feattype How to compute the value assigned to the words that are
  *   shared:
@@ -402,7 +455,7 @@ class WordMatchingCandidateInstFactory[Co](feattype: String) extends
 }
 
 /**
- * A factory for generating candidate instances for a document, generating
+ * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each n-gram.
  */
 abstract class NgramByNgramCandidateInstFactory[Co] extends
@@ -415,7 +468,8 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
   def get_ngram_feature(word: Gram, doccount: Double, doclm: NgramLangModel,
     celllm: NgramLangModel): Option[(String, Double)]
 
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
+      initial_rank: Int) = {
     val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
     val celllm =
       Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
@@ -431,8 +485,9 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
 }
 
 /**
- * A simple factory for generating candidate instances for a document, using
- * the presence of ngrams in the document.
+ * A factory for generating features for a doc-cell candidate consisting of
+ * features for each ngram in the document that don't involve a comparison
+ * between the doc and cell's ngram probabilities.
  *
  * @param feattype How to compute the value assigned to the ngrams:
  *
@@ -464,8 +519,9 @@ class NgramCandidateInstFactory[Co](feattype: String) extends
 }
 
 /**
- * A simple factory for generating candidate instances for a document, using
- * the presence of matching ngrams between document and cell.
+ * A factory for generating features for a doc-cell candidate consisting of
+ * features for each ngram in the document that involve a comparison
+ * between the doc and cell's ngram probabilities.
  *
  * @param feattype How to compute the value assigned to the ngrams that are
  *   shared:
@@ -584,10 +640,9 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
       protected def create_candidate_evaluation_instance(query: GridDoc[Co],
-          candidate: GridCell[Co], initial_score: Double) = {
-        self.create_candidate_evaluation_instance(query, candidate,
-          initial_score)
-      }
+          candidate: GridCell[Co], initial_score: Double, initial_rank: Int
+      ) = self.create_candidate_evaluation_instance(query, candidate,
+          initial_score, initial_rank)
     }
   }
 

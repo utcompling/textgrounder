@@ -140,7 +140,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
    * this candidate.
    */
   protected def create_candidate_evaluation_instance(query: Query,
-    candidate: Candidate, initial_score: Double): FeatureVector
+    candidate: Candidate, initial_score: Double, initial_rank: Int): FeatureVector
 
   /**
    * Rerank a set of top candidates, given the query and the initial score
@@ -149,8 +149,8 @@ trait PointwiseClassifyingReranker[Query, Candidate]
   protected def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)]) = {
     val cand_featvecs =
-      for ((candidate, score) <- scored_candidates)
-        yield create_candidate_evaluation_instance(item, candidate, score)
+      for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
+        yield create_candidate_evaluation_instance(item, candidate, score, rank)
     val query_featvec = new AggregateFeatureVector(cand_featvecs.toIndexedSeq)
     val new_scores = rerank_classifier.score(query_featvec).toIndexedSeq
     val candidates = scored_candidates.map(_._1).toIndexedSeq
@@ -280,11 +280,11 @@ trait PointwiseClassifyingRerankerTrainer[
      *    feature vector.
      */
     def aggregate_featvec(
-      create_candidate_featvec: (Query, Candidate, Double) => FeatureVector
+      create_candidate_featvec: (Query, Candidate, Double, Int) => FeatureVector
     ) = {
       val featvecs =
-        for ((cand, score) <- cand_scores) yield
-          create_candidate_featvec(query, cand, score)
+        for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
+          create_candidate_featvec(query, cand, score, rank)
       new AggregateFeatureVector(featvecs.toIndexedSeq)
     }
 
@@ -328,7 +328,8 @@ trait PointwiseClassifyingRerankerTrainer[
    * of previously unseen words).
    */
   protected def create_candidate_evaluation_instance(query: Query,
-    candidate: Candidate, initial_score: Double): FeatureVector
+    candidate: Candidate, initial_score: Double, initial_rank: Int
+  ): FeatureVector
 
   /**
    * Create an initial ranker based on a set of external instances.
@@ -490,8 +491,9 @@ trait PointwiseClassifyingRerankerTrainer[
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
       protected def create_candidate_evaluation_instance(query: Query,
-          candidate: Candidate, initial_score: Double) = {
-        self.create_candidate_evaluation_instance(query, candidate, initial_score)
+          candidate: Candidate, initial_score: Double, initial_rank: Int) = {
+        self.create_candidate_evaluation_instance(query, candidate,
+          initial_score, initial_rank)
       }
     }
   }
