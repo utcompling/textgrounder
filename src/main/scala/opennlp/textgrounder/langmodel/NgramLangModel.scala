@@ -39,7 +39,6 @@ import NgramStorage.RawNgram
  * Normal version of memoizer which maps words to Ints.
  */
 trait WordSeqAsIntMemoizer extends ItemAsIntMemoizer[RawNgram] {
-  val blank_memoized_string = memoize(Array(""))
 }
 
 object Ngram extends WordSeqAsIntMemoizer {
