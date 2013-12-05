@@ -647,7 +647,7 @@ trained on that same data. Default is %default.""")
 
   var rerank_classifier =
     ap.option[String]("rerank-classifier",
-      default = "perceptron",
+      default = "avg-perceptron",
       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
         "cost-perceptron"),
       help = """Type of classifier to use for reranking.  Possibilities are
