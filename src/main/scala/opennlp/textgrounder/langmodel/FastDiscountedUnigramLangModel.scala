@@ -71,7 +71,7 @@ object FastDiscountedUnigramLangModel {
    */
   def fast_kl_divergence(self: TDist,
       cache: DiscountedUnigramKLDivergenceCache,
-      other: TDist, interpolate: Boolean, partial: Boolean = false): Double = {
+      other: TDist, interpolate: Boolean, partial: Boolean = true): Double = {
 
     val the_cache =
       if (cache == null)
@@ -204,7 +204,7 @@ object FastDiscountedUnigramLangModel {
   proceed as with KL-divergence and ignore words not in P.
    */
   def fast_smoothed_cosine_similarity(self: TDist, other: TDist,
-    partial: Boolean = false): Double = {
+    partial: Boolean = true): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
     val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
@@ -283,7 +283,7 @@ object FastDiscountedUnigramLangModel {
   proceed as with KL-divergence and ignore words not in P.
    */
   def fast_cosine_similarity(self: TDist, other: TDist,
-    partial: Boolean = false) = {
+    partial: Boolean = true) = {
     val pfact = 1.0/self.model.num_tokens
     val qfact = 1.0/other.model.num_tokens
     // 1.
