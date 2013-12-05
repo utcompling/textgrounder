@@ -24,8 +24,6 @@ import math.{log, sqrt}
 
 import util.collection.DynamicArray
 
-import LangModel.Word
-
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
   for use with discounted smoothing.  This code was originally written

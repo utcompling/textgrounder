@@ -3,15 +3,15 @@ package gridlocate
 
 import math.log
 
-import langmodel.{LangModel,Ngram,NgramLangModel,Unigram,UnigramLangModel}
-import langmodel.NgramStorage._
-import LangModel._
+import langmodel._
 import util.debug._
 import util.print._
 import util.math.logn
 import util.metering._
 import util.textdb.Row
 import learning._
+
+object Featurizer extends WordAsIntMemoizer { }
 
 /**
  * A ranker for ranking cells in a grid as possible matches for a given
@@ -77,7 +77,7 @@ trait CandidateInstFactory[Co] extends (
   (GridDoc[Co], GridCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory =
-    new SparseFeatureVectorFactory[Word](word => memoizer.unmemoize(word))
+    new SparseFeatureVectorFactory[Word](word => Featurizer.unmemoize(word))
   val scoreword = "$score"
 
   /**
@@ -157,7 +157,7 @@ trait CandidateInstFactory[Co] extends (
     }
     val feats_with_score = unmemoized_feats_with_score.map {
       case (word, value) =>
-        (memoizer.memoize(word), value)
+        (Featurizer.memoize(word), value)
     }
     featvec_factory.make_feature_vector(feats_with_score, is_training)
   }
@@ -414,7 +414,8 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
       // conceivably lead to clashes if a word actually has the
       // separator in it, but that's unlikely and doesn't really matter
       // anyway.
-      yield ("%s$%s" format (ngram mkString "|", suff), featval)
+      yield ("%s$%s" format (Ngram.unmemoize(ngram) mkString "|", suff),
+        featval)
   }
 }
 

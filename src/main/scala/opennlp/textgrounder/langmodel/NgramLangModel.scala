@@ -33,9 +33,16 @@ import util.print.{errprint, warning}
 
 import util.debug._
 
-import LangModel._
+import NgramStorage.RawNgram
 
-object Ngram {
+/**
+ * Normal version of memoizer which maps words to Ints.
+ */
+trait WordSeqAsIntMemoizer extends ItemAsIntMemoizer[RawNgram] {
+  val blank_memoized_string = memoize(Array(""))
+}
+
+object Ngram extends WordSeqAsIntMemoizer {
   def check_ngram_lang_model(lang_model: LangModel) = {
     lang_model match {
       case x: NgramLangModel => x
@@ -45,25 +52,26 @@ object Ngram {
 }
 
 object NgramStorage {
-  type Ngram = Iterable[String]
+  type RawNgram = Array[String]
 }
 
 /**
  * An interface for storing and retrieving ngrams.
  */
-trait NgramStorage extends ItemStorage[NgramStorage.Ngram] {
-  type Ngram = NgramStorage.Ngram
+trait NgramStorage extends ItemStorage[Word] {
 }
 
 /**
  * An implementation for storing and retrieving ngrams using OpenNLP.
  */
 class OpenNLPNgramStorer extends NgramStorage {
-
   import opennlp.tools.ngram._
   import opennlp.tools.util.StringList
 
   val model = new NGramModel()
+
+  protected def get_sl_ngram(ngram: Ngram) =
+    new StringList(Ngram.unmemoize(ngram).toSeq: _*)
 
   /**************************** Abstract functions ***********************/
 
@@ -75,7 +83,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
-    val sl_ngram = new StringList(ngram.toSeq: _*)
+    val sl_ngram = get_sl_ngram(ngram)
     /* OpenNLP only lets you either add 1 to a possibly non-existing n-gram
        or set the count of an existing n-gram. */
     model.add(sl_ngram)
@@ -89,7 +97,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     if (count != count.toInt)
       throw new IllegalArgumentException(
         "Partial count %s not allowed in this class" format count)
-    val sl_ngram = new StringList(ngram.toSeq: _*)
+    val sl_ngram = get_sl_ngram(ngram)
     /* OpenNLP only lets you either add 1 to a possibly non-existing n-gram
        or set the count of an existing n-gram. */
     model.add(sl_ngram)
@@ -100,7 +108,7 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Remove an n-gram, if it exists.
    */
   def remove_item(ngram: Ngram) {
-    val sl_ngram = new StringList(ngram.toSeq: _*)
+    val sl_ngram = get_sl_ngram(ngram)
     model.remove(sl_ngram)
   }
 
@@ -108,7 +116,7 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Return whether a given n-gram is stored.
    */
   def contains(ngram: Ngram) = {
-    val sl_ngram = new StringList(ngram.toSeq: _*)
+    val sl_ngram = get_sl_ngram(ngram)
     model.contains(sl_ngram)
   }
 
@@ -116,7 +124,7 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Return whether a given n-gram is stored.
    */
   def get_item(ngram: Ngram) = {
-    val sl_ngram = new StringList(ngram.toSeq: _*)
+    val sl_ngram = get_sl_ngram(ngram)
     model.getCount(sl_ngram)
   }
 
@@ -131,7 +139,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
     for (x <- model.iterator.toIterable)
-      yield x.iterator.toIterable
+      yield Ngram.memoize(x.iterator.toArray)
   }
 
   /**
@@ -145,7 +153,8 @@ class OpenNLPNgramStorer extends NgramStorage {
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
     for (x <- model.iterator.toIterable)
-      yield (x.iterator.toIterable, model.getCount(x).toDouble)
+      yield (Ngram.memoize(x.iterator.toArray),
+        model.getCount(x).toDouble)
   }
 
   /**
@@ -227,7 +236,7 @@ class OpenNLPNgramStorer extends NgramStorage {
  * properties).  This suggests that at some point we may find it useful
  * to outsource the storage implementation/management to another class.
  *
- * Some terminology:
+ * Some terminology (FIXME: Outdated):
  *
  * Name                             Short name   Scala type
  * -------------------------------------------------------------------------
@@ -252,11 +261,9 @@ class OpenNLPNgramStorer extends NgramStorage {
 abstract class NgramLangModel(
     factory: LangModelFactory
   ) extends LangModel(factory) with FastSlowKLDivergence {
-  import NgramStorage.Ngram
-  type Item = Ngram
   val model = new OpenNLPNgramStorer
 
-  def item_to_string(item: Item) = item mkString " "
+  def item_to_string(item: Item) = Ngram.unmemoize(item) mkString " "
 
   def lookup_ngram(ngram: Ngram): Double
 
@@ -325,7 +332,6 @@ class DefaultNgramLangModelBuilder(
   max_ngram: Int = 0,
   raw_text_max_ngram: Int = 3
 ) extends LangModelBuilder(factory: LangModelFactory) {
-  import NgramStorage.Ngram
   /**
    * Internal map holding the encoded ngrams and counts.
    */
@@ -351,7 +357,7 @@ class DefaultNgramLangModelBuilder(
    * Returns true if the n-gram was counted, false if it was ignored (e.g.
    * due to length restrictions, stoplisting or whitelisting). */
   protected def add_ngram_with_count(lm: NgramLangModel,
-      ngram: Ngram, count: WordCount) = {
+      ngram: Iterable[String], count: WordCount) = {
     if (max_ngram > 0 && ngram.size > max_ngram)
       false
     else {
@@ -359,7 +365,7 @@ class DefaultNgramLangModelBuilder(
       // FIXME: Not right with stopwords or whitelist
       //if (!stopwords.contains(lgram) &&
       //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-        lm.model.add_item(lgram, count)
+        lm.model.add_item(Ngram.memoize(lgram.toArray), count)
         true
       //}
       //else
@@ -392,7 +398,7 @@ class DefaultNgramLangModelBuilder(
       // way rather than directly calling lm.model.add_item() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
-      add_ngram_with_count(lm, ngram, count)
+      add_ngram_with_count(lm, Ngram.unmemoize(ngram), count)
   }
 
   /**
@@ -425,9 +431,8 @@ class DefaultNgramLangModelBuilder(
 
   def finish_before_global(lm: LangModel) {
     val model = lm.asInstanceOf[NgramLangModel].model
-    // A table listing OOV ngrams, e.g. Seq(OOV, OOV), Seq(OOV, OOV, OOV), etc.
+    // A table listing OOV ngrams, e.g. Seq(OOV), Seq(OOV, OOV), etc.
     val oov_hash = mutable.Map[Int, Ngram]()
-    val oov = Seq("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate n-grams whose count
     // is too small by replacing them with -OOV-.
@@ -436,9 +441,10 @@ class DefaultNgramLangModelBuilder(
     if (minimum_word_count > 1) {
       for ((ngram, count) <- model.iter_items if count < minimum_word_count) {
         model.remove_item(ngram)
-        val siz = ngram.size
+        val siz = Ngram.unmemoize(ngram).size
         val oov = oov_hash.getOrElse(siz, {
-          val newoov = (1 to siz).map(_ => "-OOV-")
+          val newoov =
+            Ngram.memoize((1 to siz).map(_ => "-OOV-").toArray)
           oov_hash(siz) = newoov
           newoov
         } )
@@ -447,7 +453,7 @@ class DefaultNgramLangModelBuilder(
     }
   }
 
-  def maybe_lowercase(ngram: Ngram) =
+  def maybe_lowercase(ngram: Iterable[String]) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
   def create_lang_model(countstr: String) = {

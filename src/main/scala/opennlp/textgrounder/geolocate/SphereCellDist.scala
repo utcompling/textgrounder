@@ -24,7 +24,7 @@ import math._
 import util.spherical._
 
 import gridlocate.{Grid,WordCellDist,CellDistFactory}
-import langmodel.LangModel._
+import langmodel.Unigram
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //
@@ -97,9 +97,9 @@ object SphereWordCellDist {
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ memoizer.unmemoize(celldist.word) }</name>
+            <name>{ Unigram.unmemoize(celldist.word) }</name>
             <open>1</open>
-            <description>{ "Cell distribution for word '%s'" format memoizer.unmemoize(celldist.word) }</description>
+            <description>{ "Cell distribution for word '%s'" format Unigram.unmemoize(celldist.word) }</description>
             <LookAt>
               <latitude>{ KMLConstants.look_at_latitude }</latitude>
               <longitude>{ KMLConstants.look_at_longitude }</longitude>

@@ -75,8 +75,6 @@ import util.time._
 import gridlocate._
 import util.debug._
 
-import langmodel.LangModel._
-
 /*
 
 This module is the main driver module for the Poligrounder subproject.

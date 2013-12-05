@@ -19,11 +19,8 @@
 package opennlp.textgrounder
 package langmodel
 
-import LangModel._
-
-import util.print.errprint
-
 import util.debug._
+import util.print.errprint
 
 /**
  * This class implements a simple version of Good-Turing smoothing where we

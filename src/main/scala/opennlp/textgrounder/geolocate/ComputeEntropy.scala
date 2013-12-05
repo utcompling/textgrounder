@@ -28,7 +28,6 @@ import util.textdb._
 import gridlocate._
 
 import langmodel._
-import LangModel._
 
 class ComputeEntropyParameters(
   parser: ArgParser
@@ -110,7 +109,7 @@ class ComputeEntropyDriver extends
     // Maybe print word and cell counts.
     if (params.verbose) {
       for ((word, count) <- words_counts)
-        errprint("Word: %s (%s) = %s / %s", word, memoizer.unmemoize(word),
+        errprint("Word: %s (%s) = %s / %s", word, Unigram.unmemoize(word),
           count, words_cellcounts(word))
     }
     errprint("Computing set of words seen ... done.")
@@ -177,7 +176,7 @@ class ComputeEntropyDriver extends
           normed_log_wordcount, normed_log_cellcount,
           normed_wordcount, normed_cellcount
         ) => Seq(
-        "word" -> memoizer.unmemoize(word),
+        "word" -> Unigram.unmemoize(word),
         "wordcount" -> wordcount,
         "cellcount" -> cellcount,
         "entropy" -> entropy

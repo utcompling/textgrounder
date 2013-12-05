@@ -26,8 +26,6 @@ import util.print.errprint
 
 import util.debug._
 
-import LangModel._
-
 abstract class DiscountedUnigramLangModelFactory(
   create_builder: LangModelFactory => LangModelBuilder,
   val interpolate: Boolean,
@@ -46,9 +44,9 @@ abstract class DiscountedUnigramLangModelFactory(
    * the value in 'globally_unseen_word_prob'.  We start out by storing raw
    * counts, then adjusting them.
    */
-  var overall_word_probs = create_word_double_map
+  var overall_word_probs = Unigram.create_word_double_map
   var owp_adjusted = false
-  var document_freq = create_word_double_map
+  var document_freq = Unigram.create_word_double_map
   var num_documents = 0
   var global_normalization_factor = 0.0
 

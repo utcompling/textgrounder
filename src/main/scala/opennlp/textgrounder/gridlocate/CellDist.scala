@@ -24,8 +24,7 @@ import collection.mutable
 import util.collection.{LRUCache, doublemap}
 import util.print.{errprint, warning}
 
-import langmodel.{LangModel,Unigram,UnigramLangModel}
-import LangModel.Word
+import langmodel.{Word,LangModel,Unigram,UnigramLangModel}
 
 /**
  * A general distribution over cells, associating a probability with each
