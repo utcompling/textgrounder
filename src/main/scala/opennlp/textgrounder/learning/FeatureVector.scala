@@ -196,11 +196,29 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
         }.mkString(",")
     )
 
+  def pretty_feature_string(prefix: String,
+      feature_values: Iterable[(Int, Double)]) =
+    feature_values.toSeq.sorted.map {
+      case (index, value) => {
+        val featstr =
+          if (include_displayed_feature)
+            "%s(%s)" format (format_feature(index), index)
+          else
+            "%s" format index
+        "  %s: %-40s = %.2f" format (prefix, featstr, value)
+      }
+    }.mkString("\n")
+
   def toIterable: Iterable[(Int, Double)]
 
   def string_prefix: String
 
   override def toString = compute_toString(string_prefix, toIterable)
+
+  def pretty_print(prefix: String) = {
+    "%s: %s".format(prefix, string_prefix) + "\n" +
+      pretty_feature_string(prefix, toIterable)
+  }
 
   // Simple implementation of this to optimize in the common case
   // where the other vector is sparse.
@@ -217,7 +235,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
       // If the other vector has a value at that index, it will be
       // handled when we loop over the other vector. (Otherwise, the
       // index is 0 in both vectors and contributes nothing.)
-      case sp2:SparseFeatureVectorLike => {
+      case sp2: SparseFeatureVectorLike => {
         var res = 0.0
         for ((ind, value) <- toIterable) {
           if (value != 0.0) {
