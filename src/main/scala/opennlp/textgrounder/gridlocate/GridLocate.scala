@@ -700,15 +700,15 @@ For the perceptron classifiers, see also `--pa-variant`,
     rerank_features_matching_ngram_choices
 
   val combined_rerank_features =
-    rerank_features_all_unigram_choices ++ Seq("misc")
+    rerank_features_all_unigram_choices ++ Seq("misc", "score")
 
-  val allowed_rerank_features = Seq("combined", "misc", "trivial") ++
+  val allowed_rerank_features = Seq("combined", "misc", "score", "trivial") ++
     rerank_features_all_unigram_choices ++
     rerank_features_all_ngram_choices
 
   var rerank_features =
     ap.option[String]("rerank-features",
-      default = "combined",
+      default = "misc,score",
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
 respective language models). The original ranking score for the cell always
@@ -1345,6 +1345,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           new TrivialCandidateInstFactory[Co]
         case "misc" =>
           new MiscCandidateInstFactory[Co]
+        case "score" =>
+          new ScoreCandidateInstFactory[Co]
         case "combined" =>
           new CombiningCandidateInstFactory[Co](
             (params.combined_rerank_features).map(
