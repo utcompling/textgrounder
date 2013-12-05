@@ -699,10 +699,8 @@ For the perceptron classifiers, see also `--pa-variant`,
     rerank_features_simple_ngram_choices ++
     rerank_features_matching_ngram_choices
 
-  val combined_rerank_features =
-    rerank_features_all_unigram_choices ++ Seq("misc", "score")
-
-  val allowed_rerank_features = Seq("combined", "misc", "score", "trivial") ++
+  val allowed_rerank_features =
+    Seq("misc", "types-in-common", "model-compare", "score", "trivial") ++
     rerank_features_all_unigram_choices ++
     rerank_features_all_ngram_choices
 
@@ -770,11 +768,15 @@ serves as one of the features.  Possibilities are:
   different ranges (aka bins) of values, generally logarithmically, but
   by fixed increments for fractions and similarly bounded, additive values
 
-'misc' (non-word-specific features, e.g. number of documents in a cell,
-  number of word types/tokens in a document/cell, etc.)
+'types-in-common' (number of word/ngram types in the document that are also
+  found in the cell)
 
-'combined' (use all of the unigram features of all the previous methods,
-  as well as 'misc').
+'model-compare' (various ways of comparing the language models of document and
+  cell: KL-divergence, symmetric KL-divergence, cosine similarity, Naive Bayes)
+
+'misc' (other non-word-specific features, e.g. number of documents in a cell,
+  number of word types/tokens in a document/cell, etc.; should be fairly fast
+  to compute)
 
 Multiple feature types can be specified, separated by spaces or commas.
 
@@ -1345,12 +1347,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           new TrivialCandidateInstFactory[Co]
         case "misc" =>
           new MiscCandidateInstFactory[Co]
+        case "types-in-common" =>
+          new TypesInCommonCandidateInstFactory[Co]
+        case "model-compare" =>
+          new ModelCompareCandidateInstFactory[Co]
         case "score" =>
           new ScoreCandidateInstFactory[Co]
-        case "combined" =>
-          new CombiningCandidateInstFactory[Co](
-            (params.combined_rerank_features).map(
-              create_fact(_)))
       }
     }
 
@@ -1397,13 +1399,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           ): Iterable[(GridRankerInst[Co], Int)] = {
 
             def create_candidate_featvec(query: GridDoc[Co],
-                candidate: GridCell[Co], initial_score: Double) = {
+                candidate: GridCell[Co], initial_score: Double,
+                initial_rank: Int) = {
               val featvec =
                 candidate_instance_factory(query, candidate, initial_score,
-                  is_training = true)
+                  initial_rank, is_training = true)
               if (debug("features"))
-                errprint("Training: For query %s, candidate %s, initial score %s, featvec %s",
-                  query, candidate, initial_score, featvec)
+                errprint("Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
+                  query, candidate, initial_score, initial_rank, featvec)
               featvec
             }
 
@@ -1420,10 +1423,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
            * pair) during evaluation, by invoking the candidate-instance
            * factory (see above). */
           protected def create_candidate_evaluation_instance(query: GridDoc[Co],
-              candidate: GridCell[Co], initial_score: Double) = {
+              candidate: GridCell[Co], initial_score: Double,
+              initial_rank: Int) = {
             val featvec =
               candidate_instance_factory(query, candidate, initial_score,
-                is_training = false)
+                initial_rank, is_training = false)
             if (debug("features"))
               errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
                 query, candidate, initial_score, featvec)
