@@ -665,22 +665,47 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
+  protected def with_binned(feats: String*) =
+    feats flatMap { f => Seq(f, f + "-binned") }
+
   val rerank_features_simple_unigram_choices =
-    Seq("unigram-binary", "unigram-count")
+    (Seq("binary") ++
+      with_binned("doc-count", "doc-prob", "cell-count", "cell-prob")
+    ).map { "unigram-" + _ }
 
   val rerank_features_matching_unigram_choices =
-    Seq("unigram-binary", "unigram-count", "unigram-count-product",
-        "unigram-probability", "unigram-prob-product", "kl").map {
-      "matching-" + _ }
+    (Seq("binary") ++ with_binned(
+      "doc-count", "cell-count", "doc-prob", "cell-prob",
+      "count-product", "count-quotient", "prob-product", "prob-quotient",
+      "kl")
+    ).map { "matching-unigram-" + _ }
+
+  val rerank_features_simple_ngram_choices =
+    (Seq("binary") ++
+      with_binned("doc-count", "doc-prob", "cell-count", "cell-prob")
+    ).map { "ngram-" + _ }
 
   val rerank_features_matching_ngram_choices =
-    Seq("ngram-binary", "ngram-count", "ngram-count-product").map {
-      "matching-" + _ }
+    (Seq("binary") ++ with_binned(
+      "doc-count", "cell-count", "doc-prob", "cell-prob",
+      "count-product", "count-quotient", "prob-product", "prob-quotient",
+      "kl")
+    ).map { "matching-ngram-" + _ }
 
-  val allowed_rerank_features = Seq("all-kl", "combined", "trivial") ++
+  val rerank_features_all_unigram_choices =
     rerank_features_simple_unigram_choices ++
-    rerank_features_matching_unigram_choices ++
+    rerank_features_matching_unigram_choices
+
+  val rerank_features_all_ngram_choices =
+    rerank_features_simple_ngram_choices ++
     rerank_features_matching_ngram_choices
+
+  val combined_rerank_features =
+    rerank_features_all_unigram_choices ++ Seq("misc")
+
+  val allowed_rerank_features = Seq("combined", "misc", "trivial") ++
+    rerank_features_all_unigram_choices ++
+    rerank_features_all_ngram_choices
 
   var rerank_features =
     ap.option[String]("rerank-features",
@@ -695,41 +720,62 @@ serves as one of the features.  Possibilities are:
 'unigram-binary' (use the value 1 when a word exists in the document,
   0 otherwise);
 
-'unigram-count' (use the document word count when a word exists the document);
+'unigram-doc-count' (use the document word count when a word exists in
+  the document);
+
+'unigram-doc-prob' (use the document word probability when a word exists in
+  the document);
+
+'unigram-cell-count' (use the cell word count when a word exists in
+  the document);
+
+'unigram-cell-prob' (use the cell word probability when a word exists in
+  the document);
 
 'matching-unigram-binary' (use the value 1 when a word exists in both document
   and cell, 0 otherwise);
 
-'matching-unigram-count' (use the document word count when a word exists in both
-document and cell);
+'matching-unigram-doc-count' (use the document word count when a word exists
+  in both document and cell);
+
+'matching-unigram-doc-prob' (use the document word probability when a word
+  exists in both document and cell);
+
+'matching-unigram-cell-count' (use the cell word count when a word exists
+  in both document and cell -- equivalent to 'unigram-cell-count');
+
+'matching-unigram-cell-prob' (use the cell word probability when a word exists
+  in both document and cell);
 
 'matching-unigram-count-product' (use the product of the document and cell
   word count when a word exists in both document and cell);
 
-'matching-unigram-probability' (use the document probability when a word exists
-  in both document and cell);
+'matching-unigram-count-quotient' (use the quotient of the cell and document
+  word count when a word exists in both document and cell);
 
 'matching-unigram-prob-product' (use the product of both the document and cell
   probability when a word exists in both document and cell);
 
-'matching-kl' (when a word exists in both document and cell, use the individual
-  KL-divergence component score between document and cell for the word,
-  else 0);
+'matching-unigram-prob-quotient' (use the quotient of the cell and document
+  word probability when a word exists in both document and cell);
 
-'matching-ngram-binary' (similar to 'unigram-binary' but include features for
-  N-grams up to --max-rerank-ngram);
+'matching-unigram-kl' (when a word exists in both document and cell, use the
+  individual KL-divergence component score between document and cell for the
+  word, else 0);
 
-'matching-ngram-count' (similar to 'unigram-count' but include features for
-  N-grams up to --max-rerank-ngram);
+'ngram-*', 'matching-ngram-*' (similar to the corresponding unigram features
+  but include features for N-grams up to --max-rerank-ngram);
 
-'matching-ngram-count-product' (similar to 'unigram-count-product' but include
-  N-grams up to --max-rerank-ngram);
+'*-binned' (for all feature types given above except for the '*-binary'
+  types, a "binned" equivalent exists that creates binary features for
+  different ranges (aka bins) of values, generally logarithmically, but
+  by fixed increments for fractions and similarly bounded, additive values
 
-'all-kl' (for all words in the document, use the KL-divergence score between
-  document and cell -- probably not useful as distinct from plain 'kl',
-  because the difference is only due to smoothing);
+'misc' (non-word-specific features, e.g. number of documents in a cell,
+  number of word types/tokens in a document/cell, etc.)
 
-'combined' (use all of the features of all the previous methods).
+'combined' (use all of the unigram features of all the previous methods,
+  as well as 'misc').
 
 Multiple feature types can be specified, separated by spaces or commas.
 
@@ -753,10 +799,10 @@ specifies something other than 'trivial'.""")
       grid_lang_model_type
     else {
       val is_ngram =
-        (rerank_features_matching_ngram_choices.intersect(
+        (rerank_features_all_ngram_choices.intersect(
           rerank_feature_list).size != 0)
       val is_unigram =
-        (rerank_features_matching_unigram_choices.intersect(
+        (rerank_features_all_unigram_choices.intersect(
           rerank_feature_list).size != 0)
       if (is_ngram && is_unigram)
         ap.usageError("Can't have both ngram and unigram features in --rerank-features")
@@ -1291,17 +1337,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new WordCandidateInstFactory[Co](ty)
       else if (params.rerank_features_matching_unigram_choices contains ty)
         new WordMatchingCandidateInstFactory[Co](ty)
+      else if (params.rerank_features_simple_ngram_choices contains ty)
+        new NgramCandidateInstFactory[Co](ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
         new NgramMatchingCandidateInstFactory[Co](ty)
       else ty match {
         case "trivial" =>
           new TrivialCandidateInstFactory[Co]
-        case "all-kl" =>
-          new KLDivCandidateInstFactory[Co]
+        case "misc" =>
+          new MiscCandidateInstFactory[Co]
         case "combined" =>
           new CombiningCandidateInstFactory[Co](
-            (params.rerank_features_simple_unigram_choices ++
-             params.rerank_features_matching_unigram_choices).map(
+            (params.combined_rerank_features).map(
               create_fact(_)))
       }
     }

@@ -8,6 +8,7 @@ import langmodel.NgramStorage._
 import LangModel._
 import util.debug._
 import util.print._
+import util.math.logn
 import util.metering._
 import util.textdb.Row
 import learning._
@@ -77,17 +78,65 @@ trait CandidateInstFactory[Co] extends (
 ) {
   val featvec_factory =
     new SparseFeatureVectorFactory[Word](word => memoizer.unmemoize(word))
-  val scoreword = memoizer.memoize("-SCORE-")
+  val scoreword = "$score"
 
   /**
-   * Return a set of feature-value pairs for a document-cell pair, describing
-   * similarities between the document and cell's language models.
-   * Meant to be supplied by subclasses.
+   * Return an Iterable of feature-value pairs for a document-cell pair,
+   * usually describing similarities between the document and cell's
+   * language models. Meant to be supplied by subclasses.
    *
    * @param doc Document of document-cell pair.
    * @param cell Cell of document-cell pair.
    */
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]): Iterable[(Word, Double)]
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]
+    ): Iterable[(String, Double)]
+
+  val logarithmic_base = 2.0
+
+  def disallowed_value(value: Double) = value.isNaN || value.isInfinity
+
+  def bin_logarithmically(feat: String, value: Double) = {
+    // We have separate bins for the values that will cause problems (NaN,
+    // positive and negative infinity, 0). In addition, we create separate
+    // bins for negative values, using the same binning scheme as for
+    // positive values but with "!neg" appended to the feature name.
+    // (Log of positive values produces both positive and negative results
+    // depending on whether the value is greater or less than 1, and log
+    // of negative values is disallowed.)
+    if (disallowed_value(value))
+      ("%s!%s" format (feat, value), 1.0)
+    else if (value == 0.0)
+      ("%s!zero" format feat, 1.0)
+    else if (value > 0) {
+      val log = logn(value, logarithmic_base).toInt
+      ("%s!%s" format (feat, log), 1.0)
+    } else {
+      val log = logn(-value, logarithmic_base).toInt
+      ("%s!%s!neg" format (feat, log), 1.0)
+    }
+  }
+
+  def include_and_bin_logarithmically(feat: String, value: Double) = {
+    // We cannot allow NaN, +Inf or -Inf as a feature value, as they will
+    // wreak havoc on error calculations. However, we can still create
+    // bins noting the fact that such values were encountered.
+    if (disallowed_value(value))
+      Seq(bin_logarithmically(feat, value))
+    else
+      Seq(feat -> value, bin_logarithmically(feat, value))
+  }
+
+  val fractional_increment = 0.1
+
+  def bin_fractionally(feat: String, value: Double) = {
+    assert(value >= 0 && value <= 1)
+    val incr = (value / fractional_increment).toInt
+    ("%s!%s" format (feat, incr), 1.0)
+  }
+
+  def include_and_bin_fractionally(feat: String, value: Double) = {
+    Seq(feat -> value, bin_fractionally(feat, value))
+  }
 
   /**
    * Generate a feature vector from a query-candidate (document-cell) pair.
@@ -100,8 +149,16 @@ trait CandidateInstFactory[Co] extends (
    */
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
     is_training: Boolean) = {
-    val feats_with_score =
+    val unmemoized_feats_with_score =
       get_features(doc, cell) ++ Iterable(scoreword -> score)
+    unmemoized_feats_with_score.foreach { case (feat, value) =>
+      assert(!disallowed_value(value),
+        "feature %s has disallowed value %s" format (feat, value))
+    }
+    val feats_with_score = unmemoized_feats_with_score.map {
+      case (word, value) =>
+        (memoizer.memoize(word), value)
+    }
     featvec_factory.make_feature_vector(feats_with_score, is_training)
   }
 }
@@ -132,21 +189,89 @@ class CombiningCandidateInstFactory[Co](
       fact.get_features(doc, cell) map { case (item, count) =>
         val featname =
           // FIXME! Use item_to_string to be more general.
-          "%s$%s" format (memoizer.unmemoize(item), index)
+          // FIXME! May not be necessary to memoize like this. I don't think we
+          // need to unmemoize the feature names (except for debugging
+          // purposes), so it's enough just to OR the index onto the top bits
+          // of the word, which is already a low integer due to memoization
+          // (or if we change the memoization strategy in a way that generates
+          // spread-out integers, we can just XOR the index onto the top bits
+          // or hash the two numbers together; occasional feature clashes
+          // aren't a big deal).
+          "%s$%s" format (item, index)
         if (debug("combined-features")) {
           errprint("%s = %s", featname, count)
         }
-        // FIXME! May not be necessary to memoize like this. I don't think we
-        // need to unmemoize the feature names (except for debugging
-        // purposes), so it's enough just to OR the index onto the top bits
-        // of the word, which is already a low integer due to memoization
-        // (or if we change the memoization strategy in a way that generates
-        // spread-out integers, we can just XOR the index onto the top bits
-        // or hash the two numbers together; occasional feature clashes
-        // aren't a big deal).
-        (memoizer.memoize(featname), count)
+        (featname, count)
       }
     }
+  }
+}
+
+/**
+ * A factory for generating candidate instances for a document, generating
+ * separate features for each word.
+ */
+abstract class UnigramCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  /**
+   * Return an Iterable of features corresponding to the given doc-cell
+   * (query-candidate) pair, provided that Unigram rerank distributions
+   * are being used.
+   *
+   * @param doc Document of document-cell pair.
+   * @param doclm Unigram rerank language model of document.
+   * @param cell Cell of document-cell pair.
+   * @param celllm Unigram rerank language model of cell.
+   */
+  def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
+    cell: GridCell[Co], celllm: UnigramLangModel): Iterable[(String, Double)]
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
+    val celllm =
+      Unigram.check_unigram_lang_model(cell.rerank_lm)
+    get_unigram_features(doc, doclm, cell, celllm)
+  }
+}
+
+/**
+ * A factory for generating candidate instances for a document, generating
+ * non-word-by-word features.
+ */
+class MiscCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  protected def ib(feat: String, value: Double) =
+    include_and_bin_logarithmically(feat, value)
+
+  protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
+    val doctypes = doclm.model.iter_keys.toSeq
+    val celltypes = celllm.model.iter_keys.toSeq
+    (doctypes intersect celltypes).size
+  }
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val doclm = doc.rerank_lm
+    val celllm = cell.rerank_lm
+    Iterable(
+      ib("$cell-numdocs", cell.num_docs),
+      ib("$cell-numtypes", celllm.model.num_types),
+      ib("$cell-numtokens", celllm.model.num_tokens),
+      ib("$cell-salience", cell.salience),
+      ib("$doc-numtypes", doclm.model.num_types),
+      ib("$doc-numtokens", doclm.model.num_tokens),
+      ib("$doc-salience", doc.salience.getOrElse(0.0)),
+      ib("$numtypes-quotient", celllm.model.num_types/doclm.model.num_types),
+      ib("$numtokens-quotient", celllm.model.num_tokens/doclm.model.num_tokens),
+      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0)),
+      ib("$numtypes-diff", celllm.model.num_types - doclm.model.num_types),
+      ib("$numtokens-diff", celllm.model.num_tokens - doclm.model.num_tokens),
+      ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
+      ib("$types-in-common", types_in_common(doclm, celllm)),
+      ib("$kldiv", doclm.kl_divergence(celllm)),
+      ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      ib("$cossim", doclm.cosine_similarity(celllm)),
+      ib("$nb-logprob", doclm.model_logprob(celllm))
+    ).flatten
   }
 }
 
@@ -155,59 +280,20 @@ class CombiningCandidateInstFactory[Co](
  * separate features for each word.
  */
 abstract class WordByWordCandidateInstFactory[Co] extends
-    CandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
-    celldist: UnigramLangModel): Option[Double]
+    UnigramCandidateInstFactory[Co] {
+  /** Optionally return a per-word feature whose count in the document is
+    * `count`, with specified document and cell language models. The
+    * return value is a tuple of suffix describing the particular feature
+    * class being returned, and feature value. The suffix will be appended
+    * to the word itself to form the feature name. */
+  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+    celllm: UnigramLangModel): Option[(String, Double)]
 
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
-    val celldist =
-      Unigram.check_unigram_lang_model(cell.lang_model.rerank_lm)
+  def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
+    cell: GridCell[Co], celllm: UnigramLangModel) = {
     for ((word, count) <- doclm.model.iter_items;
-         featval = get_word_feature(word, count, doclm, celldist);
-         if featval != None)
-      yield (word, featval.get)
-  }
-}
-
-/**
- * A factory for generating candidate instances for a document, generating
- * separate features for each word.
- */
-abstract class NgramByNgramCandidateInstFactory[Co] extends
-    CandidateInstFactory[Co] {
-  def get_ngram_feature(word: Ngram, count: Double, doclm: NgramLangModel,
-    celldist: NgramLangModel): Option[Double]
-
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
-    val celldist =
-      Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
-    for ((ngram, count) <- doclm.model.iter_items;
-         featval = get_ngram_feature(ngram, count, doclm, celldist);
-         if featval != None)
-      // Generate a feature name by concatenating the words. This may
-      // conceivably lead to clashes if a word actually has the
-      // separator in it, but that's unlikely and doesn't really matter
-      // anyway.
-      yield (memoizer.memoize(ngram mkString "|"), featval.get)
-  }
-}
-
-/**
- * A simple factory for generating candidate instances for a document, using
- * individual KL-divergence components for each word in the document.
- */
-class KLDivCandidateInstFactory[Co] extends
-    WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
-      celldist: UnigramLangModel) = {
-    val p = doclm.lookup_word(word)
-    val q = celldist.lookup_word(word)
-    if (q == 0.0)
-      None
-    else
-      Some(p*(log(p/q)))
+         (suff, featval) <- get_word_feature(word, count, doclm, celllm))
+      yield ("%s$%s" format (doclm.item_to_string(word), suff), featval)
   }
 }
 
@@ -215,20 +301,32 @@ class KLDivCandidateInstFactory[Co] extends
  * A simple factory for generating candidate instances for a document, using
  * the presence of words in the document.
  *
- * @param value How to compute the value assigned to the words:
+ * @param feattype How to compute the value assigned to the words:
  *
  * - `unigram-binary`: always assign 1
- * - `unigram-count`: use document word count
+ * - `unigram-doc-count`: use document word count
+ * - `unigram-cell-count`: use cell word count
+ * - `unigram-doc-prob`: use document word probability
+ * - `unigram-cell-prob`: use cell word probability
+ * - any of the above with `-binned` added, which bins logarithmically
  */
-class WordCandidateInstFactory[Co](value: String) extends
+class WordCandidateInstFactory[Co](feattype: String) extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
-      celldist: UnigramLangModel) = {
-    val wordval = value match {
+  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+      celllm: UnigramLangModel) = {
+    val binned = feattype.endsWith("-binned")
+    val basetype = feattype.replace("-binned", "")
+    val wordval = basetype match {
       case "unigram-binary" => 1
-      case "unigram-count" => count
+      case "unigram-doc-count" => doccount
+      case "unigram-cell-count" => celllm.model.get_item(word)
+      case "unigram-doc-prob" => doclm.lookup_word(word)
+      case "unigram-cell-prob" => celllm.lookup_word(word)
     }
-    Some(wordval)
+    if (binned)
+      Some(bin_logarithmically(feattype, wordval))
+    else
+      Some((feattype, wordval))
   }
 }
 
@@ -236,70 +334,179 @@ class WordCandidateInstFactory[Co](value: String) extends
  * A simple factory for generating candidate instances for a document, using
  * the presence of matching words between document and cell.
  *
- * @param value How to compute the value assigned to the words that are
+ * @param feattype How to compute the value assigned to the words that are
  *   shared:
  *
- * - `unigram-binary`: always assign 1
- * - `unigram-count`: use document word count
- * - `unigram-count-product`: use product of document and cell word count
- * - `unigram-probability`: use document word probability
- * - `unigram-prob-product`: use product of document and cell word prob
- * - `kl`: use KL-divergence component for document/cell probs
+ * - `matching-unigram-binary`: always assign 1
+ * - `matching-unigram-doc-count`: use document word count
+ * - `matching-unigram-cell-count`: use cell word count
+ * - `matching-unigram-doc-prob`: use document word probability
+ * - `matching-unigram-cell-prob`: use cell word probability
+ * - `matching-unigram-count-product`: use product of document and cell word count
+ * - `matching-unigram-count-quotient`: use quotient of cell and document word count
+ * - `matching-unigram-prob-product`: use product of document and cell word prob
+ * - `matching-unigram-prob-quotient`: use quotient of cell and document word prob
+ * - `matching-unigram-kl`: use KL-divergence component for document/cell probs
+ * - any of the above with `-binned` added, which bins logarithmically
  */
-class WordMatchingCandidateInstFactory[Co](value: String) extends
+class WordMatchingCandidateInstFactory[Co](feattype: String) extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, count: Double, doclm: UnigramLangModel,
-      celldist: UnigramLangModel) = {
-    val qcount = celldist.model.get_item(word)
-    if (qcount == 0.0)
+  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+      celllm: UnigramLangModel) = {
+    val cellcount = celllm.model.get_item(word)
+    if (cellcount == 0.0)
       None
     else {
-      val wordval = value match {
+      val binned = feattype.endsWith("-binned")
+      val basetype = feattype.replace("-binned", "")
+      val wordval = basetype match {
         case "matching-unigram-binary" => 1
-        case "matching-unigram-count" => count
-        case "matching-unigram-count-product" => count * qcount
-        case "matching-unigram-prob-product" =>
-          doclm.lookup_word(word) * celldist.lookup_word(word)
-        case "matching-unigram-probability" => doclm.lookup_word(word)
-        case "matching-kl" => {
-          val p = doclm.lookup_word(word)
-          val q = celldist.lookup_word(word)
-          p*(log(p/q))
+        case "matching-unigram-doc-count" => doccount
+        case "matching-unigram-cell-count" => cellcount
+        case "matching-unigram-count-product" => doccount * cellcount
+        case "matching-unigram-count-quotient" => cellcount / doccount
+        case _ => {
+          val docprob = doclm.lookup_word(word)
+          val cellprob = celllm.lookup_word(word)
+          basetype match {
+            case "matching-unigram-doc-prob" =>
+              docprob
+            case "matching-unigram-cell-prob" =>
+              cellprob
+            case "matching-unigram-prob-product" =>
+              docprob * cellprob
+            case "matching-unigram-prob-quotient" =>
+              cellprob / docprob
+            case "matching-unigram-kl" =>
+              docprob*(log(docprob/cellprob))
+          }
         }
       }
-      Some(wordval)
+      if (binned)
+        Some(bin_logarithmically(feattype, wordval))
+      else
+        Some((feattype, wordval))
     }
   }
 }
 
 /**
+ * A factory for generating candidate instances for a document, generating
+ * separate features for each n-gram.
+ */
+abstract class NgramByNgramCandidateInstFactory[Co] extends
+    CandidateInstFactory[Co] {
+  /** Optionally return a per-ngram feature whose count in the document is
+    * `doccount`, with specified document and cell language models. The
+    * return value is a tuple of suffix describing the particular feature
+    * class being returned, and feature value. The suffix will be appended
+    * to the ngram itself to form the feature name. */
+  def get_ngram_feature(word: Ngram, doccount: Double, doclm: NgramLangModel,
+    celllm: NgramLangModel): Option[(String, Double)]
+
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
+    val celllm =
+      Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
+    for ((ngram, count) <- doclm.model.iter_items;
+         (suff, featval) <- get_ngram_feature(ngram, count, doclm, celllm))
+      // Generate a feature name by concatenating the words. This may
+      // conceivably lead to clashes if a word actually has the
+      // separator in it, but that's unlikely and doesn't really matter
+      // anyway.
+      yield ("%s$%s" format (ngram mkString "|", suff), featval)
+  }
+}
+
+/**
  * A simple factory for generating candidate instances for a document, using
- * the presence of matching n-grams between document and cell.
+ * the presence of ngrams in the document.
  *
- * @param value How to compute the value assigned to the words that are
+ * @param feattype How to compute the value assigned to the ngrams:
+ *
+ * - `ngram-binary`: always assign 1
+ * - `ngram-doc-count`: use document ngram count
+ * - `ngram-cell-count`: use cell ngram count
+ * - `ngram-doc-prob`: use document ngram probability
+ * - `ngram-cell-prob`: use cell ngram probability
+ * - any of the above with `-binned` added, which bins logarithmically
+ */
+class NgramCandidateInstFactory[Co](feattype: String) extends
+    NgramByNgramCandidateInstFactory[Co] {
+  def get_ngram_feature(ngram: Ngram, doccount: Double, doclm: NgramLangModel,
+      celllm: NgramLangModel) = {
+    val binned = feattype.endsWith("-binned")
+    val basetype = feattype.replace("-binned", "")
+    val ngramval = basetype match {
+      case "ngram-binary" => 1
+      case "ngram-doc-count" => doccount
+      case "ngram-cell-count" => celllm.model.get_item(ngram)
+      case "ngram-doc-prob" => doclm.lookup_ngram(ngram)
+      case "ngram-cell-prob" => celllm.lookup_ngram(ngram)
+    }
+    if (binned)
+      Some(bin_logarithmically(feattype, ngramval))
+    else
+      Some((feattype, ngramval))
+  }
+}
+
+/**
+ * A simple factory for generating candidate instances for a document, using
+ * the presence of matching ngrams between document and cell.
+ *
+ * @param feattype How to compute the value assigned to the ngrams that are
  *   shared:
  *
- * - `unigram-binary`: always assign 1
- * - `unigram-count`: use document word count
- * - `unigram-count-product`: use product of document and cell word count
- * - `unigram-probability`: use document word probability
- * - `unigram-prob-product`: use product of document and cell word prob
- * - `kl`: use KL-divergence component for document/cell probs
+ * - `matching-ngram-binary`: always assign 1
+ * - `matching-ngram-doc-count`: use document ngram count
+ * - `matching-ngram-cell-count`: use cell ngram count
+ * - `matching-ngram-doc-prob`: use document ngram probability
+ * - `matching-ngram-cell-prob`: use cell ngram probability
+ * - `matching-ngram-count-product`: use product of document and cell ngram count
+ * - `matching-ngram-count-quotient`: use quotient of cell and document ngram count
+ * - `matching-ngram-prob-product`: use product of document and cell ngram prob
+ * - `matching-ngram-prob-quotient`: use quotient of cell and document ngram prob
+ * - `matching-ngram-kl`: use KL-divergence component for document/cell probs
+ * - any of the above with `-binned` added, which bins logarithmically
  */
-class NgramMatchingCandidateInstFactory[Co](value: String) extends
+class NgramMatchingCandidateInstFactory[Co](feattype: String) extends
     NgramByNgramCandidateInstFactory[Co] {
-  def get_ngram_feature(word: Ngram, count: Double, doclm: NgramLangModel,
-    celldist: NgramLangModel) = {
-    val qcount = celldist.model.get_item(word)
-    if (qcount == 0.0)
+  def get_ngram_feature(ngram: Ngram, doccount: Double, doclm: NgramLangModel,
+      celllm: NgramLangModel) = {
+    val cellcount = celllm.model.get_item(ngram)
+    if (cellcount == 0.0)
       None
     else {
-      val wordval = value match {
+      val binned = feattype.endsWith("-binned")
+      val basetype = feattype.replace("-binned", "")
+      val ngramval = basetype match {
         case "matching-ngram-binary" => 1
-        case "matching-ngram-count" => count
-        case "matching-ngram-count-product" => count * qcount
+        case "matching-ngram-doc-count" => doccount
+        case "matching-ngram-cell-count" => cellcount
+        case "matching-ngram-count-product" => doccount * cellcount
+        case "matching-ngram-count-quotient" => cellcount / doccount
+        case _ => {
+          val docprob = doclm.lookup_ngram(ngram)
+          val cellprob = celllm.lookup_ngram(ngram)
+          basetype match {
+            case "matching-ngram-doc-prob" =>
+              docprob
+            case "matching-ngram-cell-prob" =>
+              cellprob
+            case "matching-ngram-prob-product" =>
+              docprob * cellprob
+            case "matching-ngram-prob-quotient" =>
+              cellprob / docprob
+            case "matching-ngram-kl" =>
+              docprob*(log(docprob/cellprob))
+          }
+        }
       }
-      Some(wordval)
+      if (binned)
+        Some(bin_logarithmically(feattype, ngramval))
+      else
+        Some((feattype, ngramval))
     }
   }
 }
