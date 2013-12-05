@@ -1398,19 +1398,24 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             data: Iterable[QueryTrainingData]
           ): Iterable[(GridRankerInst[Co], Int)] = {
 
+            val task = new Meter("converting QTD's to", "RTI'")
+
             def create_candidate_featvec(query: GridDoc[Co],
                 candidate: GridCell[Co], initial_score: Double,
                 initial_rank: Int) = {
               val featvec =
                 candidate_instance_factory(query, candidate, initial_score,
                   initial_rank, is_training = true)
-              if (debug("features"))
-                errprint("Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
-                  query, candidate, initial_score, initial_rank, featvec)
+              if (debug("features")) {
+                val prefix = "#%s-%s" format (task.num_processed + 1,
+                  initial_rank)
+                errprint("%s: Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
+                  prefix, query, candidate, initial_score,
+                  initial_rank, featvec.pretty_print(prefix))
+              }
               featvec
             }
 
-            val task = new Meter("converting", "QTD's to RTI's")
             data.mapMetered(task) { qtd =>
               val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
               val label = qtd.label
