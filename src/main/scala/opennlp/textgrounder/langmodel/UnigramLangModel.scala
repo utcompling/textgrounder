@@ -53,7 +53,7 @@ object Unigram extends WordAsIntMemoizer {
  *
  * @tparam Item Type of the items stored.
  */
-class UnigramStorage extends ItemStorage[Word] {
+class UnigramStorage extends ItemStorage {
 
   /**
    * A map (or possibly a "sorted list" of tuples, to save memory?) of
@@ -67,29 +67,24 @@ class UnigramStorage extends ItemStorage[Word] {
   var tokens_accurate = true
   var num_tokens_val = 0.0
 
-  def add_item(item: Word, count: WordCount) {
+  def add_item(item: Gram, count: WordCount) {
     counts(item) += count
     num_tokens_val += count
   }
 
-  def set_item(item: Word, count: WordCount) {
+  def set_item(item: Gram, count: WordCount) {
     counts(item) = count
     tokens_accurate = false
   }
 
-  def remove_item(item: Word) {
+  def remove_item(item: Gram) {
     counts -= item
     tokens_accurate = false
   }
 
-  // Declare these inline final to try to ensure that the code gets inlined.
-  // Note that the code does get inlined in normal circumstances, but won't
-  // currently if trait `ItemStorage` is specialized on Int (which doesn't
-  // help fast_kl_divergence() in any case, based on disassembly of the byte
-  // code).
-  @inline final def contains(item: Word) = counts contains item
+  def contains(item: Gram) = counts contains item
 
-  @inline final def get_item(item: Word) = counts(item)
+  def get_item(item: Gram) = counts(item)
 
   def iter_items = counts.toIterable
 
@@ -110,7 +105,7 @@ class UnigramStorage extends ItemStorage[Word] {
     num_tokens_val
   }
 
-  @inline final def num_types = counts.size
+  def num_types = counts.size
 }
 
 /**
@@ -131,7 +126,7 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def item_to_string(item: Item) = Unigram.unmemoize(item)
+  def item_to_string(item: Gram) = Unigram.unmemoize(item)
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -160,8 +155,8 @@ abstract class UnigramLangModel(
       if (return_contributing_words) mutable.Map[String, WordCount]() else null
     // 1.
     for (word <- model.iter_keys) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
+      val p = item_prob(word)
+      val q = other.item_prob(word)
       if (q == 0.0)
         { } // This is OK, we just skip these words
       else if (p <= 0.0 || q <= 0.0)
@@ -178,8 +173,8 @@ abstract class UnigramLangModel(
     else {
       // Step 2.
       for (word <- other.model.iter_keys if !(model contains word)) {
-        val p = lookup_word(word)
-        val q = other.lookup_word(word)
+        val p = item_prob(word)
+        val q = other.item_prob(word)
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
           contribs(item_to_string(word)) = p*(log(p) - log(q))
@@ -196,24 +191,6 @@ abstract class UnigramLangModel(
    */
   def kl_divergence_34(other: UnigramLangModel): Double
   
-  /**
-   * Return the log-probability of a word, taking into account the
-   * possibility that the probability is zero (in which case the
-   * log-probability is defined to be zero also).
-   *
-   * @see #lookup_word
-   */
-  @inline final def word_logprob(word: Item) = {
-    val value = lookup_word(word)
-    assert(value >= 0)
-    // The probability returned will be 0 for words never seen in the
-    // training data at all, i.e. we don't even have any global values to
-    // back off to. General practice is to ignore such words.
-    if (value > 0)
-      log(value)
-    else 0.0
-  }
-
   /**
    * Return `log p(thismodel|othermodel)`. This implements a log-linear
    * model, i.e. it is similar to a standard Naive-Bayes model that
@@ -246,7 +223,7 @@ abstract class UnigramLangModel(
     }.sum
   }
 
-  def get_most_contributing_grams(xlangmodel: LangModel,
+  def get_most_contributing_items(xlangmodel: LangModel,
       xrelative_to: Iterable[LangModel] = Iterable()) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val relative_to = xrelative_to.map(_.asInstanceOf[UnigramLangModel])
@@ -274,56 +251,6 @@ abstract class UnigramLangModel(
       }
     weights.toSeq.sortWith { _._2.abs > _._2.abs }
   }
-
-  /**
-   * Return the probability of a given word in the lang model.
-   */
-  protected def imp_lookup_word(word: Word): Double
-
-  def lookup_word(word: Word): Double = {
-    assert(finished)
-    if (empty)
-      throw new IllegalStateException("Attempt to lookup word %s in empty lang model %s"
-        format (item_to_string(word), this))
-    val wordprob = imp_lookup_word(word)
-    // Write this way because if negated as an attempt to catch bad values,
-    // it won't catch NaN, which fails all comparisons.
-    if (wordprob >= 0 && wordprob <= 1)
-      ()
-    else {
-      errprint("Out-of-bounds prob %s for word %s",
-        wordprob, item_to_string(word))
-      assert(false)
-    }
-    wordprob
-  }
-  
-  def mle_word_prob(word: Word): Double = {
-    assert(finished)
-    if (empty)
-      throw new IllegalStateException("Attempt to lookup word %s in empty lang model %s"
-        format (item_to_string(word), this))
-    val wordcount = if (model contains word) model.get_item(word) else 0.0
-    wordcount.toDouble/model.num_tokens
-  }
-
-  /**
-   * Look for the most common word matching a given predicate.
-   * @param pred Predicate, passed the raw (unmemoized) form of a word.
-   *   Should return true if a word matches.
-   * @return Most common word matching the predicate (wrapped with
-   *   Some()), or None if no match.
-   */
-  def find_most_common_word(pred: String => Boolean): Option[Word] = {
-    val filtered =
-      (for ((word, count) <- model.iter_items if pred(item_to_string(word)))
-        yield (word, count)).toSeq
-    if (filtered.length == 0) None
-    else {
-      val (maxword, maxcount) = filtered maxBy (_._2)
-      Some(maxword)
-    }
-  }
 }
 
 /**
@@ -347,7 +274,7 @@ class DefaultUnigramLangModelBuilder(
   stopwords: Set[String],
   whitelist: Set[String],
   minimum_word_count: Int,
-  word_weights: collection.Map[Word, Double],
+  word_weights: collection.Map[Gram, Double],
   missing_word_weight: Double
 ) extends LangModelBuilder(factory: LangModelFactory) {
   /**
@@ -505,7 +432,7 @@ class FilterUnigramLangModelBuilder(
     stopwords: Set[String],
     whitelist: Set[String],
     minimum_word_count: Int,
-    word_weights: collection.Map[Word, Double],
+    word_weights: collection.Map[Gram, Double],
     missing_word_weight: Double
   ) extends DefaultUnigramLangModelBuilder(
     factory, ignore_case, stopwords, whitelist, minimum_word_count,

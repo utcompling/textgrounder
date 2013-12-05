@@ -77,7 +77,7 @@ trait CandidateInstFactory[Co] extends (
   (GridDoc[Co], GridCell[Co], Double, Boolean) => FeatureVector
 ) {
   val featvec_factory =
-    new SparseFeatureVectorFactory[Word](word => Featurizer.unmemoize(word))
+    new SparseFeatureVectorFactory[Gram](word => Featurizer.unmemoize(word))
   val scoreword = "$score"
 
   /**
@@ -260,7 +260,7 @@ abstract class WordByWordCandidateInstFactory[Co] extends
     * return value is a tuple of suffix describing the particular feature
     * class being returned, and feature value. The suffix will be appended
     * to the word itself to form the feature name. */
-  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
     celllm: UnigramLangModel): Option[(String, Double)]
 
   def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
@@ -286,7 +286,7 @@ abstract class WordByWordCandidateInstFactory[Co] extends
  */
 class WordCandidateInstFactory[Co](feattype: String) extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
       celllm: UnigramLangModel) = {
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
@@ -294,8 +294,8 @@ class WordCandidateInstFactory[Co](feattype: String) extends
       case "unigram-binary" => 1
       case "unigram-doc-count" => doccount
       case "unigram-cell-count" => celllm.model.get_item(word)
-      case "unigram-doc-prob" => doclm.lookup_word(word)
-      case "unigram-cell-prob" => celllm.lookup_word(word)
+      case "unigram-doc-prob" => doclm.item_prob(word)
+      case "unigram-cell-prob" => celllm.item_prob(word)
     }
     if (binned)
       Some(bin_logarithmically(feattype, wordval))
@@ -325,7 +325,7 @@ class WordCandidateInstFactory[Co](feattype: String) extends
  */
 class WordMatchingCandidateInstFactory[Co](feattype: String) extends
     WordByWordCandidateInstFactory[Co] {
-  def get_word_feature(word: Word, doccount: Double, doclm: UnigramLangModel,
+  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
       celllm: UnigramLangModel) = {
     val cellcount = celllm.model.get_item(word)
     if (cellcount == 0.0)
@@ -340,8 +340,8 @@ class WordMatchingCandidateInstFactory[Co](feattype: String) extends
         case "matching-unigram-count-product" => doccount * cellcount
         case "matching-unigram-count-quotient" => cellcount / doccount
         case _ => {
-          val docprob = doclm.lookup_word(word)
-          val cellprob = celllm.lookup_word(word)
+          val docprob = doclm.item_prob(word)
+          val cellprob = celllm.item_prob(word)
           basetype match {
             case "matching-unigram-doc-prob" =>
               docprob
@@ -375,7 +375,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
     * return value is a tuple of suffix describing the particular feature
     * class being returned, and feature value. The suffix will be appended
     * to the ngram itself to form the feature name. */
-  def get_ngram_feature(word: Ngram, doccount: Double, doclm: NgramLangModel,
+  def get_ngram_feature(word: Gram, doccount: Double, doclm: NgramLangModel,
     celllm: NgramLangModel): Option[(String, Double)]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co]) = {
@@ -408,7 +408,7 @@ abstract class NgramByNgramCandidateInstFactory[Co] extends
  */
 class NgramCandidateInstFactory[Co](feattype: String) extends
     NgramByNgramCandidateInstFactory[Co] {
-  def get_ngram_feature(ngram: Ngram, doccount: Double, doclm: NgramLangModel,
+  def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
       celllm: NgramLangModel) = {
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
@@ -416,8 +416,8 @@ class NgramCandidateInstFactory[Co](feattype: String) extends
       case "ngram-binary" => 1
       case "ngram-doc-count" => doccount
       case "ngram-cell-count" => celllm.model.get_item(ngram)
-      case "ngram-doc-prob" => doclm.lookup_ngram(ngram)
-      case "ngram-cell-prob" => celllm.lookup_ngram(ngram)
+      case "ngram-doc-prob" => doclm.item_prob(ngram)
+      case "ngram-cell-prob" => celllm.item_prob(ngram)
     }
     if (binned)
       Some(bin_logarithmically(feattype, ngramval))
@@ -447,7 +447,7 @@ class NgramCandidateInstFactory[Co](feattype: String) extends
  */
 class NgramMatchingCandidateInstFactory[Co](feattype: String) extends
     NgramByNgramCandidateInstFactory[Co] {
-  def get_ngram_feature(ngram: Ngram, doccount: Double, doclm: NgramLangModel,
+  def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
       celllm: NgramLangModel) = {
     val cellcount = celllm.model.get_item(ngram)
     if (cellcount == 0.0)
@@ -462,8 +462,8 @@ class NgramMatchingCandidateInstFactory[Co](feattype: String) extends
         case "matching-ngram-count-product" => doccount * cellcount
         case "matching-ngram-count-quotient" => cellcount / doccount
         case _ => {
-          val docprob = doclm.lookup_ngram(ngram)
-          val cellprob = celllm.lookup_ngram(ngram)
+          val docprob = doclm.item_prob(ngram)
+          val cellprob = celllm.item_prob(ngram)
           basetype match {
             case "matching-ngram-doc-prob" =>
               docprob

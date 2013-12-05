@@ -187,26 +187,22 @@ class TimeGrid(
   }
 }
 
-abstract class LangModelComparer(min_prob: Double, max_items: Int) {
-  type LM <: LangModel
-
+class LangModelComparer(min_prob: Double, max_items: Int) {
   def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
-  def get_lm(cell: TimeCell): LM =
-    cell.lang_model.asInstanceOf[LM]
-  def get_keys(lm: LM) = lm.model.iter_keys.toSet
-  def lookup_item(lm: LM)(item: lm.Item): Double
+  def get_keys(lm: LangModel) = lm.model.iter_keys.toSet
 
   def compare_cells_2way(grid: TimeGrid, category: String) {
-    val before_lm = get_lm(get_pair(grid, category).before_cell)
-    val after_lm = get_lm(get_pair(grid, category).after_cell)
+    /* FIXME: What about rerank_lm? */
+    val before_lm = get_pair(grid, category).before_cell.grid_lm
+    val after_lm = get_pair(grid, category).after_cell.grid_lm
 
     val itemdiff =
       for {
         rawitem <- get_keys(before_lm) ++ get_keys(after_lm)
-        item = rawitem.asInstanceOf[before_lm.Item]
-        p = lookup_item(before_lm)(item)
-        q = lookup_item(after_lm)(item.asInstanceOf[after_lm.Item])
+        item = rawitem
+        p = before_lm.item_prob(item)
+        q = after_lm.item_prob(item)
         if p >= min_prob || q >= min_prob
       } yield (item, before_lm.dunning_log_likelihood_2x1(
         item, after_lm), q - p)
@@ -218,15 +214,15 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
         (format_float(dunning),
          before_lm.item_to_string(item),
          if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(lookup_item(before_lm)(item)),
-         format_float(lookup_item(after_lm)(item.asInstanceOf[after_lm.Item]))
+         format_float(before_lm.item_prob(item)),
+         format_float(after_lm.item_prob(item))
        ))
     }
     println("")
 
     val diff_up = itemdiff filter (_._3 > 0)
     val diff_down = itemdiff filter (_._3 < 0) map (x => (x._1, x._2, x._3.abs))
-    def print_diffs(diffs: Iterable[(before_lm.Item, Double, Double)],
+    def print_diffs(diffs: Iterable[(Gram, Double, Double)],
         incdec: String, updown: String) {
       println("")
       println("Items that %s in probability:" format incdec)
@@ -235,8 +231,8 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
           diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
         println("%s: %s - %s = %s%s (LL %s)" format
           (before_lm.item_to_string(item),
-           format_float(lookup_item(before_lm)(item)),
-           format_float(lookup_item(after_lm)(item.asInstanceOf[after_lm.Item])),
+           format_float(before_lm.item_prob(item)),
+           format_float(after_lm.item_prob(item)),
            updown, format_float(prob),
            format_float(dunning)))
       }
@@ -249,10 +245,11 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
 
   def compare_cells_4way(grid: TimeGrid, category1: String,
       category2: String) {
-    val before_lm_1 = get_lm(get_pair(grid, category1).before_cell)
-    val after_lm_1 = get_lm(get_pair(grid, category1).after_cell)
-    val before_lm_2 = get_lm(get_pair(grid, category2).before_cell)
-    val after_lm_2 = get_lm(get_pair(grid, category2).after_cell)
+    /* FIXME: What about rerank_lm? */
+    val before_lm_1 = get_pair(grid, category1).before_cell.grid_lm
+    val after_lm_1 = get_pair(grid, category1).after_cell.grid_lm
+    val before_lm_2 = get_pair(grid, category2).before_cell.grid_lm
+    val after_lm_2 = get_pair(grid, category2).after_cell.grid_lm
 
     val cat13 = category1.slice(0,3)
     val cat23 = category2.slice(0,3)
@@ -263,11 +260,11 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
       for {
         rawitem <- get_keys(before_lm_1) ++ get_keys(after_lm_1) ++
           get_keys(before_lm_2) ++ get_keys(after_lm_2)
-        item = rawitem.asInstanceOf[before_lm_1.Item]
-        p1 = lookup_item(before_lm_1)(item)
-        q1 = lookup_item(after_lm_1)(item.asInstanceOf[after_lm_1.Item])
-        p2 = lookup_item(before_lm_2)(item.asInstanceOf[before_lm_2.Item])
-        q2 = lookup_item(after_lm_2)(item.asInstanceOf[after_lm_2.Item])
+        item = rawitem
+        p1 = before_lm_1.item_prob(item)
+        q1 = after_lm_1.item_prob(item)
+        p2 = before_lm_2.item_prob(item)
+        q2 = after_lm_2.item_prob(item)
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
         abs1 = q1 - p1
         abs2 = q2 - p2
@@ -280,8 +277,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
           else "+both"
         }
       } yield (item, before_lm_1.dunning_log_likelihood_2x2(
-          item.asInstanceOf[before_lm_1.Item],
-          after_lm_1, before_lm_2, after_lm_2),
+          item, after_lm_1, before_lm_2, after_lm_2),
           p1, q1, p2, q2, abs1, abs2, pct1, pct2, change
         )
 
@@ -301,7 +297,7 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
     println("")
 
     type ItemDunProb =
-      (before_lm_1.Item, Double, Double, Double, Double, Double, Double,
+      (Gram, Double, Double, Double, Double, Double, Double,
         Double, Double, Double, String)
     val diff_cat1 = itemdiff filter (_._11 == "+"+cat13)
     val diff_cat2 = itemdiff filter (_._11 == "+"+cat23)
@@ -331,43 +327,19 @@ abstract class LangModelComparer(min_prob: Double, max_items: Int) {
   }
 }
 
-class UnigramComparer(min_prob: Double, max_items: Int) extends
-    LangModelComparer(min_prob, max_items) {
-  type LM = UnigramLangModel
-
-  def lookup_item(lm: LM)(item: lm.Item) = lm.lookup_word(item)
-}
-
-class NgramComparer(min_prob: Double, max_items: Int) extends
-    LangModelComparer(min_prob, max_items) {
-  type LM = NgramLangModel
-
-  def lookup_item(lm: LM)(item: lm.Item) = lm.lookup_ngram(item)
-}
-
 object LangModelComparer {
-  def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
-      max_items: Int) =
-    /* FIXME: What about rerank_lm? */
-    grid.pairs(category).before_cell.grid_lm match {
-      case _: UnigramLangModel =>
-        new UnigramComparer(min_prob, max_items)
-      case _: NgramLangModel =>
-        new NgramComparer(min_prob, max_items)
-      case _ => throw new IllegalArgumentException(
-        "Don't know how to compare this type of language model")
-    }
+  def get_comparer(min_prob: Double, max_items: Int) =
+    new LangModelComparer(min_prob, max_items)
 
   def compare_cells_2way(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) {
-    val comparer = get_comparer(grid, category, min_prob, max_items)
+    val comparer = get_comparer(min_prob, max_items)
     comparer.compare_cells_2way(grid, category)
   }
 
   def compare_cells_4way(grid: TimeGrid, category1: String,
       category2: String, min_prob: Double, max_items: Int) {
-    val comparer = get_comparer(grid, category1, min_prob, max_items)
+    val comparer = get_comparer(min_prob, max_items)
     comparer.compare_cells_4way(grid, category1, category2)
   }
 }
-

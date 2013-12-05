@@ -23,9 +23,7 @@ package object langmodel {
   // currently used to handle differently-weighted words, which (so far)
   // also hasn't helped.
   type WordCount = Double
-  type Word = Int
   type Gram = Int
-  type Ngram = Int
 }
 
 package langmodel {
@@ -267,11 +265,11 @@ trait LangModelFactory {
  * Normal version of memoizer which maps words to Ints.
  */
 trait ItemAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
-  val invalid_word: Word = -1
+  val invalid_word: Gram = -1
 
-  val blank_memoized_string: Word
+  val blank_memoized_string: Gram
 
-  // These should NOT be declared to have a type of mutable.Map[Word, Int]
+  // These should NOT be declared to have a type of mutable.Map[Gram, Int]
   // or whatever.  Doing so ensures that we go through the Map[] interface,
   // which requires lots of boxing and unboxing.
   def create_word_int_map = hashfact.create_int_int_map
@@ -293,24 +291,22 @@ trait WordAsIntMemoizer extends ItemAsIntMemoizer[String] {
  * that we don't make any assumptions about memoized words being Ints.
  */
 trait WordAsStringMemoizer extends IdentityMemoizer[String] {
-  type Word = String
+  type Gram = String
 
-  val invalid_word: Word = null
+  val invalid_word: Gram = null
 
   val blank_memoized_string = memoize("")
 
-  def create_word_int_map = intmap[Word]()
+  def create_word_int_map = intmap[Gram]()
 
-  def create_word_double_map = doublemap[Word]()
+  def create_word_double_map = doublemap[Gram]()
 }
 
 /**
  * An interface for storing and retrieving vocabulary items (e.g. words,
  * n-grams, etc.).
- *
- * @tparam Item Type of the items stored.
  */
-trait ItemStorage[Item] {
+trait ItemStorage {
   // NOTE: Do not need to specialize the type on Int, given the current
   // definition of UnigramStorage; in fact, doing so interferes with the
   // ability of the compiler to inline what we ask it to inline in
@@ -320,38 +316,38 @@ trait ItemStorage[Item] {
    * Add an item with the given count.  If the item exists already,
    * add the count to the existing value.
    */
-  def add_item(item: Item, count: WordCount)
+  def add_item(item: Gram, count: WordCount)
 
   /**
    * Set the item to the given count.  If the item exists already,
    * replace its value with the given one.
    */
-  def set_item(item: Item, count: WordCount)
+  def set_item(item: Gram, count: WordCount)
 
   /**
    * Remove an item, if it exists.
    */
-  def remove_item(item: Item)
+  def remove_item(item: Gram)
 
   /**
    * Return whether a given item is stored.
    */
-  def contains(item: Item): Boolean
+  def contains(item: Gram): Boolean
 
   /**
    * Return the count of a given item.
    */
-  def get_item(item: Item): WordCount
+  def get_item(item: Gram): WordCount
 
   /**
    * Iterate over all items that are stored.
    */
-  def iter_items: Iterable[(Item, WordCount)]
+  def iter_items: Iterable[(Gram, WordCount)]
 
   /**
    * Iterate over all keys that are stored.
    */
-  def iter_keys: Iterable[Item]
+  def iter_keys: Iterable[Gram]
 
   /**
    * Total number of tokens stored.
@@ -375,8 +371,7 @@ trait ItemStorage[Item] {
  * a document, cell, etc.
  */
 abstract class LangModel(val factory: LangModelFactory) {
-  type Item = Word
-  val model: ItemStorage[Item]
+  val model: ItemStorage
 
   /**
    * Whether we have finished computing the lang model, and therefore can
@@ -482,10 +477,9 @@ abstract class LangModel(val factory: LangModelFactory) {
    * indicating how much more likely the item is in this corpus than the
    * other to be different.
    */
-  def dunning_log_likelihood_2x1(item: Item, other: LangModel) = {
+  def dunning_log_likelihood_2x1(item: Gram, other: LangModel) = {
     val a = model.get_item(item).toDouble
-    // This cast is kind of ugly but I don't see a way around it.
-    val b = other.model.get_item(item.asInstanceOf[other.Item]).toDouble
+    val b = other.model.get_item(item).toDouble
     val c = model.num_tokens.toDouble - a
     val d = other.model.num_tokens.toDouble - b
     val val1 = dunning_log_likelihood_1(a, b, c, d)
@@ -496,13 +490,12 @@ abstract class LangModel(val factory: LangModelFactory) {
     val1
   }
 
-  def dunning_log_likelihood_2x2(item: Item, other_b: LangModel,
+  def dunning_log_likelihood_2x2(item: Gram, other_b: LangModel,
       other_c: LangModel, other_d: LangModel) = {
     val a = model.get_item(item).toDouble
-    // This cast is kind of ugly but I don't see a way around it.
-    val b = other_b.model.get_item(item.asInstanceOf[other_b.Item]).toDouble
-    val c = other_c.model.get_item(item.asInstanceOf[other_c.Item]).toDouble
-    val d = other_d.model.get_item(item.asInstanceOf[other_d.Item]).toDouble
+    val b = other_b.model.get_item(item).toDouble
+    val c = other_c.model.get_item(item).toDouble
+    val d = other_d.model.get_item(item).toDouble
     val val1 = dunning_log_likelihood_1(a, b, c, d)
     val val2 = dunning_log_likelihood_2(a, b, c, d)
     if (debug("dunning"))
@@ -580,9 +573,78 @@ abstract class LangModel(val factory: LangModelFactory) {
   def class_name: String
 
   /**
-   * Convert an item (of type Item) to a string.
+   * Return the probability of a given gram in the lang model.
    */
-  def item_to_string(item: Item): String
+  protected def imp_item_prob(word: Gram): Double
+
+  def item_prob(gram: Gram): Double = {
+    assert(finished)
+    if (empty)
+      throw new IllegalStateException(
+        "Attempt to lookup gram %s in empty lang model %s"
+        format (item_to_string(gram), this))
+    val prob = imp_item_prob(gram)
+    // Write this way because if negated as an attempt to catch bad values,
+    // it won't catch NaN, which fails all comparisons.
+    if (prob >= 0 && prob <= 1)
+      ()
+    else {
+      errprint("Out-of-bounds prob %s for gram %s",
+        prob, item_to_string(gram))
+      assert(false)
+    }
+    prob
+  }
+  
+  /**
+   * Return the log-probability of a word, taking into account the
+   * possibility that the probability is zero (in which case the
+   * log-probability is defined to be zero also).
+   *
+   * @see #item_prob
+   */
+  def word_logprob(word: Gram) = {
+    val value = item_prob(word)
+    assert(value >= 0)
+    // The probability returned will be 0 for words never seen in the
+    // training data at all, i.e. we don't even have any global values to
+    // back off to. General practice is to ignore such words.
+    if (value > 0)
+      log(value)
+    else 0.0
+  }
+
+  def mle_item_prob(gram: Gram): Double = {
+    assert(finished)
+    if (empty)
+      throw new IllegalStateException("Attempt to lookup gram %s in empty lang model %s"
+        format (item_to_string(gram), this))
+    val count = if (model contains gram) model.get_item(gram) else 0.0
+    count.toDouble/model.num_tokens
+  }
+
+  /**
+   * Look for the most common gram matching a given predicate.
+   * @param pred Predicate, passed the raw (unmemoized) form of a gram.
+   *   Should return true if a gram matches.
+   * @return Most common gram matching the predicate (wrapped with
+   *   Some()), or None if no match.
+   */
+  def find_most_common_item(pred: String => Boolean): Option[Gram] = {
+    val filtered =
+      (for ((gram, count) <- model.iter_items if pred(item_to_string(gram)))
+        yield (gram, count)).toSeq
+    if (filtered.length == 0) None
+    else {
+      val (maxgram, maxcount) = filtered maxBy (_._2)
+      Some(maxgram)
+    }
+  }
+
+  /**
+   * Convert an item (of type Gram) to a string.
+   */
+  def item_to_string(item: Gram): String
 
   /**
    * Extra text to add to the `toString` output, for extra class params.
@@ -638,8 +700,8 @@ abstract class LangModel(val factory: LangModelFactory) {
    *   compare this language model to each of the others in turn and take
    *   the maximum weight as the gram's weight.
    */
-  def get_most_contributing_grams(langmodel: LangModel,
-    relative_to: Iterable[LangModel] = Iterable()): Iterable[(Item, Double)]
+  def get_most_contributing_items(langmodel: LangModel,
+    relative_to: Iterable[LangModel] = Iterable()): Iterable[(Gram, Double)]
 }
 
 }
