@@ -131,10 +131,10 @@ abstract class GridCell[Co](
     "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
       describe_location, unfinished, contains,
       num_docs,
-      grid_lm.model.num_types,
-      grid_lm.model.num_tokens,
-      rerank_lm.model.num_types,
-      rerank_lm.model.num_tokens,
+      grid_lm.num_types,
+      grid_lm.num_tokens,
+      rerank_lm.num_types,
+      rerank_lm.num_tokens,
       salience)
   }
 
@@ -149,13 +149,13 @@ abstract class GridCell[Co](
     "central-point" -> get_central_point,
     "num-documents" -> num_docs,
     "grid-num-word-types" ->
-      grid_lm.model.num_types,
+      grid_lm.num_types,
     "grid-num-word-tokens" ->
-      grid_lm.model.num_tokens,
+      grid_lm.num_tokens,
     "rerank-num-word-types" ->
-      rerank_lm.model.num_types,
+      rerank_lm.num_types,
     "rerank-num-word-tokens" ->
-      rerank_lm.model.num_tokens,
+      rerank_lm.num_tokens,
     "salience" -> salience,
     "most-salient-document" ->
       Encoder.string(most_salient_document),

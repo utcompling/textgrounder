@@ -51,10 +51,9 @@ abstract class DiscountedUnigramLangModelFactory(
   var global_normalization_factor = 0.0
 
   override def note_lang_model_globally(lm: LangModel) {
-    val udist = lm.asInstanceOf[DiscountedUnigramLangModel]
     super.note_lang_model_globally(lm)
     assert(!owp_adjusted)
-    for ((word, count) <- udist.model.iter_grams) {
+    for ((word, count) <- lm.iter_grams) {
       if (!(overall_word_probs contains word))
         total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
@@ -67,8 +66,9 @@ abstract class DiscountedUnigramLangModelFactory(
     }
     num_documents += 1
     if (debug("lots")) {
+      val ulm = lm.asInstanceOf[DiscountedUnigramLangModel]
       errprint("""For lang model, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
-        udist.model.num_tokens, udist.unseen_mass, udist.overall_unseen_mass)
+        ulm.num_tokens, ulm.unseen_mass, ulm.overall_unseen_mass)
     }
   }
 
@@ -192,21 +192,21 @@ abstract class DiscountedUnigramLangModel(
       overall_unseen_mass = 1.0
     else
       overall_unseen_mass = 1.0 - (
-        (for (ind <- model.iter_keys)
+        (for (ind <- iter_keys)
           yield factory.overall_word_probs(ind)) sum)
     if (factory.tf_idf) {
-      for ((word, count) <- model.iter_grams)
-        model.set_gram(word,
+      for ((word, count) <- iter_grams)
+        set_gram(word,
           count*log(factory.num_documents/factory.document_freq(word)))
     }
-    normalization_factor = model.num_tokens
+    normalization_factor = num_tokens
     assert(normalization_factor > 0,
       "Zero normalization factor for lm %s" format this)
     //if (LangModelConstants.use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
       errprint("For lang model %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
-        format (this, normalization_factor, model.num_tokens, unseen_mass))
+        format (this, normalization_factor, num_tokens, unseen_mass))
   }
 
   def fast_kl_divergence(other: LangModel, partial: Boolean = true,
@@ -231,7 +231,7 @@ abstract class DiscountedUnigramLangModel(
 
   def kl_divergence_34(other: UnigramLangModel) = {
     var overall_probs_diff_words = 0.0
-    for (word <- other.model.iter_keys if !(model contains word)) {
+    for (word <- other.iter_keys if !contains(word)) {
       overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
@@ -289,7 +289,7 @@ abstract class DiscountedUnigramLangModel(
 
   protected def imp_gram_prob(word: Gram) = {
     if (factory.interpolate) {
-      val wordcount = if (model contains word) model.get_gram(word) else 0.0
+      val wordcount = if (contains(word)) get_gram(word) else 0.0
       // if (debug("some")) {
       //   errprint("Found counts for document %s, num word types = %s",
       //            doc, wordcounts(0).length)
@@ -313,7 +313,7 @@ abstract class DiscountedUnigramLangModel(
       wordprob
     } else {
       val retval =
-        if (!(model contains word)) {
+        if (!contains(word)) {
           factory.overall_word_probs.get(word) match {
             case None => {
               /*
@@ -344,8 +344,8 @@ abstract class DiscountedUnigramLangModel(
             }
           }
         } else {
-          val wordcount = model.get_gram(word)
-          //if (wordcount <= 0 or model.num_tokens <= 0 or unseen_mass >= 1.0)
+          val wordcount = get_gram(word)
+          //if (wordcount <= 0 or num_tokens <= 0 or unseen_mass >= 1.0)
           //  warning("Bad values; wordcount = %s, unseen_mass = %s",
           //          wordcount, unseen_mass)
           //  for ((word, count) <- self.counts)

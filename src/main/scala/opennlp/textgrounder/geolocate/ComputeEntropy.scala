@@ -94,14 +94,14 @@ class ComputeEntropyDriver extends
     // Filter words with too small word count.
     val words_counts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
-      lm.model.iter_grams.toMap
+      lm.iter_grams.toMap
     }.reduce[Map[Gram,Double]](combine_double_maps _).
     filter { _._2 >= params.entropy_minimum_word_count }
 
     // Compute the number of cells each word occurs in.
     val words_cellcounts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
-      lm.model.iter_grams.map {
+      lm.iter_grams.map {
         case (word, count) => (word, 1)
       }.toMap
     }.reduce[Map[Gram,Int]](combine_int_maps _)

@@ -158,22 +158,20 @@ class KdTreeGrid(
       driver.show_progress("interpolating", "K-d tree cell").
       foreach(nodes.filter(_.parent != null)) { node =>
         val cell = nodes_to_cell(node)
-        val wd = cell.lang_model
-        val model = wd.asInstanceOf[UnigramLangModel].model
+        val wd = cell.lang_model.grid_lm // FIXME!!
 
-        for ((k,v) <- model.iter_grams) {
-          model.set_gram(k, (1 - interpolateWeight) * v)
+        for ((k,v) <- wd.iter_grams) {
+          wd.set_gram(k, (1 - interpolateWeight) * v)
         }
 
         val pcell = nodes_to_cell(node.parent)
-        val pwd = pcell.lang_model
-        val pmodel = pwd.asInstanceOf[UnigramLangModel].model
+        val pwd = pcell.lang_model.grid_lm // FIXME!!
 
-        for ((k,v) <- pmodel.iter_grams) {
-          val oldv = if (model contains k) model.get_gram(k) else 0.0
+        for ((k,v) <- pwd.iter_grams) {
+          val oldv = if (wd contains k) wd.get_gram(k) else 0.0
           val newv = oldv + interpolateWeight * v
           if (newv > interpolateWeight)
-            model.set_gram(k, newv)
+            wd.set_gram(k, newv)
         }
       }
     }
