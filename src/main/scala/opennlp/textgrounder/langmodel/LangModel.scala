@@ -17,7 +17,18 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package langmodel
+package object langmodel {
+  // FIXME! This is present to handle partial counts but these weren't
+  // ever really used because they didn't seem to help. However, it's also
+  // currently used to handle differently-weighted words, which (so far)
+  // also hasn't helped.
+  type WordCount = Double
+  type Word = Int
+  type Gram = Int
+  type Ngram = Int
+}
+
+package langmodel {
 
 import math._
 import collection.mutable
@@ -30,8 +41,6 @@ import util.memoizer._
 
 import util.debug._
 
-import LangModel._
-
 /**
  * Constants used in various places esp. debugging code, e.g. how many
  * of the most-common words in a language model to output.
@@ -40,7 +49,6 @@ object LangModelConstants {
   val lang_model_words_to_print = 15
   //val use_sorted_list = false
 }
-
 
 /**
  * An exception thrown to indicate an error during lang model creation
@@ -258,16 +266,10 @@ trait LangModelFactory {
 /**
  * Normal version of memoizer which maps words to Ints.
  */
-trait WordAsIntMemoizer {
-  type Word = Int
-  // Use Trove for fast, efficient hash tables.
-  val hashfact = new TroveHashTableFactory
-  // Alternatively, just use the normal Scala hash tables.
-  // val hashfact = new ScalaHashTableFactory
-  val memoizer = new ToIntMemoizer[String](hashfact)
+trait ItemAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
   val invalid_word: Word = -1
 
-  val blank_memoized_string = memoizer.memoize("")
+  val blank_memoized_string: Word
 
   // These should NOT be declared to have a type of mutable.Map[Word, Int]
   // or whatever.  Doing so ensures that we go through the Map[] interface,
@@ -280,33 +282,26 @@ trait WordAsIntMemoizer {
 }
 
 /**
+ * Normal version of memoizer which maps words to Ints.
+ */
+trait WordAsIntMemoizer extends ItemAsIntMemoizer[String] {
+  val blank_memoized_string = memoize("")
+}
+
+/**
  * Version of memoizer which maps words to themselves as strings. This tests
  * that we don't make any assumptions about memoized words being Ints.
  */
-trait WordAsStringMemoizer {
+trait WordAsStringMemoizer extends IdentityMemoizer[String] {
   type Word = String
-  val memoizer = new IdentityMemoizer[String]
+
   val invalid_word: Word = null
 
-  val blank_memoized_string = memoizer.memoize("")
+  val blank_memoized_string = memoize("")
 
   def create_word_int_map = intmap[Word]()
 
   def create_word_double_map = doublemap[Word]()
-}
-
-/**
- * Object describing how "words" are memoized and storing the memoizer
- * object used for memoization. Memoization means mapping words (which are
- * strings) into integers, for faster and less space-intensive operations
- * on them).
- */
-object LangModel extends WordAsIntMemoizer {
-  // FIXME! This is present to handle partial counts but these weren't
-  // ever really used because they didn't seem to help. However, it's also
-  // currently used to handle differently-weighted words, which (so far)
-  // also hasn't helped.
-  type WordCount = Double
 }
 
 /**
@@ -380,7 +375,7 @@ trait ItemStorage[Item] {
  * a document, cell, etc.
  */
 abstract class LangModel(val factory: LangModelFactory) {
-  type Item
+  type Item = Word
   val model: ItemStorage[Item]
 
   /**
@@ -645,4 +640,6 @@ abstract class LangModel(val factory: LangModelFactory) {
    */
   def get_most_contributing_grams(langmodel: LangModel,
     relative_to: Iterable[LangModel] = Iterable()): Iterable[(Item, Double)]
+}
+
 }

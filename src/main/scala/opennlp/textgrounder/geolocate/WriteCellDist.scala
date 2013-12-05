@@ -28,7 +28,6 @@ import util.textdb._
 import gridlocate._
 
 import langmodel._
-import LangModel._
 
 class WriteCellDistParameters(
   parser: ArgParser
@@ -82,7 +81,7 @@ class WriteCellDistDriver extends
     val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_words) {
-      val celldist = cdist_factory.get_cell_dist(grid, memoizer.memoize(word))
+      val celldist = cdist_factory.get_cell_dist(grid, Unigram.memoize(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating a cell-distribution file.""", word)

@@ -19,8 +19,6 @@
 package opennlp.textgrounder
 package langmodel
 
-import LangModel._
-
 /**
  * This class implements Dirichlet discounting, where the discount factor
  * depends on the size of the document.

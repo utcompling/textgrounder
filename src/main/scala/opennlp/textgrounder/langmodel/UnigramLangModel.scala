@@ -33,9 +33,12 @@ import util.print.{errprint, warning}
 
 import util.debug._
 
-import LangModel._
-
-object Unigram {
+/**
+ * Object describing how "words" are memoized. Memoization means mapping
+ * words (which are strings) into integers, for faster and less
+ * space-intensive operations on them).
+ */
+object Unigram extends WordAsIntMemoizer {
   def check_unigram_lang_model(lang_model: LangModel) = {
     lang_model match {
       case x: UnigramLangModel => x
@@ -60,7 +63,7 @@ class UnigramStorage extends ItemStorage[Word] {
    * code does interpolation on cells).  FIXME: This seems ugly, perhaps
    * there is a better way?
    */
-  val counts = create_word_double_map
+  val counts = Unigram.create_word_double_map
   var tokens_accurate = true
   var num_tokens_val = 0.0
 
@@ -125,11 +128,10 @@ class UnigramStorage extends ItemStorage[Word] {
 abstract class UnigramLangModel(
   factory: UnigramLangModelFactory
 ) extends LangModel(factory) with FastSlowKLDivergence {
-  type Item = Word
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def item_to_string(item: Item) = memoizer.unmemoize(item)
+  def item_to_string(item: Item) = Unigram.unmemoize(item)
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -392,7 +394,7 @@ class DefaultUnigramLangModelBuilder(
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
-      model.add_item(memoizer.memoize(lword), count)
+      model.add_item(Unigram.memoize(lword), count)
       true
     }
     else
@@ -454,7 +456,7 @@ class DefaultUnigramLangModelBuilder(
 
   def finish_before_global(lm: LangModel) {
     val model = lm.asInstanceOf[UnigramLangModel].model
-    val oov = memoizer.memoize("-OOV-")
+    val oov = Unigram.memoize("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -515,7 +517,7 @@ class FilterUnigramLangModelBuilder(
 
     val lm = xlm.asInstanceOf[UnigramLangModel]
     val model = lm.model
-    val oov = memoizer.memoize("-OOV-")
+    val oov = Unigram.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
     for ((word, count) <- model.iter_items

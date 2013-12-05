@@ -27,32 +27,36 @@ import com.codahale.trove.{mutable => trovescala}
 import collection._
 import print.errprint
 
-trait HashTableFactory {
-  /**
-   * Create a mutable map from Ints to Ints, with 0 as default value.
-   * (I.e., attempting to fetch a nonexistent key will yield 0 rather than
-   * throw an error.)
-   */
-  def create_int_int_map: mutable.Map[Int, Int]
-  /**
-   * Create a mutable map from Ints to Doubles, with 0.0 as default value.
-   * (I.e., attempting to fetch a nonexistent key will yield 0.0 rather than
-   * throw an error.)
-   */
-  def create_int_double_map: mutable.Map[Int, Double]
-  /**
-   * Create a mutable map from Ints to arbitrary reference type T.
-   */
-  def create_int_object_map[T]: mutable.Map[Int, T]
-  /**
-   * Create a mutable map from arbitrary reference type T to Ints, with 0
-   * as default value. (I.e., attempting to fetch a nonexistent key will
-   * yield 0 rather than throw an error.)
-   */
-  def create_object_int_map[T]: mutable.Map[T, Int]
-}
+// We comment this out and don't use it to avoid the possibility that
+// accesses to Trove hash tables go through the boxing/unboxing interface
+// to/from mutable.Map[]. (FIXME: Is this actually an issue?)
+//
+//trait HashTableFactory {
+//  /**
+//   * Create a mutable map from Ints to Ints, with 0 as default value.
+//   * (I.e., attempting to fetch a nonexistent key will yield 0 rather than
+//   * throw an error.)
+//   */
+//  def create_int_int_map: mutable.Map[Int, Int]
+//  /**
+//   * Create a mutable map from Ints to Doubles, with 0.0 as default value.
+//   * (I.e., attempting to fetch a nonexistent key will yield 0.0 rather than
+//   * throw an error.)
+//   */
+//  def create_int_double_map: mutable.Map[Int, Double]
+//  /**
+//   * Create a mutable map from Ints to arbitrary reference type T.
+//   */
+//  def create_int_object_map[T]: mutable.Map[Int, T]
+//  /**
+//   * Create a mutable map from arbitrary reference type T to Ints, with 0
+//   * as default value. (I.e., attempting to fetch a nonexistent key will
+//   * yield 0 rather than throw an error.)
+//   */
+//  def create_object_int_map[T]: mutable.Map[T, Int]
+//}
 
-class ScalaHashTableFactory extends HashTableFactory {
+class ScalaHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = intmap[Int]()
   def create_int_double_map = doublemap[Int]()
   def create_int_object_map[T] = mutable.Map[Int,T]()
@@ -63,7 +67,7 @@ class ScalaHashTableFactory extends HashTableFactory {
  * Use Trove for extremely fast and memory-efficient hash tables, making use of
  * the Trove-Scala interface for easy access to the Trove hash tables.
  */
-class TroveHashTableFactory extends HashTableFactory {
+class TroveHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = trovescala.IntIntMap()
   def create_int_double_map = trovescala.IntDoubleMap()
   def create_int_object_map[T] = trovescala.IntObjectMap[T]()
@@ -94,17 +98,19 @@ trait Memoizer[T,U] {
 }
 
 /**
- * Standard memoizer for mapping values to Ints.  It is suggested to use
- * TroveHashTableFactory for the hash-table factory, for efficiency.
- *
- * @param hashfact Hash-table factory for generating hash tables.
- * @param minimum_index Smallest index returned. Can be changed to reserve
- *   some indices for other purposes.
+ * Standard memoizer for mapping values to Ints.  Specialization of
+ * `Memoizer` for Ints, without boxing or unboxing. Uses
+ * TroveHashTableFactory for efficiency.
  */
-class ToIntMemoizer[T](
-  val hashfact: HashTableFactory,
+trait ToIntMemoizer[T] {
+  // Use Trove for fast, efficient hash tables.
+  val hashfact = new TroveHashTableFactory
+  // Alternatively, just use the normal Scala hash tables.
+  // val hashfact = new ScalaHashTableFactory
+
+  /** Smallest index returned. Can be changed to reserve some indices for
+    * other purposes. */
   val minimum_index: Int = 0
-) extends Memoizer[T,Int] {
   protected var next_index: Int = minimum_index
 
   def number_of_valid_indices = next_index
@@ -138,28 +144,19 @@ class ToIntMemoizer[T](
   def unmemoize(index: Int) = id_value_map(index)
 }
 
-/**
- * The memoizer we actually use.  Maps word strings to Ints.  Uses Trove
- * for extremely fast and memory-efficient hash tables, making use of the
- * Trove-Scala interface for easy access to the Trove hash tables.
- */
-class IntIntMemoizer(
-  hashfact: HashTableFactory,
-  minimum_index: Int = 0
-) extends ToIntMemoizer[Int](hashfact, minimum_index) {
-  protected override val value_id_map = hashfact.create_int_int_map
-
-  // Map in the opposite direction.
-  protected override val id_value_map = hashfact.create_int_int_map
-}
+// Doesn't currently work because overriding this way leads to error
+// "value value_id_map has incompatible type".
+//trait IntIntMemoizer extends ToIntMemoizer[Int] {
+//  protected override val value_id_map = hashfact.create_int_int_map
+//
+//  // Map in the opposite direction.
+//  protected override val id_value_map = hashfact.create_int_int_map
+//}
 
 /**
  * Version for debugging the String-to-Int memoizer.
  */
-class TestStringIntMemoizer(
-  hashfact: HashTableFactory,
-  minimum_index: Int = 0
-) extends ToIntMemoizer[String](hashfact, minimum_index) {
+trait TestStringIntMemoizer extends ToIntMemoizer[String] {
   override def memoize(value: String) = {
     // if (debug("memoize")) {
     val retval =
@@ -203,7 +200,7 @@ class TestStringIntMemoizer(
  * A memoizer for testing that doesn't actually do anything -- the memoized
  * values are the same as the unmemoized values.
  */
-class IdentityMemoizer[T] extends Memoizer[T,T] {
+trait IdentityMemoizer[T] extends Memoizer[T,T] {
   def memoize(value: T) = value
   def memoize_if(value: T) = Some(value)
   def unmemoize(value: T) = value

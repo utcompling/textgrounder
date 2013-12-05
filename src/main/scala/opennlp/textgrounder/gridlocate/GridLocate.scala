@@ -34,7 +34,6 @@ import util.debug._
 import learning.{ArrayVector, Ranker}
 import learning.perceptron._
 import langmodel._
-import LangModel._
 
 /*
 
@@ -1148,7 +1147,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
           val word = row.gets("word")
           val weight = row.get[Double]("weight")
-          val wordint = memoizer.memoize(word)
+          val wordint = Unigram.memoize(word)
           if (word_weights contains wordint)
             warning("Word %s with weight %s already seen with weight %s",
               word, weight, word_weights(wordint))

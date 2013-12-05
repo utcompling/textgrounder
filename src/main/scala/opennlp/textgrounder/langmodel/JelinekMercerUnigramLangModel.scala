@@ -19,8 +19,6 @@
 package opennlp.textgrounder
 package langmodel
 
-import LangModel._
-
 /**
  * This class implements Jelinek-Mercer discounting, the simplest type of
  * discounting where we just use a constant discount factor.

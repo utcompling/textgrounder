@@ -34,7 +34,6 @@ import util.textdb.Row
 import gridlocate._
 import util.debug._
 import langmodel._
-import langmodel.LangModel._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
@@ -341,7 +340,6 @@ class UnigramComparer(min_prob: Double, max_items: Int) extends
 
 class NgramComparer(min_prob: Double, max_items: Int) extends
     LangModelComparer(min_prob, max_items) {
-  import NgramStorage.Ngram
   type LM = NgramLangModel
 
   def lookup_item(lm: LM)(item: lm.Item) = lm.lookup_ngram(item)

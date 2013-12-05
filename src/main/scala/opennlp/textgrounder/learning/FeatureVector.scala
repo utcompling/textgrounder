@@ -314,6 +314,11 @@ abstract class TupleArraySparseFeatureVector(
   def string_prefix = "TupleArraySparseFeatureVector"
 }
 
+class FeatureMapper[T] extends ToIntMemoizer[T] {
+  // Reserve 0 for the bias (intercept) term
+  override val minimum_index = 1
+}
+
 /**
  * A factory object for creating sparse feature vectors for classification.
  * Sparse feature vectors store only the features with non-zero values.
@@ -325,19 +330,13 @@ abstract class TupleArraySparseFeatureVector(
 class SparseFeatureVectorFactory[T](
   format_feature: T => String
 ) { self =>
-  // Use Trove for fast, efficient hash tables.
-  val hashfact = new TroveHashTableFactory
-  // Alternatively, just use the normal Scala hash tables.
-  // val hashfact = new ScalaHashTableFactory
-
-  // Reserve 0 for the bias (intercept) term
-  val feature_mapper = new ToIntMemoizer[T](hashfact, minimum_index = 1)
-
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
             "ShortCompressed" | "TupleArray" | "Map") => f
     case "" => "DoubleCompressed"
   }
+
+  val feature_mapper = new FeatureMapper[T]
 
   errprint("Feature vector implementation: %s", vector_impl match {
     case "DoubleCompressed" => "compressed feature vectors, using doubles"
@@ -402,6 +401,11 @@ class SparseFeatureVectorFactory[T](
   }
 }
 
+class LabelMapper[T] extends ToIntMemoizer[T] {
+  // Reserve 0 for the bias (intercept) term
+  override val minimum_index = 1
+}
+
 /**
  * A factory object for creating sparse nominal instances for classification,
  * consisting of a nominal label and a set of nominal features.  Nominal
@@ -409,7 +413,7 @@ class SparseFeatureVectorFactory[T](
  */
 class SparseNominalInstanceFactory extends
   SparseFeatureVectorFactory[String](identity) {
-  val label_mapper = new ToIntMemoizer[String](hashfact, minimum_index = 0)
+  val label_mapper = new LabelMapper[String]
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
   def number_of_labels = label_mapper.number_of_valid_indices

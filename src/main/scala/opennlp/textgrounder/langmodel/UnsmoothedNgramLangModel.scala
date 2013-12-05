@@ -32,8 +32,6 @@ class UnsmoothedNgramLangModelFactory(
 class UnsmoothedNgramLangModel(
   gen_factory: LangModelFactory
 ) extends NgramLangModel(gen_factory) {
-  import NgramStorage.Ngram
-
   type TThis = UnsmoothedNgramLangModel
 
   def class_name = "UnsmoothedNgramLangModel"
