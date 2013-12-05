@@ -60,5 +60,5 @@ class UnsmoothedNgramLangModel(
   def inner_kl_divergence_34(other: TThis,
       overall_probs_diff_words: Double) = ???
 
-  def imp_item_prob(gram: Gram) = mle_item_prob(gram)
+  def imp_gram_prob(gram: Gram) = mle_gram_prob(gram)
 }

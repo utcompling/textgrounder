@@ -92,7 +92,7 @@ class PseudoGoodTuringUnigramLangModel(
     // Compute probabilities.  Use a very simple version of Good-Turing
     // smoothing where we assign to unseen words the probability mass of
     // words seen once, and adjust all other probs accordingly.
-    val num_types_seen_once = model.iter_items count { case (k,v) => v == 1 }
+    val num_types_seen_once = model.iter_grams count { case (k,v) => v == 1 }
     unseen_mass =
       if (model.num_tokens > 0)
         // If no words seen only once, we will have a problem if we assign 0

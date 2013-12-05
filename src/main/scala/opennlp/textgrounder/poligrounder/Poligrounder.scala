@@ -112,10 +112,10 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
     help = """Mininum probability when comparing language models.
     Default is 0.0, which means no restrictions.""")
 
-  var max_items = ap.option[Int]("max-items", "mi", default = 200,
-    help = """Maximum number of items (words or n-grams) to output when
+  var max_grams = ap.option[Int]("max-grams", "mg", default = 200,
+    help = """Maximum number of grams (words or n-grams) to output when
     comparing language models.  Default is %default.  This applies separately
-    to those items that have increased and decreased, meaning the total
+    to those grams that have increased and decreased, meaning the total
     number counting both kinds may be as much as twice the maximum.""")
 
   var ideological_user_corpus = ap.option[String](
@@ -211,11 +211,11 @@ class PoligrounderDriver extends
     if (params.ideological_user_corpus == null)
       LangModelComparer.compare_cells_2way(
         grid.asInstanceOf[TimeGrid], "all",
-        params.min_prob, params.max_items)
+        params.min_prob, params.max_grams)
     else
       LangModelComparer.compare_cells_4way(
         grid.asInstanceOf[TimeGrid], "liberal", "conservative",
-        params.min_prob, params.max_items)
+        params.min_prob, params.max_grams)
   }
 }
 

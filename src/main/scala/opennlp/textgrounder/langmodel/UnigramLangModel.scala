@@ -38,7 +38,7 @@ import util.debug._
  * words (which are strings) into integers, for faster and less
  * space-intensive operations on them).
  */
-object Unigram extends WordAsIntMemoizer {
+object Unigram extends StringGramAsIntMemoizer {
   def check_unigram_lang_model(lang_model: LangModel) = {
     lang_model match {
       case x: UnigramLangModel => x
@@ -48,12 +48,10 @@ object Unigram extends WordAsIntMemoizer {
 }
 
 /**
- * An interface for storing and retrieving vocabulary items (e.g. words,
+ * An interface for storing and retrieving vocabulary grams (e.g. words,
  * n-grams, etc.).
- *
- * @tparam Item Type of the items stored.
  */
-class UnigramStorage extends ItemStorage {
+class UnigramStorage extends GramStorage {
 
   /**
    * A map (or possibly a "sorted list" of tuples, to save memory?) of
@@ -63,30 +61,30 @@ class UnigramStorage extends ItemStorage {
    * code does interpolation on cells).  FIXME: This seems ugly, perhaps
    * there is a better way?
    */
-  val counts = Unigram.create_word_double_map
+  val counts = Unigram.create_gram_double_map
   var tokens_accurate = true
   var num_tokens_val = 0.0
 
-  def add_item(item: Gram, count: WordCount) {
-    counts(item) += count
+  def add_gram(gram: Gram, count: GramCount) {
+    counts(gram) += count
     num_tokens_val += count
   }
 
-  def set_item(item: Gram, count: WordCount) {
-    counts(item) = count
+  def set_gram(gram: Gram, count: GramCount) {
+    counts(gram) = count
     tokens_accurate = false
   }
 
-  def remove_item(item: Gram) {
-    counts -= item
+  def remove_gram(gram: Gram) {
+    counts -= gram
     tokens_accurate = false
   }
 
-  def contains(item: Gram) = counts contains item
+  def contains(gram: Gram) = counts contains gram
 
-  def get_item(item: Gram) = counts(item)
+  def get_gram(gram: Gram) = counts(gram)
 
-  def iter_items = counts.toIterable
+  def iter_grams = counts.toIterable
 
   // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some
   // reason; if not, the accuracy of computations that loop over the keys drops
@@ -126,7 +124,7 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def item_to_string(item: Gram) = Unigram.unmemoize(item)
+  def gram_to_string(gram: Gram) = Unigram.unmemoize(gram)
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -152,11 +150,11 @@ abstract class UnigramLangModel(
     val other = xother.asInstanceOf[UnigramLangModel]
     var kldiv = 0.0
     val contribs =
-      if (return_contributing_words) mutable.Map[String, WordCount]() else null
+      if (return_contributing_words) mutable.Map[String, GramCount]() else null
     // 1.
     for (word <- model.iter_keys) {
-      val p = item_prob(word)
-      val q = other.item_prob(word)
+      val p = gram_prob(word)
+      val q = other.gram_prob(word)
       if (q == 0.0)
         { } // This is OK, we just skip these words
       else if (p <= 0.0 || q <= 0.0)
@@ -164,7 +162,7 @@ abstract class UnigramLangModel(
       else {
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(item_to_string(word)) = p*(log(p) - log(q))
+          contribs(gram_to_string(word)) = p*(log(p) - log(q))
       }
     }
 
@@ -173,11 +171,11 @@ abstract class UnigramLangModel(
     else {
       // Step 2.
       for (word <- other.model.iter_keys if !(model contains word)) {
-        val p = item_prob(word)
-        val q = other.item_prob(word)
+        val p = gram_prob(word)
+        val q = other.gram_prob(word)
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(item_to_string(word)) = p*(log(p) - log(q))
+          contribs(gram_to_string(word)) = p*(log(p) - log(q))
       }
 
       val retval = kldiv + kl_divergence_34(other)
@@ -218,34 +216,34 @@ abstract class UnigramLangModel(
    */
   def model_logprob(xlangmodel: LangModel) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
-    langmodel.model.iter_items.map {
-      case (word, count) => count * word_logprob(word)
+    langmodel.model.iter_grams.map {
+      case (word, count) => count * gram_logprob(word)
     }.sum
   }
 
-  def get_most_contributing_items(xlangmodel: LangModel,
+  def get_most_contributing_grams(xlangmodel: LangModel,
       xrelative_to: Iterable[LangModel] = Iterable()) = {
     val langmodel = xlangmodel.asInstanceOf[UnigramLangModel]
     val relative_to = xrelative_to.map(_.asInstanceOf[UnigramLangModel])
-    val words_counts = langmodel.model.iter_items
+    val words_counts = langmodel.model.iter_grams
     val weights =
       if (relative_to.isEmpty)
         words_counts.map {
-          case (word, count) => (word, count * word_logprob(word))
+          case (word, count) => (word, count * gram_logprob(word))
         }
       else if (relative_to.size == 1) {
         val othermodel = relative_to.head
         words_counts.map {
           case (word, count) =>
             (word, count *
-              (word_logprob(word) - othermodel.word_logprob(word)))
+              (gram_logprob(word) - othermodel.gram_logprob(word)))
         }
       } else {
         words_counts.map {
           case (word, count) =>
-            val factor = word_logprob(word)
+            val factor = gram_logprob(word)
             val relcontribs =
-              relative_to.map { factor - _.word_logprob(word) }
+              relative_to.map { factor - _.gram_logprob(word) }
             (word, count * (relcontribs maxBy { _.abs}))
         }
       }
@@ -317,11 +315,11 @@ class DefaultUnigramLangModelBuilder(
   // Returns true if the word was counted, false if it was ignored due to
   // stoplisting and/or whitelisting
   protected def add_word_with_count(model: UnigramStorage, word: String,
-      count: WordCount): Boolean = {
+      count: GramCount): Boolean = {
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
-      model.add_item(Unigram.memoize(lword), count)
+      model.add_gram(Unigram.memoize(lword), count)
       true
     }
     else
@@ -335,12 +333,12 @@ class DefaultUnigramLangModelBuilder(
   }
 
   protected def imp_add_language_model(lm: LangModel, other: LangModel,
-      partial: WordCount) {
+      partial: GramCount) {
     // FIXME: Implement partial!
     val model = lm.asInstanceOf[UnigramLangModel].model
     val othermodel = other.asInstanceOf[UnigramLangModel].model
-    for ((word, count) <- othermodel.iter_items)
-      model.add_item(word, count)
+    for ((word, count) <- othermodel.iter_grams)
+      model.add_gram(word, count)
   }
 
   /**
@@ -388,24 +386,24 @@ class DefaultUnigramLangModelBuilder(
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
     if (minimum_word_count > 1) {
-      // Copy items iterating over to avoid a ConcurrentModificationException
-      for ((word, count) <- model.iter_items.toSeq
+      // Copy grams iterating over to avoid a ConcurrentModificationException
+      for ((word, count) <- model.iter_grams.toSeq
            if count < minimum_word_count) {
-        model.remove_item(word)
-        model.add_item(oov, count)
+        model.remove_gram(word)
+        model.add_gram(oov, count)
       }
     }
 
     // Adjust the counts to track the specified weights.
     if (word_weights.size > 0)
-      // Copy items iterating over to avoid a ConcurrentModificationException
-      for ((word, count) <- model.iter_items.toSeq) {
+      // Copy grams iterating over to avoid a ConcurrentModificationException
+      for ((word, count) <- model.iter_grams.toSeq) {
         val weight = word_weights.getOrElse(word, missing_word_weight)
         assert(weight >= 0)
         if (weight == 0)
-          model.remove_item(word)
+          model.remove_gram(word)
         else
-          model.set_item(word, count * weight)
+          model.set_gram(word, count * weight)
       }
 
   }
@@ -447,10 +445,10 @@ class FilterUnigramLangModelBuilder(
     val oov = Unigram.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
-    for ((word, count) <- model.iter_items
-         if !(filter_words contains lm.item_to_string(word))) {
-      model.remove_item(word)
-      model.add_item(oov, count)
+    for ((word, count) <- model.iter_grams
+         if !(filter_words contains lm.gram_to_string(word))) {
+      model.remove_gram(word)
+      model.add_gram(oov, count)
     }
   }
 }
