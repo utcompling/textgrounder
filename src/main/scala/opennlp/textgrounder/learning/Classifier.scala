@@ -243,8 +243,6 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   /** Create and initialize a vector of weights of length `len` to all 0's. */
   def new_zero_weights(len: Int) = {
     errprint("Length of weight vector: %s", len)
-    errprint("Length if we used lang-model memoization: %s",
-      gridlocate.Featurizer.number_of_valid_indices)
     factory.empty(len)
   }
 

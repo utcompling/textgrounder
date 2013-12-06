@@ -332,9 +332,8 @@ abstract class TupleArraySparseFeatureVector(
   def string_prefix = "TupleArraySparseFeatureVector"
 }
 
-class FeatureMapper[T] extends ToIntMemoizer[T] {
-  // Reserve 0 for the bias (intercept) term
-  override val minimum_index = 1
+class FeatureMapper extends ToIntMemoizer[String] {
+  val intercept_feature = memoize("$intercept")
 }
 
 /**
@@ -345,16 +344,14 @@ class FeatureMapper[T] extends ToIntMemoizer[T] {
  * There will always be a feature with the index 0, value 1.0, to handle
  * the intercept term.
  */
-class SparseFeatureVectorFactory[T](
-  format_feature: T => String
-) { self =>
+class SparseFeatureVectorFactory { self =>
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
             "ShortCompressed" | "TupleArray" | "Map") => f
     case "" => "DoubleCompressed"
   }
 
-  val feature_mapper = new FeatureMapper[T]
+  val feature_mapper = new FeatureMapper
 
   errprint("Feature vector implementation: %s", vector_impl match {
     case "DoubleCompressed" => "compressed feature vectors, using doubles"
@@ -367,8 +364,7 @@ class SparseFeatureVectorFactory[T](
   })
 
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
-    override def format_feature(index: Int) =
-      self.format_feature(feature_mapper.unmemoize(index))
+    override def format_feature(index: Int) = feature_mapper.unmemoize(index)
     def length = feature_mapper.number_of_valid_indices
   }
 
@@ -379,18 +375,20 @@ class SparseFeatureVectorFactory[T](
    * containing a non-existent index, causing a crash during lookup (e.g.
    * during the dot-product operation).
    */
-  def make_feature_vector(feature_values: Iterable[(T, Double)],
+  def make_feature_vector(feature_values: Iterable[(String, Double)],
       is_training: Boolean) = {
-    val memoized_features = Iterable(0 -> 1.0) ++: (// the intercept term
-      if (is_training)
-        feature_values.map {
-          case (name, value) => (feature_mapper.memoize(name), value)
-        }
-       else
-        for { (name, value) <- feature_values;
-               index = feature_mapper.memoize_if(name);
-               if index != None }
-          yield (index.get, value)
+    val memoized_features =
+      // Include an intercept term
+      Iterable(feature_mapper.intercept_feature -> 1.0) ++: (
+        if (is_training)
+          feature_values.map {
+            case (name, value) => (feature_mapper.memoize(name), value)
+          }
+         else
+          for { (name, value) <- feature_values;
+                 index = feature_mapper.memoize_if(name);
+                 if index != None }
+            yield (index.get, value)
       )
     vector_impl match {
       case "TupleArray" =>
@@ -419,19 +417,13 @@ class SparseFeatureVectorFactory[T](
   }
 }
 
-class LabelMapper[T] extends ToIntMemoizer[T] {
-  // Reserve 0 for the bias (intercept) term
-  override val minimum_index = 1
-}
-
 /**
  * A factory object for creating sparse nominal instances for classification,
  * consisting of a nominal label and a set of nominal features.  Nominal
  * labels have no ordering or other numerical significance.
  */
-class SparseNominalInstanceFactory extends
-  SparseFeatureVectorFactory[String](identity) {
-  val label_mapper = new LabelMapper[String]
+class SparseNominalInstanceFactory extends SparseFeatureVectorFactory {
+  val label_mapper = new FeatureMapper
   def label_to_index(label: String) = label_mapper.memoize(label)
   def index_to_label(index: Int) = label_mapper.unmemoize(index)
   def number_of_labels = label_mapper.number_of_valid_indices

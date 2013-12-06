@@ -31,7 +31,7 @@ import util.print._
 import util.textdb._
 import util.debug._
 
-import learning.{ArrayVector, Ranker}
+import learning.{ArrayVector, Ranker, SparseFeatureVectorFactory}
 import learning.perceptron._
 import langmodel._
 
@@ -1333,26 +1333,27 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @see CandidateInstFactory
    */
   protected def create_candidate_instance_factory = {
+    val featvec_factory = new SparseFeatureVectorFactory
     def create_fact(ty: String): CandidateInstFactory[Co] = {
       if (params.rerank_features_simple_unigram_choices contains ty)
-        new WordCandidateInstFactory[Co](ty)
+        new WordCandidateInstFactory[Co](featvec_factory, ty)
       else if (params.rerank_features_matching_unigram_choices contains ty)
-        new WordMatchingCandidateInstFactory[Co](ty)
+        new WordMatchingCandidateInstFactory[Co](featvec_factory, ty)
       else if (params.rerank_features_simple_ngram_choices contains ty)
-        new NgramCandidateInstFactory[Co](ty)
+        new NgramCandidateInstFactory[Co](featvec_factory, ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
-        new NgramMatchingCandidateInstFactory[Co](ty)
+        new NgramMatchingCandidateInstFactory[Co](featvec_factory, ty)
       else ty match {
         case "trivial" =>
-          new TrivialCandidateInstFactory[Co]
+          new TrivialCandidateInstFactory[Co](featvec_factory)
         case "misc" =>
-          new MiscCandidateInstFactory[Co]
+          new MiscCandidateInstFactory[Co](featvec_factory)
         case "types-in-common" =>
-          new TypesInCommonCandidateInstFactory[Co]
+          new TypesInCommonCandidateInstFactory[Co](featvec_factory)
         case "model-compare" =>
-          new ModelCompareCandidateInstFactory[Co]
+          new ModelCompareCandidateInstFactory[Co](featvec_factory)
         case "score" =>
-          new ScoreCandidateInstFactory[Co]
+          new ScoreCandidateInstFactory[Co](featvec_factory)
       }
     }
 
@@ -1363,7 +1364,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_fact(featlist.head)
     else {
       val facts = featlist.map(create_fact)
-      new CombiningCandidateInstFactory[Co](facts)
+      new CombiningCandidateInstFactory[Co](featvec_factory, facts)
     }
   }
 
