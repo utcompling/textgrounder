@@ -108,9 +108,12 @@ trait ToIntMemoizer[T] {
   // Alternatively, just use the normal Scala hash tables.
   // val hashfact = new ScalaHashTableFactory
 
+  // Don't set minimum_index to 0. I think this causes problems because
+  // TroveHashTableFactory by default returns 0 when an item isn't found
+  // in an x->int map.
   /** Smallest index returned. Can be changed to reserve some indices for
     * other purposes. */
-  val minimum_index: Int = 0
+  val minimum_index: Int = 1
   protected var next_index: Int = minimum_index
 
   def number_of_valid_indices = next_index
