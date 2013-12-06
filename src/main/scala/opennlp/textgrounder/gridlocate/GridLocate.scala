@@ -664,6 +664,25 @@ For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
+  var rerank_binning =
+    ap.option[String]("rerank-binning", "rb", "bin", metavar = "BINNING",
+      default = "also",
+      aliasedChoices = Seq(
+        Seq("also", "yes"),
+        Seq("only"),
+        Seq("no")),
+      help = """Whether to include binned features in addition to or in place of
+numeric features. If 'also' or 'yes', include both binned and numeric features.
+If 'only', include only binned features. If 'no', include only numeric features.
+Binning features involves converting numeric values to one of a limited number
+of choices. Binning of most values is done logarithmically using base 2.
+Binning of some fractional values is done in equal intervals. Default '%default'.
+
+NOTE: Currently, this option does not affect any of the word-by-word rerank feature
+types, which have separate '*-binned' equivalents that can be specified directly.
+It does affect 'misc', 'model-compare', 'score' and similar non-word-by-word
+feature types. See '--rerank-features'.""")
+
   protected def with_binned(feats: String*) =
     feats flatMap { f => Seq(f, f + "-binned") }
 
@@ -1334,26 +1353,31 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_candidate_instance_factory = {
     val featvec_factory = new SparseFeatureVectorFactory
+    val binning_status = params.rerank_binning match {
+      case "also" => BinningAlso
+      case "only" => BinningOnly
+      case "no" => BinningNo
+    }
     def create_fact(ty: String): CandidateInstFactory[Co] = {
       if (params.rerank_features_simple_unigram_choices contains ty)
-        new WordCandidateInstFactory[Co](featvec_factory, ty)
+        new WordCandidateInstFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_matching_unigram_choices contains ty)
-        new WordMatchingCandidateInstFactory[Co](featvec_factory, ty)
+        new WordMatchingCandidateInstFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_simple_ngram_choices contains ty)
-        new NgramCandidateInstFactory[Co](featvec_factory, ty)
+        new NgramCandidateInstFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
-        new NgramMatchingCandidateInstFactory[Co](featvec_factory, ty)
+        new NgramMatchingCandidateInstFactory[Co](featvec_factory, binning_status, ty)
       else ty match {
         case "trivial" =>
-          new TrivialCandidateInstFactory[Co](featvec_factory)
+          new TrivialCandidateInstFactory[Co](featvec_factory, binning_status)
         case "misc" =>
-          new MiscCandidateInstFactory[Co](featvec_factory)
+          new MiscCandidateInstFactory[Co](featvec_factory, binning_status)
         case "types-in-common" =>
-          new TypesInCommonCandidateInstFactory[Co](featvec_factory)
+          new TypesInCommonCandidateInstFactory[Co](featvec_factory, binning_status)
         case "model-compare" =>
-          new ModelCompareCandidateInstFactory[Co](featvec_factory)
+          new ModelCompareCandidateInstFactory[Co](featvec_factory, binning_status)
         case "score" =>
-          new ScoreCandidateInstFactory[Co](featvec_factory)
+          new ScoreCandidateInstFactory[Co](featvec_factory, binning_status)
       }
     }
 
@@ -1364,7 +1388,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_fact(featlist.head)
     else {
       val facts = featlist.map(create_fact)
-      new CombiningCandidateInstFactory[Co](featvec_factory, facts)
+      new CombiningCandidateInstFactory[Co](featvec_factory, binning_status, facts)
     }
   }
 
