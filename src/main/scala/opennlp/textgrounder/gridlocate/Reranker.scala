@@ -202,31 +202,35 @@ class CombiningCandidateInstFactory[Co](
     // For each subsidiary factory, retrieve its features, then add the
     // index of the factory to the feature's name to disambiguate, and
     // concatenate all features.
-    if (debug("combined-features")) {
+    if (debug("show-combined-features")) {
       errprint("Document: %s", doc)
       errprint("Cell: %s", cell)
     }
     subsidiary_facts.zipWithIndex flatMap {
       case (fact, index) => {
-        fact.get_features(doc, cell, initial_score, initial_rank) map {
-          case (item, count) => {
-            val featname =
-              // FIXME! Use gram_to_string to be more general.
-              // FIXME! May not be necessary to memoize like this. I don't
-              // think we need to unmemoize the feature names (except for
-              // debugging purposes), so it's enough just to OR the index
-              // onto the top bits of the word, which is already a low
-              // integer due to memoization (or if we change the memoization
-              // strategy in a way that generates spread-out integers, we
-              // can just XOR the index onto the top bits or hash the two
-              // numbers together; occasional feature clashes aren't a big
-              // deal).
-              "%s$%s" format (item, index)
-            if (debug("combined-features")) {
-              errprint("%s = %s", featname, count)
-            }
-            (featname, count)
+        val feats = fact.get_features(doc, cell, initial_score, initial_rank)
+        if (!debug("show-combined-features") && !debug("tag-combined-features"))
+          feats
+        else feats map { case (item, count) =>
+          val featname =
+            // Obsolete comment:
+            // [FIXME! May not be necessary to memoize like this. I don't
+            // think we need to unmemoize the feature names (except for
+            // debugging purposes), so it's enough just to OR the index
+            // onto the top bits of the word, which is already a low
+            // integer due to memoization (or if we change the memoization
+            // strategy in a way that generates spread-out integers, we
+            // can just XOR the index onto the top bits or hash the two
+            // numbers together; occasional feature clashes aren't a big
+            // deal).]
+            if (debug("tag-combined-features"))
+              "~%s~%s" format (index, item)
+            else
+              item
+          if (debug("show-combined-features")) {
+            errprint("%s = %s", featname, count)
           }
+          (featname, count)
         }
       }
     }
