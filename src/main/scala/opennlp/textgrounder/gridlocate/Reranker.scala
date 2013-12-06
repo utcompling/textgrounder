@@ -95,22 +95,37 @@ trait CandidateInstFactory[Co] extends (
 
   val logarithmic_base = 2.0
 
+  def disallowed_value(value: Double) = value.isNaN || value.isInfinity
+
   def bin_logarithmically(feat: String, value: Double) = {
-    // We create separate bins for negative values, using the same binning scheme
-    // as for positive values but with "$neg" appended to the feature name.
-    if (value >= 0) {
-      // This should work even when value is 0, yielding -2147483648
-      // (Int.MinValue)
+    // We have separate bins for the values that will cause problems (NaN,
+    // positive and negative infinity, 0). In addition, we create separate
+    // bins for negative values, using the same binning scheme as for
+    // positive values but with "!neg" appended to the feature name.
+    // (Log of positive values produces both positive and negative results
+    // depending on whether the value is greater or less than 1, and log
+    // of negative values is disallowed.)
+    if (disallowed_value(value))
+      ("%s!%s" format (feat, value), 1.0)
+    else if (value == 0.0)
+      ("%s!zero" format feat, 1.0)
+    else if (value > 0) {
       val log = logn(value, logarithmic_base).toInt
-      ("%s$%s" format (feat, log), 1.0)
+      ("%s!%s" format (feat, log), 1.0)
     } else {
       val log = logn(-value, logarithmic_base).toInt
-      ("%s$%s$neg" format (feat, log), 1.0)
+      ("%s!%s!neg" format (feat, log), 1.0)
     }
   }
 
   def include_and_bin_logarithmically(feat: String, value: Double) = {
-    Seq(feat -> value, bin_logarithmically(feat, value))
+    // We cannot allow NaN, +Inf or -Inf as a feature value, as they will
+    // wreak havoc on error calculations. However, we can still create
+    // bins noting the fact that such values were encountered.
+    if (disallowed_value(value))
+      Seq(bin_logarithmically(feat, value))
+    else
+      Seq(feat -> value, bin_logarithmically(feat, value))
   }
 
   // Shorthand for include_and_bin_logarithmically, which may need to be
@@ -123,7 +138,7 @@ trait CandidateInstFactory[Co] extends (
   def bin_fractionally(feat: String, value: Double) = {
     assert(value >= 0 && value <= 1)
     val incr = (value / fractional_increment).toInt
-    ("%s$%s" format (feat, incr), 1.0)
+    ("%s!%s" format (feat, incr), 1.0)
   }
 
   def include_and_bin_fractionally(feat: String, value: Double) = {
@@ -156,9 +171,14 @@ trait CandidateInstFactory[Co] extends (
    *   (see above)
    */
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
-      initial_rank: Int, is_training: Boolean) =
-    make_feature_vector(get_features(doc, cell, score, initial_rank),
-      is_training)
+      initial_rank: Int, is_training: Boolean) = {
+    val feats = get_features(doc, cell, score, initial_rank)
+    feats.foreach { case (feat, value) =>
+      assert(!disallowed_value(value),
+        "feature %s has disallowed value %s" format (feat, value))
+    }
+    make_feature_vector(feats, is_training)
+  }
 }
 
 /**
