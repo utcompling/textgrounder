@@ -46,7 +46,7 @@ class TwitterTweetDoc(
 class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
-  def create_and_init_document(row: Row, lang_model: DocLangModel,
+  def create_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord) =
     new TwitterTweetDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
@@ -75,7 +75,7 @@ class TwitterUserDoc(
 class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
-  def create_and_init_document(row: Row, lang_model: DocLangModel,
+  def create_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord) =
     new TwitterUserDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),

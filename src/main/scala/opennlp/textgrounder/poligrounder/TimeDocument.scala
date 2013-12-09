@@ -69,7 +69,7 @@ class TimeDocFactory(
 ) extends GridDocFactory[TimeCoord](
   driver, lang_model_factory
 ) {
-  def create_and_init_document(row: Row, lang_model: DocLangModel) =
+  def create_document(row: Row, lang_model: DocLangModel) =
     new TimeDoc(row.schema, lang_model,
       row.get[TimeCoord]("min-timestamp"),
       row.get[String]("user")

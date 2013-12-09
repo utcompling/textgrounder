@@ -52,7 +52,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * Return value can be None if the document is to be skipped; otherwise,
    * it will be recorded in the appropriate split.
    */
-  def create_and_init_document(row: Row, lang_model: DocLangModel,
+  def create_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord): TDoc
   def record_training_document_in_subfactory(doc: SphereDoc) { }
 }
@@ -85,11 +85,11 @@ class SphereDocFactory(
   def wikipedia_subfactory =
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
-  override def create_and_init_document(row: Row,
+  def create_document(row: Row,
      lang_model: DocLangModel) = {
     val coord = row.get_or_else[SphereCoord]("coord", null)
     find_subfactory(row).
-      create_and_init_document(row, lang_model, coord)
+      create_document(row, lang_model, coord)
   }
 
   override def record_training_document_in_subfactory(doc: SphereDoc) {
@@ -147,7 +147,7 @@ class GenericSphereDoc(
 class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
-  def create_and_init_document(row: Row, lang_model: DocLangModel,
+  def create_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord) =
     new GenericSphereDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),

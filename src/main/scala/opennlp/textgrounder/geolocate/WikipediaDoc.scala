@@ -86,7 +86,7 @@ class WikipediaDoc(
 class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
-  override def create_and_init_document(row: Row, lang_model: DocLangModel,
+  override def create_document(row: Row, lang_model: DocLangModel,
       coord: SphereCoord) = {
     val namespace = row.gets_or_else("namepace", "")
     // docs with namespace != Main should be filtered during preproc
