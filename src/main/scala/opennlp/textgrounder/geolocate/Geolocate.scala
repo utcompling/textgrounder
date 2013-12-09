@@ -168,8 +168,7 @@ class SalienceMostCommonToponymSphereGridRanker(
       errprint("  candidates = %s", cands)
     // Sort candidate list by salience score
     val cand_salience =
-      (for (cand <- cands) yield (cand,
-        cand.asInstanceOf[WikipediaDoc].adjusted_salience)).
+      (for (cand <- cands) yield (cand, cand.salience.getOrElse(0.0))).
         // sort by second element of tuple, in reverse order
         sortWith(_._2 > _._2)
     if (debug("commontop"))
