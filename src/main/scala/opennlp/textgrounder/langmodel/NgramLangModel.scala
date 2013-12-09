@@ -156,6 +156,9 @@ class OpenNLPNgramStorer extends NgramStorage {
         model.getCount(x).toDouble)
   }
 
+  // Copy grams iterating over to avoid a ConcurrentModificationException
+  def iter_grams_for_modify = iter_grams.toSeq
+
   /**
    * Total number of tokens stored.
    */
@@ -429,7 +432,7 @@ class DefaultNgramLangModelBuilder(
     // FIXME!!! This should almost surely operate at the word level, not the
     // n-gram level.
     if (minimum_word_count > 1) {
-      for ((ngram, count) <- lm.iter_grams if count < minimum_word_count) {
+      for ((ngram, count) <- lm.iter_grams_for_modify if count < minimum_word_count) {
         lm.remove_gram(ngram)
         val siz = Ngram.unmemoize(ngram).size
         val oov = oov_hash.getOrElse(siz, {

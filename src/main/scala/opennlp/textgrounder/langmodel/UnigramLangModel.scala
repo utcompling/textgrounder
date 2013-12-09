@@ -57,9 +57,13 @@ class UnigramStorage extends GramStorage {
    * A map (or possibly a "sorted list" of tuples, to save memory?) of
    * (word, count) items, specifying the counts of all words seen
    * at least once.  These are given as double because in some cases
-   * they may store "partial" counts (in particular, when the K-d tree
-   * code does interpolation on cells).  FIXME: This seems ugly, perhaps
-   * there is a better way?
+   * they may store "partial" or weighted counts. For example, when the
+   * K-d tree code does interpolation; when --word-weights is given;
+   * when --tf-idf is given. FIXME: This seems ugly in some ways; should
+   * we just store the probability? What about things like
+   * --minimum-word-count? How to implement? Perhaps don't transform away from
+   * integers until after we've initialized the language model, or include a
+   * separate structure to track global minimum-word-count stats?
    */
   val counts = Unigram.create_gram_double_map
   var tokens_accurate = true
@@ -85,6 +89,9 @@ class UnigramStorage extends GramStorage {
   def get_gram(gram: Gram) = counts(gram)
 
   def iter_grams = counts.toIterable
+
+  // Copy grams iterating over to avoid a ConcurrentModificationException
+  def iter_grams_for_modify = iter_grams.toSeq
 
   // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some
   // reason; if not, the accuracy of computations that loop over the keys drops
@@ -254,7 +261,7 @@ abstract class UnigramLangModel(
  * @param factory Corresponding factory object for creating language models.
  * @param ignore_case Whether to fold all words to lowercase.
  * @param stopwords Set of stopwords to ignore.
- * @param whitelist If non-empty, only allow the specified words to passs.
+ * @param whitelist If non-empty, only allow the specified words to pass.
  * @param minimum_word_count Remove words with total count less than this
  *   (in each document). FIXME: This should work with the total count over
  *   all documents, not each individual document.
@@ -378,8 +385,7 @@ class DefaultUnigramLangModelBuilder(
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
     if (minimum_word_count > 1) {
-      // Copy grams iterating over to avoid a ConcurrentModificationException
-      for ((word, count) <- lm.iter_grams.toSeq
+      for ((word, count) <- lm.iter_grams_for_modify
            if count < minimum_word_count) {
         lm.remove_gram(word)
         lm.add_gram(oov, count)
@@ -388,8 +394,7 @@ class DefaultUnigramLangModelBuilder(
 
     // Adjust the counts to track the specified weights.
     if (word_weights.size > 0)
-      // Copy grams iterating over to avoid a ConcurrentModificationException
-      for ((word, count) <- lm.iter_grams.toSeq) {
+      for ((word, count) <- lm.iter_grams_for_modify) {
         val weight = word_weights.getOrElse(word, missing_word_weight)
         assert(weight >= 0)
         if (weight == 0)
@@ -435,7 +440,7 @@ class FilterUnigramLangModelBuilder(
     val oov = Unigram.memoize("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
-    for ((word, count) <- lm.iter_grams
+    for ((word, count) <- lm.iter_grams_for_modify
          if !(filter_words contains lm.gram_to_string(word))) {
       lm.remove_gram(word)
       lm.add_gram(oov, count)
