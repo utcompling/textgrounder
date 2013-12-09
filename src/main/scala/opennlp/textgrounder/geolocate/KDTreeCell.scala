@@ -162,7 +162,7 @@ class KdTreeGrid(
         // There may be a separate grid_lm and rerank_lm; do both if needed
         (cell.lang_model.iterator zip pcell.lang_model.iterator).foreach {
           case (wd, pwd) =>
-            for ((k,v) <- wd.iter_grams) {
+            for ((k,v) <- wd.iter_grams_for_modify) {
               wd.set_gram(k, (1 - interpolateWeight) * v)
             }
 

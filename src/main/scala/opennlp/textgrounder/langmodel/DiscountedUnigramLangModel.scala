@@ -195,7 +195,7 @@ abstract class DiscountedUnigramLangModel(
         (for (ind <- iter_keys)
           yield factory.overall_word_probs(ind)) sum)
     if (factory.tf_idf) {
-      for ((word, count) <- iter_grams)
+      for ((word, count) <- iter_grams_for_modify)
         set_gram(word,
           count*log(factory.num_documents/factory.document_freq(word)))
     }

@@ -335,6 +335,12 @@ trait GramStorage {
   def iter_grams: Iterable[(Gram, GramCount)]
 
   /**
+   * Iterate over all grams that are stored, when planning on modifying the
+   * model during iteration.
+   */
+  def iter_grams_for_modify: Iterable[(Gram, GramCount)]
+
+  /**
    * Iterate over all keys that are stored.
    */
   def iter_keys: Iterable[Gram]
@@ -407,6 +413,13 @@ abstract class LangModel(val factory: LangModelFactory) {
    * Iterate over all grams that are stored.
    */
   def iter_grams: Iterable[(Gram, GramCount)] = model.iter_grams
+
+  /**
+   * Iterate over all grams that are stored, when planning on modifying the
+   * model during iteration.
+   */
+  def iter_grams_for_modify: Iterable[(Gram, GramCount)] =
+    model.iter_grams_for_modify
 
   /**
    * Iterate over all keys that are stored.
