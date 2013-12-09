@@ -78,49 +78,6 @@ class WikipediaDoc(
   override def toString = {
     "%s (id=%s)".format(super.toString, id)
   }
-
-  def adjusted_salience =
-    WikipediaDoc.adjust_salience(salience)
-}
-
-object WikipediaDoc {
-  /**
-   * Compute the short form of a document name.  If short form includes a
-   * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
-   * else return a tuple (SHORTFORM, None).
-   */
-  def compute_short_form(name: String) = {
-    val includes_div_re = """(.*?), (.*)$""".r
-    val includes_parentag_re = """(.*) \(.*\)$""".r
-    name match {
-      case includes_div_re(tucson, arizona) => (tucson, arizona)
-      case includes_parentag_re(tucson, city) => (tucson, null)
-      case _ => (name, null)
-    }
-  }
-
-  def log_adjust_salience(salience: Double) = {
-    if (salience == 0) // Whether from unknown count or count is actually zero
-      0.01 // So we don't get errors from log(0)
-    else salience
-  }
-
-  def adjust_salience(salience: Option[Double]) = {
-    val ail =
-      salience match {
-        case None => {
-          if (debug("some"))
-            warning("Strange, object has no salience value")
-          0.0
-        }
-        case Some(il) => {
-          if (debug("some"))
-            errprint("--> Salience is %s", il)
-          il
-        }
-      }
-    ail
-  }
 }
 
 /**
@@ -149,6 +106,21 @@ class WikipediaDocSubfactory(
   val lower_toponym_to_document = bufmap[String, WikipediaDoc]()
 
   /**
+   * Compute the short form of a document name.  If short form includes a
+   * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
+   * else return a tuple (SHORTFORM, None).
+   */
+  def compute_short_form(name: String) = {
+    val includes_div_re = """(.*?), (.*)$""".r
+    val includes_parentag_re = """(.*) \(.*\)$""".r
+    name match {
+      case includes_div_re(tucson, arizona) => (tucson, arizona)
+      case includes_parentag_re(tucson, city) => (tucson, null)
+      case _ => (name, null)
+    }
+  }
+
+  /**
    * Add document to related lists mapping lowercased form, short form, etc.
    */ 
   override def record_training_document_in_subfactory(xdoc: SphereDoc) {
@@ -166,7 +138,7 @@ class WikipediaDocSubfactory(
     assert(name.length > 0)
     assert(name == capfirst(name))
     val loname = name.toLowerCase
-    val (short, div) = WikipediaDoc.compute_short_form(loname)
+    val (short, div) = compute_short_form(loname)
     if (!(lower_toponym_to_document(loname) contains doc))
       lower_toponym_to_document(loname) += doc
     if (short != loname &&
