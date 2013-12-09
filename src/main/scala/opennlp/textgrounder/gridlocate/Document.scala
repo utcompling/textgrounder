@@ -468,7 +468,7 @@ abstract class GridDocFactory[Co : Serializer](
    * @param lang_model Language model(s) describing the document, as
    *   computed from data in the row
    */
-  protected def create_and_init_document(row: Row, lang_model: DocLangModel
+  protected def create_document(row: Row, lang_model: DocLangModel
   ): GridDoc[Co]
 
   /* Record a training document in any subsidiary factores, subclasses, etc.
@@ -542,7 +542,7 @@ abstract class GridDocFactory[Co : Serializer](
             }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
         val doc = catch_doc_validation {
-          create_and_init_document(row, lang_model)
+          create_document(row, lang_model)
         }
         // if (doc == None) // used to mean skipped
         // num_non_error_skipped_records_by_split(split) += 1
