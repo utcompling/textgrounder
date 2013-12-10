@@ -1067,8 +1067,6 @@ abstract class GridDoc[Co : Serializer](
     }
   }
 
-  // def __repr__ = "GridDoc(%s)" format toString.encode("utf-8")
-
   def shortstr = "%s" format title
 
   override def toString = {
@@ -1077,8 +1075,6 @@ abstract class GridDoc[Co : Serializer](
     val corpusstr = if (corpus_name != null) "%s/".format(corpus_name) else ""
     "%s%s%s".format(corpusstr, title, coordstr)
   }
-
-  def xmldesc: scala.xml.Elem
 
   def distance_to_coord(coord2: Co): Double
 

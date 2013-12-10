@@ -32,15 +32,6 @@ class TwitterTweetDoc(
   val id: Long
 ) extends RealSphereDoc(schema, lang_model, coord, salience) {
   def title = id.toString
-
-  def xmldesc =
-    <TwitterTweetDoc>
-      <id>{ id }</id>
-      {
-        if (has_coord)
-          <location>{ coord }</location>
-      }
-    </TwitterTweetDoc>
 }
 
 class TwitterTweetDocSubfactory(
@@ -61,15 +52,6 @@ class TwitterUserDoc(
   val user: String
 ) extends RealSphereDoc(schema, lang_model, coord, salience) {
   def title = user
-
-  def xmldesc =
-    <TwitterUserDoc>
-      <user>{ user }</user>
-      {
-        if (has_coord)
-          <location>{ coord }</location>
-      }
-    </TwitterUserDoc>
 }
 
 class TwitterUserDocSubfactory(

@@ -65,16 +65,6 @@ class WikipediaDoc(
     }
   }
 
-  def xmldesc =
-    <WikipediaDoc>
-      <title>{ title }</title>
-      <id>{ id }</id>
-      {
-        if (has_coord)
-          <location>{ coord }</location>
-      }
-    </WikipediaDoc>
-
   override def toString = {
     "%s (id=%s)".format(super.toString, id)
   }
