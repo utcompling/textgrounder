@@ -133,15 +133,6 @@ class GenericSphereDoc(
   salience: Option[Double],
   val title: String
 ) extends RealSphereDoc(schema, lang_model, coord, salience) {
-
-  def xmldesc =
-    <GenericSphereDoc>
-      <title>{ title }</title>
-      {
-        if (has_coord)
-          <location>{ coord }</location>
-      }
-    </GenericSphereDoc>
 }
 
 class GenericSphereDocSubfactory(

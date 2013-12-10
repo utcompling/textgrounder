@@ -138,10 +138,6 @@ abstract class GridCell[Co](
       salience)
   }
 
-  // def __repr__() = {
-  //   toString.encode("utf-8")
-  // }
-
   def to_row = Seq(
     "location" -> describe_location,
     "true-center" -> get_true_center,
@@ -172,23 +168,6 @@ abstract class GridCell[Co](
       str += ", most-salient %s" format most_salient_document
     str
   }
-
-  /**
-   * Return an XML representation of the cell.  Currently used only for
-   * debugging-output purposes, so the exact representation isn't too important.
-   */
-  def xmldesc =
-    <GridCell>
-      <bounds>{ describe_location }</bounds>
-      <finished>{ finished }</finished>
-      {
-        if (most_salient_document != "")
-          (<mostSalientDocument>most_salient_document</mostSalientDocument>
-           <mostSalientDocumentSalience>most_salient_doc_salience</mostSalientDocumentSalience>)
-      }
-      <numDocuments>{ num_docs }</numDocuments>
-      <salience>{ salience }</salience>
-    </GridCell>
 
   /************************* Building up the cell *************************/
 

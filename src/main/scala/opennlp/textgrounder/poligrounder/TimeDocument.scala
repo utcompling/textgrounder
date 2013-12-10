@@ -38,14 +38,6 @@ class TimeDoc(
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 
-  def xmldesc =
-    <TimeDoc>
-      {
-        if (has_coord)
-          <timestamp>{ coord }</timestamp>
-      }
-    </TimeDoc>
-
   def coord_as_double(coor: TimeCoord) = coor match {
     case null => Double.NaN
     case TimeCoord(x) => x.toDouble / 1000
