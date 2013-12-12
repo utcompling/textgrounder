@@ -79,15 +79,15 @@ class ParseTweetsParams(ap: ArgParser) extends
     choices = Seq("json", "textdb", "raw-lines"),
     default = "json",
     help="""Format for input of tweets.  Possibilities are
-    
+
     -- `json` (Read in JSON-formatted tweets.)
-    
+
     -- `textdb` (Read in data in textdb format, i.e. as a simple database
     with one record per line, fields separated by TAB characters, and a
     separate schema file indicating the names of the columns.  Typically this
     will result from a previous run of ParseTweets using the default textdb
     output format.)
-  
+
     -- `raw-lines` (Read in lines of raw text and treat them as "tweets".  The
     tweets will have no useful information in them except for the text and
     file name, but this can still be useful for things like generating n-grams.)
@@ -96,14 +96,14 @@ class ParseTweetsParams(ap: ArgParser) extends
     choices = Seq("textdb", "stats", "json"),
     default = "textdb",
     help="""Format for output of tweets or tweet groups.  Possibilities are
-    
+
     -- `textdb` (Store in textdb format, i.e. as a simple database with one
     record per line, fields separated by TAB characters, and a separate schema
     file indicating the names of the columns.)
-  
+
     -- `json` (Simply output JSON-formatted tweets directly, exactly as
     received.)
-    
+
     -- `stats` (Textdb-style output with statistics on the tweets, users, etc.
     rather than outputting the tweets themselves.)""")
   var corpus_name = ap.option[String]("corpus-name",
@@ -153,21 +153,21 @@ one of the following:
 -- An expression specifying a two-sided restriction on the time of the tweet
    (i.e. the tweet's time must be within a given interval).  Either of the
    following forms are allowed:
-   
+
    -- 'TIME WITHIN 2010:08:02:1805PDT/2h'
    -- 'TIME WITHIN (2010:08:02:0500pmPDT 2010:08:03:0930amPDT)'
-   
+
    That is, the interval of time can be given either as a point of time plus
    an offset, or as two points of time.  The offset can be specified in
    various ways, e.g.
-   
+
    -- '1h' or '+1h' (1 hour)
    -- '3m2s' or '3m+2s' or '+3m+2s' (3 minutes, 2 seconds)
    -- '2.5h' (2.5 hours, i.e. 2 hours 30 minutes)
    -- '5d2h30m' (5 days, 2 hours, 30 minutes)
    -- '-3h' (-3 hours, i.e. 3 hours backwards from a given point of time)
    -- '5d-1s' (5 days less 1 second)
-  
+
    That is, an offset is a combination of individual components, each of
    which is a number (possibly fractional or negative or with a prefixed
    plus sign, which is ignored) plus a unit: 'd' = days, 'h' = hours,
@@ -179,7 +179,7 @@ one of the following:
    have a location, or a more specific restriction requiring both that
    the location exist and be within a given bounding box, e.g. for
    North America:
-   
+
    -- 'LOCATION WITHIN (25.0,-126.0,49.0,-60.0)'
 
    The format is (MINLAT, MINLONG, MAXLAT, MAXLONG).
@@ -219,7 +219,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     help="""Fields to output in textdb format.  This should consist of one or
     more directives, separated by spaces or commas.  Directives are processed
     sequentially.  Each directive should be one of
-    
+
     1. A field name, meaning to include that field
 
     2. A field set, meaning to include those fields; currently the recognized
@@ -234,17 +234,17 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     4. A field name or field set with a preceding - sign, meaning to exclude
        the respective field(s).
-    
+
     5. The directive 'all', meaning to include all fields, canceling any
        previous directives.
-    
+
     6. The directive 'none', meaning to include no fields, canceling any
        previous directives.
-    
+
     7. The directive 'default', meaning to set the current fields to output
        to the default (which may vary depending on other settings), canceling
        any previous directives.
-    
+
     Currently recognized fields:
 
     'path': Path of file that the tweet came from
@@ -289,14 +289,14 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'ngram-counts': All n-grams, with counts
 
-    'counts': 'ngram-counts' if --max-ngram > 1, else 'unigram-counts' 
+    'counts': 'ngram-counts' if --max-ngram > 1, else 'unigram-counts'
 
     'mapquest-place': The nearest "place" for the lat/long position,
       found using MapQuest. Empty if no position exists or or if no
       place can be found.
 
     The default value is the directive 'default', which is defined as follows:
-    
+
     1. For --input-format=raw-lines, include only 'path', 'numtweets',
        'text' and 'counts'. (Most other fields are not meaningful.)
     2. Else, for --grouping=file, all small fields.
@@ -851,7 +851,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     // NOT CURRENTLY USED, but potentially useful as an indicator of how to
     // implement a parser for numbers. Instead we currently handle floating-
-    // point numbers using parse_float(). 
+    // point numbers using parse_double().
 //    class ExprLexical extends StdLexical {
 //      override def token: Parser[Token] = floatingToken | super.token
 //
@@ -933,7 +933,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def compare_op = ( "<=" | "<" | ">=" | ">" )
 
-    def parse_float(x: String) = {
+    def parse_double(x: String) = {
       try {
         Some(x.toDouble)
       } catch {
@@ -941,25 +941,48 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
     }
 
-    def time = stringLit ^^ { s => (s, parse_date(s)) } ^? (
+    /**
+     * Return a parser for objects of human-readable type `tag`, which parses
+     * strings using `parse_fn`.
+     */
+    def parse_string[T](tag: String, parse_fn: String => Option[T]) = {
+      // stringLit is a Parser[String] that parses a string literal into a
+      // string. The ^^ function is function application, transforming the
+      // parser into a Parser[(String, Option[T])] which parses a string
+      // literal into an object of some type, returning the untransformed
+      // string and the parsed object wrapped in an Option[]. The ^?
+      // function is partial function application, transforming the parser
+      // into a Parser[T] but throwing an error if the string could not
+      // be parsed. (It takes two arguments, the partial function itself
+      // and an error function to be called when the partial function
+      // isn't applicable. The error function returns a string, which is
+      // included in the thrown error.
+      stringLit ^^ { s => (s, parse_fn(s)) } ^? (
       { case (_, Some(x)) => x },
-      { case (s, None) => "Unable to parse date %s" format s
+      { case (s, None) => "Unable to parse %s %s" format (tag, s)
         case _ => internal_error("Should not get here") } )
+    }
 
+    def time = parse_string("date", parse_date)
+
+    /**
+     * Parse a string literal into a time interval of type (Long, Long).
+     * This parses "short intervals" e.g. "2010:08:02:1805PDT/2h".
+     * "Full intervals", which consist of two separate dates, are handled
+     * with `full_interval`. This parser works essentially the same way as
+     * the parser created in parse_string.
+     */
     def short_interval = stringLit ^^ { parse_date_interval(_) } ^? (
       { case (Some((from, to)), "") => (from, to) },
       { case (None, errmess) => errmess
         case _ => internal_error("Should not get here") } )
-     
+
     def full_interval = "(" ~> time ~ time <~ ")" ^^ {
       case from ~ to => (from, to) }
-    
+
     def interval = (short_interval | full_interval)
 
-    def latlong = stringLit ^^ { s => (s, parse_float(s)) } ^? (
-      { case (_, Some(x)) => x },
-      { case (s, None) => "Unable to parse coordinate %s" format s
-        case _ => internal_error("Should not get here") } )
+    def latlong = parse_string("coordinate", parse_double)
 
     def bounding_box = ("(" ~> latlong ~ ("," ~> latlong) ~ ("," ~> latlong) ~
         ("," ~> latlong) <~ ")") ^^ {
@@ -1265,7 +1288,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
              indices = indices in text of raw URL
              (NOTE: all URL's in the JSON text have /'s quoted as \/, and
               display_url may not be present)
-           
+
            hashtags: Hashtags mentioned in the text; subkeys are
              text = text of the hashtag
              indices = indices in text of hashtag, including the #
@@ -1282,7 +1305,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
                  resize = "crop" or "fit"
                  h = height (as number)
                  w = width (as number)
-             
+
              Example of URL's for photo:
   url = http:\/\/t.co\/AO3mRYaG
   expanded_url = http:\/\/twitter.com\/alejandraoraa\/status\/215758169589284864\/photo\/1
@@ -1735,7 +1758,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
          -- Group by output key;
          -- Merge, merging the 'matches' values (a.matches || b.matches);
          -- Filter results based on _.matches.
-      
+
       5. Output grouping, filter grouping, different keys: Combine 3+2:
          -- Group by filter key;
          -- Filter to see if any tweet in group matches group filter
@@ -2140,7 +2163,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val weekday = calinst.get(Calendar.DAY_OF_WEEK)
       output.replace("QQ", weekday.toString)
     }
-      
+
     def stats_for_tweet(tweet: Tweet) = {
       Seq(FeatureValueStats.from_tweet(tweet, "user", "user", tweet.user),
           // Get a summary for all languages plus a summary for each lang
