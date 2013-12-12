@@ -104,6 +104,9 @@ protected class SphericalImpl {
     def format = SphereCoord.format_lat_long(lat, long)
   }
 
+  implicit val SphereCoordOrdering =
+    Ordering[(Double, Double)].on((x: SphereCoord) => (x.lat, x.long))
+
   implicit object SphereCoord extends Serializer[SphereCoord] {
     def format_lat_long(lat: Double, long: Double) =
       "(%.2f,%.2f)".format(lat, long)
