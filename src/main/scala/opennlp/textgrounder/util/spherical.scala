@@ -55,13 +55,13 @@ import net.liftweb
      latitude/longitude.
 
   2. The SphereCoord class (holding a latitude/longitude pair)
-  
+
   3. Function spheredist() to compute spherical (great-circle) distance
      between two SphereCoords; likewise degree_dist() to compute degree
      distance between two SphereCoords
  */
 protected class SphericalImpl {
- 
+
   /***** Fixed values *****/
 
   val minimum_latitude = -90.0
@@ -73,7 +73,7 @@ protected class SphericalImpl {
   // and km per degree of latitude/longitude.
   // val earth_radius_in_miles = 3963.191
   val earth_radius_in_km = 6376.774
- 
+
   // Number of kilometers per mile.
   val km_per_mile = 1.609
 
@@ -81,7 +81,7 @@ protected class SphericalImpl {
   // same everywhere, but for latitude it is proportional to the degrees away
   // from the equator.
   val km_per_degree = Pi * 2 * earth_radius_in_km / 360.0
- 
+
   // Number of miles per degree, at the equator.
   val miles_per_degree = km_per_degree / km_per_mile
 
@@ -126,7 +126,7 @@ protected class SphericalImpl {
       if (places.length == 0) None
       else Some(places(0)("display_name").asInstanceOf[String])
     }
-      
+
     // Create a coord, with METHOD defining how to handle coordinates
     // out of bounds.  If METHOD =  "validate", check within bounds,
     // and abort if not.  If "coerce", coerce within bounds (latitudes
@@ -175,7 +175,7 @@ protected class SphericalImpl {
       val Array(lat, long) = foo_stripped.split(",", -1)
       SphereCoord(lat.toDouble, long.toDouble)
     }
-    
+
     def serialize(foo: SphereCoord) = "%s,%s".format(foo.lat, foo.long)
 
     /** Compute the centroid of a set of points.
@@ -224,14 +224,14 @@ protected class SphericalImpl {
 
   // Compute spherical distance in km (along a great circle) between two
   // coordinates.
-  
+
   def spheredist(p1: SphereCoord, p2: SphereCoord): Double = {
     if (p1 == null || p2 == null) return 1000000.0
     val thisRadLat = (p1.lat / 180.0) * Pi
     val thisRadLong = (p1.long / 180.0) * Pi
     val otherRadLat = (p2.lat / 180.0) * Pi
     val otherRadLong = (p2.long / 180.0) * Pi
-          
+
     val anglecos = (sin(thisRadLat)*sin(otherRadLat)
                 + cos(thisRadLat)*cos(otherRadLat)*
                   cos(otherRadLong-thisRadLong))
@@ -249,7 +249,7 @@ protected class SphericalImpl {
     }
     return earth_radius_in_km * acos(anglecos)
   }
-  
+
   def degree_dist(c1: SphereCoord, c2: SphereCoord) = {
     sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
       (c1.long - c2.long) * (c1.long - c2.long))
@@ -292,6 +292,48 @@ protected class SphericalImpl {
     else
       (long1 + long2) / 2.0
   }
+
+  // FIXME: Not yet tested!!
+//  class GrahamScan {
+//    // Graham Scan - Based on Python code from
+//    // Tom Switzer <thomas.switzer@gmail.com>.
+//    //
+//    // FIXME: This is actually designed for Euclidean geometry, not
+//    // spherical geometry.
+//    //
+//    // FIXME: This will have problems if points wrap across the
+//    // -180/+180 line.
+//    //
+//    // FIXME: Rewrite this with a type parameter to allow it to be
+//    // applied to other types of 2-d points.
+//
+//    protected val TURN_LEFT = 1
+//    protected val TURN_RIGHT = -1
+//    protected val TURN_NONE = 0
+//
+//    protected def turn(p: SphereCoord, q: SphereCoord, r: SphereCoord) =
+//      ((q.lat - p.lat)*(r.long - p.long) - (r.lat - p.lat)*(q.long - p.long)
+//        ) compare 0
+//
+//    protected def keep_left(hull: IndexedSeq[SphereCoord], r: SphereCoord) = {
+//      var h = hull
+//      while (h.size > 1 && turn(h(h.size - 2), h(h.size - 1), r) != TURN_LEFT)
+//        h = h.dropRight(1)
+//      if (h.size == 0 || h.last != r)
+//        h :+= r
+//      h
+//    }
+//
+//    /**
+//     * Returns points on convex hull of an array of points in CCW order.
+//     */
+//    def convex_hull(points: IndexedSeq[SphereCoord]) = {
+//      val sortpoints = points.sorted
+//      val l = sortpoints.foldLeft(IndexedSeq[SphereCoord]())(keep_left)
+//      val u = sortpoints.reverse.foldLeft(IndexedSeq[SphereCoord]())(keep_left)
+//      l ++ u.drop(1).dropRight(1)
+//    }
+//  }
 
   class SphereMeanShift(
     h: Double = 1.0,
