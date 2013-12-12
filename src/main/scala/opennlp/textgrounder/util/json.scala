@@ -19,70 +19,116 @@
 package opennlp.textgrounder
 package util
 
-import net.liftweb.json.JsonAST
-import net.liftweb.json.JsonDSL._
-import net.liftweb.json.Printer._
+import net.liftweb.json.{Serializer=>LiftSerializer,_}
+
+package json {
+  /**
+   * A Liftweb serializer that special-cases the situation where we have a
+   * Traversable over ("string" -> x) pairs, by converting this to a JObject
+   * (similar to a map). If we didn't do this, we'd instead end up with an
+   * array of separate JObjects, each containing a single mapping. Note that
+   * this will automatically handle Maps, which are a subclass of Traversable.
+   * FIXME: This will lead to errors if the Traversable contains a
+   * ("string" -> x) pair as its first element but other things as other
+   * elements.
+   */
+  class MapIterableSerializer extends LiftSerializer[Traversable[(String, Any)]] {
+    def deserialize(implicit format: Formats): PartialFunction[(TypeInfo, JValue), Traversable[(String, Any)]] = {
+     case null => throw new MappingException("Should never happen")
+    }
+
+    def serialize(implicit format: Formats): PartialFunction[Any, JValue] = {
+      case x: Traversable[_] if is_map_as_sequence(x) =>
+        Extraction.decompose(x.asInstanceOf[Traversable[(String, Any)]].toMap)(format)
+    }
+  }
+}
 
 package object json {
-  /**
-   * Convert an object of any type into a JSON expression. Types
-   * that are unknown are converted to strings.
-   *
-   * FIXME: Add a mechanism to allow extensibility of conversions.
-   * (On the other hand, this might not be possible, at least using
-   * the implicit mechanism. Probably just easier to require the
-   * caller to convert such types manually into a JValue.)
-   */
-  def value_to_json(value: Any): JsonAST.JValue = {
-    value match {
-      case null => JsonAST.JNull
-      // These declarations work because there are implicit converters from
-      // these various types to JValue, which are invoked because the return
-      // type of value_to_json is declared as a JValue.
-      //
-      // FIXME: This looks weird. Is there a better way?
-      case x: Boolean => x
-      case x: Byte => x
-      case x: Char => x
-      case x: Short => x
-      case x: Int => x
-      case x: Long => x
-      case x: Float => x
-      case x: Double => x
-      case x: BigInt => x
-      case x: BigDecimal => x
-      case x: String => x
-      case x: Symbol => x
-      case x: JsonAST.JValue => x
-      case x: Option[_] => x map value_to_json
-      case (x:String, y) => (x, value_to_json(y))
-      // We special-case the situation where we have an Traversable over
-      // ("string" -> x) pairs, by converting this to a JObject (similar to
-      // a map). If we didn't do this, we'd instead end up with an array of
-      // separate JObjects, each containing a single mapping. Note that this
-      // will automatically handle Maps, which are a subclass of Traversable.
-      // FIXME: This will lead to errors if the Traversable contains a
-      // ("string" -> x) pair as its first element but other things as
-      // other elements.
-      case x: Traversable[_] => {
-        assert(x.size >= 0)
-        val head = x.head
-        head match {
-          case (_:String, _) =>
-            row_to_json(x.asInstanceOf[Traversable[(String, Any)]])
-          case _ => x map value_to_json
+  def is_map_as_sequence(x: Traversable[Any]) = {
+    x match {
+      case _: scala.collection.Map[_,_] => false
+      case _ =>
+        x.size > 0 && {
+          val head = x.head
+          head match {
+            case (_:String, _) => true
+            case _ => false
+          }
         }
-      }
-      case x@_ => x.toString
     }
   }
 
-  protected def row_to_json(row: Traversable[(String, Any)]) = {
-    row.map { case (key, value) => (key, value_to_json(value)) }.
-      // This is necessary to invoke the implicit conversion to JObject
-      map { x => x: JsonAST.JObject }.
-      reduce(_ ~ _)
-  }
+  val no_type_hints_formats = Serialization.formats(NoTypeHints)
+  implicit val default_formats = no_type_hints_formats + new MapIterableSerializer
+
+  /**
+   * Convert an object of any type into a JSON expression.
+   */
+  def value_to_json(value: Any)(implicit formats: Formats): JValue =
+    Extraction.decompose(value)(formats)
+
+//  /**
+//   * Convert an object of any type into a JSON expression. Types
+//   * that are unknown are converted to strings.
+//   *
+//   * FIXME: Add a mechanism to allow extensibility of conversions.
+//   * (On the other hand, this might not be possible, at least using
+//   * the implicit mechanism. Probably just easier to require the
+//   * caller to convert such types manually into a JValue.)
+//   */
+//  def value_to_json_old(value: Any): JValue = {
+//    import net.liftweb.json.JsonDSL._
+//    value match {
+//      case null => JNull
+//      // These declarations work because there are implicit converters from
+//      // these various types to JValue, which are invoked because the return
+//      // type of value_to_json is declared as a JValue.
+//      //
+//      // FIXME: This looks weird. Is there a better way?
+//      case x: Boolean => x
+//      case x: Byte => x
+//      case x: Char => x
+//      case x: Short => x
+//      case x: Int => x
+//      case x: Long => x
+//      case x: Float => x
+//      case x: Double => x
+//      case x: BigInt => x
+//      case x: BigDecimal => x
+//      case x: String => x
+//      case x: Symbol => x
+//      case x: JValue => x
+//      case x: Option[_] => x map value_to_json
+//      case (x:String, y) => (x, value_to_json(y))
+//      // We special-case the situation where we have a Traversable over
+//      // ("string" -> x) pairs, by converting this to a JObject (similar to
+//      // a map). If we didn't do this, we'd instead end up with an array of
+//      // separate JObjects, each containing a single mapping. Note that this
+//      // will automatically handle Maps, which are a subclass of Traversable.
+//      // FIXME: This will lead to errors if the Traversable contains a
+//      // ("string" -> x) pair as its first element but other things as
+//      // other elements.
+//      case x: Traversable[_] => {
+//        assert(x.size >= 0)
+//        val head = x.head
+//        head match {
+//          case (_:String, _) =>
+//            row_to_json_old(x.asInstanceOf[Traversable[(String, Any)]])
+//          case _ => x map value_to_json
+//        }
+//      }
+//      case x@_ => x.toString
+//    }
+//  }
+//
+//  protected def row_to_json_old(row: Traversable[(String, Any)]) = {
+//    import net.liftweb.json.JsonDSL._
+//    row.map { case (key, value) => (key, value_to_json_old(value)) }.
+//      // This is necessary to invoke the implicit conversion to JObject
+//      map { x => x: JObject }.
+//      reduce(_ ~ _)
+//  }
 
   /**
    * Convert an object of any type into a JSON expression and render
@@ -90,12 +136,12 @@ package object json {
    * whitespace).
    */
   def pretty_json(value: Any) =
-    pretty(JsonAST.render(value_to_json(value)))
+    pretty(render(value_to_json(value)))
 
   /**
    * Convert an object of any type into a JSON expression and render
    * as a string in a compact format (no extra whitespace).
    */
   def compact_json(value: Any) =
-    compact(JsonAST.render(value_to_json(value)))
+    compact(render(value_to_json(value)))
 }
