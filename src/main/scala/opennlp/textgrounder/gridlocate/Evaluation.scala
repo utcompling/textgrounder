@@ -207,7 +207,7 @@ class DocEvalResult[Co](
     "numtokens" -> document.grid_lm.num_tokens,
     "rerank-lm-numtypes" -> document.rerank_lm.num_types,
     "rerank-lm-numtokens" -> document.rerank_lm.num_tokens,
-    "correct-cell" -> correct_cell.describe_location,
+    "correct-cell" -> correct_cell.format_location,
     "correct-cell-true-center" -> correct_cell.get_true_center,
     "correct-cell-centroid" -> correct_cell.get_centroid,
     "correct-cell-central-point" -> correct_cell.get_central_point,
@@ -747,7 +747,7 @@ class RankedDocEvalResult[Co](
   }
 
   override def to_row = super.to_row ++ Seq(
-    "pred-cell" -> pred_cell.describe_location,
+    "pred-cell" -> pred_cell.format_location,
     "pred-cell-true-center" -> pred_cell.get_true_center,
     "pred-cell-centroid" -> pred_cell.get_centroid,
     "pred-cell-central-point" -> pred_cell.get_central_point,
@@ -772,7 +772,7 @@ class RerankedDocEvalResult[Co](
   }
 
   override def to_row = super.to_row ++ Seq(
-    "initial-pred-cell" -> initial_pred_cell.describe_location,
+    "initial-pred-cell" -> initial_pred_cell.format_location,
     "initial-pred-cell-true-center" -> initial_pred_cell.get_true_center,
     "initial-pred-cell-central-point" -> initial_pred_cell.get_central_point,
     "initial-pred-cell-numdocs" -> initial_pred_cell.num_docs,
@@ -804,7 +804,7 @@ class FullRankedDocEvalResult[Co](
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
         errprint("%s: %6s: Cell at %s: score = %g", doctag, index + 1,
-          cell.describe_indices, score)
+          cell.format_indices, score)
       }
     }
     super.print_result(doctag, driver)

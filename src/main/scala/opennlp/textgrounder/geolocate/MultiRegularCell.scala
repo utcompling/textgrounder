@@ -153,7 +153,7 @@ class MultiRegularCell(
 
   def get_northeast_coord = grid.multi_cell_index_to_far_corner_coord(index)
 
-  def describe_indices = "%s,%s" format (index.latind, index.longind)
+  def format_indices = "%s,%s" format (index.latind, index.longind)
 
   /**
    * For a given multi cell, iterate over the tiling cells in the multi cell.

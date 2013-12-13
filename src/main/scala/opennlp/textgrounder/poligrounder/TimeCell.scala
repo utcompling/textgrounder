@@ -57,10 +57,10 @@ class TimeCell(
   // FIXME!!!!
   def get_centroid = TimeCoord((to + from)/2)
 
-  def describe_location =
+  def format_location =
     "%s - %s" format (format_time(from), format_time(to))
 
-  def describe_indices =
+  def format_indices =
     "%s/%s" format (format_time(from), format_interval(to - from))
 }
 

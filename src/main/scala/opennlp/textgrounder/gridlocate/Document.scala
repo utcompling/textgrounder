@@ -1067,8 +1067,6 @@ abstract class GridDoc[Co : Serializer](
     }
   }
 
-  def shortstr = "%s" format title
-
   override def toString = {
     val coordstr = if (has_coord) " at %s".format(coord) else ""
     val corpus_name = schema.get_fixed_field_or_else("corpus-name", null)

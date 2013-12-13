@@ -321,7 +321,7 @@ class RankedSphereDocEvalResult(
 //        errprint("  Rank %s, goodness %g:", rank, vall)
 //        errprint(cell.xmldesc.toString) // indent=4
 //      } else
-//        errprint("  Rank %s, goodness %g: %s", rank, vall, cell.shortstr)
+//        errprint("  Rank %s, goodness %g: %s", rank, vall, cell.format_location)
 //    }
 //
 //    new TitledDocResult()

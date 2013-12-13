@@ -53,10 +53,10 @@ abstract class PolygonalCell(
    */
   def get_boundary: Iterable[SphereCoord]
 
-  /**
-   * Specify the boundary of the polygon as a string.
-   */
-  def describe_boundary = get_boundary.map(_.toString).mkString(":")
+//  /**
+//   * Specify the boundary of the polygon as a string.
+//   */
+//  def format_boundary = get_boundary.map(_.toString).mkString(":")
 
   /**
    * Return the "inner boundary" -- something echoing the actual boundary of the
@@ -157,7 +157,7 @@ abstract class RectangularCell(
    */
   def get_northeast_coord: SphereCoord
 
-  def describe_location = {
+  def format_location = {
     "%s:%s" format (get_southwest_coord, get_northeast_coord)
   }
 

@@ -108,13 +108,13 @@ abstract class GridCell[Co](
    * Return a string describing the location of the cell in its grid,
    * e.g. by its boundaries or similar.
    */
-  def describe_location: String
+  def format_location: String
 
   /**
    * Return a string describing the indices of the cell in its grid.
    * Only used for debugging.
    */
-  def describe_indices: String
+  def format_indices: String
 
   /**
    * Return a string representation of the cell.  Generally does not need
@@ -129,7 +129,7 @@ abstract class GridCell[Co](
       else ""
 
     "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
-      describe_location, unfinished, contains,
+      format_location, unfinished, contains,
       num_docs,
       grid_lm.num_types,
       grid_lm.num_tokens,
@@ -139,7 +139,7 @@ abstract class GridCell[Co](
   }
 
   def to_row = Seq(
-    "location" -> describe_location,
+    "location" -> format_location,
     "true-center" -> get_true_center,
     "centroid" -> get_centroid,
     "central-point" -> get_central_point,
@@ -157,17 +157,6 @@ abstract class GridCell[Co](
       Encoder.string(most_salient_document),
     "most-salient-document-salience" -> most_salient_doc_salience
   )
-
-  /**
-   * Return a shorter string representation of the cell, for
-   * logging purposes.
-   */
-  def shortstr = {
-    var str = "Cell %s" format describe_location
-    if (most_salient_document != "")
-      str += ", most-salient %s" format most_salient_document
-    str
-  }
 
   /************************* Building up the cell *************************/
 
