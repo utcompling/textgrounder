@@ -857,6 +857,25 @@ protected class CollectionPackage {
     def sortNumeric = seq sortWith { (x,y) => ordering.lt(x._2, y._2) }
     def sortNumericRev = seq sortWith { (x,y) => ordering.gt(x._2, y._2) }
   }
+
+  implicit class IntersectUnionWithPimp[K, A](a: Iterable[(K, A)]) {
+    private def occCounts[B](sq: Iterable[B]): mutable.Map[B, Int] = {
+      val occ = new mutable.HashMap[B, Int] { override def default(k: B) = 0 }
+      for (y <- sq) occ(y) += 1
+      occ
+    }
+
+    def intersectionWith[B, R](b: Iterable[(K, B)])(
+        combine: (K, A, B) => R) = {
+      val occ = b.toMap
+      val buf = mutable.Buffer[R]()
+      for ((key, value) <- a)
+        if (occ contains key) {
+          buf += combine(key, value, occ(key))
+        }
+      buf.toIterable
+    }
+  }
 }
 
 package object collection extends CollectionPackage { }
