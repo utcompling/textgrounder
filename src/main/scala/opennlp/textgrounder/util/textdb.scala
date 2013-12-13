@@ -363,15 +363,16 @@ package textdb {
            if tail.startsWith(prefix) &&
              schema_regex.findFirstMatchIn(file) != None
          } yield file).toSeq
+      val prefix_tag = if (prefix == "") "" else ", prefix %s" format prefix
       if (files.length == 0) {
         throw new FileFormatException(
-          "Found no schema files (matching %s) in directory %s"
-          format (schema_regex, dir))
+          "Found no schema files (matching %s) in directory %s%s"
+          format (schema_regex, dir, prefix_tag))
       }
       if (files.length > 1)
         throw new FileFormatException(
-          "Found multiple schema files (matching %s) in directory %s: %s"
-          format (schema_regex, dir, files))
+          "Found multiple schema files (matching %s) in directory %s%s: %s"
+          format (schema_regex, dir, prefix_tag, files))
       files(0)
     }
 
