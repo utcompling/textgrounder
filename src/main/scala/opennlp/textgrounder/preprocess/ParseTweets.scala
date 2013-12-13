@@ -183,7 +183,11 @@ one of the following:
    -- 'LOCATION WITHIN (25.0,-126.0,49.0,-60.0)'
 
    The format is (MINLAT, MINLONG, MAXLAT, MAXLONG).
-   
+
+-- An expression specifying a restriction on which tweets are selected by
+   the index of the tweet (where the first tweet is numbered 1, the second
+   2, etc.). This is a comparison, e.g. 'TWEETINDEX <= 5'.
+
 Examples:
 
 --filter-tweets "mitt romney OR obama"
@@ -249,6 +253,9 @@ Look for any tweets containing the word "clinton" as well as either the words
     Currently recognized fields:
 
     'path': Path of file that the tweet came from
+
+    'index': 1-based index of the tweet (= line number of tweet in file
+      it was taken from)
 
     'user': User name
 
@@ -445,6 +452,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   // TweetID = Twitter's numeric ID used to uniquely identify a tweet.
   type TweetID = Long
 
+  // Count of tweets; also used for tweet indices (= count of tweets
+  // seen so far)
+  type TweetCount = Long
+
   type Timestamp = Long
 
   def empty_map = Map[String, Int]()
@@ -466,6 +477,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    *
    * @param json Raw JSON for tweet; only stored when --output-format=json
    * @param path Path of file that the tweet came from
+   * @param index 1-based index of tweet (= line number); 0 if multiple
    * @param text Text for tweet or tweets (a Seq in case of multiple tweets)
    * @param user User name (FIXME: or one of them, when going by time; should
    *    do something smarter)
@@ -489,6 +501,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   case class Tweet(
     json: String,
     path: String,
+    // FIXME!!! Currently this counts from the first tweet we've seen in
+    // a file, but if a file was split into multiple chunks and each
+    // chunk processed by a different mapper, our indices will begin
+    // from the start of the chunk rather than reflecting the actual
+    // line number in the file. This can be fixed by calling `zipWithIndex`
+    // on the DList before operating on it, but this function only exists
+    // starting in Scoobi 0.7.
+    index: TweetCount,
     text: Iterable[String],
     user: String,
     id: TweetID,
@@ -500,7 +520,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     followers: Int,
     following: Int,
     lang: String,
-    numtweets: Int,
+    numtweets: TweetCount,
     positions: Map[Timestamp, SphereCoord],
     user_mentions: Map[String, Int],
     retweets: Map[String, Int],
@@ -511,10 +531,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        some less obvious places.  In all:
 
        -- the doc string just above
-       -- the definition of to_row() and Tweet.row_fields()
-       -- parse_json_lift() below
-       -- merge_records() below
-       -- TweetFilterParser.main() below
+       -- the help string for parameter --output-fields (output_fields)
+       -- the definition of to_row() and either Tweet.small_fields or
+          Tweet.big_fields (or some variant)
+       -- Tweet.from_row(), Tweet.from_raw_text(), Tweet.to_row()
+       -- parse_json_lift()
+       -- is_valid_tweet()
+       -- merge_records()
+       -- TweetFilterParser.main()
     */
   ) {
     def lookup_mapquest_place: String = {
@@ -540,6 +564,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "user" => string(user)
           case "id" => elong(id)
           case "path" => string(path)
+          case "index" => elong(index)
           case "min-timestamp" => timestamp(min_timestamp)
           case "max-timestamp" => timestamp(max_timestamp)
           case "geo-timestamp" => timestamp(geo_timestamp)
@@ -558,7 +583,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "followers" => int(followers)
           case "following" => int(following)
           case "lang" => string(lang)
-          case "numtweets" => int(numtweets)
+          case "numtweets" => elong(numtweets)
           case "positions" => {
             val strmap =
               positions.toSeq sortWith (_._1 < _._1) map {
@@ -590,7 +615,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val operation_category = "Tweet"
 
     val small_fields =
-      Seq("user", "id", "path", "min-timestamp", "max-timestamp",
+      Seq("user", "id", "path", "index", "min-timestamp", "max-timestamp",
         "geo-timestamp", "coord", "followers", "following", "lang",
         "numtweets", "num-positions")
 
@@ -620,7 +645,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def row_fields(opts: ParseTweetsParams) = opts.included_fields
 
-    def from_row(schema: Schema, fields: IndexedSeq[String]) = {
+    def from_row(schema: Schema, fields: IndexedSeq[String],
+        index: TweetCount) = {
       var json = ""
       var path = ""
       var text = Seq[String]()
@@ -634,7 +660,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var followers = 0
       var following = 0
       var lang = ""
-      var numtweets = 1
+      var numtweets = 1L
       var positions = Map[Timestamp, SphereCoord]()
       var user_mentions = empty_map
       var retweets = empty_map
@@ -670,7 +696,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "followers"     => followers = int(x)
           case "following"     => following = int(x)
           case "lang"          => lang = string(x)
-          case "numtweets"     => numtweets = int(x)
+          case "numtweets"     => numtweets = dlong(x)
           case "positions"     => {
             val strmap = string_map(x)
             strmap map {
@@ -687,7 +713,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "counts"        =>
             { } // We don't record counts as they're built from text
           case _               => {
-            if (!(warned_fields contains name)) {
+            // Ignore index because we take it from the line number
+            if (name != "index" && !(warned_fields contains name)) {
               logger.warn("Unrecognized field %s with value %s" format
                 (name, x))
               warned_fields += name
@@ -709,13 +736,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       if (positions.size == 0 && !lat.isNaN && !long.isNaN)
         positions = Map(geo_timestamp -> SphereCoord(lat, long))
 
-      Tweet(json, path, text, user, id, min_timestamp, max_timestamp,
+      Tweet(json, path, index, text, user, id, min_timestamp, max_timestamp,
         geo_timestamp, lat, long, followers, following, lang, numtweets,
         positions, user_mentions, retweets, hashtags, urls)
     }
 
-    def from_raw_text(path: String, text: String) = {
-      Tweet("", path, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
+    def from_raw_text(path: String, text: String, index: TweetCount) = {
+      Tweet("", path, index, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
         1, Map[Timestamp, SphereCoord](), empty_map, empty_map,
         empty_map, empty_map)
     }
@@ -807,23 +834,30 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         !e.matches(tweet, text)
     }
 
-    def time_compare(time1: Timestamp, op: String, time2: Timestamp) = {
+    def long_compare(val1: Timestamp, op: String, time2: Timestamp) = {
       op match {
-        case "<" => time1 < time2
-        case "<=" => time1 <= time2
-        case ">" => time1 > time2
-        case ">=" => time1 >= time2
+        case "<" => val1 < time2
+        case "<=" => val1 <= time2
+        case ">" => val1 > time2
+        case ">=" => val1 >= time2
       }
     }
 
     def time_compare(tw: Tweet, op: String, time: Timestamp): Boolean = {
       assert(tw.min_timestamp == tw.max_timestamp)
-      time_compare(tw.min_timestamp, op, time)
+      long_compare(tw.min_timestamp, op, time)
     }
 
     case class TimeCompare(op: String, time: Timestamp) extends Expr {
       def matches(tweet: Tweet, text: Iterable[String]) =
         time_compare(tweet, op, time)
+    }
+
+    case class TweetIndexCompare(op: String, index: Long) extends Expr {
+      def matches(tweet: Tweet, text: Iterable[String]) = {
+        assert(tweet.index > 0) // No merged tweets!
+        long_compare(tweet.index, op, index)
+      }
     }
 
     case class TimeWithin(interval: (Timestamp, Timestamp)) extends Expr {
@@ -918,7 +952,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     override val lexical = new FilterLexical
     lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "LOCATION",
-      "WITHIN", "EXISTS")
+      "TWEETINDEX", "WITHIN", "EXISTS")
     // FIXME! This is partly duplicated above in isPrintableNonDelim, and
     // the function above is required to handle parens and commas not
     // delimited by whitespace. Do we need this defn here at all?
@@ -933,6 +967,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def compare_op = ( "<=" | "<" | ">=" | ">" )
+
+    def parse_long(x: String) = {
+      try {
+        Some(x.toLong)
+      } catch {
+        case _: NumberFormatException => None
+      }
+    }
 
     def parse_double(x: String) = {
       try {
@@ -1003,6 +1045,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       bbox => LocationWithin(bbox)
     }
 
+    def index = parse_string("index", parse_long)
+
+    def tweetindex_compare = "TWEETINDEX" ~> compare_op ~ index ^^ {
+      case op ~ index => TweetIndexCompare(op, index)
+    }
+
     def location_exists = "LOCATION" ~> "EXISTS" ^^ {
       _ => LocationExists()
     }
@@ -1055,9 +1103,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           "Unable to parse date %s" format args(1))
       }
       val tweet =
-        Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
+        Tweet("", "", 1, Seq(text), "user", 0, timestamp, timestamp,
           timestamp, NaN, NaN, 0, 0, "unknown", 1,
-          Map[Timestamp, SphereCoord](), empty_map, empty_map, empty_map, empty_map)
+          Map[Timestamp, SphereCoord](), empty_map, empty_map,
+          empty_map, empty_map)
       test(args(0), tweet)
     }
   }
@@ -1076,7 +1125,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      *
      * @return status and tweet.
      */
-    def parse_json_lift(path: String, line: String): (String, Tweet) = {
+    def parse_json_lift(path: String, line: String, index: TweetCount
+        ): (String, Tweet) = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -1354,7 +1404,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
           ("success",
             Tweet(if (opts.output_format == "json") line else "",
-              path, Seq(text), user, tweet_id.toLong, timestamp,
+              path, index, Seq(text), user, tweet_id.toLong, timestamp,
               timestamp, timestamp, lat, long, followers, following, lang, 1,
               positions, user_mentions, retweets, hashtags, urls))
         }
@@ -1407,12 +1457,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       else {
         bump_counter("total tweets parsed")
         val (status, tweet) = opts.input_format match {
-          case "raw-lines" => ("success", Tweet.from_raw_text(path, line))
-          case "json" => parse_json_lift(path, line)
+          case "raw-lines" => ("success",
+            Tweet.from_raw_text(path, line, lineno))
+          case "json" => parse_json_lift(path, line, lineno)
           case "textdb" =>
             error_wrap(line, ("error", null: Tweet)) { line =>
               ("success",
-                Tweet.from_row(opts.input_schema, line.split("\t", -1)))
+                Tweet.from_row(opts.input_schema, line.split("\t", -1),
+                  lineno))
             }
         }
         if (status == "error") {
@@ -1631,7 +1683,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // FIXME maybe want to track the different users
       val tweet =
-        Tweet("", path, text, t1.user, id, min_timestamp, max_timestamp,
+        Tweet("", path, 0, text, t1.user, id, min_timestamp, max_timestamp,
           geo_timestamp, lat, long, followers, following, lang, numtweets,
           positions, user_mentions, retweets, hashtags, urls)
       Record(tw1.output_key, "", tw1.matches || tw2.matches, tweet)

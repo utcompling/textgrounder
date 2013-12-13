@@ -83,7 +83,7 @@ trait ScoobiProcessFilesAction {
   val operation_category: String
   def full_operation_category = progname + "." + operation_category
 
-  var lineno = 0
+  var lineno = 0L
   lazy val logger = LogFactory.getLog(full_operation_category)
 
   def warning(line: String, fmt: String, args: Any*) {
@@ -132,7 +132,7 @@ trait ScoobiProcessFilesAction {
    */
   private class ErrorWrapper {
     // errprint("Created an ErrorWrapper")
-    var lineno = 0
+    var lineno = 0L
   }
 
   /**
