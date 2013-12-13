@@ -201,7 +201,7 @@ class DocEvalResult[Co](
   }
 
   def to_row = Seq(
-    "document" -> document,
+    "title" -> document.title,
     "correct-coord" -> document.coord,
     "numtypes" -> document.grid_lm.num_types,
     "numtokens" -> document.grid_lm.num_tokens,
