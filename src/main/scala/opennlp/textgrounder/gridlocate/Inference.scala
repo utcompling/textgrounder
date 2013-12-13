@@ -100,7 +100,7 @@ abstract class PointwiseScoreGridRanker[Co](
       for (cell <- grid.iter_nonempty_cells_including(include)) yield {
         if (debug("lots")) {
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
-            cell.describe_indices, cell.describe_location,
+            cell.format_indices, cell.format_location,
             cell.num_docs)
         }
         (cell, score_cell(lang_model, cell))
@@ -134,7 +134,7 @@ abstract class PointwiseScoreGridRanker[Co](
     if (parallel && debug("lots")) {
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
-          cell.describe_indices, cell.describe_location,
+          cell.format_indices, cell.format_location,
           cell.num_docs, score)
     }
     retval

@@ -46,7 +46,8 @@ class KdTreeCell(
   def get_southwest_coord =
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
 
-  def describe_indices = "Placeholder"
+  // FIXME! Describe path down to leaf.
+  def format_indices = "Placeholder"
 }
 
 object KdTreeGrid {

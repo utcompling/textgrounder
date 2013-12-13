@@ -1226,7 +1226,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     if (params.output_training_cell_lang_models) {
       for (cell <- grid.iter_nonempty_cells) {
-        outout(cell.shortstr+"\t")
+        outout(cell.format_location+"\t")
         outprint("%s", cell.grid_lm.debug_string)
       }
     }
