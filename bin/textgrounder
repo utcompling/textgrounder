@@ -20,9 +20,12 @@ fi
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
-# NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
+#RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
+RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
 
-# Process options
+########################### Process options ##########################
+
+# NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
 
 VERBOSE=no
 DEBUG=no
@@ -57,6 +60,8 @@ while true; do
   esac
 done
 
+######################### Build up Java command line ########################
+
 # For info on Sun JVM options, see:
 
 # http://java.sun.com/docs/hotspot/VMOptions.html
@@ -73,7 +78,7 @@ done
 
 JAVA_MEMORY_OPT=
 # Try to set the maximum heap size to something slightly less than
-# the physical memory of the machine.  
+# the physical memory of the machine.
 if [ -n "$MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
 elif [ -n "$TG_SET_JVM_MEMORY" ]; then
@@ -125,8 +130,7 @@ CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 # JAVA_MEMORY_OPT, because it depends on env var TG_SET_JVM_MEMORY).
 JAVA_COMMAND="$JAVA $TG_JAVA_OPT $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $JAVA_USER_OPT -classpath $CP"
 
-CMD="$1"
-shift
+######################### Usage text ########################
 
 help()
 {
@@ -188,14 +192,18 @@ Environment variables:
                         See the following URL (although even this doesn't
                         document all of them):
 
-   http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html 
+   http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html
 
 General commands:
 
-  build-all             Build TextGrounder from source using SBT.
+  compile [COMMAND ...] Build TextGrounder from source using SBT;
+                        equivalent to 'build compile'. An arbitrary
+                        command can optionally be specified afterwards
+                        (e.g. 'run CLASS ...'); if so, it will be executed
+                        if the compilation succeeds.
   build                 Enter SBT command line, to issue further commands.
-  build COMMAND ...     Run SBT using some other arbitrary command(s).
-  sbt COMMAND ...       Run SBT using some other arbitrary command(s); same
+  build SBTCOMMAND ...  Run SBT using some other arbitrary command(s).
+  sbt SBTCOMMAND ...    Run SBT using some other arbitrary command(s); same
                         as 'build'.
   run CLASS ...         Run the main method of a given class (with the
                         classpath set appropriately to pick up all
@@ -230,10 +238,14 @@ The arguments for the various commands are specific to the particular
 command, and often include options and/or file names.  Use --help after the
 command for more information.
 EOF
+  exit 1
 }
 
-#RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
-RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
+######################### Main program ########################
+
+# Function to execute a command, optionally logging the command being
+# executed on stderr and/or changing to the top-level TextGrounder directory
+# before running.
 
 execute()
 {
@@ -249,110 +261,123 @@ execute()
     if [ "$CD" = yes ]; then
       dbg Executing: cd $TEXTGROUNDER_DIR
     fi
-    dbg Executing: $RUNCMD ${1+"$@"}
+    dbg Executing: $RUNCMD "$@"
   fi
   if [ "$CD" = yes ]; then
     cd $TEXTGROUNDER_DIR
   fi
-  $RUNCMD ${1+"$@"}
+  $RUNCMD "$@"
 }
 
-if [ -z "$CMD" ]; then
-  help; exit 1
+# Main function to process command-line arguments and act accordingly.
 
-elif [ "$CMD" = 'javap' ]; then
+process_args() {
+  CMD="$1"
+  shift
 
-  execute javap -classpath "$CP" ${1+"$@"}
+  if [ -z "$CMD" ]; then
+    help
 
-elif [ "$CMD" = 'scalap' ]; then
+  elif [ "$CMD" = 'javap' ]; then
 
-  execute scalap -classpath "$CP" ${1+"$@"}
+    execute javap -classpath "$CP" "$@"
 
-elif [ "$CMD" = 'scala' ]; then
+  elif [ "$CMD" = 'scalap' ]; then
 
-  execute scala -classpath "$CP" ${1+"$@"}
+    execute scalap -classpath "$CP" "$@"
 
-elif [ "$CMD" = 'run-cp' ]; then
+  elif [ "$CMD" = 'scala' ]; then
 
-  CP_CMD="$1"; shift
-  execute "$CP_CMD" -classpath "$CP" ${1+"$@"}
+    execute scala -classpath "$CP" "$@"
 
-elif [ "$CMD" = 'build' -o "$CMD" = 'sbt' ]; then
+  elif [ "$CMD" = 'run-cp' ]; then
 
-  # We need to cd to the top-level TextGrounder dir when running SBT,
-  # so the proper build.sbt file gets picked up, etc.
-  execute --cd "$RUN_SBT" ${1+"$@"}
+    CP_CMD="$1"; shift
+    execute "$CP_CMD" -classpath "$CP" "$@"
 
-elif [ "$CMD" = 'build-all' ]; then
+  elif [ "$CMD" = 'build' -o "$CMD" = 'sbt' ]; then
 
-  # We need to cd to the top-level TextGrounder dir when running SBT,
-  # so the proper build.sbt file gets picked up, etc.
-  execute --cd "$RUN_SBT update compile" ${1+"$@"}
+    # We need to cd to the top-level TextGrounder dir when running SBT,
+    # so the proper build.sbt file gets picked up, etc.
+    execute --cd "$RUN_SBT" "$@"
 
-else  
+  elif [ "$CMD" = 'compile' ]; then
 
-  CLASS=
-  HADOOP_ARGS=
-  TGGEOLOCATE=opennlp.textgrounder.geolocate
-
-  case $CMD in
-    # Geolocate commands
-    geolocate-document)
-      # Include now because we need TEXTGROUNDER_URL; but not before so that
-      # we don't get complaints about TG_CORPUS_DIR otherwise.
-      . config-geolocate
-
-      # Note that the only difference between running in distributed and
-      # non-distributed mode is how we run things (using 'hadoop jar' for
-      # distributed, 'java' for non-distributed) and the input paths we
-      # pass (through --textgrounder-dir here, and also through corpora
-      # paths in 'tg-geolocate').
-      if [ -n "$HADOOP" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
-      elif [ -n "$HADOOP_NONDIST" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
-      else
-        CLASS=$TGGEOLOCATE.GeolocateDocument
+    # We need to cd to the top-level TextGrounder dir when running SBT,
+    # so the proper build.sbt file gets picked up, etc.
+    (execute --cd "$RUN_SBT" compile) && {
+      if [ -n "$1" ]; then
+        process_args "$@"
       fi
-    ;;
-    generate-kml) CLASS=$TGGEOLOCATE.GenerateKML;;
+    }
 
-    # Misc
-    run) CLASS="$1"; shift;;
-    hdebrun)
-      VERBOSE=yes; HADOOP=yes; CLASS="$1"; shift;
-      HADOOP_ARGS="$HADOOP_FAILURE_OK_ARGS $HADOOP_ARGS"
-      ;;
-    help) help; exit 1;;
-    *) dbg "Unrecognized command: $CMD"; help; exit 1;;
-  esac
-
-  # We need to *not* cd to the top-level TextGrounder dir, otherwise if
-  # there are command-line arguments referring relatively to files, the
-  # files won't be found because the lookup will be relative to the
-  # wrong directory.
-
-  if [ -n "$HADOOP" ]; then
-    ASSEMBLY_DIR="$TEXTGROUNDER_DIR/target"
-    ASSEMBLY_GLOB="$ASSEMBLY_DIR/TextGrounder-*.jar"
-    if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
-      dbg "No assembly file!  Unable to execute in Hadoop distributed mode."
-      exit 1
-    else
-      NUM_ASSEMBLY_FILES=`ls -1 $ASSEMBLY_GLOB | wc -l`
-      ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
-      if [ "$NUM_ASSEMBLY_FILES" -ne 1 ]; then
-        dbg "Warning!  More than one assembly file found:"
-        ls -1 $ASSEMBLY_GLOB
-        dbg "Choosing $ASSEMBLY_FILE"
-      fi
-    fi       
-            
-    HADOOP_COMMAND="$HADOOP_BINARY jar $ASSEMBLY_FILE"
-
-    execute "$HADOOP_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
   else
-    execute "$JAVA_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
-  fi
 
-fi
+    CLASS=
+    HADOOP_ARGS=
+    TGGEOLOCATE=opennlp.textgrounder.geolocate
+
+    case $CMD in
+      # Geolocate commands
+      geolocate-document)
+        # Include now because we need TEXTGROUNDER_URL; but not before so that
+        # we don't get complaints about TG_CORPUS_DIR otherwise.
+        . config-geolocate
+
+        # Note that the only difference between running in distributed and
+        # non-distributed mode is how we run things (using 'hadoop jar' for
+        # distributed, 'java' for non-distributed) and the input paths we
+        # pass (through --textgrounder-dir here, and also through corpora
+        # paths in 'tg-geolocate').
+        if [ -n "$HADOOP" ]; then
+          HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
+        elif [ -n "$HADOOP_NONDIST" ]; then
+          HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocument
+        else
+          CLASS=$TGGEOLOCATE.GeolocateDocument
+        fi
+      ;;
+      generate-kml) CLASS=$TGGEOLOCATE.GenerateKML;;
+
+      # Misc
+      run) CLASS="$1"; shift;;
+      hdebrun)
+        VERBOSE=yes; HADOOP=yes; CLASS="$1"; shift;
+        HADOOP_ARGS="$HADOOP_FAILURE_OK_ARGS $HADOOP_ARGS"
+        ;;
+      help) help; exit 1;;
+      *) dbg "Unrecognized command: $CMD"; help; exit 1;;
+    esac
+
+    # We need to *not* cd to the top-level TextGrounder dir, otherwise if
+    # there are command-line arguments referring relatively to files, the
+    # files won't be found because the lookup will be relative to the
+    # wrong directory.
+
+    if [ -n "$HADOOP" ]; then
+      ASSEMBLY_DIR="$TEXTGROUNDER_DIR/target"
+      ASSEMBLY_GLOB="$ASSEMBLY_DIR/TextGrounder-*.jar"
+      if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
+        dbg "No assembly file!  Unable to execute in Hadoop distributed mode."
+        exit 1
+      else
+        NUM_ASSEMBLY_FILES=`ls -1 $ASSEMBLY_GLOB | wc -l`
+        ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
+        if [ "$NUM_ASSEMBLY_FILES" -ne 1 ]; then
+          dbg "Warning!  More than one assembly file found:"
+          ls -1 $ASSEMBLY_GLOB
+          dbg "Choosing $ASSEMBLY_FILE"
+        fi
+      fi
+
+      HADOOP_COMMAND="$HADOOP_BINARY jar $ASSEMBLY_FILE"
+
+      execute "$HADOOP_COMMAND $CLASS" $HADOOP_ARGS "$@"
+    else
+      execute "$JAVA_COMMAND $CLASS" $HADOOP_ARGS "$@"
+    fi
+
+  fi
+}
+
+process_args "$@"
