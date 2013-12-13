@@ -1071,9 +1071,10 @@ abstract class GridDoc[Co : Serializer](
 
   override def toString = {
     val coordstr = if (has_coord) " at %s".format(coord) else ""
-    val corpus_name = schema.get_fixed_field_or_else("corpus-name", "unknown")
-    val corpusstr = if (corpus_name != null) "%s/".format(corpus_name) else ""
-    "%s%s%s".format(corpusstr, title, coordstr)
+    val corpus_name = schema.get_fixed_field_or_else("corpus-name", null)
+    val corpusstr =
+      if (corpus_name != null) " (corpus %s)".format(corpus_name) else ""
+    "%s%s%s".format(title, coordstr, corpusstr)
   }
 
   def distance_to_coord(coord2: Co): Double
