@@ -134,8 +134,8 @@ package object text {
     } toIterable
   }
 
-  def split_text_into_words(text: String, ignore_punc: Boolean=false,
-    include_nl: Boolean=false) = {
+  def split_text_into_words(text: String, ignore_punc: Boolean = false,
+      include_nl: Boolean = false) = {
     // This regexp splits on whitespace, but also handles the following cases:
     // 1. Any of , ; . etc. at the end of a word
     // 2. Parens or quotes in words like (foo) or "bar"
