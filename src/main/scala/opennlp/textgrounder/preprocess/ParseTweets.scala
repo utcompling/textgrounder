@@ -1651,19 +1651,19 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         else Map[Timestamp,SphereCoord]()
       val user_mentions =
         if (opts.need_to_compute_field("user-mentions"))
-          combine_int_maps(t1.user_mentions, t2.user_mentions)
+          combine_maps(t1.user_mentions, t2.user_mentions)
         else empty_map
       val retweets =
         if (opts.need_to_compute_field("retweets"))
-          combine_int_maps(t1.retweets, t2.retweets)
+          combine_maps(t1.retweets, t2.retweets)
         else empty_map
       val hashtags =
         if (opts.need_to_compute_field("hashtags"))
-          combine_int_maps(t1.hashtags, t2.hashtags)
+          combine_maps(t1.hashtags, t2.hashtags)
         else empty_map
       val urls =
         if (opts.need_to_compute_field("urls"))
-          combine_int_maps(t1.urls, t2.urls)
+          combine_maps(t1.urls, t2.urls)
         else empty_map
 
       val (lat, long, geo_timestamp) =

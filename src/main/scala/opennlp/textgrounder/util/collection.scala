@@ -810,30 +810,21 @@ protected class CollectionPackage {
   /**
    * Combine two maps, adding up the numbers where overlap occurs.
    */
-  def combine_int_maps[T](map1: Map[T, Int], map2: Map[T, Int]) = {
-      /* We need to iterate over one of the maps and add each element to the
-         other map, checking first to see if it already exists.  Make sure
-         to iterate over the smallest map, so that repeated combination of
-         maps will have O(n) rather than worst-case O(N^2). */
-      if (map1.size > map2.size)
-        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
-      else
-        map2 ++ map1.map { case (k,v) => k -> (v + map2.getOrElse(k,0)) }
-    }
-
-  /**
-   * Combine two maps, adding up the numbers where overlap occurs.
-   */
-  def combine_double_maps[T](map1: Map[T, Double], map2: Map[T, Double]) = {
-      /* We need to iterate over one of the maps and add each element to the
-         other map, checking first to see if it already exists.  Make sure
-         to iterate over the smallest map, so that repeated combination of
-         maps will have O(n) rather than worst-case O(N^2). */
-      if (map1.size > map2.size)
-        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0.0)) }
-      else
-        map2 ++ map1.map { case (k,v) => k -> (v + map2.getOrElse(k,0.0)) }
-    }
+  def combine_maps[T, Num](map1: Map[T, Num], map2: Map[T, Num]
+      )(implicit num: Numeric[Num]) = {
+    /* We need to iterate over one of the maps and add each element to the
+       other map, checking first to see if it already exists.  Make sure
+       to iterate over the smallest map, so that repeated combination of
+       maps will have O(n) rather than worst-case O(N^2). */
+    if (map1.size > map2.size)
+      map1 ++ map2.map {
+        case (k,v) => k -> num.plus(v, map1.getOrElse(k,num.zero))
+      }
+    else
+      map2 ++ map1.map {
+        case (k,v) => k -> num.plus(v, map2.getOrElse(k,num.zero))
+      }
+  }
 
   /**
    * Convert a list of items to a map counting how many of each item occurs.
