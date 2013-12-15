@@ -382,7 +382,7 @@ object FindPolitical extends
      */
     def merge_political_features(u1: PoliticalFeature, u2: PoliticalFeature) = {
       assert(u1.value == u2.value)
-      PoliticalFeature(u1.value, combine_int_maps(u1.spellings, u2.spellings),
+      PoliticalFeature(u1.value, combine_maps(u1.spellings, u2.spellings),
         u1.num_accounts + u2.num_accounts,
         u1.num_refs + u2.num_refs,
         u1.num_lib_accounts + u2.num_lib_accounts,

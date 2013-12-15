@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package geolocate
 
 import util.argparser._
-import util.collection.{combine_double_maps, combine_int_maps}
+import util.collection.combine_maps
 import util.experiment._
 import util.print.errprint
 import util.textdb._
@@ -95,7 +95,7 @@ class ComputeEntropyDriver extends
     val words_counts = cells.map { cell =>
       val lm = Unigram.check_unigram_lang_model(cell.grid_lm)
       lm.iter_grams.toMap
-    }.reduce[Map[Gram,Double]](combine_double_maps _).
+    }.reduce[Map[Gram,Double]](combine_maps _).
     filter { _._2 >= params.entropy_minimum_word_count }
 
     // Compute the number of cells each word occurs in.
@@ -104,7 +104,7 @@ class ComputeEntropyDriver extends
       lm.iter_grams.map {
         case (word, count) => (word, 1)
       }.toMap
-    }.reduce[Map[Gram,Int]](combine_int_maps _)
+    }.reduce[Map[Gram,Int]](combine_maps _)
 
     // Maybe print word and cell counts.
     if (params.verbose) {
