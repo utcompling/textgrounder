@@ -74,14 +74,18 @@ package object text {
   /**
    * Try to format a floating-point number using %f style (i.e. avoding
    * scientific notation) and with a fixed number of significant digits
-   * after the decimal point.
+   * after the decimal point. Normally this is the same as the actual
+   * number of digits displayed after the decimal point, but more digits
+   * will be used if the number is excessively small (e.g. possible outputs
+   * might be 0.33, 0.033, 0.0033, etc. for 1.0/3, 1.0/30, 1.0/300, etc.).
    *
    * @param sigdigits Number of significant digits after decimal point
    *   to display.
    * @param include_plus If true, include a + sign before positive numbers.
+   * @param drop_zeros If true, drop trailing zeros after decimal point.
    */
   def format_float(x: Double, sigdigits: Int = 2,
-      include_plus: Boolean = false) = {
+      include_plus: Boolean = false, drop_zeros: Boolean = false) = {
     var precision = sigdigits
     if (x != 0) {
       var xx = abs(x)
@@ -92,7 +96,13 @@ package object text {
     }
     val formatstr =
       "%%%s.%sf" format (if (include_plus) "+" else "", precision)
-    formatstr format x
+    val retval = formatstr format x
+    if (drop_zeros)
+      // Drop zeros after decimal point, then drop decimal point if it's last.
+      retval.replaceAll("""\.([0-9]*?)0+$""", """.$1""").
+        replaceAll("""\.$""", "")
+    else
+      retval
   }
 
   ////////////////////////////////////////////////////////////////////////////
