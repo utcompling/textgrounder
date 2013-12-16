@@ -117,10 +117,15 @@ protected class PrintCollection {
       stream.close()
   }
 
-  def errprint(format: String, args: Any*) {
-    errout_stream.println(format_outtext(format, args: _*))
+  def errpr(str: String) {
+    errout_stream.println(str)
     need_prefix = true
     errout_stream.flush()
+  }
+
+  def errprint(format: String, args: Any*) {
+    val text = format_outtext(format, args: _*)
+    errpr(text)
   }
 
   def errout(format: String, args: Any*) {
