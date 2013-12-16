@@ -548,7 +548,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           SphereCoord.lookup_lat_long_mapquest(lat, long) getOrElse ""
         } catch {
           case e:Exception =>
-            errprint("%s" format e)
+            errprint("%s", e)
             return ""
         }
       }
