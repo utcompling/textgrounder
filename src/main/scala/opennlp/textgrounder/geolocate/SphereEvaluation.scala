@@ -25,7 +25,7 @@ import math.{round, floor}
 import collection.mutable
 import scala.util.control.Breaks._
 
-import util.collection.{DoubleTableByRange}
+import util.collection.{DoubleTableByRange,bufferToIndexedSeq}
 import util.spherical._
 import util.experiment.ExperimentDriverStats
 import util.math.{mean, median}

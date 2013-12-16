@@ -91,7 +91,7 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
     outf.close()
   }
 
-  def print_stats(prefix: String, units: String, nums: Seq[Double]) {
+  def print_stats(prefix: String, units: String, nums: IndexedSeq[Double]) {
     def pr(fmt: String, args: Any*) {
       outprint("%s: %s", prefix, fmt format (args: _*))
     }
