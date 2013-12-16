@@ -44,56 +44,65 @@ package object math {
   }
 
   /**
-   *  Return the median value of a list.
+   *  Return the median value of a sequence.
+   *
+   *  @param seq Sequence of points to retrieve median of.
+   *  @param sorted Whether the sequence is already sorted; this is an
+   *     optimization, as otherwise the sequence will be sorted.
    */
-  def median(list: Seq[Double]) = {
-    val sorted = list.sorted
-    val len = sorted.length
-    if (len % 2 == 1)
-      sorted(len / 2)
-    else {
-      val midp = len / 2
-      0.5*(sorted(midp-1) + sorted(midp))
-    }
-  }
+  def median(seq: IndexedSeq[Double], sorted: Boolean = false) =
+    quantile_at(seq, 0.5, sorted)
   
   /**
-   *  Return the quantile value at the given fraction. The input sequence
-   *  must be sorted. If the quantile doesn't fall exactly at a point in
-   *  the array, we interpolate between the nearest two points.
+   *  Return the quantile value at the given fraction. If the quantile
+   *  doesn't fall exactly at a point in the array, we interpolate between
+   *  the nearest two points.
+   *
+   *  @param seq Sequence of points to retrieve quantile of.
+   *  @param fraction Quantile to retrieve.
+   *  @param sorted Whether the sequence is already sorted; this is an
+   *     optimization, as otherwise the sequence will be sorted.
    */
-  def quantile_at(seq: IndexedSeq[Double], fraction: Double) = {
-    val len = seq.size
+  def quantile_at(seq: IndexedSeq[Double], fraction: Double,
+      sorted: Boolean = false) = {
+    val els = if (sorted) seq else seq.sorted
+    val len = els.size
     val leftind_float = (len - 1) * fraction
     val leftind = leftind_float.toInt
     if (leftind == leftind_float)
-      seq(leftind)
+      els(leftind)
     else {
       val offset = leftind_float - leftind
-      seq(leftind) * (1.0 - offset) + seq(leftind + 1) * offset
+      els(leftind) * (1.0 - offset) + els(leftind + 1) * offset
     }
   }
 
   /**
-   *  Return the mean (average) of a list.
+   *  Return the mean (average) of a collection.
    */
-  def mean(list: Iterable[Double]) = {
-    list.sum / list.size
+  def mean(x: Traversable[Double]) = {
+    x.sum / x.size
   }
 
   /**
-   *  Return the mode (most common value) of a list.
+   *  Return the mode (most common value) of a collection.
    */
-  def mode[T](list: Seq[T]) = {
-    (argmax(list.countItems) { _._2 })._1
+  def mode[T](x: Traversable[T]) = {
+    (argmax(x.countItems) { _._2 })._1
   }
 
-  def variance(x: Iterable[Double]) = {
+  /**
+   *  Return the variance of a collection.
+   */
+  def variance(x: Traversable[Double]) = {
     val m = mean(x)
     mean(for (y <- x) yield ((y - m) * (y - m)))
   }
 
-  def stddev(x: Iterable[Double]) = sqrt(variance(x))
+  /**
+   *  Return the standard deviation (square root of the variance) of a collection.
+   */
+  def stddev(x: Traversable[Double]) = sqrt(variance(x))
 
   private val log2_value = log(2)
   def log2(x: Double) = log(x) / log2_value
