@@ -99,9 +99,28 @@ protected class PrintCollection {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
+    import scala.runtime.ScalaRunTime.stringOf
     val outtext =
       if (args.length == 0) format
-      else format format (args: _*)
+      else {
+        val strargs = args.map { x =>
+          x match {
+            case null => stringOf(x)
+            case _: Boolean => x
+            case _: Byte => x
+            case _: Char => x
+            case _: Short => x
+            case _: Int => x
+            case _: Long => x
+            case _: Float => x
+            case _: Double => x
+            case _: BigInt => x
+            case _: BigDecimal => x
+            case _ => stringOf(x)
+          }
+        }
+        format format (strargs: _*)
+      }
     if (need_prefix)
       errout_prefix + outtext
     else
@@ -117,15 +136,15 @@ protected class PrintCollection {
       stream.close()
   }
 
-  def errpr(str: String) {
-    errout_stream.println(str)
-    need_prefix = true
-    errout_stream.flush()
+  def errln(format: String, args: Any*) {
+    errprint(format, args: _*)
   }
 
   def errprint(format: String, args: Any*) {
     val text = format_outtext(format, args: _*)
-    errpr(text)
+    errout_stream.println(text)
+    need_prefix = true
+    errout_stream.flush()
   }
 
   def errout(format: String, args: Any*) {

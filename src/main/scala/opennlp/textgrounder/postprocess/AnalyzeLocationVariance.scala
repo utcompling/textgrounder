@@ -445,7 +445,7 @@ par(mfrow=c($height,$width))
   legend("topleft", legend=legends, pch=shapes, col=colors)
 """
     R.eval(plotlines_code)
-//    errpr(s"""
+//    errprint(s"""
 //computed spar: ${R.toVector[Double]("spar").toSeq}
 //computed df: ${R.toVector[Double]("df").toSeq}
 //""")
@@ -506,7 +506,7 @@ par(mfrow=c($height,$width))
        * the scale and take up the bottom half or so of the space.
        */
       def compute_mult_factor(limit: Double, potential_lim: Double) = {
-        errpr(s"called with $limit, $potential_lim")
+        errprint(s"called with $limit, $potential_lim")
         val basic_possible_mult_factors =
           ((1.0 to 5.0 by 0.5) ++ (6.0 to 9.0 by 1.0)).toSeq
         val possible_mult_factors = basic_possible_mult_factors.map { x =>
@@ -523,7 +523,7 @@ par(mfrow=c($height,$width))
           case (fact, display) =>
             ((1 - raw_mult_factor/fact).abs, (fact, display))
         }.minBy(_._1)._2
-        errpr(s"($closest_factor, $disp_factor)")
+        errprint(s"($closest_factor, $disp_factor)")
         (closest_factor, disp_factor)
       }
 
@@ -553,7 +553,7 @@ par(mfrow=c($height,$width))
         //    (bin, binned_value).
         val tables =
           for ((label, fn) <- LocationStats.run_fns.toArray) yield {
-            errprint("Plot label: %s", label)
+            errprint(s"Plot label: $label")
             val binned_merged_stats = bin_merged_stats(fn, base, max_bin)
             val lines = binned_merged_stats.map {
               case (bin, results) => {
