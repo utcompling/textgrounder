@@ -1129,6 +1129,11 @@ protected class CollectionPackage {
     def sortNumeric = seq sortWith { (x,y) => ordering.lt(x._2, y._2) }
     def sortNumericRev = seq sortWith { (x,y) => ordering.gt(x._2, y._2) }
   }
+
+  implicit def wrappedArrayToIndexedSeq[T](buf: mutable.WrappedArray[T]) =
+    buf.toIndexedSeq
+
+  implicit def bufferToIndexedSeq[T](buf: mutable.Buffer[T]) = buf.toIndexedSeq
 }
 
 package object collection extends CollectionPackage { }
