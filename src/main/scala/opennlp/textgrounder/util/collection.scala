@@ -37,6 +37,7 @@ package util
 
 import scala.util.control.Breaks._
 import scala.collection.mutable
+import scala.collection.immutable
 import mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
 import scala.collection.{Map => BaseMap}
@@ -785,6 +786,286 @@ protected class CollectionPackage {
   }
 
  /////////////////////////////////////////////////////////////////////////////
+ //             Intersect/Union/Diff by key and specified combiner          //
+ /////////////////////////////////////////////////////////////////////////////
+
+  implicit class IntersectUnionWithPimp[K, A](a: Traversable[(K, A)]) {
+    private def occItems[B](sq: Traversable[(K, B)]) = {
+      val occ = new mutable.HashMap[K, mutable.Buffer[B]] {
+        override def default(key: K) = {
+          val newbuf = mutable.Buffer[B]()
+          this(key) = newbuf
+          newbuf
+        }
+      }
+      for ((k, v) <- sq)
+        occ(k) += v
+      occ
+    }
+
+    /**
+     * Intersect two collections by their keys. This is identical to
+     * `intersectWith` except that the combiner function is passed the
+     * key as well as the two items to combine.
+     *
+     * @param b Other collection to intersect with.
+     * @param combine Function to combine values from the two collections.
+     */
+    def intersectWithKey[B, R](b: Traversable[(K, B)])(
+        combine: (K, A, B) => R): Traversable[(K, R)] = {
+      (a, b) match {
+        // FIXME! Should use implicit functions to handle this. But
+        // then need to be careful to define special implicit versions of
+        // functions like intersectWith() and intersectBy() that call this.
+        // These need to be written specifically for IntMap, LongMap,
+        // and HashMap. Either we need to duplicate all these functions
+        // (YUCK!) or figure out some other way. Possibly we would need to
+        // have a manifest passed in. But this should be a sort of manifest
+        // that is allowed to not exist so we don't run into problems when
+        // one isn't available.
+        case (x: immutable.IntMap[A], y: immutable.IntMap[B]) =>
+          x.intersectionWith[B, R](y, (k, p, q) =>
+            combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
+            asInstanceOf[Traversable[(K, R)]]
+        case (x: immutable.LongMap[A], y: immutable.LongMap[B]) =>
+          x.intersectionWith[B, R](y, (k, p, q) =>
+            combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
+            asInstanceOf[Traversable[(K, R)]]
+        case _ => {
+          val buf = mutable.Buffer[(K, R)]()
+          val occ = b.toMap
+          if (occ.size == b.size) {
+            // The easy way: no repeated items in `b`.
+            for ((key, value) <- a) {
+              if (occ contains key)
+                buf += key -> combine(key, value, occ(key))
+            }
+          } else {
+            // The hard way. Create a map listing all occurrences of each
+            // key in `b`. Every time we find a key in `a`, iterate over
+            // all occurrences in `b`.
+            val occb = occItems(b)
+            for ((key, value) <- a; value2 <- occb(key))
+              buf += key -> combine(key, value, value2)
+          }
+          buf.toTraversable
+        }
+      }
+    }
+
+    /**
+     * Intersect two collections by their keys. Keep the ordering of
+     * objects in the first collection. Use a combiner function to
+     * combine items in common. If either item is a multi-map, then
+     * for a key seen `n` times in the first collection and `m`
+     * times in the second collection, it will occur `n * m` times
+     * in the resulting collection, including all the possible
+     * combinations of pairs of identical keys in the two collections.
+     *
+     * @param b Other collection to intersect with.
+     * @param combine Function to combine values from the two collections.
+     */
+    def intersectWith[B, R](b: Traversable[(K, B)])(
+        combine: (A, B) => R): Traversable[(K, R)] =
+      a.intersectWithKey(b) { case (_, x, y) => combine(x, y) }
+
+    /**
+     * Union two collections by their keys. This is identical to
+     * `unionWith` except that the combiner function is passed the
+     * key as well as the two items to combine.
+     *
+     * @param b Other collection to union with.
+     * @param combine Function to combine values from the two collections.
+     */
+    def unionWithKey[B >: A](b: Traversable[(K, B)])(
+        combine: (K, A, B) => B): Traversable[(K, B)] = {
+      // One way to write:
+      // a.intersectWith(b)(combine) ++ a.diffWith(b) ++ b.diffWith(a)
+      // Instead, we expand out the code to avoid extra work.
+      // FIXME! Should use implicit functions to handle this. See
+      // comment above in intersectWithKey().
+      (a, b) match {
+        case (x: immutable.HashMap[K, A], y: immutable.HashMap[K, B]) =>
+          x.merged(y) { (p, q) =>
+            (p._1, combine(p._1, p._2.asInstanceOf[A], q._2)) }
+        case (x: immutable.IntMap[A], y: immutable.IntMap[B]) =>
+          x.unionWith[B](y, (k, p, q) =>
+            combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
+            asInstanceOf[Traversable[(K, B)]]
+        case (x: immutable.LongMap[A], y: immutable.LongMap[B]) =>
+          x.unionWith[B](y, (k, p, q) =>
+            combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
+            asInstanceOf[Traversable[(K, B)]]
+        case _ => {
+          val buf = mutable.Buffer[(K, B)]()
+          val occ = b.toMap
+          if (occ.size == b.size) {
+            // The easy way: no repeated items in `b`.
+            for ((key, value) <- a) {
+              if (occ contains key)
+                buf += key -> combine(key, value, occ(key))
+              else
+                buf += key -> value
+            }
+          } else {
+            val occb = occItems(b)
+            for ((key, value) <- a) {
+              // The hard way. See above.
+              val values_b = occb(key)
+              if (values_b.size > 0) {
+                for (value2 <- values_b)
+                  buf += key -> combine(key, value, value2)
+              } else
+                buf += key -> value
+            }
+          }
+          // Finally handle items in `b` but not `a`.
+          val occa = a.map(_._1).toSet
+          for ((key, value) <- b) {
+            if (!(occa contains key))
+              buf += key -> value
+          }
+          buf.toTraversable
+        }
+      }
+    }
+
+    /**
+     * Union two collections by their keys. Keep the ordering of
+     * objects in the first collection, followed by the second
+     * collection. Use a combiner function to combine items in common.
+     * If either item is a multi-map, then for a key seen `n` times
+     * in the first collection and `m` times in the second collection,
+     * it will occur `n * m` times in the resulting collection, including
+     * all the possible combinations of pairs of identical keys in the
+     * two collections.
+     *
+     * FIXME! We run into an error trying to call unionWith() on an
+     * IntMap or LongMap because there's an existing unionWith(). Even
+     * though that one takes two parameters, Scala isn't smart enough
+     * to handle polymorphism between an implicit and non-implicit
+     * function of the same name. This would be fixed if these functions
+     * are defined directly in IntMap rather than as implicits.
+     *
+     * @param b Other collection to union with.
+     * @param combine Function to combine values from the two collections.
+     */
+    def unionWith[B >: A](b: Traversable[(K, B)])(
+        combine: (A, B) => B): Traversable[(K, B)] =
+      a.unionWithKey(b) { case (_, x, y) => combine(x, y) }
+
+    /**
+     * Difference two collections by their keys. Keep the ordering of
+     * objects in the first collection.
+     *
+     * FIXME: This doesn't quite work the way that plain `diff` works.
+     * In our case, if a key occurs in `b`, all elements with the same
+     * key in `a` are removed. In plain `diff`, only as many elements
+     * are removed from `a` as occur in `b`. This makes sense with
+     * multisets for simple objects but it's less clear whether this
+     * makes sense with keys, because the values will typically be
+     * different.
+     *
+     * @param b Other collection to difference with.
+     */
+    def diffWith[B >: A](b: Traversable[(K, B)]): Traversable[(K, B)] = {
+      val occ = b.map(_._1).toSet
+      val buf = mutable.Buffer[(K, B)]()
+      for ((key, value) <- a) {
+        if (!(occ contains key))
+          buf += key -> value
+      }
+      buf.toTraversable
+    }
+  }
+
+  implicit class IntersectUnionByPimp[A](a: Traversable[A]) {
+    /**
+     * Intersect two collections by their keys, with separate key-selection
+     * functions for the two collections. This is identical to
+     * `intersectBy` except that each collection has its own key-selection
+     * function. This allows the types of the two collections to be
+     * distinct, with no common parent.
+     *
+     * @param b Other collection to intersect with.
+     * @param key1fn Function to select the comparison key for the first
+     *   collection.
+     * @param key1fn Function to select the comparison key for the first
+     *   collection.
+     * @param combine Function to combine values from the two collections.
+     */
+    def intersectBy2[K, B, R](b: Traversable[B])(key1fn: A => K
+        )(key2fn: B => K)(combine: (A, B) => R): Traversable[R] = {
+      val keyed_a = a.map { x => (key1fn(x), x) }
+      val keyed_b = b.map { x => (key2fn(x), x) }
+      keyed_a.intersectWith(keyed_b)(combine).map(_._2)
+    }
+
+    /**
+     * Intersect two collections by their keys. Keep the ordering of
+     * objects in the first collection. Use a combiner function to
+     * combine items in common. If either item is a multi-map, then
+     * for a key seen `n` times in the first collection and `m`
+     * times in the second collection, it will occur `n * m` times
+     * in the resulting collection, including all the possible
+     * combinations of pairs of identical keys in the two collections.
+     *
+     * @param b Other collection to intersect with.
+     * @param keyfn Function to select the comparison key.
+     * @param combine Function to combine values from the two collections.
+     */
+    def intersectBy[K, B >: A](b: Traversable[B])(keyfn: B => K)(
+        combine: (A, B) => B): Traversable[B] = {
+      val keyed_a = a.map { x => (keyfn(x), x) }
+      val keyed_b = b.map { x => (keyfn(x), x) }
+      keyed_a.intersectWith(keyed_b)(combine).map(_._2)
+    }
+
+    /**
+     * Union two collections by their keys. Keep the ordering of
+     * objects in the first collection, followed by the second
+     * collection. Use a combiner function to combine items in common.
+     * If either item is a multi-map, then for a key seen `n` times
+     * in the first collection and `m` times in the second collection,
+     * it will occur `n * m` times in the resulting collection, including
+     * all the possible combinations of pairs of identical keys in the
+     * two collections.
+     *
+     * @param b Other collection to union with.
+     * @param keyfn Function to select the comparison key.
+     * @param combine Function to combine values from the two collections.
+     */
+    def unionBy[K, B >: A](b: Traversable[B])(keyfn: B => K)(
+        combine: (A, B) => B): Traversable[B] = {
+      val keyed_a = a.map { x => (keyfn(x), x) }
+      val keyed_b = b.map { x => (keyfn(x), x) }
+      keyed_a.unionWith(keyed_b)(combine).map(_._2)
+    }
+
+    /**
+     * Difference two collections by their keys. Keep the ordering of
+     * objects in the first collection.
+     *
+     * FIXME: This doesn't quite work the way that plain `diff` works.
+     * In our case, if a key occurs in `b`, all elements with the same
+     * key in `a` are removed. In plain `diff`, only as many elements
+     * are removed from `a` as occur in `b`. This makes sense with
+     * multisets for simple objects but it's less clear whether this
+     * makes sense with keys, because the values will typically be
+     * different.
+     *
+     * @param b Other collection to difference with.
+     * @param keyfn Function to select the comparison key.
+     */
+    def diffBy[K, B >: A](b: Traversable[B])(keyfn: B => K
+        ): Traversable[B] = {
+      val keyed_a = a.map { x => (keyfn(x), x) }
+      val keyed_b = b.map { x => (keyfn(x), x) }
+      keyed_a.diffWith(keyed_b).map(_._2)
+    }
+  }
+
+ /////////////////////////////////////////////////////////////////////////////
  //                        Misc. list/iterator functions                    //
  /////////////////////////////////////////////////////////////////////////////
 
@@ -847,25 +1128,6 @@ protected class CollectionPackage {
     private val ordering = implicitly[Ordering[U]]
     def sortNumeric = seq sortWith { (x,y) => ordering.lt(x._2, y._2) }
     def sortNumericRev = seq sortWith { (x,y) => ordering.gt(x._2, y._2) }
-  }
-
-  implicit class IntersectUnionWithPimp[K, A](a: Iterable[(K, A)]) {
-    private def occCounts[B](sq: Iterable[B]): mutable.Map[B, Int] = {
-      val occ = new mutable.HashMap[B, Int] { override def default(k: B) = 0 }
-      for (y <- sq) occ(y) += 1
-      occ
-    }
-
-    def intersectionWith[B, R](b: Iterable[(K, B)])(
-        combine: (K, A, B) => R) = {
-      val occ = b.toMap
-      val buf = mutable.Buffer[R]()
-      for ((key, value) <- a)
-        if (occ contains key) {
-          buf += combine(key, value, occ(key))
-        }
-      buf.toIterable
-    }
   }
 }
 

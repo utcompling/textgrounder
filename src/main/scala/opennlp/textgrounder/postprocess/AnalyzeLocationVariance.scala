@@ -306,8 +306,8 @@ dev.off()
       } else List()
 
 
-    val merged_stats = user_stats.intersectionWith(user_results) {
-      (_, s, r) => (s, r) }
+    val merged_stats = user_stats.intersectWith(user_results) {
+      (s, r) => (s, r) }.map(_._2)
 
     val run_fns = Seq[(String, LocationStats => Double)](
       "dist across bounding box" -> { _.dist_across_bounding_box },
