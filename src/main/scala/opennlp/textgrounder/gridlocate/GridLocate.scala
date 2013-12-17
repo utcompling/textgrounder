@@ -136,14 +136,15 @@ trait GridLocateLangModelParameters {
   //// Options used when creating language models
   var jelinek_factor_default = 0.3
   var dirichlet_factor_default = 500.0
-  var lang_model =
-    ap.optionWithParams[String]("lang-model", "lm", "word-dist", "wd",
-      default = ("dirichlet", ":1,000,000"),
-      aliasedChoices = Seq(
+  val lang_model_choices = Seq(
         Seq("pseudo-good-turing", "pgt"),
         Seq("dirichlet"),
         Seq("jelinek-mercer", "jelinek"),
-        Seq("unsmoothed-ngram")),
+        Seq("unsmoothed-ngram"))
+  var lang_model =
+    ap.optionWithParams[String]("lang-model", "lm", "word-dist", "wd",
+      default = ("dirichlet", ":1,000,000"),
+      aliasedChoices = lang_model_choices,
       help = """Type of language model to use.  Possibilities are
 'pseudo-good-turing' (a simplified version of Good-Turing smoothing over a
 unigram language model), 'dirichlet' (Dirichlet smoothing over a unigram
@@ -558,13 +559,15 @@ is '%default'.""")
   var rerank_lang_model =
     ap.optionWithParams[String]("rerank-lang-model", "rerank-word-dist",
         "rlm", "rwd",
-      default = ("pseudo-good-turing", ""),
-      aliasedChoices = Seq(
-        Seq("pseudo-good-turing", "pgt"),
-        Seq("dirichlet"),
-        Seq("jelinek-mercer", "jelinek"),
-        Seq("unsmoothed-ngram")),
-      help = """Language model for reranking. See `--lang-model`.""")
+      default = ("default", ""),
+      aliasedChoices = lang_model_choices :+ Seq("default"),
+      help = """Language model for reranking. See `--lang-model`.
+
+A value of 'default' means use the same lang model as is specified in
+`--lang-model`. Default value is '%default'.""")
+
+  if (rerank_lang_model._1 == "default")
+    rerank_lang_model = lang_model
 
   var rerank_interpolate =
     ap.option[String]("rerank-interpolate",
