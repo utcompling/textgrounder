@@ -678,12 +678,34 @@ package experiment {
    * using the `argparser` module, following the preferred style of that
    * module.
    *
+   * This uses an ArgParser object (stored in the `parser` field) to set
+   * the parameters appropriately, e.g. from the command line. The parameters
+   * themselves are stored in field variables, initialized from the ArgParser
+   * object. In order to make this work, the following steps are necessary:
+   *
+   * <ol>
+   * <li>Create an empty ArgParser.
+   * <li>Create a parameter object, passing in the parser. As the
+   *     "shadow fields" in this object get initialized, the parser records
+   *     the valid parameters and their properties, and initializes the
+   *     fields to their default values.
+   * <li>Tell the parser to parse a command line.
+   * <li>Create a second parameter object the same way the first one was
+   *     created. This time, the fields will be initialized to the values
+   *     stored in the command line.
+   * </ol>
+   *
+   * If programmatic access is desired and the parameters are to be set
+   * in some other way, just  do the first two steps, and then change any
+   * parameters that should not have their default values.
+   *
    * @param parser the ArgParser object that does the actual parsing of
    *   command-line arguments.
    */
 
   trait ArgParserParameters {
     val parser: ArgParser
+    protected lazy val ap = parser
   }
 
   /**

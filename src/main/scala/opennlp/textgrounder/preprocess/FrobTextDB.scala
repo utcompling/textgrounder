@@ -37,8 +37,8 @@ import gridlocate.GridDoc
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class FrobTextDBParameters(ap: ArgParser) extends
-    ProcessFilesParameters(ap) {
+class FrobTextDBParameters(parser: ArgParser) extends
+    ProcessFilesParameters(parser) {
   val input_dir =
     ap.option[String]("i", "input-dir",
       metavar = "DIR",

@@ -75,36 +75,10 @@ object GridLocateConstants {
 }
 
 /**
- * General class retrieving command-line arguments or storing programmatic
- * configuration parameters for a cell-grid-based application. The
- * parameters in here are those necessary for initializing a cell grid
- * from training documents, but not those used for geolocating test
- * documents or other applications (e.g. creating KML maps of the
- * distribution of the training docs).
- *
- * This uses an ArgParser object (stored in the `parser` field) to set
- * the parameters appropriately, e.g. from the command line. The parameters
- * themselves are stored in field variables, initialized from the ArgParser
- * object. In order to make this work, the following steps are necessary:
- *
- * <ol>
- * <li>Create an empty ArgParser.
- * <li>Create a parameter object, passing in the parser. As the
- *     "shadow fields" in this object get initialized, the parser records
- *     the valid parameters and their properties, and initializes the
- *     fields to their default values.
- * <li>Tell the parser to parse a command line.
- * <li>Create a second parameter object the same way the first one was
- *     created. This time, the fields will be initialized to the values
- *     stored in the command line.
- * </ol>
- *
- * If programmatic access is desired and the parameters are to be set
- * in some other way, just  do the first two steps, and then change any
- * parameters that should not have their default values.
+ * Mixin holding basic GridLocate parameters.
  */
-trait GridLocateParameters extends ArgParserParameters {
-  protected val ap = parser
+trait GridLocateBasicParameters {
+  this: GridLocateParameters =>
 
   var language =
     ap.option[String]("language", "lang",
@@ -121,21 +95,6 @@ Two- and three-letter ISO-639 codes can be used.  Currently recognized:
 English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   //// Input files
-  var stopwords_file =
-    ap.option[String]("stopwords-file",
-      metavar = "FILE",
-      help = """File containing list of stopwords.  If not specified,
-a default list of English stopwords (stored in the TextGrounder distribution)
-is used.""")
-
-  var whitelist_file =
-    ap.option[String]("whitelist-file",
-       metavar = "FILE",
-       help = """File containing a whitelist of words. If specified, ONLY
-words on the list will be read from any corpora; other words will be ignored.
-If not specified, all words (except those on the stopword list) will be
-read.""")
-
   var input =
     ap.multiOption[String]("i", "input", "input-corpus",
       metavar = "FILE",
@@ -169,123 +128,10 @@ Wikipedia article, etc.).
 
 Multiple such files can be given by specifying the option multiple
 times.""")
-  var eval_file =
-    ap.multiOption[String]("e", "eval-file",
-      metavar = "FILE",
-      help = """File or directory containing files to evaluate on.
-Multiple such files/directories can be given by specifying the option multiple
-times.  If a directory is given, all files in the directory will be
-considered (but if an error occurs upon parsing a file, it will be ignored).
-Each file is read in and then disambiguation is performed.  Not used during
-document geolocation when --eval-format=internal (the default).""")
+}
 
-  var salience_file =
-    ap.option[String]("salience-file",
-       metavar = "FILE",
-       help = """File containing a set of salient coordinates for identifying
-grid cells, in textdb format. These coordinates can be e.g. cities from a
-gazetteer with their population used as the salience value. For each grid
-cell, the most salient item in the cell will be noted, and when a particular
-grid cell is identified in diagnostic output (e.g. in `--print-results`), the
-salient item will be displayed along with the cell's coordinates to make it
-easier to identify the nature of the cell in question.
-
-The value can be any of the following: Either the data or schema file of
-the database; the common prefix of the two; or the directory containing
-them, provided there is only one textdb in the directory.
-
-The file should be in textdb format, with `name`, `coord` and `salience`
-fields. If omitted, cells will be identified by the most salient document
-in the cell, if documents have their own salience values.""")
-
-  var weights_file =
-    ap.option[String]("weights-file",
-       metavar = "FILE",
-       help = """File containing a set of word weights for weighting words
-non-uniformly (e.g. so that more geographically informative words are weighted
-higher). The file should be in textdb format, with `word` and `weight` fields.
-The weights do not need to be normalized but must not be negative. They will
-be normalized so that the average is 1. Each time a word is read in, it will
-be given a count corresponding to its normalized weight rather than a count
-of 1.
-
-The parameter value can be any of the following: Either the data or schema
-file of the database; the common prefix of the two; or the directory containing
-them, provided there is only one textdb in the directory.""")
-
-  var missing_word_weight =
-    ap.option[Double]("missing-word-weight", "mww",
-       metavar = "WEIGHT",
-       default = -1.0,
-       help = """Weight to use for words not given in the word-weight
-file, when `--weights-file` is given. If negative (the default), use
-the average of all weights in the file, which treats them as if they
-have no special weight. It is possible to set this value to zero, in
-which case unspecified words will be ignored.""")
-
-  var ignore_weights_below =
-    ap.option[Double]("ignore-weights-below", "iwb",
-       metavar = "WEIGHT",
-       help = """If given, ignore words whose weights are below the given
-value. If you specify this, you might also want to specify
-`--missing-word-weight 0` so that words with a missing or ignored weight are
-assigned a weight of 0 rather than the average of the weights that have been
-seen.""")
-
-  var results =
-    ap.option[String]("r", "results",
-      metavar = "FILE",
-      help = """If specified, prefix of file to store results into.
-Results are also normally output to stderr for debugging purposes unless
-`--no-results` is given.  Results are stored as a textdb database, i.e. two
-files will be written, with extensions `.data.txt` and `.schema.txt`, with
-the former storing the data as tab-separated fields and the latter naming
-the fields.""")
-
-  var num_nearest_neighbors =
-    ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
-      help = """Number of nearest neighbors (k in kNN); default is %default.""")
-
-  var num_top_cells_to_output =
-    ap.option[Int]("num-top-cells-to-output", "num-top-cells", default = 5,
-      help = """Number of nearest neighbor cells to output; default is %default;
--1 means output all""")
-
-  var output_training_cell_lang_models =
-    ap.flag("output-training-cell-lang-models", "output-training-cells",
-      help = """Output the training cell lang models after they've been trained.""")
-
-  //// Options indicating which documents to train on or evaluate
-  var eval_set =
-    ap.option[String]("eval-set", "es", metavar = "SET",
-      default = "dev",
-      aliasedChoices = Seq(Seq("dev", "devel"), Seq("test")),
-      help = """Set to use for evaluation during document geolocation when
-when --eval-format=internal ('dev' or 'devel' for the development set,
-'test' for the test set).  Default '%default'.""")
-  var num_training_docs =
-    ap.option[Int]("num-training-docs", "ntrain", metavar = "NUM",
-      default = 0,
-      help = """Maximum number of training documents to use.
-0 means no limit.  Default 0, i.e. no limit.""")
-  var num_test_docs =
-    ap.option[Int]("num-test-docs", "ntest", metavar = "NUM",
-      default = 0,
-      help = """Maximum number of test (evaluation) documents to process.
-0 means no limit.  Default 0, i.e. no limit.""")
-  var skip_initial_test_docs =
-    ap.option[Int]("skip-initial-test-docs", "skip-initial", metavar = "NUM",
-      default = 0,
-      help = """Skip this many test docs at beginning.  Default 0, i.e.
-don't skip any documents.""")
-  var every_nth_test_doc =
-    ap.option[Int]("every-nth-test-doc", "every-nth", metavar = "NUM",
-      default = 1,
-      help = """Only process every Nth test doc.  Default 1, i.e.
-process all.""")
-  //  def skip_every_n_test_docs =
-  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
-  //      help = """Skip this many after each one processed.  Default 0.""")
+trait GridLocateLangModelParameters {
+  this: GridLocateParameters =>
 
   //// Options used when creating language models
   var jelinek_factor_default = 0.3
@@ -384,26 +230,6 @@ smoothing).""")
     else "unigram"
   }
 
-  var rerank_lang_model =
-    ap.optionWithParams[String]("rerank-lang-model", "rerank-word-dist",
-        "rlm", "rwd",
-      default = ("pseudo-good-turing", ""),
-      aliasedChoices = Seq(
-        Seq("pseudo-good-turing", "pgt"),
-        Seq("dirichlet"),
-        Seq("jelinek-mercer", "jelinek"),
-        Seq("unsmoothed-ngram")),
-      help = """Language model for reranking. See `--lang-model`.""")
-  var rerank_interpolate =
-    ap.option[String]("rerank-interpolate",
-      default = "default",
-      aliasedChoices = Seq(
-        Seq("yes", "interpolate"),
-        Seq("no", "backoff"),
-        Seq("default")),
-      help = """Whether to do interpolation rather than back-off when
-reranking. See `--interpolate`.""")
-
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
@@ -442,15 +268,6 @@ away.""")
       help = """Adjust word counts according to TF-IDF weighting (i.e.
 downweight words that occur in many documents).""")
 
-  //// Options relating to cells
-  var center_method =
-    ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
-      default = "centroid",
-      choices = Seq("centroid", "center"),
-      help = """Chooses whether to use true center or centroid for cell
-central-point calculation. Options are either 'centroid' or 'center'.
-Default '%default'.""")
-
   //// Options used when doing Naive Bayes geolocation
   var naive_bayes_weighting =
     ap.option[String]("naive-bayes-weighting", "nbw", metavar = "STRATEGY",
@@ -479,74 +296,180 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
       help = """Number of entries in the LRU cache.  Default %default.
 Used only when --ranker=average-cell-probability.""")
 
-  //// Miscellaneous options for controlling internal operation
-  var no_parallel =
-    ap.flag("no-parallel",
-      help = """If true, don't do ranking computations in parallel.""")
+  var stopwords_file =
+    ap.option[String]("stopwords-file",
+      metavar = "FILE",
+      help = """File containing list of stopwords.  If not specified,
+a default list of English stopwords (stored in the TextGrounder distribution)
+is used.""")
 
-  //// Debugging/output options
-  var max_time_per_stage =
-    ap.option[Double]("max-time-per-stage", "mts", metavar = "SECONDS",
-      default = 0.0,
-      help = """Maximum time per stage in seconds.  If 0, no limit.
-Used for testing purposes.  Default 0, i.e. no limit.""")
+  var whitelist_file =
+    ap.option[String]("whitelist-file",
+       metavar = "FILE",
+       help = """File containing a whitelist of words. If specified, ONLY
+words on the list will be read from any corpora; other words will be ignored.
+If not specified, all words (except those on the stopword list) will be
+read.""")
+
+  var weights_file =
+    ap.option[String]("weights-file",
+       metavar = "FILE",
+       help = """File containing a set of word weights for weighting words
+non-uniformly (e.g. so that more geographically informative words are weighted
+higher). The file should be in textdb format, with `word` and `weight` fields.
+The weights do not need to be normalized but must not be negative. They will
+be normalized so that the average is 1. Each time a word is read in, it will
+be given a count corresponding to its normalized weight rather than a count
+of 1.
+
+The parameter value can be any of the following: Either the data or schema
+file of the database; the common prefix of the two; or the directory containing
+them, provided there is only one textdb in the directory.""")
+
+  var missing_word_weight =
+    ap.option[Double]("missing-word-weight", "mww",
+       metavar = "WEIGHT",
+       default = -1.0,
+       help = """Weight to use for words not given in the word-weight
+file, when `--weights-file` is given. If negative (the default), use
+the average of all weights in the file, which treats them as if they
+have no special weight. It is possible to set this value to zero, in
+which case unspecified words will be ignored.""")
+
+  var ignore_weights_below =
+    ap.option[Double]("ignore-weights-below", "iwb",
+       metavar = "WEIGHT",
+       help = """If given, ignore words whose weights are below the given
+value. If you specify this, you might also want to specify
+`--missing-word-weight 0` so that words with a missing or ignored weight are
+assigned a weight of 0 rather than the average of the weights that have been
+seen.""")
+
+  var output_training_cell_lang_models =
+    ap.flag("output-training-cell-lang-models", "output-training-cells",
+      help = """Output the training cell lang models after they've been trained.""")
+}
+
+trait GridLocateCellParameters {
+  this: GridLocateParameters =>
+
+  //// Options relating to cells
+  var center_method =
+    ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
+      default = "centroid",
+      choices = Seq("centroid", "center"),
+      help = """Chooses whether to use true center or centroid for cell
+central-point calculation. Options are either 'centroid' or 'center'.
+Default '%default'.""")
+
+  var salience_file =
+    ap.option[String]("salience-file",
+       metavar = "FILE",
+       help = """File containing a set of salient coordinates for identifying
+grid cells, in textdb format. These coordinates can be e.g. cities from a
+gazetteer with their population used as the salience value. For each grid
+cell, the most salient item in the cell will be noted, and when a particular
+grid cell is identified in diagnostic output (e.g. in `--print-results`), the
+salient item will be displayed along with the cell's coordinates to make it
+easier to identify the nature of the cell in question.
+
+The value can be any of the following: Either the data or schema file of
+the database; the common prefix of the two; or the directory containing
+them, provided there is only one textdb in the directory.
+
+The file should be in textdb format, with `name`, `coord` and `salience`
+fields. If omitted, cells will be identified by the most salient document
+in the cell, if documents have their own salience values.""")
+}
+
+//// Options indicating which documents to train on or evaluate
+trait GridLocateEvalParameters {
+  this: GridLocateParameters =>
+
+  //// Eval input options
+  var eval_set =
+    ap.option[String]("eval-set", "es", metavar = "SET",
+      default = "dev",
+      aliasedChoices = Seq(Seq("dev", "devel"), Seq("test")),
+      help = """Set to use for evaluation during document geolocation when
+when --eval-format=internal ('dev' or 'devel' for the development set,
+'test' for the test set).  Default '%default'.""")
+
+  var eval_file =
+    ap.multiOption[String]("e", "eval-file",
+      metavar = "FILE",
+      help = """File or directory containing files to evaluate on.
+Multiple such files/directories can be given by specifying the option multiple
+times.  If a directory is given, all files in the directory will be
+considered (but if an error occurs upon parsing a file, it will be ignored).
+Each file is read in and then disambiguation is performed.  Not used during
+document geolocation when --eval-format=internal (the default).""")
+
+  //// Eval output options
+  var results =
+    ap.option[String]("r", "results",
+      metavar = "FILE",
+      help = """If specified, prefix of file to store results into.
+Results are also normally output to stderr for debugging purposes unless
+`--no-results` is given.  Results are stored as a textdb database, i.e. two
+files will be written, with extensions `.data.txt` and `.schema.txt`, with
+the former storing the data as tab-separated fields and the latter naming
+the fields.""")
+
   var print_results =
     ap.flag("print-results", "show-results",
       help = """Show individual results for each test document.""")
+
   var results_by_range =
     ap.flag("results-by-range",
       help = """Show results by range (of error distances and number of
 documents in correct cell).  Not on by default as counters are used for this,
 and setting so many counters breaks some Hadoop installations.""")
+
+  var num_nearest_neighbors =
+    ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
+      help = """Number of nearest neighbors (k in kNN); default is %default.""")
+
+  var num_top_cells_to_output =
+    ap.option[Int]("num-top-cells-to-output", "num-top-cells", default = 5,
+      help = """Number of nearest neighbor cells to output; default is %default;
+-1 means output all""")
+
+  //// Restricting documents evaluated
   var oracle_results =
     ap.flag("oracle-results",
       help = """Only compute oracle results (much faster).""")
-  var debug =
-    ap.option[String]("d", "debug", metavar = "FLAGS",
-      help = """Output debug info of the given types.  Multiple debug
-parameters can be specified, indicating different types of info to output.
-Separate parameters by spaces, colons or semicolons.  Params can be boolean,
-if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
-list-valued; multiple values are specified by including the parameter
-multiple times, or by separating values by a comma.
 
-The best way to figure out the possible parameters is by reading the
-source code. (Look for references to debug("foo") for boolean params,
-debugval("foo") for valueful params, or debuglist("foo") for list-valued
-params.) Some known debug flags:
+  var num_training_docs =
+    ap.option[Int]("num-training-docs", "ntrain", metavar = "NUM",
+      default = 0,
+      help = """Maximum number of training documents to use.
+0 means no limit.  Default 0, i.e. no limit.""")
 
-gridrank: For the given test document number (starting at 1), output
-a grid of the predicted rank for cells around the correct cell.
-Multiple documents can have the rank output, e.g. --debug 'gridrank=45,58'
-(This will output info for documents 45 and 58.) This output can be
-postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
+  var num_test_docs =
+    ap.option[Int]("num-test-docs", "ntest", metavar = "NUM",
+      default = 0,
+      help = """Maximum number of test (evaluation) documents to process.
+0 means no limit.  Default 0, i.e. no limit.""")
 
-gridranksize: Size of the grid, in numbers of documents on a side.
-This is a single number, and the grid will be a square centered on the
-correct cell. (Default currently 11.)
+  var skip_initial_test_docs =
+    ap.option[Int]("skip-initial-test-docs", "skip-initial", metavar = "NUM",
+      default = 0,
+      help = """Skip this many test docs at beginning.  Default 0, i.e.
+don't skip any documents.""")
 
-kldiv: Print out words contributing most to KL divergence.
+  var every_nth_test_doc =
+    ap.option[Int]("every-nth-test-doc", "every-nth", metavar = "NUM",
+      default = 1,
+      help = """Only process every Nth test doc.  Default 1, i.e.
+process all.""")
+  //  def skip_every_n_test_docs =
+  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
+  //      help = """Skip this many after each one processed.  Default 0.""")
+}
 
-relcontribgrams: Print out words contributing most to the choice of the
-top-ranked cell vs. other cells. This is computed as if the Naive Bayes
-algorithm were being used. We compare cell at rank 1 vs. cell at rank 2,
-and cell at rank 1 vs. other cells, individually for each word.
-
-wordcountdocs: Regenerate document file, filtering out documents not
-seen in any counts file.
-
-some, lots, tons: General info of various sorts. (Document me.)
-
-cell: Print out info on each cell of the Earth as it's generated.  Also
-triggers some additional info during toponym resolution. (Document me.)
-
-commontop: Extra info for debugging
- --baseline-ranker=salience-most-common-toponym.
-
-pcl-travel: Extra info for debugging --eval-format=pcl-travel.
-""")
-
-  ////////////// Begin former GridLocateDocParameters
+trait GridLocateRankParameters {
+  this: GridLocateParameters =>
 
   protected def ranker_default = "naive-bayes-no-baseline"
   protected def ranker_choices = Seq(
@@ -619,8 +542,11 @@ simple algorithms meant for comparison purposes.
 
 """ + ranker_baseline_help +
 """Default is '%default'.""")
+}
 
-  //// Reranking options
+trait GridLocateRerankParameters {
+  this: GridLocateParameters =>
+
   var rerank =
     ap.option[String]("rerank",
       default = "none",
@@ -628,6 +554,27 @@ simple algorithms meant for comparison purposes.
       help = """Type of reranking to do.  Possibilities are
 'none', 'pointwise' (do pointwise reranking using a classifier).  Default
 is '%default'.""")
+
+  var rerank_lang_model =
+    ap.optionWithParams[String]("rerank-lang-model", "rerank-word-dist",
+        "rlm", "rwd",
+      default = ("pseudo-good-turing", ""),
+      aliasedChoices = Seq(
+        Seq("pseudo-good-turing", "pgt"),
+        Seq("dirichlet"),
+        Seq("jelinek-mercer", "jelinek"),
+        Seq("unsmoothed-ngram")),
+      help = """Language model for reranking. See `--lang-model`.""")
+
+  var rerank_interpolate =
+    ap.option[String]("rerank-interpolate",
+      default = "default",
+      aliasedChoices = Seq(
+        Seq("yes", "interpolate"),
+        Seq("no", "backoff"),
+        Seq("default")),
+      help = """Whether to do interpolation rather than back-off when
+reranking. See `--interpolate`.""")
 
   var rerank_top_n =
     ap.option[Int]("rerank-top-n",
@@ -832,7 +779,10 @@ specifies something other than 'trivial'.""")
         "unigram"
     }
   }
+}
 
+trait GridLocatePerceptronParameters {
+  this: GridLocateParameters =>
   var pa_variant =
     ap.option[Int]("pa-variant",
       metavar = "INT",
@@ -885,6 +835,80 @@ noisy training data.  We choose C = 1 as a compromise.""")
       help = """For perceptron: maximum number of training rounds
 (default: %default).""")
 }
+
+trait GridLocateMiscParameters {
+  this: GridLocateParameters =>
+
+  //// Miscellaneous options for controlling internal operation
+  var no_parallel =
+    ap.flag("no-parallel",
+      help = """If true, don't do ranking computations in parallel.""")
+
+  var max_time_per_stage =
+    ap.option[Double]("max-time-per-stage", "mts", metavar = "SECONDS",
+      default = 0.0,
+      help = """Maximum time per stage in seconds.  If 0, no limit.
+Used for testing purposes.  Default 0, i.e. no limit.""")
+
+  var debug =
+    ap.option[String]("d", "debug", metavar = "FLAGS",
+      help = """Output debug info of the given types.  Multiple debug
+parameters can be specified, indicating different types of info to output.
+Separate parameters by spaces, colons or semicolons.  Params can be boolean,
+if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
+list-valued; multiple values are specified by including the parameter
+multiple times, or by separating values by a comma.
+
+The best way to figure out the possible parameters is by reading the
+source code. (Look for references to debug("foo") for boolean params,
+debugval("foo") for valueful params, or debuglist("foo") for list-valued
+params.) Some known debug flags:
+
+gridrank: For the given test document number (starting at 1), output
+a grid of the predicted rank for cells around the correct cell.
+Multiple documents can have the rank output, e.g. --debug 'gridrank=45,58'
+(This will output info for documents 45 and 58.) This output can be
+postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
+
+gridranksize: Size of the grid, in numbers of documents on a side.
+This is a single number, and the grid will be a square centered on the
+correct cell. (Default currently 11.)
+
+kldiv: Print out words contributing most to KL divergence.
+
+relcontribgrams: Print out words contributing most to the choice of the
+top-ranked cell vs. other cells. This is computed as if the Naive Bayes
+algorithm were being used. We compare cell at rank 1 vs. cell at rank 2,
+and cell at rank 1 vs. other cells, individually for each word.
+
+wordcountdocs: Regenerate document file, filtering out documents not
+seen in any counts file.
+
+some, lots, tons: General info of various sorts. (Document me.)
+
+cell: Print out info on each cell of the Earth as it's generated.  Also
+triggers some additional info during toponym resolution. (Document me.)
+
+commontop: Extra info for debugging
+ --baseline-ranker=salience-most-common-toponym.
+
+pcl-travel: Extra info for debugging --eval-format=pcl-travel.
+""")
+}
+
+/**
+ * General class retrieving command-line arguments or storing programmatic
+ * configuration parameters for a cell-grid-based application. The
+ * parameters in here are those necessary for initializing a cell grid
+ * from training documents, but not those used for geolocating test
+ * documents or other applications (e.g. creating KML maps of the
+ * distribution of the training docs).
+ */
+trait GridLocateParameters extends ArgParserParameters with
+  GridLocateBasicParameters with GridLocateLangModelParameters with
+  GridLocateCellParameters with GridLocateEvalParameters with
+  GridLocateRankParameters with GridLocateRerankParameters with
+  GridLocatePerceptronParameters with GridLocateMiscParameters
 
 /**
  * Driver class for creating cell grids over some coordinate space, with a
