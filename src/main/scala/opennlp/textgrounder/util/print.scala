@@ -116,6 +116,7 @@ protected class PrintCollection {
             case _: Double => x
             case _: BigInt => x
             case _: BigDecimal => x
+            case _: String => x
             case _ => stringOf(x)
           }
         }
