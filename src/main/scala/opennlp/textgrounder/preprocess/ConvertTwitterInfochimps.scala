@@ -77,8 +77,8 @@ The fields are:
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class ConvertTwitterInfochimpsParameters(ap: ArgParser) extends
-    ProcessFilesParameters(ap) {
+class ConvertTwitterInfochimpsParameters(parser: ArgParser) extends
+    ProcessFilesParameters(parser) {
   var output_stats =
     ap.flag("output-stats",
       help = """If true, output time-based and user-based statistics on the
