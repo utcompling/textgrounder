@@ -607,19 +607,20 @@ For the perceptron classifiers, see also `--pa-variant`,
     rerank_features_matching_ngram_choices
 
   val allowed_rerank_features =
-    Seq("misc", "types-in-common", "model-compare", "score", "trivial") ++
+    Seq("misc", "types-in-common", "model-compare", "rank-score", "trivial") ++
     rerank_features_all_unigram_choices ++
     rerank_features_all_ngram_choices
 
   var rerank_features =
     ap.option[String]("rerank-features",
-      default = "misc,score",
+      default = "misc,rank-score",
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
-respective language models). The original ranking score for the cell always
-serves as one of the features.  Possibilities are:
+respective language models). Possibilities are:
 
-'trivial' (no features beyond the original score, for testing purposes);
+'trivial' (no features, for testing purposes);
+
+'rank-score' (use the original rank and ranking score);
 
 'unigram-binary' (use the value 1 when a word exists in the document,
   0 otherwise);
@@ -718,8 +719,8 @@ Binning of some fractional values is done in equal intervals. Default '%default'
 
 NOTE: Currently, this option does not affect any of the word-by-word rerank feature
 types, which have separate '*-binned' equivalents that can be specified directly.
-It does affect 'misc', 'model-compare', 'score' and similar non-word-by-word
-feature types. See '--rerank-features'.""")
+It does affect 'misc', 'model-compare', 'rank-score' and similar
+non-word-by-word feature types. See '--rerank-features'.""")
 
   var rerank_top_n =
     ap.option[Int]("rerank-top-n",
@@ -1399,8 +1400,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           new TypesInCommonCandidateInstFactory[Co](featvec_factory, binning_status)
         case "model-compare" =>
           new ModelCompareCandidateInstFactory[Co](featvec_factory, binning_status)
-        case "score" =>
-          new ScoreCandidateInstFactory[Co](featvec_factory, binning_status)
+        case "rank-score" =>
+          new RankScoreCandidateInstFactory[Co](featvec_factory, binning_status)
       }
     }
 

@@ -332,9 +332,9 @@ class ModelCompareCandidateInstFactory[Co](
 
 /**
  * A factory for generating features for a doc-cell candidate consisting of
- * the original ranking score and binned equivalent.
+ * the original rank, ranking score and maybe the binned equivalents.
  */
-class ScoreCandidateInstFactory[Co](
+class RankScoreCandidateInstFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateInstFactory[Co] {
