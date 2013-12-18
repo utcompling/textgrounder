@@ -611,14 +611,14 @@ package experiment {
     def output_command_line_parameters() {
       errprint("")
       errprint("Non-default parameter values:")
-      for (name <- arg_parser.argNames) {
+      for (name <- arg_parser.argNames.toSeq.sorted) {
         if (arg_parser.specified(name)) {
           errprint("%30s: %s", name, arg_parser(name))
         }
       }
       errprint("")
       errprint("Parameter values:")
-      for (name <- arg_parser.argNames) {
+      for (name <- arg_parser.argNames.toSeq.sorted) {
         errprint("%30s: %s", name, arg_parser(name))
         //errprint("%30s: %s", name, arg_parser.getType(name))
       }
