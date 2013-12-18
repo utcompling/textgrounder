@@ -549,12 +549,8 @@ trait GridLocateRerankParameters {
   this: GridLocateParameters =>
 
   var rerank =
-    ap.option[String]("rerank",
-      default = "none",
-      choices = Seq("none", "pointwise"),
-      help = """Type of reranking to do.  Possibilities are
-'none', 'pointwise' (do pointwise reranking using a classifier).  Default
-is '%default'.""")
+    ap.flag("rerank",
+      help = """If specified, do reranking of grid cells.""")
 
   var rerank_classifier =
     ap.option[String]("rerank-classifier",
@@ -755,7 +751,7 @@ A value of 'default' means use the same lang model as is specified in
     rerank_lang_model = lang_model
 
   lazy val rerank_lang_model_type = {
-    if (rerank == "none")
+    if (!rerank)
       grid_lang_model_type
     else {
       val is_ngram =
@@ -1428,7 +1424,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     /* The basic ranker object. */
     def basic_ranker =
       create_ranker_from_documents(read_raw_training_documents)
-    if (params.rerank == "none") basic_ranker
+    if (!params.rerank) basic_ranker
     else {
       /* Factory object for generating feature vectors describing
        * candidate instances (document-cell pairs) to be ranked. There is
