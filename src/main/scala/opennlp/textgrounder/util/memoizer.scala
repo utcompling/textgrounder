@@ -127,9 +127,9 @@ trait ToIntMemoizer[T] {
   // Map in the opposite direction.
   protected val id_value_map = hashfact.create_int_object_map[T]
 
-  def memoize_if(value: T) = value_id_map.get(value)
+  def memoize_if(value: T) = synchronized { value_id_map.get(value) }
 
-  def memoize(value: T) = {
+  def memoize(value: T) = synchronized {
     val lookup = memoize_if(value)
     // println("Saw value=%s, index=%s" format (value, lookup))
     lookup match {
@@ -144,7 +144,7 @@ trait ToIntMemoizer[T] {
     }
   }
 
-  def unmemoize(index: Int) = id_value_map(index)
+  def unmemoize(index: Int) = synchronized { id_value_map(index) }
 }
 
 // Doesn't currently work because overriding this way leads to error
