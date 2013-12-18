@@ -31,7 +31,7 @@ import util.print._
 import util.textdb._
 import util.debug._
 
-import learning.{ArrayVector, Ranker, SparseFeatureVectorFactory}
+import learning._
 import learning.perceptron._
 import langmodel._
 
@@ -779,6 +779,21 @@ A value of 'default' means use the same lang model as is specified in
         Seq("default")),
       help = """Whether to do interpolation rather than back-off when
 reranking. See `--interpolate`.""")
+
+  var rerank_initial_weights =
+    ap.option[String]("rerank-initial-weights", "riw",
+      default = "zero",
+      choices = Seq("zero", "rank-score-only", "random"),
+      help = """How to initialize weights during reranking. Possibilities
+are 'zero' (set to all zero), 'rank-score-only' (set to zero except for
+the original ranking score), 'random' (set to random).""")
+
+  var rerank_random_restart =
+    ap.option[Int]("rerank-random-restart", "rrr",
+      default = 1,
+      help = """How often to compute the reranking weights. The resulting
+set of weights will be averaged. This only makes sense when
+'--rerank-initialize-weights random', and implements random restarting.""")
 }
 
 trait GridLocatePerceptronParameters {
@@ -1335,24 +1350,46 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   protected def create_pointwise_classifier_trainer = {
     val vec_factory = ArrayVector
+    def create_weights(weights: VectorAggregate) = {
+      errprint("Creating %s weight vector: length %s",
+        params.rerank_initial_weights, weights.length)
+      params.rerank_initial_weights match {
+        case "zero" => ()
+        case "random" => {
+          val r = new scala.util.Random
+          for (d <- 0 until weights.depth; i <- 0 until weights.length)
+            weights(d)(i) = r.nextGaussian
+        }
+        case "rank-score-only" => ??? // FIXME!!
+      }
+      weights
+    }
     params.rerank_classifier match {
       case "perceptron" | "avg-perceptron" =>
         new BasicSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds,
-          averaged = params.rerank_classifier == "avg-perceptron")
+          averaged = params.rerank_classifier == "avg-perceptron") {
+            override def new_weights(len: Int) =
+              create_weights(new_zero_weights(len))
+          }
       case "pa-perceptron" =>
         new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.pa_variant, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.perceptron_rounds)
+          max_iterations = params.perceptron_rounds) {
+            override def new_weights(len: Int) =
+              create_weights(new_zero_weights(len))
+          }
       case "cost-perceptron" =>
         new PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.pa_cost_type == "prediction-based",
           params.pa_variant, params.perceptron_aggressiveness,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds) {
+            override def new_weights(len: Int) =
+              create_weights(new_zero_weights(len))
             def cost(inst: GridRankerInst[Co], correct: Int, predicted: Int) = {
               // Is this checking for correctness itself correct?  Is there a
               // problem with always returning a non-zero cost even when we
