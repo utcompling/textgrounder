@@ -21,14 +21,14 @@ class DebugSettings {
   }
 
   def parse_debug_spec(debugspec: String) {
-    val params = """[:;\s]+""".r.split(debugspec)
+    val params = """[,;\s]+""".r.split(debugspec)
     // Allow params with values, and allow lists of values to be given
     // by repeating the param
     for (f <- params) {
       if (f contains '=') {
         val Array(param, value) = f.split("=", 2)
         if (list_debug_params contains param) {
-          val values = "[,]".split(value)
+          val values = ":".split(value)
           debuglist(param) ++= values
         } else
           debugval(param) = value

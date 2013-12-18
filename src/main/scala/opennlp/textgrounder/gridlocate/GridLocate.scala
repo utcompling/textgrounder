@@ -857,10 +857,10 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
     ap.option[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
 parameters can be specified, indicating different types of info to output.
-Separate parameters by spaces, colons or semicolons.  Params can be boolean,
+Separate parameters by spaces, commas or semicolons.  Params can be boolean,
 if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
 list-valued; multiple values are specified by including the parameter
-multiple times, or by separating values by a comma.
+multiple times, or by separating values by a colon.
 
 The best way to figure out the possible parameters is by reading the
 source code. (Look for references to debug("foo") for boolean params,
