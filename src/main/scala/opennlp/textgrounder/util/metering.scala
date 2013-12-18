@@ -20,6 +20,8 @@ package opennlp.textgrounder
 package util
 
 import scala.util.control.Breaks._
+import scala.collection.{GenTraversable, GenTraversableOnce}
+import scala.collection.generic.CanBuildFrom
 
 import collection.{InterruptibleIterator, SideEffectIterator}
 import os._
@@ -31,7 +33,7 @@ import time.format_minutes_seconds
 //                             Metered Tasks                               //
 /////////////////////////////////////////////////////////////////////////////
 
-package metering {
+protected class MeteringPackage {
   /**
    * Class for tracking number of items processed in a long task, and
    * reporting periodic status messages concerning how many items
@@ -181,7 +183,7 @@ package metering {
       errprint("--------------------------------------------------------")
     }
 
-    def foreach[T](trav: Traversable[T])(f: T => Unit) {
+    def foreach[T](trav: GenTraversable[T])(f: T => Unit) {
       start()
       breakable {
         trav.foreach {
@@ -205,29 +207,16 @@ package metering {
     }
   }
 
-  import scala.collection.GenTraversableOnce
-  import scala.collection.generic.CanBuildFrom
-
-  private[metering] class MeteredTraversablePimp[T](trav: Traversable[T]) {
+  implicit class MeteredGenTraversablePimp[T, C[T] <: GenTraversable[T]](trav: C[T]) {
     def foreachMetered(m: Meter)(f: T => Unit) =
       m.foreach(trav)(f)
-  }
 
-  private[metering] class MeteredIteratorPimp[T](iter: Iterator[T]) {
-    def mapMetered[B](m: Meter)(f: (T) => B): Iterator[B] =
-      m.iterate(iter.map(f))
-
-    def flatMapMetered[B](m: Meter)(f: (T) => GenTraversableOnce[B]
-      ): Iterator[B] = m.iterate(iter.flatMap(f))
-  }
-
-  private[metering] class MeteredIterablePimp[T](iable: Iterable[T]) {
     def mapMetered[B, That](m: Meter)(f: (T) => B)(
-      implicit bf: CanBuildFrom[Iterable[T], B, That]
+      implicit bf: CanBuildFrom[GenTraversable[T], B, That]
     ): That = {
       m.start()
       try {
-        iable.map { x =>
+        trav.map { x =>
           val z = f(x)
           m.item_processed()
           z
@@ -236,11 +225,11 @@ package metering {
     }
 
     def flatMapMetered[B, That](m: Meter)(f: (T) => GenTraversableOnce[B])(
-      implicit bf: CanBuildFrom[Iterable[T], B, That]
+      implicit bf: CanBuildFrom[GenTraversable[T], B, That]
     ): That = {
       m.start()
       try {
-        iable.flatMap { x =>
+        trav.flatMap { x =>
           val z = f(x)
           m.item_processed()
           z
@@ -248,13 +237,14 @@ package metering {
       } finally { m.finish() }
     }
   }
+
+  implicit class MeteredIteratorPimp[T](iter: Iterator[T]) {
+    def mapMetered[B](m: Meter)(f: (T) => B): Iterator[B] =
+      m.iterate(iter.map(f))
+
+    def flatMapMetered[B](m: Meter)(f: (T) => GenTraversableOnce[B]
+      ): Iterator[B] = m.iterate(iter.flatMap(f))
+  }
 }
 
-package object metering {
-  implicit def to_MeteredIteratorPimp[T](iter: Iterator[T]) =
-    new MeteredIteratorPimp[T](iter)
-  implicit def to_MeteredIterablePimp[T](iable: Iterable[T]) =
-    new MeteredIterablePimp[T](iable)
-  implicit def to_MeteredTraversablePimp[T](trav: Traversable[T]) =
-    new MeteredTraversablePimp[T](trav)
-}
+package object metering extends MeteringPackage { }
