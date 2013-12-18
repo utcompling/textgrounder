@@ -21,7 +21,6 @@ package learning.perceptron
 import learning._
 
 import util.debug._
-import util.text.format_float
 
 /**
  * A perceptron for statistical classification.
@@ -247,14 +246,10 @@ trait BinaryPerceptronTrainer
       ): (VectorAggregate, Int) = {
     val weight_aggr = initialize(data)
     val weights = weight_aggr(0)
-    def print_weights() {
-       errprint("Weights: length=%s,max=%s,min=%s",
-         weights.length, weights.max, weights.min)
-      // errprint("Weights: [%s]", weights.mkString(","))
-    }
-    print_weights()
-    iterate_averaged(weight_aggr, averaged, error_threshold, max_iterations) {
-        (weights, iter) =>
+
+    debug_print_weights(weight_aggr, data.head._1.format_feature _)
+    iterate_averaged(data, weight_aggr, averaged, error_threshold,
+        max_iterations) { (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0
       var num_adjustments = 0
@@ -273,7 +268,7 @@ trait BinaryPerceptronTrainer
         errprint("Scale %s", scale)
         if (scale != 0) {
           fv.update_weights(weights(0), scale, 1)
-          print_weights()
+          debug_print_weights(weight_aggr, fv.format_feature _)
           total_adjustment += math.abs(scale)
           num_adjustments += 1
         }
@@ -288,8 +283,8 @@ trait BinaryPerceptronTrainer
       return debug_get_weights(data)
     val weight_aggr = initialize(data)
     val weights = weight_aggr(0)
-    iterate_averaged(weight_aggr, averaged, error_threshold, max_iterations) {
-        (weights, iter) =>
+    iterate_averaged(data, weight_aggr, averaged, error_threshold,
+        max_iterations) { (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0
       var num_adjustments = 0
@@ -499,12 +494,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
   def debug_get_weights(data: Iterable[(DI, Int)]
       ): (VectorAggregate, Int) = {
     val weights = initialize(data)
-    def print_weights() {
-       errprint("Weights: length=%s,max=%s,min=%s",
-         weights.length, weights.max, weights.min)
-      // errprint("Weights: [%s]", weights.mkString(","))
-    }
-    iterate_averaged(weights, averaged, error_threshold, max_iterations) {
+    iterate_averaged(data, weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0
@@ -535,7 +525,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
         if (scale != 0) {
           fv.update_weights(weights(r), scale, r)
           fv.update_weights(weights(s), -scale, s)
-          print_weights()
+          debug_print_weights(weights, fv.format_feature _)
           total_adjustment += math.abs(scale)
           num_adjustments += 1
         }
@@ -549,7 +539,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weights = initialize(data)
-    iterate_averaged(weights, averaged, error_threshold, max_iterations) {
+    iterate_averaged(data, weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0
@@ -575,7 +565,6 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
       }
       errprint("Pct error: %s/%s = %.2f", num_errors, data.size,
         num_errors.toDouble / data.size * 100)
-      errprint("Weight sum: %s", format_float(weights.sum))
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -769,11 +758,6 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
   def debug_get_weights(data: Iterable[(DI, Int)]
       ): (VectorAggregate, Int) = {
     val weights = initialize(data)
-    def print_weights() {
-       errprint("Weights: length=%s,max=%s,min=%s",
-         weights.length, weights.max, weights.min)
-      // errprint("Weights: [%s]", weights.mkString(","))
-    }
     def get_cost(inst: DI, correct: Int, predicted: Int) = {
       val costval = cost(inst, correct, predicted)
       errprint("Cost (correct = %s, predicted = %s): %s",
@@ -781,7 +765,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
       costval
     }
 
-    iterate_averaged(weights, averaged, error_threshold, max_iterations) {
+    iterate_averaged(data, weights, averaged, error_threshold, max_iterations) {
         (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0
@@ -819,7 +803,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
           if (scale != 0) {
             fv.update_weights(weights(correct), scale, correct)
             fv.update_weights(weights(predicted), -scale, predicted)
-            print_weights()
+            debug_print_weights(weights, fv.format_feature _)
             total_adjustment += math.abs(scale)
             num_adjustments += 1
           }
@@ -833,7 +817,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weights = initialize(data)
-    iterate_averaged(weights, averaged, error_threshold,
+    iterate_averaged(data, weights, averaged, error_threshold,
          max_iterations) { (weights, iter) =>
       var total_adjustment = 0.0
       var num_errors = 0

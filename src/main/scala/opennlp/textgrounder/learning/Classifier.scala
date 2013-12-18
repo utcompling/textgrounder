@@ -31,8 +31,13 @@ import io.Source
 import util.math.argmax
 import util.metering._
 import util.print._
+import util.text.format_float
 
 import util.debug._
+
+object ClassifierConstants {
+  val weights_to_print = 15
+}
 
 /**
  * Mix-in for classifiers and classifier trainers.
@@ -121,21 +126,15 @@ trait ScoringClassifier extends Classifier {
   }
 }
 
-abstract class LinearClassifier(
-  val weights: VectorAggregate
-) extends ScoringClassifier {
-  def score_label(inst: FeatureVector, label: Int) =
-    inst.dot_product(weights(label), label)
-
-  /** Convert a feature index into a user-readable string. */
-  def format_feature(index: Int) = index.toString
-
+trait LinearClassifierLike {
   /** Print the weight coefficients with the largest absolute value.
     *
     * @param num_items Number of items to print. If &lt;= 0, print all items.
     */
-  def debug_print_weights(num_items: Int = -1) {
-    errprint("Weights:")
+  def debug_print_weights(weights: VectorAggregate,
+      format_feature: Int => String, num_items: Int) {
+    errprint("Weights: length=%s, depth=%s, max=%s, min=%s",
+       weights.length, weights.depth, weights.max, weights.min)
     for (depth <- 0 until weights.depth) {
       val vec = weights(depth)
       errprint("  Weights at depth %s: ", depth)
@@ -150,6 +149,24 @@ abstract class LinearClassifier(
       }
     }
   }
+
+  def debug_print_weights(weights: VectorAggregate,
+      format_feature: Int => String) {
+    val weights_to_print_str = debugval("weights-to-print")
+    val weights_to_print =
+      if (weights_to_print_str == "")
+        ClassifierConstants.weights_to_print
+      else
+        weights_to_print_str.toInt
+    debug_print_weights(weights, format_feature, weights_to_print)
+  }
+}
+
+abstract class LinearClassifier(
+  val weights: VectorAggregate
+) extends ScoringClassifier with LinearClassifierLike {
+  def score_label(inst: FeatureVector, label: Int) =
+    inst.dot_product(weights(label), label)
 }
 
 /** Mix-in for a fixed-depth classifier (or trainer thereof). */
@@ -221,7 +238,7 @@ trait ClassifierTrainer[DI <: DataInstance]
  * @tparam DI Type of data instance used in training the classifier.
  */
 trait LinearClassifierTrainer[DI <: DataInstance]
-    extends ClassifierTrainer[DI] {
+    extends ClassifierTrainer[DI] with LinearClassifierLike {
   val factory: VectorAggregateFactory
 
   /** Check that the arguments passed in are kosher, and return an array of
@@ -289,23 +306,25 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *   total_adjustment) where `num_errors` is the number of errors made on
     *   the training data and `total_adjustment` is the total sum of the
     *   scaling factors used to update the weights when a mistake is made. */
-  def iterate_averaged(weights: VectorAggregate,
+  def iterate_averaged(data: Iterable[(DI, Int)], weights: VectorAggregate,
         averaged: Boolean, error_threshold: Double, max_iterations: Int)(
       fun: (VectorAggregate, Int) => (Int, Int, Double)) = {
+    def do_iterate(coda: => Unit) =
+      iterate(error_threshold, max_iterations){ iter =>
+        val retval = fun(weights, iter)
+        errprint("Weight sum: %s", format_float(weights.sum))
+        if (debug("weights-each-iteration"))
+          debug_print_weights(weights,
+            data.head._1.feature_vector.format_feature _)
+        coda
+        retval
+      }
     if (!averaged) {
-      val num_iterations =
-        iterate(error_threshold, max_iterations){ iter =>
-          fun(weights, iter)
-        }
+      val num_iterations = do_iterate { }
       (weights, num_iterations)
     } else {
       val avg_weights = new_zero_weights(weights.length)
-      val num_iterations =
-        iterate(error_threshold, max_iterations){ iter =>
-          val retval = fun(weights, iter)
-          avg_weights += weights
-          retval
-        }
+      val num_iterations = do_iterate { avg_weights += weights }
       avg_weights *= 1.0 / num_iterations
       (avg_weights, num_iterations)
     }
@@ -317,18 +336,17 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *   to compute them. */
   def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int)
 
-  /** Create a linear classifier given weights and a function to format
-    * feature indices into user-readable strings. */
-  def create_classifier(weights: VectorAggregate,
-      format_feature_fn: Int => String): LinearClassifier
+  /** Create a linear classifier. */
+  def create_classifier(weights: VectorAggregate): LinearClassifier
 
   /** Train a linear classifier given a set of labeled instances. */
   def apply(data: Iterable[(DI, Int)]) = {
     val (weights, _) = get_weights(data)
-    val format_feature_fn = data.head._1.feature_vector.format_feature _
-    val cfier = create_classifier(weights, format_feature_fn)
-    if (debug("weights"))
-      cfier.debug_print_weights()
+    val cfier = create_classifier(weights)
+    if (debug("weights")) {
+      val format_feature_fn = data.head._1.feature_vector.format_feature _
+      cfier.debug_print_weights(cfier.weights, format_feature_fn)
+    }
     cfier
   }
 }
@@ -384,12 +402,8 @@ trait SingleWeightLinearClassifierTrainer[DI <: DataInstance]
   val vector_factory: SimpleVectorFactory
   lazy val factory = new SingleVectorAggregateFactory(vector_factory)
 
-  def create_classifier(weights: VectorAggregate,
-      format_feature_fn: Int => String) = {
-    new VariableDepthLinearClassifier(weights) {
-      override def format_feature(index: Int) = format_feature_fn(index)
-    }
-  }
+  def create_classifier(weights: VectorAggregate) =
+    new VariableDepthLinearClassifier(weights)
 }
 
 /**
@@ -408,12 +422,8 @@ trait MultiWeightLinearClassifierTrainer[DI <: DataInstance]
   val vector_factory: SimpleVectorFactory
   lazy val factory = new MultiVectorAggregateFactory(vector_factory, num_labels)
 
-  def create_classifier(weights: VectorAggregate,
-      format_feature_fn: Int => String) = {
-    new FixedDepthLinearClassifier(weights, num_labels) {
-      override def format_feature(index: Int) = format_feature_fn(index)
-    }
-  }
+  def create_classifier(weights: VectorAggregate) =
+    new FixedDepthLinearClassifier(weights, num_labels)
 }
 
 /**
@@ -426,12 +436,8 @@ trait BinaryLinearClassifierTrainer[DI <: DataInstance]
   val vector_factory: SimpleVectorFactory
   lazy val factory = new SingleVectorAggregateFactory(vector_factory)
 
-  def create_classifier(weights: VectorAggregate,
-      format_feature_fn: Int => String) = {
-    new BinaryLinearClassifier(weights.asInstanceOf[SingleVectorAggregate]) {
-      override def format_feature(index: Int) = format_feature_fn(index)
-    }
-  }
+  def create_classifier(weights: VectorAggregate) =
+    new BinaryLinearClassifier(weights.asInstanceOf[SingleVectorAggregate])
 }
 
 /**
