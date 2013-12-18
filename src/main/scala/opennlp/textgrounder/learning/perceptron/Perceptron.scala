@@ -21,6 +21,7 @@ package learning.perceptron
 import learning._
 
 import util.debug._
+import util.text.format_float
 
 /**
  * A perceptron for statistical classification.
@@ -574,6 +575,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
       }
       errprint("Pct error: %s/%s = %.2f", num_errors, data.size,
         num_errors.toDouble / data.size * 100)
+      errprint("Weight sum: %s", format_float(weights.sum))
       (num_errors, num_adjustments, total_adjustment)
     }
   }

@@ -35,6 +35,8 @@ trait SimpleVector {
 
   def min: Double
 
+  def sum: Double
+
   def apply(index: Int): Double
 
   def update(index: Int, value: Double)
@@ -95,6 +97,7 @@ class ArrayVector(array: Array[Double]) extends BasicSimpleVectorImpl {
 
   def max = array.max
   def min = array.min
+  def sum = array.sum
 
   final def apply(index: Int) = array(index)
 
@@ -147,6 +150,7 @@ trait VectorAggregate {
 
   def max: Double = map(_.max).max
   def min: Double = map(_.min).min
+  def sum: Double = map(_.sum).sum
 }
 
 trait VectorAggregateFactory {
