@@ -1465,12 +1465,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               featvec
             }
 
-            data.mapMetered(task) { qtd =>
+            val maybepar_data =
+              if (true /* params.no_parallel */) data
+              else data.par
+
+            maybepar_data.mapMetered(task) { qtd =>
               val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
               val label = qtd.label
               val candidates = qtd.cand_scores.map(_._1).toIndexedSeq
               (GridRankerInst(qtd.query, candidates, agg_fv), label)
-            }
+            }.toIterable.seq
           }
 
           /* Create the feature vector for a candidate instance (document-cell
