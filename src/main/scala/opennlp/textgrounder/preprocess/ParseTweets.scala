@@ -69,7 +69,8 @@ class ParseTweetsParams(ap: ArgParser) extends
     directly, after duplicated tweets have been removed).  Default is
     `%default`.  See also `--filter-grouping`.""")
   var filter_grouping = ap.option[String]("filter-grouping", "fg",
-    choices = Seq("user", "time", "file", "none"),
+    default = "default",
+    choices = Seq("user", "time", "file", "none", "default"),
     help="""Mode for grouping tweets for filtering by group (using
     `--filter-groups` or `--cfilter-groups`).  The possible modes are the
     same as in `--grouping`.  The default is the same as `--grouping`, but
@@ -113,6 +114,7 @@ class ParseTweetsParams(ap: ArgParser) extends
     help="""Split (training, dev, test) to place data in.  Default %default.""")
   var timeslice_float = ap.option[Double]("timeslice", "time-slice",
     default = 6.0,
+    must = be_>(0.0),
     help="""Number of seconds per timeslice when `--grouping=time`.
     Can be a fractional number.  Default %default.""")
   // The following is set based on --timeslice
@@ -328,6 +330,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     between e.g. the name "Mark" and the word "mark".""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
+    must = be_>(0),
     help="""Largest size of n-grams to create.  Default 1, i.e. language model
     only contains unigrams.""")
 
@@ -431,7 +434,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     timeslice = (timeslice_float * 1000).toLong
     has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
     val has_group_filtering = filter_groups != null || cfilter_groups != null
-    if (filter_grouping == null) {
+    if (filter_grouping == "default") {
       if (has_group_filtering)
         filter_grouping = grouping
       else

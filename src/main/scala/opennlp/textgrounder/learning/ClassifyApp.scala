@@ -57,11 +57,13 @@ Default %default.""")
   var trainSource =
     ap.option[String]("t", "train",
       metavar = "FILE",
+      must = be_specified,
       help = """Labeled file for training model.""")
 
   var predictSource =
     ap.option[String]("p", "predict",
       metavar = "FILE",
+      must = be_specified,
       help = """(Labeled) file to make predictions on.""")
 
   var output =
@@ -72,6 +74,7 @@ Default %default.""")
   var lambda =
     ap.option[Double]("l", "lambda",
       metavar = "DOUBLE",
+      must = be_>=(0.0),
       help = """For Naive Bayes: smoothing amount >= 0.0 (default: %default).""")
 
   var variant =
@@ -84,17 +87,20 @@ Default %default.""")
     ap.option[Double]("e", "error-threshold", "thresh",
       metavar = "DOUBLE",
       default = 1e-10,
+      must = be_>(0.0),
       help = """For perceptron: Total error threshold below which training stops (default: %default).""")
 
   var aggressiveness =
     ap.option[Double]("a", "aggressiveness",
       metavar = "DOUBLE",
       default = 1.0,
+      must = be_>(0.0),
       help = """For perceptron: aggressiveness factor > 0.0 (default: %default).""")
 
   var rounds =
     ap.option[Int]("r", "rounds",
       default = 10000,
+      must = be_>(0),
       help = """For perceptron: maximum number of training rounds (default: %default).""")
 
   var debug =
@@ -107,6 +113,8 @@ list-valued; multiple values are specified by including the parameter
 multiple times, or by separating values by a comma.
 """)
 
+  if (ap.parsedValues && debug != null)
+    parse_debug_spec(debug)
 }
 
 /**
@@ -121,17 +129,6 @@ object Classify extends ExperimentApp("Classify") {
   def create_param_object(ap: ArgParser) = new ClassifyParameters(ap)
 
   def initialize_parameters() {
-    val ap = arg_parser
-    if (params.lambda < 0)
-      ap.error("Lambda value should be greater than or equal to zero.")
-    if (params.aggressiveness <= 0)
-      ap.error("Aggressiveness value should be strictly greater than zero.")
-    if (params.trainSource == null)
-      ap.error("No training file provided.")
-    if (params.predictSource == null)
-      ap.error("No input file provided.")
-    if (params.debug != null)
-      parse_debug_spec(params.debug)
   }
 
   def run_program(args: Array[String]) = {

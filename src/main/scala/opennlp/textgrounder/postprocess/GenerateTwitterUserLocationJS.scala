@@ -31,6 +31,7 @@ import util.debug._
 
 class GenerateTwitterUserLocationJSParameters(ap: ArgParser) {
   var input = ap.positional[String]("input",
+    must = be_specified,
     help = """Results file to analyze, a textdb database. The value can be
   any of the following: Either the data or schema file of the database;
   the common prefix of the two; or the directory containing them, provided

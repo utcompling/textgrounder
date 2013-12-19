@@ -38,6 +38,7 @@ class FindPoliticalParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var political_twitter_accounts = ap.option[String](
     "political-twitter-accounts", "pta",
+    must = be_specified,
     help="""Textdb database containing list of politicians and associated
     twitter accounts, for identifying liberal and conservative tweeters.
     The value can be any of the following: Either the data or schema file
@@ -54,15 +55,18 @@ class FindPoliticalParams(ap: ArgParser) extends
     TextGrounder corpus format, with ideology identified by a numeric
     score).""")
   var min_accounts = ap.option[Int]("min-accounts", default = 2,
+    must = be_>(0),
     help="""Minimum number of political accounts referenced by Twitter users
     in order for users to be considered.  Default %default.""")
   var min_conservative = ap.option[Double]("min-conservative", "mc",
     default = 0.75,
+    must = be_within(0.0, 1.0),
     help="""Minimum ideology score to consider a user as an "ideological
     conservative".  On the ideology scale, greater values indicate more
     conservative.  Currently, the scale runs from 0 to 1; hence, this value
     should be greater than 0.5.  Default %default.""")
   var max_liberal = ap.option[Double]("max-liberal", "ml",
+    must = be_within(0.0, 1.0),
     help="""Maximum ideology score to consider a user as an "ideological
     liberal".  On the ideology scale, greater values indicate more
     conservative.  Currently, the scale runs from 0 to 1; hence, this value
@@ -71,6 +75,7 @@ class FindPoliticalParams(ap: ArgParser) extends
     --min-conservative=0.75).""")
   var iterations = ap.option[Int]("iterations", "i",
     default = 1,
+    must = be_>(0),
     help="""Number of iterations when generating ideological users.""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
@@ -104,12 +109,8 @@ class FindPoliticalParams(ap: ArgParser) extends
   var schema: Schema = _
 
   override def check_usage() {
-    if (political_twitter_accounts == null)
-      ap.error("--political-twitter-accounts must be specified")
     if (!ap.specified("max-liberal"))
       max_liberal = 1 - min_conservative
-    if (iterations <= 0)
-      ap.error("--iterations must be > 0")
   }
 }
 

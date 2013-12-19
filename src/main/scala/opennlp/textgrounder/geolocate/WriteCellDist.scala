@@ -34,6 +34,7 @@ class WriteCellDistParameters(
 ) extends GeolocateParameters(parser) {
   var words =
     ap.option[String]("words",
+      must = be_specified,
       help = """Words to write distributions for.  Each word should be
 separated by a comma.  For each word, a textdb file is written using the
 value of `--output` as a prefix.""")
@@ -41,6 +42,7 @@ value of `--output` as a prefix.""")
   var split_words:Seq[String] = _
   var output =
     ap.option[String]("o", "output",
+      must = be_specified,
       metavar = "FILE",
       help = """File prefix of written-out distributions.  Distributions are
 stored as textdb corpora, i.e. for each word, two files will be written, formed
@@ -56,7 +58,6 @@ class WriteCellDistDriver extends
 
   override def handle_parameters() {
     super.handle_parameters()
-    need(params.words, "words")
     params.split_words = params.words.split(',')
   }
 

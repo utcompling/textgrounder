@@ -223,23 +223,27 @@ class GeolocateParameters(val parser: ArgParser
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
     ap.option[Double]("degrees-per-cell", "dpc", metavar = "DEGREES",
+      must = be_>=(0.0),
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default is 1.0 if neither --miles-per-cell
 nor --km-per-cell is given. """)
   var miles_per_cell =
     ap.option[Double]("miles-per-cell", "mpc", metavar = "MILES",
+      must = be_>=(0.0),
       help = """Size (in miles, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var km_per_cell =
     ap.option[Double]("km-per-cell", "kpc", metavar = "KM",
+      must = be_>=(0.0),
       help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var width_of_multi_cell =
     ap.option[Int]("width-of-multi-cell", metavar = "CELLS", default = 1,
+      must = be_>(0),
       help = """Width of the cell used to compute a language model
 for geolocation purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
@@ -256,6 +260,7 @@ grid cell.""")
   var kd_bucket_size =
     ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default = 200,
       metavar = "INT",
+      must = be_>(0),
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
 
@@ -276,6 +281,7 @@ language models.""")
 
   var kd_interpolate_weight =
     ap.option[Double]("kd-interpolate-weight", "kdiw", default = 0.0,
+      must = be_>=(0.0),
       help = """Specifies the weight given to parent language models.
 Default value '%default' means no interpolation is used.""")
 
@@ -351,6 +357,7 @@ Default '%default'.""")
   var k_best =
     ap.option[Int]("k-best", "kb",
       default = 10,
+      must = be_>(0),
       help = """Value of K for use in the mean-shift algorithm
 (see '--coord-strategy').  For this value of K, we choose the K best cells
 and then apply the mean-shift algorithm to the central points of those cells.
@@ -360,6 +367,7 @@ Default '%default'.""")
   var mean_shift_window =
     ap.option[Double]("mean-shift-window", "msw",
       default = 1.0,
+      must = be_>(0.0),
       help = """Window to use in the mean-shift algorithm
 (see '--coord-strategy').
 
@@ -368,6 +376,7 @@ Default '%default'.""")
   var mean_shift_max_stddev =
     ap.option[Double]("mean-shift-max-stddev", "msms",
       default = 1e-10,
+      must = be_>(0.0),
       help = """Maximum allowed standard deviation (i.e. approximately the
 average distance of the points from their mean) among the points selected by
 the mean-shift algorithm (see '--coord-strategy').
@@ -377,6 +386,7 @@ Default '%default'.""")
   var mean_shift_max_iterations =
     ap.option[Int]("mean-shift-max-iterations", "msmi",
       default = 100,
+      must = be_>(0),
       help = """Maximum number of iterations in the mean-shift algorithm
 (see '--coord-strategy').
 
@@ -391,9 +401,6 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
 
   override def handle_parameters() {
     super.handle_parameters()
-
-    if (params.width_of_multi_cell <= 0)
-      param_error("Width of multi cell must be positive")
 
     // Handle different ways of specifying grid size
 

@@ -49,6 +49,7 @@ class ProcessFilesParameters(val parser: ArgParser) extends
   val output_dir =
     parser.option[String]("o", "output-dir",
       metavar = "DIR",
+      must = be_specified,
       help = """Directory to store output files in.  It must not already
 exist, and will be created (including any parent directories).""")
 }
@@ -58,7 +59,6 @@ abstract class ProcessFilesDriver extends HadoopableArgParserExperimentDriver {
   type TRunRes = Unit
 
   def handle_parameters() {
-    need(params.output_dir, "output-dir")
   }
 
   def run() {

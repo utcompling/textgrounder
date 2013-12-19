@@ -29,6 +29,7 @@ class WriteGridParameters(
   var output =
     ap.option[String]("o", "output",
       metavar = "FILE",
+      must = be_specified,
       help = """File prefix of written-out cells.  Cells are written as a
 textdb corpus, i.e. two files will be written, formed by adding
 `WORD.data.txt` and `WORD.schema.txt` to the prefix, with the former

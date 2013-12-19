@@ -243,11 +243,13 @@ matching), not to toponyms, which are always matched case-insensitively.""")
   var minimum_word_count =
     ap.option[Int]("minimum-word-count", "mwc", metavar = "NUM",
       default = 1,
+      must = be_>(0),
       help = """Minimum count of words to consider in language models.
 Words whose count is less than this value are ignored.""")
   var max_ngram =
     ap.option[Int]("max-ngram", "mn", metavar = "NUM",
       default = 0,
+      must = be_>=(0),
       help = """Maximum length of n-grams to include in an n-gram language
 model. Any larger n-grams included in the source (e.g. corpus)
 will be ignored. A value of 0 means don't filter any n-grams.  See
@@ -256,6 +258,7 @@ generated from a raw document.""")
   var raw_text_max_ngram =
     ap.option[Int]("raw-text-max-ngram", "rdmn", metavar = "NUM",
       default = 3,
+      must = be_>=(0),
       help = """Maximum length of n-grams to generate when generating
 n-grams from a raw document.  See also `--max-ngram`, which filters out
 all n-grams above a particular length from an existing corpus of n-grams.
@@ -287,6 +290,7 @@ from the toponym.""")
     ap.option[Double]("naive-bayes-baseline-weight", "nbbw",
       metavar = "WEIGHT",
       default = 0.5,
+      must = be_>=(0.0),
       help = """Relative weight to assign to the baseline (prior
 probability) when doing weighted Naive Bayes.  Default %default.""")
 
@@ -294,6 +298,7 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
   var lru_cache_size =
     ap.option[Int]("lru-cache-size", "lru", metavar = "SIZE",
       default = 400,
+      must = be_>(0),
       help = """Number of entries in the LRU cache.  Default %default.
 Used only when --ranker=average-cell-probability.""")
 
@@ -429,6 +434,7 @@ and setting so many counters breaks some Hadoop installations.""")
 
   var num_nearest_neighbors =
     ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
+      must = be_>(0),
       help = """Number of nearest neighbors (k in kNN); default is %default.""")
 
   var num_top_cells_to_output =
@@ -444,24 +450,28 @@ and setting so many counters breaks some Hadoop installations.""")
   var num_training_docs =
     ap.option[Int]("num-training-docs", "ntrain", metavar = "NUM",
       default = 0,
+      must = be_>=(0),
       help = """Maximum number of training documents to use.
 0 means no limit.  Default 0, i.e. no limit.""")
 
   var num_test_docs =
     ap.option[Int]("num-test-docs", "ntest", metavar = "NUM",
       default = 0,
+      must = be_>=(0),
       help = """Maximum number of test (evaluation) documents to process.
 0 means no limit.  Default 0, i.e. no limit.""")
 
   var skip_initial_test_docs =
     ap.option[Int]("skip-initial-test-docs", "skip-initial", metavar = "NUM",
       default = 0,
+      must = be_>=(0),
       help = """Skip this many test docs at beginning.  Default 0, i.e.
 don't skip any documents.""")
 
   var every_nth_test_doc =
     ap.option[Int]("every-nth-test-doc", "every-nth", metavar = "NUM",
       default = 1,
+      must = be_>(0),
       help = """Only process every Nth test doc.  Default 1, i.e.
 process all.""")
   //  def skip_every_n_test_docs =
@@ -725,11 +735,13 @@ non-word-by-word feature types. See '--rerank-features'.""")
   var rerank_top_n =
     ap.option[Int]("rerank-top-n",
       default = 50,
+      must = be_>(0),
       help = """Number of top-ranked items to rerank.  Default is %default.""")
 
   var rerank_num_training_splits =
     ap.option[Int]("rerank-num-training-splits",
       default = 5,
+      must = be_>(0),
       help = """Number of splits to use when training the reranker.
 The source training data is split into this many segments, and each segment
 is used to construct a portion of the actual training data for the reranker
@@ -791,6 +803,7 @@ the original ranking score), 'random' (set to random).""")
   var rerank_random_restart =
     ap.option[Int]("rerank-random-restart", "rrr",
       default = 1,
+      must = be_>(0),
       help = """How often to compute the reranking weights. The resulting
 set of weights will be averaged. This only makes sense when
 '--rerank-initialize-weights random', and implements random restarting.""")
@@ -822,6 +835,7 @@ means as many times as the value of `--rerank-top-n`). Default %s.""")
     ap.option[Double]("perceptron-error-threshold",
       metavar = "DOUBLE",
       default = 1e-10,
+      must = be_>(0.0),
       help = """For perceptron when reranking: Total error threshold below
 which training stops (default: %default).""")
 
@@ -829,6 +843,7 @@ which training stops (default: %default).""")
     ap.option[Double]("perceptron-aggressiveness",
       metavar = "DOUBLE",
       default = 0.0,
+      must = be_>=(0.0),
       help = """For perceptron: aggressiveness factor > 0.0.  If 0, use
 the default value, currently 1.0 for both the the regular and PA-perceptrons,
 but that may change because the meaning is rather different for the two
@@ -847,6 +862,7 @@ noisy training data.  We choose C = 1 as a compromise.""")
     ap.option[Int]("perceptron-rounds",
       metavar = "INT",
       default = 10000,
+      must = be_>(0),
       help = """For perceptron: maximum number of training rounds
 (default: %default).""")
 }
@@ -862,6 +878,7 @@ trait GridLocateMiscParameters {
   var max_time_per_stage =
     ap.option[Double]("max-time-per-stage", "mts", metavar = "SECONDS",
       default = 0.0,
+      must = be_>=(0.0),
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
 
@@ -973,8 +990,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     need_seq(params.input, "input")
 
-    if (params.perceptron_aggressiveness < 0)
-      param_error("Perceptron aggressiveness value should be strictly greater than zero")
     if (params.perceptron_aggressiveness == 0.0) // If default ...
       // Currently same for both regular and pa-perceptron, despite
       // differing interpretations.

@@ -35,6 +35,7 @@ class ComputeEntropyParameters(
   var output =
     ap.option[String]("o", "output",
       metavar = "PREFIX",
+      must = be_specified,
       help = """File prefix of written-out distributions.  Distributions are
 stored as textdb corpora, i.e. for each word, two files will be written, named
 `PREFIX.data.txt` and `PREFIX.schema.txt`, with the former storing the data
@@ -44,6 +45,7 @@ as tab-separated fields and the latter naming the fields.""")
     ap.option[Int]("entropy-minimum-word-count", "emwc",
       metavar = "INT",
       default = 10,
+      must = be_>(0),
       help = """Minimum total count of a word in order for it to be included
 in the list of words for which the entropy is computed.  Default %default.""")
 
@@ -75,11 +77,6 @@ class ComputeEntropyDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = ComputeEntropyParameters
   type TRunRes = Unit
-
-  override def handle_parameters() {
-    super.handle_parameters()
-    need(params.output, "output")
-  }
 
   /**
    * Do the actual computation.

@@ -46,8 +46,10 @@ class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug_file = ap.option[String]("debug-file",
     help="""File to write debug info to, instead of stderr.""")
   var input = ap.positional[String]("INPUT",
+    must = be_specified,
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
+    must = be_specified,
     help = "Destination directory to place files in.")
 
   /**

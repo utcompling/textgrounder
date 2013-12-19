@@ -71,6 +71,7 @@ class GenerateKMLParameters(
   //// Options used only in KML generation (--mode=generate-kml)
   var kml_words =
     ap.option[String]("k", "kml-words", "kw",
+      must = be_specified,
       help = """Words to generate KML distributions for, when
 --mode=generate-kml.  Each word should be separated by a comma.  A separate
 file is generated for each word, using the value of '--kml-prefix' and adding
@@ -95,6 +96,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
   var kml_max_height =
     ap.option[Double]("kml-max-height", "kmh",
       default = 2000000.0,
+      must = be_>(0.0),
       help = """Height of highest bar, in meters.  Default %default.""")
   var kml_include_cell_names =
     ap.flag("kml-include-cell-names", "kicn", "kml-names",
@@ -109,7 +111,6 @@ class GenerateKMLDriver extends
 
   override def handle_parameters() {
     super.handle_parameters()
-    need(params.kml_words, "kml-words")
     params.split_kml_words = params.kml_words.split(',')
   }
 

@@ -29,17 +29,17 @@ import util.textdb._
 import util.debug._
 
 class AnalyzePropertyParameters(ap: ArgParser) {
-  var field =
-    ap.option[String]("field",
-      metavar = "FIELD",
-      help = """Field to analyze.""")
-  var field_type =
-    ap.option[String]("field-type",
-      metavar = "TYPE",
-      choices = Seq("integer", "real", "string"),
-      default = "string",
-      help = """Type of field: 'integer', 'real', 'string'. Default %default.""")
+  var field = ap.option[String]("field",
+    metavar = "FIELD",
+    must = be_specified,
+    help = """Field to analyze.""")
+  var field_type = ap.option[String]("field-type",
+    metavar = "TYPE",
+    choices = Seq("integer", "real", "string"),
+    default = "string",
+    help = """Type of field: 'integer', 'real', 'string'. Default %default.""")
   var input = ap.positional[String]("input",
+    must = be_specified,
     help = """Textdb database to analyze. The value can be
 any of the following: Either the data or schema file of the database;
 the common prefix of the two; or the directory containing them, provided

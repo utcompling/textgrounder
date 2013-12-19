@@ -42,6 +42,7 @@ class FrobTextDBParameters(parser: ArgParser) extends
   val input_dir =
     ap.option[String]("i", "input-dir",
       metavar = "DIR",
+      must = be_specified,
       help = """Directory containing input corpus.""")
   var input_suffix =
     ap.option[String]("s", "input-suffix",
@@ -381,7 +382,6 @@ class FrobTextDBDriver extends
   }
   
   override def handle_parameters() {
-    need(params.input_dir, "input-dir")
     if (params.add_field_by_range != null) {
       val (destfield, srcfield, split_pairs) =
         parse_add_field_by(params.add_field_by_range)

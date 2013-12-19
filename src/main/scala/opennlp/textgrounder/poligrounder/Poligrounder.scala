@@ -103,16 +103,20 @@ See GridLocate.scala.
 class PoligrounderParameters(val parser: ArgParser = null) extends
     GridLocateParameters {
   var from = ap.option[String]("f", "from",
+    must = be_specified,
     help = """Chunk of start time to compare.""")
 
   var to = ap.option[String]("t", "to",
+    must = be_specified,
     help = """Chunk of end time to compare.""")
 
   var min_prob = ap.option[Double]("min-prob", "mp", default = 0.0,
+    must = be_within(0.0, 1.0),
     help = """Mininum probability when comparing language models.
     Default is 0.0, which means no restrictions.""")
 
   var max_grams = ap.option[Int]("max-grams", "mg", default = 200,
+    must = be_>(0),
     help = """Maximum number of grams (words or n-grams) to output when
     comparing language models.  Default is %default.  This applies separately
     to those grams that have increased and decreased, meaning the total

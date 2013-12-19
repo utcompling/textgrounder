@@ -43,17 +43,21 @@ class MMCParameters(val parser: ArgParser) extends
   val output_dir =
     parser.option[String]("o", "output-dir",
       metavar = "DIR",
+      must = be_specified,
       help = """Directory to store output files in.""")
   val input_dir =
     parser.option[String]("i", "input-dir",
+      must = be_specified,
       metavar = "FILE",
       help = """Directory containing the input corpus, in old format.""")
   val counts_file =
     parser.option[String]("counts-file",
+      must = be_specified,
       metavar = "FILE",
       help = """File containing the word counts, in old format.""")
   var output_file_prefix =
     parser.option[String]("output-file-prefix",
+      must = be_specified,
       metavar = "FILE",
       help = """Prefix to add to files in the output corpus dir.""")
 }
@@ -179,9 +183,6 @@ counts file also containing the metadata.
   }
 
   def handle_parameters() {
-    need(params.output_dir, "output-dir")
-    need(params.input_dir, "input-dir")
-    need(params.counts_file, "counts-file")
   }
 
   def run() {

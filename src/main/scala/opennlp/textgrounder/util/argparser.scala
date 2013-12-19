@@ -301,124 +301,6 @@ package object argparser {
   }
 
   /**
-   * Check restrictions on `value`, the parsed value for option named
-   * `name`.  Restrictions can specify that the number must be greater than or
-   * equal, or strictly greater than, a given number -- and/or that the
-   * number must be less than or equal, or strictly less than, a given
-   * number.  Signal an error if restrictions not met.
-   *
-   * @tparam T Numeric type of `value` (e.g. Int or Double).
-   * @param minposs Required: Minimum possible value for this numeric type;
-   *   used as the default value for certain non-specified arguments.
-   * @param maxposs Required: Maximum possible value for this numeric type;
-   *   used as the default value for certain non-specified arguments.
-   * @param gt If specified, `value` must be greater than the given number.
-   * @param ge If specified, `value` must be greater than or equal to the
-   *   given number.
-   * @param lt If specified, `value` must be less than the given number.
-   * @param le If specified, `value` must be less than or equal to the
-   *   given number.
-   */
-  def check_restrictions[T <% Ordered[T]](value: T, name: String, ap: ArgParser,
-      minposs: T, maxposs: T)(gt: T = minposs, ge: T = minposs,
-      lt: T = maxposs, le: T = maxposs) {
-    val has_lower_bound = !(gt == minposs && ge == minposs)
-    val has_upper_bound = !(lt == maxposs && le == maxposs)
-    val has_open_lower_bound = (gt != minposs)
-    val has_open_upper_bound = (lt != maxposs)
-
-    def check_lower_bound(): String = {
-      if (!has_lower_bound) null
-      else if (has_open_lower_bound) {
-        if (value > gt) null
-        else "strictly greater than %s" format gt
-      } else {
-        if (value >= ge) null
-        else "at least %s" format ge
-      }
-    }
-    def check_upper_bound(): String = {
-      if (!has_upper_bound) null
-      else if (has_open_upper_bound) {
-        if (value < lt) null
-        else "strictly less than %s" format lt
-      } else {
-        if (value <= le) null
-        else "at most %s" format le
-      }
-    }
-
-    val lowerstr = check_lower_bound()
-    val upperstr = check_upper_bound()
-
-    def range_error(restriction: String) {
-      val msg = """Argument "%s" has value %s, but must be %s.""" format
-        (name, value, restriction)
-      throw new ArgParserRangeException(msg)
-    }
-
-    if (lowerstr != null && upperstr != null)
-      range_error("%s and %s" format (lowerstr, upperstr))
-    else if (lowerstr != null)
-      range_error("%s" format lowerstr)
-    else if (upperstr != null)
-      range_error("%s" format upperstr)
-  }
-
-  /**
-   * Conversion function for Ints.  Also check that the result meets the
-   * given restrictions (conditions).
-   */
-  def convertRestrictedInt(
-    gt: Int = Int.MinValue, ge: Int = Int.MinValue,
-    lt: Int = Int.MaxValue, le: Int = Int.MaxValue
-  ) = {
-    (rawval: String, name: String, ap: ArgParser) => {
-      val retval = convertInt(rawval, name, ap)
-      check_restrictions[Int](retval, name, ap, Int.MinValue, Int.MaxValue)(
-        gt = gt, ge = ge, lt = lt, le = le)
-      retval
-    }
-  }
-
-  /**
-   * Conversion function for Doubles.  Also check that the result meets the
-   * given restrictions (conditions).
-   */
-  def convertRestrictedDouble(
-    gt: Double = Double.NegativeInfinity, ge: Double = Double.NegativeInfinity,
-    lt: Double = Double.PositiveInfinity, le: Double = Double.PositiveInfinity
-  ) = {
-    (rawval: String, name: String, ap: ArgParser) => {
-      val retval = convertDouble(rawval, name, ap)
-      check_restrictions[Double](retval, name, ap,
-        Double.NegativeInfinity, Double.PositiveInfinity)(
-        gt = gt, ge = ge, lt = lt, le = le)
-      retval
-    }
-  }
-
-  /**
-   * Conversion function for positive Int.  Checks that the result is &gt; 0.
-   */
-  def convertPositiveInt = convertRestrictedInt(gt = 0)
-  /**
-   * Conversion function for non-negative Int.  Check that the result is &gt;=
-   * 0.
-   */
-  def convertNonNegativeInt = convertRestrictedInt(ge = 0)
-
-  /**
-   * Conversion function for positive Double.  Checks that the result is &gt; 0.
-   */
-  def convertPositiveDouble = convertRestrictedDouble(gt = 0)
-  /**
-   * Conversion function for non-negative Double.  Check that the result is &gt;=
-   * 0.
-   */
-  def convertNonNegativeDouble = convertRestrictedDouble(ge = 0)
-
-  /**
    * Implicit conversion function for Strings.  Automatically selected
    * for String-type arguments.
    */
@@ -451,6 +333,119 @@ package object argparser {
   }
 
   /**
+   * Check that the value is &lt; a given integer. Used with argument `must`.
+   */
+  def be_<(num: Int) =
+    Must[Int]( { x => x < num }, "value %%s must be < %s" format num)
+  /**
+   * Check that the value is &lt; a given double. Used with argument `must`.
+   */
+  def be_<(num: Double) =
+    Must[Double]( { x => x < num }, "value %%s must be < %s" format num)
+  /**
+   * Check that the value is &gt; a given integer. Used with argument `must`.
+   */
+  def be_>(num: Int) =
+    Must[Int]( { x => x > num }, "value %%s must be > %s" format num)
+  /**
+   * Check that the value is &gt; a given double. Used with argument `must`.
+   */
+  def be_>(num: Double) =
+    Must[Double]( { x => x > num }, "value %%s must be > %s" format num)
+  /**
+   * Check that the value is &lt;= a given integer. Used with argument `must`.
+   */
+  def be_<=(num: Int) =
+    Must[Int]( { x => x <= num }, "value %%s must be <= %s" format num)
+  /**
+   * Check that the value is &lt;= a given double. Used with argument `must`.
+   */
+  def be_<=(num: Double) =
+    Must[Double]( { x => x <= num }, "value %%s must be <= %s" format num)
+  /**
+   * Check that the value is &gt;= a given integer. Used with argument `must`.
+   */
+  def be_>=(num: Int) =
+    Must[Int]( { x => x >= num }, "value %%s must be >= %s" format num)
+  /**
+   * Check that the value is &gt;= a given double. Used with argument `must`.
+   */
+  def be_>=(num: Double) =
+    Must[Double]( { x => x >= num }, "value %%s must be >= %s" format num)
+  /**
+   * Check that the value is a given value. Used with argument `must`.
+   */
+  def be_==[T](value: T) =
+    Must[T]( { x => x == value}, "value %%s must be = %s" format value)
+  /**
+   * Check that the value is not a given value. Used with argument `must`.
+   */
+  def be_!=[T](value: T) =
+    Must[T]( { x => x != value}, "value %%s must not be = %s" format value)
+  /**
+   * Check that the value is within a given integer range. Used with
+   * argument `must`.
+   */
+  def be_within(lower: Int, upper: Int) =
+    Must[Int]( { x => x >= lower && x <= upper },
+      "value %%s must be within range [%s, %s]" format (lower, upper))
+  /**
+   * Check that the value is within a given double range. Used with
+   * argument `must`.
+   */
+  def be_within(lower: Double, upper: Double) =
+    Must[Double]( { x => x >= lower && x <= upper },
+      "value %%s must be within range [%s, %s]" format (lower, upper))
+  /**
+   * Check that the value is specified. Used with argument `must`.
+   */
+  def be_specified[T] =
+    Must[T]( { x => x != null.asInstanceOf[T] },
+      "value must be specified")
+  /**
+   * Check that the value satisfies all of the given restrictions.
+   * Used with argument `must`.
+   */
+  def be_and[T](musts: Must[T]*) =
+    Must[T]( { x => musts.forall { y => y.fn(x) } },
+      musts.map { y =>
+        val errmess = y.errmess
+        if (errmess == null) "unknown restriction"
+        else errmess
+      }.mkString(" and "))
+  /**
+   * Check that the value satisfies at least one of the given restrictions.
+   * Used with argument `must`.
+   */
+  def be_or[T](musts: Must[T]*) =
+    Must[T]( { x => musts.exists { y => y.fn(x) } },
+      musts.map { y =>
+        val errmess = y.errmess
+        if (errmess == null) "unknown restriction"
+        else errmess
+      }.mkString(" or "))
+
+  /**
+   * Check that the value does not satisfy of the given restriction.
+   * Used with argument `must`.
+   */
+  def be_not[T](must: Must[T]) =
+    Must[T]( { x => !must.fn(x) },
+      if (must.errmess == null) null else
+      "must not be the case: " + must.errmess)
+
+  /**
+   * Check that the value is one of the given choices.
+   * Used with argument `must`.
+   *
+   * FIXME: Implement `aliasedChoices` as well.
+   */
+  def choices[T](values: T*) =
+    Must[T]( { x => values contains x },
+      "choice '%%s' not one of the recognized choices: %s" format
+      (values mkString ","))
+
+  /**
    * Execute the given body and catch parser errors. When they occur,
    * output the message and exit with exit code 1, rather than outputting
    * a stack trace.
@@ -469,6 +464,38 @@ package object argparser {
 }
 
 package argparser {
+  /* Class specifying a restriction on a possible value and possible
+   * transformation of the value. Applying the argument name and the
+   * converted value will either return a possibly transformed value
+   * or throw an error if the value does not pass the restriction.
+   *
+   * @param fn Function specifying a restriction. If null, no restriction.
+   * @param errmess Error message to be displayed when restriction fails,
+   *   optionally containing a %s in it indicating where to display the
+   *   value.
+   * @param transform Function to transform the value. If null,
+   *   no transformation.
+   */
+  case class Must[T](fn: T => Boolean, errmess: String = null,
+      transform: (String, T) => T = null) {
+    def apply(canon_name: String, converted: T): T = {
+      if (fn != null && !fn(converted)) {
+        val the_errmess =
+          if (errmess != null) errmess
+          else "value '%s' not one of the allowed values"
+        val msg =
+          if (the_errmess contains "%s") the_errmess format converted
+          else the_errmess
+        throw new ArgParserRestrictionException(
+          "Argument '%s': %s" format (canon_name, msg))
+      }
+      if (transform != null)
+        transform(canon_name, converted)
+      else
+        converted
+    }
+  }
+
   /**
    * Superclass of all exceptions related to `argparser`.  These exceptions
    * are generally thrown during argument parsing.  Normally, the exceptions
@@ -530,27 +557,16 @@ package argparser {
   ) extends ArgParserException(message, cause)
 
   /**
-   * Thrown to indicate that a command line argument was outside of a
-   * required range.
+   * Thrown to indicate that a command line argument failed to be one of
+   * the allowed values.
    *
    * @param message exception message
    * @param cause exception, if propagating an exception
    */
-  class ArgParserRangeException(
+  class ArgParserRestrictionException(
     message: String,
     cause: Option[Throwable] = None
   ) extends ArgParserException(message, cause)
-
-  /**
-   * Thrown to indicate that an invalid choice was given for a limited-choice
-   * argument.  The message indicates both the problem and the list of
-   * possible choices.
-   *
-   * @param message  exception message
-   */
-  class ArgParserInvalidChoiceException(message: String,
-    cause: Option[Throwable] = None
-  ) extends ArgParserConversionException(message, cause)
 
   /**
    * Thrown to indicate that ArgParser encountered a problem in the caller's
@@ -661,9 +677,12 @@ package argparser {
     }
 
     // Check that the given value passes any restrictions imposed by
-    // `choices` and/or `aliasedChoices`.  If not, throw an exception.
-    def checkChoices[T](converted: T,
-        choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+    // `must`, `choices` and/or `aliasedChoices`.
+    // If not, throw an exception.
+    def checkRestriction[T](canon_name: String, converted: T,
+        must: Must[T], choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+      val new_converted =
+        if (must == null) converted else must(canon_name, converted)
       if (choices == null && aliasedChoices == null) converted
       else {
         val fullaliased =
@@ -672,9 +691,9 @@ package argparser {
         if (canonmap contains converted)
           canonmap(converted)
         else
-          throw new ArgParserInvalidChoiceException(
-            "Choice '%s' not one of the recognized choices: %s"
-            format (converted, choicesList(choices, aliasedChoices,
+          throw new ArgParserRestrictionException(
+            "Argument '%s': choice '%s' not one of the recognized choices: %s"
+            format (canon_name, converted, choicesList(choices, aliasedChoices,
               includeAliases = true)))
       }
     }
@@ -699,7 +718,8 @@ package argparser {
   abstract protected class ArgAny[T](
     val parser: ArgParser,
     val name: String,
-    val default: T
+    val default: T,
+    checkres: T => T
   ) {
     /**
      * Return the value of the argument, if specified; else, the default
@@ -710,7 +730,7 @@ package argparser {
       else if (specified)
         wrappedValue
       else
-        default
+        checkres(default)
     }
 
     def setValue(newval: T) {
@@ -770,7 +790,8 @@ package argparser {
   protected class ArgFlag(
     parser: ArgParser,
     name: String
-  ) extends ArgAny[Boolean](parser, name, default = false) {
+  ) extends ArgAny[Boolean](parser, name, default = false,
+      checkres = { x: Boolean => x }) {
     var wrap: FlagOption[Boolean] = null
     def wrappedValue = wrap.value.get
     def specified = (wrap != null && wrap.value != None)
@@ -794,8 +815,9 @@ package argparser {
     parser: ArgParser,
     name: String,
     default: T,
+    checkres: T => T,
     val is_positional: Boolean = false
-  ) extends ArgAny[T](parser, name, default) {
+  ) extends ArgAny[T](parser, name, default, checkres) {
     var wrap: SingleValueArg[T] = null
     def wrappedValue = wrap.value.get
     def specified = (wrap != null && wrap.value != None)
@@ -818,10 +840,13 @@ package argparser {
     parser: ArgParser,
     name: String,
     default: Seq[T],
+    checkres: T => T,
     val is_positional: Boolean = false
-  ) extends ArgAny[Seq[T]](parser, name, default) {
+  ) extends ArgAny[Seq[T]](parser, name, default,
+      { x => x.map(checkres) }) {
     var wrap: MultiValueArg[T] = null
-    val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T])
+    val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T],
+      checkres)
     def wrappedValue = wrap.value
     def specified = (wrap != null && wrap.value.length > 0)
     def clearWrapped() { if (wrap != null) wrap.reset() }
@@ -1047,6 +1072,8 @@ package argparser {
      * @param default Default value of argument.
      * @param metavar User-visible argument type, in usage string. See
      *   `option` for more information.
+     * @param must Restriction on possible values for this option, as an
+     *    object of type `Must`.
      * @param choices Set of allowed choices, when an argument allows only
      *   a limited set of choices.
      * @param aliasedChoices List of allowed aliases for the choices specified
@@ -1070,6 +1097,7 @@ package argparser {
       name: Seq[String],
       default: U,
       metavar: String,
+      must: Must[T],
       choices: Seq[T],
       aliasedChoices: Seq[Seq[T]],
       help: String,
@@ -1124,60 +1152,67 @@ package argparser {
 
     protected def argot_converter[T](
         is_multi: Boolean, convert: (String, String, ArgParser) => T,
-        canon_name: String, choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+        canon_name: String, checkres: T => T) = {
       (rawval: String, argop: CommandLineArgument[T]) => {
         val converted = convert(rawval, canon_name, this)
-        checkChoices(converted, choices, aliasedChoices)
+        checkres(converted)
       }
     }
 
     protected def argot_converter_with_params[T](
         is_multi: Boolean, convert: (String, String, ArgParser) => T,
-        canon_name: String, choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+        canon_name: String, checkres: ((T, String)) => (T, String)) = {
       (rawval: String, argop: CommandLineArgument[(T, String)]) => {
         val (raw, params) = rawval span (_ != ':')
-        val converted = convert(raw, canon_name, this)
-        (checkChoices(converted, choices, aliasedChoices), params)
+        val converted = (convert(raw, canon_name, this), params)
+        checkres(converted)
       }
     }
 
     def optionSeq[T](name: Seq[String],
       default: T = null.asInstanceOf[T],
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgSingle(this, canon_name, default)
+        val checkres = { x: T => checkRestriction(canon_name, x,
+          must, choices, aliasedChoices) }
+        val arg = new ArgSingle(this, canon_name, default, checkres)
         arg.wrap =
           (argot.option[T](name.toList, canon_metavar, canon_help)
            (argot_converter(is_multi = false, convert, canon_name,
-             choices, aliasedChoices)))
+             checkres)))
         arg
       }
-      handle_argument[T,T](name, default, metavar, choices, aliasedChoices,
-        help, create_underlying _)
+      handle_argument[T,T](name, default, metavar, must,
+        choices, aliasedChoices, help, create_underlying _)
     }
 
     def optionSeqWithParams[T](name: Seq[String],
       default: (T, String) = (null.asInstanceOf[T], ""),
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgSingle(this, canon_name, default)
+        val checkres = { x: ((T, String)) =>
+          (checkRestriction(canon_name, x._1, must, choices, aliasedChoices),
+           x._2) }
+        val arg = new ArgSingle(this, canon_name, default, checkres)
         arg.wrap =
           (argot.option[(T, String)](name.toList, canon_metavar, canon_help)
            (argot_converter_with_params(is_multi = false, convert, canon_name,
-             choices, aliasedChoices)))
+             checkres)))
         arg
       }
-      handle_argument[T,(T, String)](name, default, metavar,
+      handle_argument[T,(T, String)](name, default, metavar, must,
         choices, aliasedChoices, help, create_underlying _)
     }
 
@@ -1209,6 +1244,11 @@ package argparser {
      *    e.g. "--counts-file FILE     File containing word counts." (The
      *    value of `metavar` would be "FILE".) If not given, automatically
      *    computed from the canonical option name by capitalizing it.
+     * @param must Restriction on possible values for this option. This is
+     *    a tuple of a function that must evaluate to true on the value
+     *    and an error message to display otherwise, with a %s in it
+     *    indicating where to display the value. There are a number of
+     *    predefined functions to use, e.g. `be_&lt;`, `be_within`, etc.
      * @param choices List of possible choices for this option.  If specified,
      *    it should be a sequence of possible choices that will be allowed,
      *    and only the choices that are either in this list of specified via
@@ -1252,14 +1292,16 @@ package argparser {
       name7: String = null, name8: String = null, name9: String = null,
       default: T = null.asInstanceOf[T],
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       optionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
-        metavar = metavar, default = default, choices = choices,
-        aliasedChoices = aliasedChoices, help = help)(convert, m)
+        metavar = metavar, default = default, must = must,
+        choices = choices, aliasedChoices = aliasedChoices, help = help
+      )(convert, m)
     }
 
     /**
@@ -1280,14 +1322,16 @@ package argparser {
       name7: String = null, name8: String = null, name9: String = null,
       default: (T, String) = (null.asInstanceOf[T], ""),
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       optionSeqWithParams[T](nonNullVals(name1, name2, name3, name4, name5,
         name6, name7, name8, name9),
-        metavar = metavar, default = default, choices = choices,
-        aliasedChoices = aliasedChoices, help = help)(convert, m)
+        metavar = metavar, default = default, must = must,
+        choices = choices, aliasedChoices = aliasedChoices, help = help
+      )(convert, m)
     }
 
     def flagSeq(name: Seq[String],
@@ -1300,8 +1344,8 @@ package argparser {
         arg
       }
       handle_argument[Boolean,Boolean](name, default = false,
-        metavar = null, choices = Seq(true, false),
-        aliasedChoices = null, help = help,
+        metavar = null, must = null,
+        choices = Seq(true, false), aliasedChoices = null, help = help,
         create_underlying = create_underlying _)
     }
 
@@ -1335,21 +1379,24 @@ package argparser {
     def multiOptionSeq[T](name: Seq[String],
       default: Seq[T] = Seq[T](),
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgMulti[T](this, canon_name, default)
+        val checkres = { x: T => checkRestriction(canon_name, x,
+          must, choices, aliasedChoices) }
+        val arg = new ArgMulti[T](this, canon_name, default, checkres)
         arg.wrap =
           (argot.multiOption[T](name.toList, canon_metavar, canon_help)
            (argot_converter(is_multi = true, convert, canon_name,
-             choices, aliasedChoices)))
+             checkres)))
         arg
       }
-      handle_argument[T,Seq[T]](name, default, metavar, choices, aliasedChoices,
-        help, create_underlying _, is_multi = true)
+      handle_argument[T,Seq[T]](name, default, metavar, must,
+        choices, aliasedChoices, help, create_underlying _, is_multi = true)
     }
 
     /**
@@ -1360,6 +1407,11 @@ package argparser {
      * (NOTE: This is different from single-valued options, where the
      * default value can be explicitly specified, and if not given, will be
      * `null` for reference types.  Here, `null` will never occur.)
+     *
+     * NOTE: The restrictions specified using `must`, `choices`,
+     * `aliasedChoices` apply individually to each value. There is no current
+     * way of specifying an overall restriction, e.g. that at least one
+     * item must be given. This should be handled separately by the caller.
      *
      * FIXME: There should be a way of allowing for specifying multiple values
      * in a single argument, separated by spaces, commas, etc.  We'd want the
@@ -1375,14 +1427,16 @@ package argparser {
       name7: String = null, name8: String = null, name9: String = null,
       default: Seq[T] = Seq[T](),
       metavar: String = null,
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       multiOptionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
-        default = default, metavar = metavar, choices = choices,
-        aliasedChoices = aliasedChoices, help = help)(convert, m)
+        metavar = metavar, default = default, must = must,
+        choices = choices, aliasedChoices = aliasedChoices, help = help
+      )(convert, m)
     }
 
     /**
@@ -1397,21 +1451,26 @@ package argparser {
      */
     def positional[T](name: String,
       default: T = null.asInstanceOf[T],
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "", optional: Boolean = false)
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgSingle(this, canon_name, default, is_positional = true)
+        val checkres = { x: T => checkRestriction(canon_name, x,
+          must, choices, aliasedChoices) }
+        val arg = new ArgSingle(this, canon_name, default, checkres,
+          is_positional = true)
         arg.wrap =
           (argot.parameter[T](canon_name, canon_help, optional)
            (argot_converter(is_multi = false, convert, canon_name,
-             choices, aliasedChoices)))
+             checkres)))
         arg
       }
-      handle_argument[T,T](Seq(name), default, null, choices, aliasedChoices,
-        help, create_underlying _, is_positional = true)
+      handle_argument[T,T](Seq(name), default, null, must,
+        choices, aliasedChoices, help, create_underlying _,
+        is_positional = true)
     }
 
     /**
@@ -1422,6 +1481,7 @@ package argparser {
      */
     def multiPositional[T](name: String,
       default: Seq[T] = Seq[T](),
+      must: Must[T] = null,
       choices: Seq[T] = null,
       aliasedChoices: Seq[Seq[T]] = null,
       help: String = "",
@@ -1429,15 +1489,18 @@ package argparser {
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgMulti[T](this, canon_name, default, is_positional = true)
+        val checkres = { x: T => checkRestriction(canon_name, x,
+          must, choices, aliasedChoices) }
+        val arg = new ArgMulti[T](this, canon_name, default,
+          checkres, is_positional = true)
         arg.wrap =
           (argot.multiParameter[T](canon_name, canon_help, optional)
            (argot_converter(is_multi = true, convert, canon_name,
-             choices, aliasedChoices)))
+             checkres)))
         arg
       }
-      handle_argument[T,Seq[T]](Seq(name), default, null, choices,
-        aliasedChoices, help, create_underlying _,
+      handle_argument[T,Seq[T]](Seq(name), default, null, must,
+        choices, aliasedChoices, help, create_underlying _,
         is_multi = true, is_positional = true)
     }
 
