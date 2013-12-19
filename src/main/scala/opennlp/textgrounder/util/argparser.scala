@@ -1641,18 +1641,18 @@ of choices, including all aliases, is %allchoices.""")
   new MyParams(ap)
   // ap.parse(List("--foo", "7"))
   ap.parse(args)
-  val Params = new MyParams(ap)
+  val params = new MyParams(ap)
   // Print out values of all arguments, whether options or positional.
   // Also print out types and default values.
   for (name <- ap.argNames)
     println("%30s: %s (%s) (default=%s)" format (
       name, ap(name), ap.getType(name), ap.defaultValue[Any](name)))
   // Examples of how to retrieve individual arguments
-  for (file <- Params.files)
+  for (file <- params.files)
     println("Process file: %s" format file)
-  println("Maximum tick mark seen: %s" format (Params.tick max))
+  println("Maximum tick mark seen: %s" format (params.tick max))
   // We can freely change the value of arguments if we want, since they're
   // just vars.
-  if (Params.daniel contains "upharsin")
-    Params.bar = "chingamos"
+  if (params.daniel contains "upharsin")
+    params.bar = "chingamos"
 }
