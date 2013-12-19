@@ -119,10 +119,10 @@ trait Reranker[Query, Candidate]
  *
  * For each possible candidate, we construct a "query-candidate pair" (simply a
  * grouping of the query and particular candidate) and from it we create
- * a "candidate instance" consisting of a feature vector, where individual
- * features describe the compatibility between query and candidate.  The
- * feature vectors for all N candidates get grouped into an "aggregate feature
- * vector" (of type `AggregateFeatureVector`), which is then passed to the
+ * a "candidate feature vector" combining individual features describing
+ * the compatibility between query and candidate.  The feature vectors for
+ * all N candidates get grouped into an "aggregate feature vector"
+ * (of type `AggregateFeatureVector`), which is then passed to the
  * classifier to be scored.
  *
  * @tparam Query type of a query
@@ -134,13 +134,13 @@ trait PointwiseClassifyingReranker[Query, Candidate]
   protected def rerank_classifier: ScoringClassifier
 
   /**
-   * Create a candidate instance (in the form of a feature vector) to feed to
-   * the classifier during evaluation, given a query item, a potential
-   * candidate from the ranker, and the score from the initial ranker on
-   * this candidate.
+   * Create a candidate feature vector to feed to the classifier during
+   * evaluation, given a query item, a potential candidate from the
+   * ranker, and the score from the initial ranker on this candidate.
    */
-  protected def create_candidate_evaluation_instance(query: Query,
-    candidate: Candidate, initial_score: Double, initial_rank: Int): FeatureVector
+  protected def create_candidate_eval_featvec(query: Query,
+    candidate: Candidate, initial_score: Double, initial_rank: Int
+  ): FeatureVector
 
   /**
    * Rerank a set of top candidates, given the query and the initial score
@@ -150,7 +150,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
       scored_candidates: Iterable[(Candidate, Double)]) = {
     val cand_featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
-        yield create_candidate_evaluation_instance(item, candidate, score, rank)
+        yield create_candidate_eval_featvec(item, candidate, score, rank)
     val query_featvec = new AggregateFeatureVector(cand_featvecs.toIndexedSeq)
     val new_scores = rerank_classifier.score(query_featvec).toIndexedSeq
     val candidates = scored_candidates.map(_._1).toIndexedSeq
@@ -176,10 +176,9 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  *    `RTI`), encapsulating an aggregate feature vector of type
  *    `AggregateFeatureVector` and the label of the correct candidate.
  *    The aggregate feature vector in turn encapsulates the set of
- *    individual feature vectors (aka candidate instances), one per
- *    candidate, consisting of features specifying the compatibility
- *    between query and candidate. See `PointwiseClassifyingReranker` for
- *    more details.
+ *    individual feature vectors, one per candidate, consisting of
+ *    features specifying the compatibility between query and candidate.
+ *    See `PointwiseClassifyingReranker` for more details.
  *
  * The use of abstract types, rather than tuples, allows the application to
  * choose how to encapsulate the data (e.g. whether to use a raw form or
@@ -320,14 +319,16 @@ trait PointwiseClassifyingRerankerTrainer[
   ): ScoringClassifier
 
   /**
-   * Create a feature vector for a candidate instance (see above) to feed to
+   * Create a candidate feature vector (see above) to feed to
    * the classifier during evaluation, given a query item, a potential
    * candidate from the ranker, and the score from the initial ranker on this
    * candidate.  Note that this function may need to work differently from
-   * the corresponding function used during training (e.g. in the handling
-   * of previously unseen words).
+   * the corresponding function used during training, typically in that new
+   * features cannot be created (hence, e.g., when handling a previously
+   * unseen word we need to skip it rather than creating a previously
+   * unseen feature).
    */
-  protected def create_candidate_evaluation_instance(query: Query,
+  protected def create_candidate_eval_featvec(query: Query,
     candidate: Candidate, initial_score: Double, initial_rank: Int
   ): FeatureVector
 
@@ -490,9 +491,9 @@ trait PointwiseClassifyingRerankerTrainer[
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      protected def create_candidate_evaluation_instance(query: Query,
+      protected def create_candidate_eval_featvec(query: Query,
           candidate: Candidate, initial_score: Double, initial_rank: Int) = {
-        self.create_candidate_evaluation_instance(query, candidate,
+        self.create_candidate_eval_featvec(query, candidate,
           initial_score, initial_rank)
       }
     }

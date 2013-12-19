@@ -59,24 +59,23 @@ case class GridRankerInst[Co](
 }
 
 /**
- * A factory for generating "candidate instances", i.e. feature vectors
- * describing the properties of one of the possible candidates (cells) to
- * be chosen by a reranker for a given query (i.e. document). Thus, a
- * candidate instance for a reranker is a query-candidate (i.e. document-cell)
- * pair, or rather a feature vector describing this pair. In general, the
+ * A factory for generating candidate feature vectors describing the
+ * properties of one of the possible candidates (cells) to be chosen by
+ * a reranker for a given query (i.e. document). In general, the
  * features describe the compatibility between the query and the candidate,
- * i.e. in this case the compatibility between the language models
- * (language models) of a document and a cell.
+ * e.g. between the language models of a document and a cell.
  *
  * The factory is in the form of a function that will generate a feature
  * vector when passed appropriate arguments: a document, a cell, the score
- * of the cell as produced by the original ranker, and a boolean indicating
- * whether we are generating the feature vector for use in training a model
- * or in evaluating a model. (This matters e.g. in the handling of unseen
- * words, which will modify the global language model during training but
- * not evaluation.)
+ * of the cell as produced by the original ranker, the initial ranking of
+ * the cell, and a boolean indicating whether we are generating the
+ * feature vector for use in training a model or in evaluating a model.
+ * (This matters in that we can only create new features, e.g. in handling
+ * unseen words, during training because it will end up lengthening the
+ * feature and weight vectors. This can't happen in evaluation, since the
+ * weight vector was already computed during training.)
  */
-trait CandidateInstFactory[Co] extends (
+trait CandidateFeatVecFactory[Co] extends (
   (GridDoc[Co], GridCell[Co], Double, Int, Boolean) => FeatureVector
 ) {
   val featvec_factory: SparseFeatureVectorFactory
@@ -187,10 +186,10 @@ trait CandidateInstFactory[Co] extends (
  * A trivial factory for generating features for a doc-cell candidate,
  * containing no features, for testing/debugging purposes.
  */
-class TrivialCandidateInstFactory[Co](
+class TrivialCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = Iterable()
 }
@@ -198,11 +197,11 @@ class TrivialCandidateInstFactory[Co](
 /**
  * A factory that combines the features of a set of subsidiary factories.
  */
-class CombiningCandidateInstFactory[Co](
+class CombiningCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus,
-  val subsidiary_facts: Iterable[CandidateInstFactory[Co]]
-) extends CandidateInstFactory[Co] {
+  val subsidiary_facts: Iterable[CandidateFeatVecFactory[Co]]
+) extends CandidateFeatVecFactory[Co] {
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     // For each subsidiary factory, retrieve its features, then add the
@@ -247,10 +246,10 @@ class CombiningCandidateInstFactory[Co](
  * A factory for generating features for a doc-cell candidate, consisting of
  * miscellaneous non-word-by-word features. Generally fairly fast.
  */
-class MiscCandidateInstFactory[Co](
+class MiscCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
     val doctypes = doclm.iter_keys.toSeq
     val celltypes = celllm.iter_keys.toSeq
@@ -290,10 +289,10 @@ class MiscCandidateInstFactory[Co](
  * the $types-in-common feature, which is currently very slow. (FIXME!!
  * Should be possible to implement in O(N log N) with sorting.)
  */
-class TypesInCommonCandidateInstFactory[Co](
+class TypesInCommonCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
     val doctypes = doclm.iter_keys.toSeq
     val celltypes = celllm.iter_keys.toSeq
@@ -313,10 +312,10 @@ class TypesInCommonCandidateInstFactory[Co](
  * of comparisons between the language models of the two (KL-divergence,
  * symmetric KL, cosine similarity, Naive Bayes). Fairly slow.
  */
-class ModelCompareCandidateInstFactory[Co](
+class ModelCompareCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     val doclm = doc.rerank_lm
@@ -334,10 +333,10 @@ class ModelCompareCandidateInstFactory[Co](
  * A factory for generating features for a doc-cell candidate consisting of
  * the original rank, ranking score and maybe the binned equivalents.
  */
-class RankScoreCandidateInstFactory[Co](
+class RankScoreCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     Iterable(
@@ -351,10 +350,10 @@ class RankScoreCandidateInstFactory[Co](
  * A factory for generating features for a doc-cell candidate, when the
  * --rerank-lang-model specifies a unigram model.
  */
-abstract class UnigramCandidateInstFactory[Co](
+abstract class UnigramCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   /**
    * Return an Iterable of features corresponding to the given doc-cell
    * (query-candidate) pair, provided that Unigram rerank distributions
@@ -381,10 +380,10 @@ abstract class UnigramCandidateInstFactory[Co](
  * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each word.
  */
-abstract class WordByWordCandidateInstFactory[Co](
+abstract class WordByWordCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus
-) extends UnigramCandidateInstFactory[Co](featvec_factory, binning_status) {
+) extends UnigramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
   /** Optionally return a per-word feature whose count in the document is
     * `count`, with specified document and cell language models. The
     * return value is a tuple of suffix describing the particular feature
@@ -415,11 +414,11 @@ abstract class WordByWordCandidateInstFactory[Co](
  * - `unigram-cell-prob`: use cell word probability
  * - any of the above with `-binned` added, which bins logarithmically
  */
-class WordCandidateInstFactory[Co](
+class WordCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends WordByWordCandidateInstFactory[Co](featvec_factory, binning_status) {
+) extends WordByWordCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
   def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
       celllm: UnigramLangModel) = {
     val binned = feattype.endsWith("-binned")
@@ -458,11 +457,11 @@ class WordCandidateInstFactory[Co](
  * - `matching-unigram-kl`: use KL-divergence component for document/cell probs
  * - any of the above with `-binned` added, which bins logarithmically
  */
-class WordMatchingCandidateInstFactory[Co](
+class WordMatchingCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends WordByWordCandidateInstFactory[Co](featvec_factory, binning_status) {
+) extends WordByWordCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
   def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
       celllm: UnigramLangModel) = {
     val cellcount = celllm.get_gram(word)
@@ -506,10 +505,10 @@ class WordMatchingCandidateInstFactory[Co](
  * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each n-gram.
  */
-abstract class NgramByNgramCandidateInstFactory[Co](
+abstract class NgramByNgramCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
-) extends CandidateInstFactory[Co] {
+) extends CandidateFeatVecFactory[Co] {
   /** Optionally return a per-ngram feature whose count in the document is
     * `doccount`, with specified document and cell language models. The
     * return value is a tuple of suffix describing the particular feature
@@ -548,11 +547,11 @@ abstract class NgramByNgramCandidateInstFactory[Co](
  * - `ngram-cell-prob`: use cell ngram probability
  * - any of the above with `-binned` added, which bins logarithmically
  */
-class NgramCandidateInstFactory[Co](
+class NgramCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends NgramByNgramCandidateInstFactory[Co](featvec_factory, binning_status) {
+) extends NgramByNgramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
   def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
       celllm: NgramLangModel) = {
     val binned = feattype.endsWith("-binned")
@@ -591,11 +590,11 @@ class NgramCandidateInstFactory[Co](
  * - `matching-ngram-kl`: use KL-divergence component for document/cell probs
  * - any of the above with `-binned` added, which bins logarithmically
  */
-class NgramMatchingCandidateInstFactory[Co](
+class NgramMatchingCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends NgramByNgramCandidateInstFactory[Co](featvec_factory, binning_status) {
+) extends NgramByNgramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
   def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
       celllm: NgramLangModel) = {
     val cellcount = celllm.get_gram(ngram)
@@ -695,9 +694,9 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      protected def create_candidate_evaluation_instance(query: GridDoc[Co],
+      protected def create_candidate_eval_featvec(query: GridDoc[Co],
           candidate: GridCell[Co], initial_score: Double, initial_rank: Int
-      ) = self.create_candidate_evaluation_instance(query, candidate,
+      ) = self.create_candidate_eval_featvec(query, candidate,
           initial_score, initial_rank)
     }
   }

@@ -1425,40 +1425,40 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Used in conjunction with the reranker. Create a candidate-instance
-   * factory that constructs candidate feature vectors for the reranker,
+   * Used in conjunction with the reranker. Create a factory that
+   * constructs candidate feature vectors for the reranker,
    * i.e. feature vectors measuring the compatibility between a given
    * document and a given cell.
    *
-   * @see CandidateInstFactory
+   * @see CandidateFeatVecFactory
    */
-  protected def create_candidate_instance_factory = {
+  protected def create_candidate_featvec_factory = {
     val featvec_factory = new SparseFeatureVectorFactory
     val binning_status = params.rerank_binning match {
       case "also" => BinningAlso
       case "only" => BinningOnly
       case "no" => BinningNo
     }
-    def create_fact(ty: String): CandidateInstFactory[Co] = {
+    def create_fact(ty: String): CandidateFeatVecFactory[Co] = {
       if (params.rerank_features_simple_unigram_choices contains ty)
-        new WordCandidateInstFactory[Co](featvec_factory, binning_status, ty)
+        new WordCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_matching_unigram_choices contains ty)
-        new WordMatchingCandidateInstFactory[Co](featvec_factory, binning_status, ty)
+        new WordMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_simple_ngram_choices contains ty)
-        new NgramCandidateInstFactory[Co](featvec_factory, binning_status, ty)
+        new NgramCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else if (params.rerank_features_matching_ngram_choices contains ty)
-        new NgramMatchingCandidateInstFactory[Co](featvec_factory, binning_status, ty)
+        new NgramMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else ty match {
         case "trivial" =>
-          new TrivialCandidateInstFactory[Co](featvec_factory, binning_status)
+          new TrivialCandidateFeatVecFactory[Co](featvec_factory, binning_status)
         case "misc" =>
-          new MiscCandidateInstFactory[Co](featvec_factory, binning_status)
+          new MiscCandidateFeatVecFactory[Co](featvec_factory, binning_status)
         case "types-in-common" =>
-          new TypesInCommonCandidateInstFactory[Co](featvec_factory, binning_status)
+          new TypesInCommonCandidateFeatVecFactory[Co](featvec_factory, binning_status)
         case "model-compare" =>
-          new ModelCompareCandidateInstFactory[Co](featvec_factory, binning_status)
+          new ModelCompareCandidateFeatVecFactory[Co](featvec_factory, binning_status)
         case "rank-score" =>
-          new RankScoreCandidateInstFactory[Co](featvec_factory, binning_status)
+          new RankScoreCandidateFeatVecFactory[Co](featvec_factory, binning_status)
       }
     }
 
@@ -1469,7 +1469,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_fact(featlist.head)
     else {
       val facts = featlist.map(create_fact)
-      new CombiningCandidateInstFactory[Co](featvec_factory, binning_status, facts)
+      new CombiningCandidateFeatVecFactory[Co](featvec_factory, binning_status, facts)
     }
   }
 
@@ -1484,13 +1484,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_ranker_from_documents(read_raw_training_documents)
     if (!params.rerank) basic_ranker
     else {
-      /* Factory object for generating feature vectors describing
-       * candidate instances (document-cell pairs) to be ranked. There is
-       * one such feature vector per cell to be ranked for a given
-       * document, and it measures the compatibility of the document's and
-       * cell's language models.
+      /* Factory object for generating candidate feature vectors
+       * to be ranked. There is one such feature vector per cell to be
+       * ranked for a given document; many of the features describe
+       * the compatibility between the document and cell, e.g. of their
+       * language models.
        */
-      val candidate_instance_factory = create_candidate_instance_factory
+      val candidate_featvec_factory = create_candidate_featvec_factory
 
       /* Object for training a reranker. */
       val reranker_trainer =
@@ -1510,7 +1510,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
                 candidate: GridCell[Co], initial_score: Double,
                 initial_rank: Int) = {
               val featvec =
-                candidate_instance_factory(query, candidate, initial_score,
+                candidate_featvec_factory(query, candidate, initial_score,
                   initial_rank, is_training = true)
               if (debug("features")) {
                 val prefix = "#%s-%s" format (task.num_processed + 1,
@@ -1534,14 +1534,22 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             }.toIterable.seq
           }
 
-          /* Create the feature vector for a candidate instance (document-cell
-           * pair) during evaluation, by invoking the candidate-instance
-           * factory (see above). */
-          protected def create_candidate_evaluation_instance(query: GridDoc[Co],
+          /* Create the candidate feature vector during evaluation, by
+           * invoking the candidate feature vector factory (see above).
+           * This may need to operate differently than during training,
+           * in particular in that new features cannot be created. Hence,
+           * e.g., when handling a previously unseen word we need to skip
+           * it rather than creating a previously unseen feature. The
+           * reason for this is that creating a new feature would increase
+           * the total size of the feature vectors and weight vector(s),
+           * which we can't do after training has completed. Typically
+           * the difference down to 'memoize()' vs. 'memoize_if()'.
+           */
+          protected def create_candidate_eval_featvec(query: GridDoc[Co],
               candidate: GridCell[Co], initial_score: Double,
               initial_rank: Int) = {
             val featvec =
-              candidate_instance_factory(query, candidate, initial_score,
+              candidate_featvec_factory(query, candidate, initial_score,
                 initial_rank, is_training = false)
             if (debug("features"))
               errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
