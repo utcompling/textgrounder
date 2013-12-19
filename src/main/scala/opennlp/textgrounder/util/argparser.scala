@@ -909,6 +909,19 @@ package argparser {
     */
 
     /**
+     * Return whether we've already parsed the command line.
+     */
+    def isParsed = parsed
+
+    /**
+     * Return whether variables holding the return value of parameters
+     * hold the parsed values. Otherwise they hold the default values,
+     * which happens either when we haven't parsed the command line or
+     * when class parameter `return_defaults` was specified.
+     */
+    def parsedValues = isParsed && !return_defaults
+
+    /**
      * Return the canonical name of an argument. If the name is already
      * canonical, the same value will be returned. Return value is an
      * `Option`; if the argument name doesn't exist, `None` will be returned.
@@ -1282,9 +1295,9 @@ package argparser {
      *    converter must explicitly be given. (The standard types recognized
      *    are currently Int, Double, Boolean and String.)
      *
-     * @return If class parameter `return_defaults` is true, the default
-     *    value.  Else, if the first time called, exits non-locally; this
-     *    is used internally.  Otherwise, the value of the parameter.
+     * @return If class parameter `return_defaults` is true or if parsing
+     *    has not yet happened, the default value.  Otherwise, the value of
+     *    the parameter.
      */
     def option[T](
       name1: String, name2: String = null, name3: String = null,
