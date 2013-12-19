@@ -280,7 +280,7 @@ package object argparser {
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
-          """Param "%s": Cannot convert argument "%s" to an integer."""
+          """Argument '%s': Cannot convert value '%s' to an integer"""
           format (name, rawval))
     }
   }
@@ -295,7 +295,7 @@ package object argparser {
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
-          """Param "%s": Cannot convert argument "%s" to a floating-point number."""
+          """Argument '%s': Cannot convert value '%s' to a floating-point number"""
           format (name, rawval))
     }
   }
@@ -443,9 +443,9 @@ package object argparser {
       case "on" => true
       case "off" => false
       case _ => throw new ArgParserConversionException(
-          ("""Param "%s": Cannot convert argument "%s" to a boolean.  """ +
+          ("""Argument '%s': Cannot convert value '%s' to a boolean.  """ +
            """Recognized values (case-insensitive) are """ +
-           """yes, no, y, n, true, false, t, f, on, off.""") format
+           """yes, no, y, n, true, false, t, f, on, off""") format
            (name, rawval))
     }
   }
@@ -1508,7 +1508,7 @@ package argparser {
     def parse(args: Seq[String], catchErrors: Boolean = true) = {
       // FIXME: Should we allow this? Not sure if Argot can tolerate this.
       if (parsed)
-        throw new ArgParserCodingError("Command-line arguments already parsed.")
+        throw new ArgParserCodingError("Command-line arguments already parsed")
 
       if (argmap.size == 0)
         throw new ArgParserCodingError("No arguments initialized.  If you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
