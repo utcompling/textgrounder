@@ -875,6 +875,16 @@ noisy training data.  We choose C = 1 as a compromise.""")
       must = be_>(0),
       help = """For perceptron: maximum number of training rounds
 (default: %default).""")
+
+  var perceptron_decay =
+    ap.option[Double]("perceptron-decay",
+      metavar = "DOUBLE",
+      default = 0.0,
+      must = be_within(0.0, 1.0),
+      help = """Amount by which to decay the perceptron aggressiveness
+factor each round. For example, the value 0.01 means to decay the factor
+by 1% each round. This should be a small number, and always a number
+between 0 and 1.""")
 }
 
 trait GridLocateMiscParameters {
@@ -1375,6 +1385,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "perceptron" | "avg-perceptron" =>
         new BasicSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.perceptron_aggressiveness,
+          decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds,
           averaged = params.rerank_classifier == "avg-perceptron") {
@@ -1384,6 +1395,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "pa-perceptron" =>
         new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.pa_variant, params.perceptron_aggressiveness,
+          decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds) {
             override def new_weights(len: Int) =
@@ -1393,6 +1405,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.pa_cost_type == "prediction-based",
           params.pa_variant, params.perceptron_aggressiveness,
+          decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds) {
             override def new_weights(len: Int) =

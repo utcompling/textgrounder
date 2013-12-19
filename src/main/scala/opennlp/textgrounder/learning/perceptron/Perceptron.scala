@@ -199,6 +199,8 @@ trait PerceptronTrainer {
   val max_iterations: Int
   assert(error_threshold >= 0)
   assert(max_iterations > 0)
+
+  def end_iteration()
 }
 
 /**
@@ -273,6 +275,7 @@ trait BinaryPerceptronTrainer
           num_adjustments += 1
         }
       }
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -302,6 +305,7 @@ trait BinaryPerceptronTrainer
           num_adjustments += 1
         }
       }
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -317,11 +321,18 @@ trait BinaryPerceptronTrainer
  */
 class BasicBinaryPerceptronTrainer(
   val vector_factory: SimpleVectorFactory,
-  val alpha: Double,
+  val alpha_param: Double,
+  val decay: Double = 0.0,
   val averaged: Boolean = false,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends BinaryPerceptronTrainer {
+  var alpha = alpha_param
+
+  def end_iteration() {
+    alpha *= 1.0 - decay
+  }
+
   def get_scale_factor(inst: FeatureVector, symmetric_label: Int,
       margin: Double) = {
     if (margin > 0)
@@ -338,9 +349,16 @@ class BasicBinaryPerceptronTrainer(
 trait PassiveAggressivePerceptronTrainer {
   val variant: Int
   val aggressiveness_param: Double
+  val decay: Double
+  var aggressiveness = aggressiveness_param
 
   assert(variant >= 0 && variant <= 2)
   assert(aggressiveness_param > 0)
+  assert(decay >= 0.0 && decay <= 1.0)
+
+  def end_iteration() {
+    aggressiveness *= 1.0 - decay
+  }
 
   /** Compute the scale factor used to update weights, given the "loss"
     * from choosing a particular label for an instance in place of the
@@ -417,6 +435,7 @@ class PassiveAggressiveBinaryPerceptronTrainer(
   val vector_factory: SimpleVectorFactory,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
+  val decay: Double = 0.0,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends { val averaged = false }
@@ -530,6 +549,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
           num_adjustments += 1
         }
       }
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -565,6 +585,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
       }
       errprint("Pct error: %s/%s = %.2f", num_errors, data.size,
         num_errors.toDouble / data.size * 100)
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -600,7 +621,13 @@ trait NoCostMultiWeightMultiLabelPerceptronTrainer[DI <: DataInstance]
  * factor.
  */
 trait BasicNoCostMultiLabelPerceptronTrainer {
-  val alpha: Double
+  val alpha_param: Double
+  val decay: Double
+  var alpha = alpha_param
+
+  def end_iteration() {
+    alpha *= 1.0 - decay
+  }
 
   def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
       max_no_label: Int, margin: Double) = {
@@ -619,7 +646,8 @@ trait BasicNoCostMultiLabelPerceptronTrainer {
  */
 class BasicSingleWeightMultiLabelPerceptronTrainer[DI <: DataInstance](
   val vector_factory: SimpleVectorFactory,
-  val alpha: Double,
+  val alpha_param: Double,
+  val decay: Double = 0.0,
   val averaged: Boolean = false,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
@@ -636,7 +664,8 @@ class BasicSingleWeightMultiLabelPerceptronTrainer[DI <: DataInstance](
 class BasicMultiWeightMultiLabelPerceptronTrainer[DI <: DataInstance](
   val vector_factory: SimpleVectorFactory,
   val num_labels: Int,
-  val alpha: Double,
+  val alpha_param: Double,
+  val decay: Double = 0.0,
   val averaged: Boolean = false,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
@@ -697,6 +726,7 @@ class PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[
   val vector_factory: SimpleVectorFactory,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
+  val decay: Double = 0.0,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends { val averaged = false }
@@ -716,6 +746,7 @@ class PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[
   val num_labels: Int,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
+  val decay: Double = 0.0,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends { val averaged = false }
@@ -809,6 +840,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
           }
         }
       }
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -847,6 +879,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
           }
         }
       }
+      end_iteration()
       (num_errors, num_adjustments, total_adjustment)
     }
   }
@@ -896,6 +929,7 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTra
   val prediction_based: Boolean,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
+  val decay: Double = 0.0,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends { val averaged = false }
@@ -916,6 +950,7 @@ abstract class PassiveAggressiveCostSensitiveMultiWeightMultiLabelPerceptronTrai
   val num_labels: Int,
   val variant: Int,
   val aggressiveness_param: Double = 20.0,
+  val decay: Double = 0.0,
   val error_threshold: Double = 1e-10,
   val max_iterations: Int = 1000
 ) extends { val averaged = false }
