@@ -417,7 +417,7 @@ package hadoop {
       // Retrieve configuration values and store in `ap`
       convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
       // Now create a class containing the stored configuration values
-      val params = create_param_object(ap)
+      val params = catch_parser_errors { create_param_object(ap) }
       driver.set_task_context(context)
       context.progress
       driver.set_parameters(params)

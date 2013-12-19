@@ -449,6 +449,23 @@ package object argparser {
            (name, rawval))
     }
   }
+
+  /**
+   * Execute the given body and catch parser errors. When they occur,
+   * output the message and exit with exit code 1, rather than outputting
+   * a stack trace.
+   */
+  def catch_parser_errors[T](body: => T): T = {
+    try {
+      body
+    } catch {
+      case e: ArgParserException => {
+        System.err.println(e.message)
+        System.exit(1)
+        ??? // Should never get here!
+      }
+    }
+  }
 }
 
 package argparser {
@@ -1531,16 +1548,8 @@ package argparser {
       // Reset everything, in case the user explicitly set some values
       // (which otherwise override values retrieved from parsing)
       clear()
-      if (catchErrors) {
-        try {
-          call_parse()
-        } catch {
-          case e: ArgParserException => {
-            System.err.println(e.message)
-            System.exit(1)
-          }
-        }
-      } else call_parse()
+      if (catchErrors) catch_parser_errors { call_parse() }
+      else call_parse()
     }
 
     /**

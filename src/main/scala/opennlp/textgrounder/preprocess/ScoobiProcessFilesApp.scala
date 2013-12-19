@@ -220,8 +220,8 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     // prefixes, they easily disappear.
     errprint("Parsing args: %s" format (args mkString " "))
     ap.parse(args)
-    val Opts = create_params(ap)
-    Opts.check_usage()
+    val Opts = catch_parser_errors { create_params(ap) }
+    catch_parser_errors { Opts.check_usage() }
     enableCounterLogging()
     if (Opts.debug) {
       HadoopLogFactory.setQuiet(false)

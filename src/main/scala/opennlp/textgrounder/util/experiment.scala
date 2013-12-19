@@ -97,7 +97,7 @@ package experiment {
 
     def set_parameters(params: TParam) {
       this.params = params
-      handle_parameters()
+      catch_parser_errors { handle_parameters() }
     }
 
     def run_program(args: Array[String]) = {
@@ -655,7 +655,7 @@ package experiment {
       set_stdout_stderr_utf_8()
       val shadow_fields = create_param_object(arg_parser)
       arg_parser.parse(args)
-      params = create_param_object(arg_parser)
+      params = catch_parser_errors { create_param_object(arg_parser) }
       initialize_parameters()
       output_command_line_parameters()
       output_ancillary_parameters()
