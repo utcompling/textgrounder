@@ -568,21 +568,33 @@ trait GridLocateRerankParameters {
       help = """If specified, do reranking of grid cells.""")
 
   var rerank_classifier =
-    ap.option[String]("rerank-classifier",
+    ap.option[String]("rerank-optimizer",
       default = "avg-perceptron",
       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
-        "cost-perceptron"),
-      help = """Type of classifier to use for reranking.  Possibilities are
-'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
-(perceptron using the basic algorithm, where the weights from the various
-rounds are averaged -- this usually improves results if the weights oscillate
-around a certain error rate, rather than steadily improving); 'pa-perceptron'
-(passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds);
-'cost-perceptron' (cost-sensitive passive-aggressive perceptron, using the
-error distance as the cost).  Default %default.
+        "cost-perceptron", "mlogit"),
+      help = """Type of optimizer to use for reranking.  Possibilities are:
 
-For the perceptron classifiers, see also `--pa-variant`,
+'perceptron' (perceptron using the basic algorithm);
+
+'avg-perceptron' (perceptron using the basic algorithm, where the weights
+  from the various rounds are averaged -- this usually improves results if
+  the weights oscillate around a certain error rate, rather than steadily
+  improving);
+
+'pa-perceptron' (passive-aggressive perceptron, which usually leads to steady
+  but gradually dropping-off error rate improvements with increased number
+  of rounds);
+
+'cost-perceptron' (cost-sensitive passive-aggressive perceptron, using the
+  error distance as the cost);
+
+'mlogit' (use a generalized linear model, specifically a conditional logit
+  model -- similar to a multinomial logistic regression or maximum entropy
+  model).
+
+Default %default.
+
+For the perceptron optimizers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
