@@ -40,7 +40,7 @@ package experiment {
    *
    * 1. Create an instance of a class of type TParam (which is determined
    *    by the particular driver implementation) and populate it with the
-   *    appropriate parameters.
+   *    appropriate parameters. Set `params` to this object.
    * 2. Call `run_program()`, passing in the parameter object created in the
    *    previous step.  The return value (of type TRunRes, again determined by
    *    the particular implementation) contains the results.
@@ -49,12 +49,9 @@ package experiment {
    * parameters recorded in the parameter object (particularly to
    * canonicalize them).
    *
-   * Note that `run_program()` is actually a convenience method that does
-   * the following steps:
-   *
-   * 1. `set_parameters`, which notes the parameters passed in and verifies
-   *    that their values are good.
-   * 2. `run`, which executes the experiment.
+   * Note that `run_program()` is actually a convenience method that wraps
+   * `run()` with some code to output the arguments at the beginning and the
+   * total execution time at the end.
    */
 
   trait ExperimentDriver {
@@ -70,37 +67,11 @@ package experiment {
      * Signal a parameter error.
      */
     def param_error(string: String) {
-      throw new IllegalArgumentException(string)
+      throw new ArgParserRestrictionException(string)
     }
 
-    protected def param_needed(param: String, param_english: String = null) {
-      val mparam_english =
-        if (param_english == null)
-          param.replace("-", " ")
-        else
-          param_english
-      param_error("Must specify %s using --%s" format
-        (mparam_english, param.replace("_", "-")))
-    }
-
-    protected def need_seq(value: Seq[String], param: String,
-        param_english: String = null) {
-      if (value.length == 0)
-        param_needed(param, param_english)
-    }
-
-    protected def need(value: String, param: String,
-        param_english: String = null) {
-      if (value == null || value.length == 0)
-        param_needed(param, param_english)
-    }
-
-    def set_parameters(params: TParam) {
+    def run_program(args: Array[String], params: TParam) = {
       this.params = params
-      catch_parser_errors { handle_parameters() }
-    }
-
-    def run_program(args: Array[String]) = {
       original_args = args
       errprint("Beginning operation at %s" format humandate_full(beginning_time))
       errprint("Arguments: %s" format (args mkString " "))
@@ -214,15 +185,6 @@ package experiment {
     /********************************************************************/
     /*                 Function to override below this line             */
     /********************************************************************/
-
-    /**
-     * Verify and canonicalize the parameters passed in.  Retrieve any other
-     * parameters from the environment.  NOTE: Currently, some of the
-     * fields in this structure will be changed (canonicalized).  See above.
-     * If parameter values are illegal, an error will be signaled.
-     */
-
-    protected def handle_parameters()
 
     /**
      * Actually run the experiment.
@@ -555,10 +517,12 @@ package experiment {
    *     initializes the ArgParser with the list of allowable arguments,
    *     types, default values, etc. `TParam` is the type of this class,
    *     and `create_param_object` must be implemented to create an instance
-   *     of this class.
-   * (2) `initialize_parameters` must be implemented to handle validation
-   *     of the command-line arguments and retrieval of any other parameters.
-   * (3) `run_program` must, of course, be implemented, to provide the
+   *     of this class. Extra validation of command-line arguments and
+   *     retrieval of any other parameters is handled inside this class.
+   *     Since the class will be executed twice, if may be necessary to
+   *     bracket code with 'if (ap.parsedValues)' if it should only execute
+   *     when values have been parsed and filled in.
+   * (2) `run_program` must, of course, be implemented, to provide the
    *     actual behavior of the application.
    */
 
@@ -576,12 +540,6 @@ package experiment {
      * Function to create an TParam, passing in the value of `arg_parser`.
      */
     def create_param_object(ap: ArgParser): TParam
-
-    /**
-     * Function to initialize and verify internal parameters from command-line
-     * arguments and other sources.
-     */
-    def initialize_parameters()
 
     /**
      * Function to run the actual app, after parameters have been set.
@@ -656,7 +614,6 @@ package experiment {
       val shadow_fields = create_param_object(arg_parser)
       arg_parser.parse(args)
       params = catch_parser_errors { create_param_object(arg_parser) }
-      initialize_parameters()
       output_command_line_parameters()
       output_ancillary_parameters()
       run_program(args)
@@ -808,12 +765,8 @@ package experiment {
         "Application generating this textdb")
     }
 
-    def initialize_parameters() {
-      driver.set_parameters(params)
-    }
-
     def run_program(args: Array[String]) = {
-      driver.run_program(args)
+      driver.run_program(args, params)
       0
     }
   }

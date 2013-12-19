@@ -119,9 +119,6 @@ object AnalyzeLocationVariance extends ExperimentApp("AnalyzeLocationVariance") 
 
   def create_param_object(ap: ArgParser) = new AnalyzeLocationVarianceParameters(ap)
 
-  def initialize_parameters() {
-  }
-
   def cartesian_product[T1, T2](A: Iterable[T1], B: Iterable[T2]
       ): Iterable[(T1, T2)] = {
     for (a <- A; b <- B) yield (a, b)

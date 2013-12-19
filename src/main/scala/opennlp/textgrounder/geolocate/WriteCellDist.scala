@@ -39,7 +39,9 @@ class WriteCellDistParameters(
 separated by a comma.  For each word, a textdb file is written using the
 value of `--output` as a prefix.""")
   // Same as above but a sequence
-  var split_words:Seq[String] = _
+  var split_words =
+    if (ap.parsedValues) words.split(',')
+    else Array[String]()
   var output =
     ap.option[String]("o", "output",
       must = be_specified,
@@ -55,11 +57,6 @@ class WriteCellDistDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = WriteCellDistParameters
   type TRunRes = Unit
-
-  override def handle_parameters() {
-    super.handle_parameters()
-    params.split_words = params.words.split(',')
-  }
 
   override protected def get_lang_model_builder_creator(lm_type: String,
       word_weights: collection.Map[Gram, Double],

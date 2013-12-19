@@ -182,9 +182,6 @@ counts file also containing the metadata.
 """)
   }
 
-  def handle_parameters() {
-  }
-
   def run() {
     if (!filehand.make_directories(params.output_dir))
       param_error("Output dir %s must not already exist" format

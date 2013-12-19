@@ -77,7 +77,9 @@ class GenerateKMLParameters(
 file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
   // Same as above but a sequence
-  var split_kml_words:Seq[String] = _
+  var split_kml_words =
+    if (ap.parsedValues) kml_words.split(',')
+    else Array[String]()
   var kml_prefix =
     ap.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
@@ -108,11 +110,6 @@ class GenerateKMLDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GenerateKMLParameters
   type TRunRes = Unit
-
-  override def handle_parameters() {
-    super.handle_parameters()
-    params.split_kml_words = params.kml_words.split(',')
-  }
 
   override protected def get_lang_model_builder_creator(lm_type: String,
       word_weights: collection.Map[Gram, Double],

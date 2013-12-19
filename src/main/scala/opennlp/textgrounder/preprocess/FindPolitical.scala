@@ -108,10 +108,8 @@ class FindPoliticalParams(ap: ArgParser) extends
   // Schema for the input file, after file read
   var schema: Schema = _
 
-  override def check_usage() {
-    if (!ap.specified("max-liberal"))
-      max_liberal = 1 - min_conservative
-  }
+  if (ap.parsedValues && !ap.specified("max-liberal"))
+    max_liberal = 1.0 - min_conservative
 }
 
 object FindPolitical extends

@@ -79,9 +79,7 @@ The Geolocate code works as follows:
    TextGrounder apps.  Argument parsing is handled using
    textgrounder.util.argparser, a custom argument-parsing package built on
    top of Argot.
--- The driver class has two main methods. `handle_parameters` verifies
-   that valid combinations of parameters were specified. `run` implements
-   the actual program.
+-- The driver class has one main method: `run` implements the actual program.
 
 In order to support all the various command-line parameters, the logic for
 doing geolocation is split up into various classes:
@@ -241,6 +239,50 @@ is used.""")
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
+
+  // Handle different ways of specifying grid size
+
+  def check_set(value: Double) = {
+    assert (value >= 0)
+    if (value > 0) 1 else 0
+  }
+  val num_set =
+    check_set(miles_per_cell) +
+    check_set(km_per_cell) +
+    check_set(degrees_per_cell)
+  if (num_set == 0)
+    degrees_per_cell = 1.0
+  else if (num_set > 1)
+    ap.error("Only one of --miles-per-cell, --km-per-cell, --degrees-per-cell may be given")
+  val (computed_dpc, computed_mpc, computed_kpc) =
+    (degrees_per_cell, miles_per_cell, km_per_cell) match {
+      case (deg, miles, km) if deg > 0 =>
+        (deg, deg * miles_per_degree, deg * km_per_degree)
+      case (deg, miles, km) if miles > 0 =>
+        (miles / miles_per_degree, miles, miles * km_per_mile)
+      case (deg, miles, km) if km > 0 =>
+        (km / km_per_degree, km / km_per_mile, km)
+    }
+
+  // NOTE! Setting this will NOT change the values returned using the
+  // argparser programmatic interface onto iterating through params or
+  // retrieving them by name. That requires reflection and is difficult
+  // or impossible (given current Scala limitations) to implement in a way
+  // that works cleanly, interfaces with the desired way of retrieving/
+  // setting parameters as variables (so that type-checking works, etc.)
+  // and doesn't require needless extra boilerplate.
+  degrees_per_cell = computed_dpc
+  km_per_cell = computed_kpc
+  miles_per_cell = computed_mpc
+
+  // The *-most-common-toponym rankers require case preserving
+  // (as if set by --preseve-case-words), while most other rankers want
+  // the opposite.  So check to make sure we don't have a clash.
+  if (ranker endsWith "most-common-toponym") {
+    errprint("Forcibly setting --preseve-case-words to true")
+    preserve_case_words = true
+  }
+
   var width_of_multi_cell =
     ap.option[Int]("width-of-multi-cell", metavar = "CELLS", default = 1,
       must = be_>(0),
@@ -295,6 +337,9 @@ uniform grid cell models?""")
   var eval_format =
     ap.option[String]("f", "eval-format",
       default = "internal",
+      must = Must({ x: String => x != "raw-text" },
+        // FIXME!!
+        "Raw-text reading not implemented yet"),
       choices = Seq("internal", "raw-text" //, "pcl-travel"
       ),
       help = """Format of evaluation file(s).  The evaluation files themselves
@@ -309,6 +354,13 @@ no eval file for this format.
 'raw-text' assumes that the eval file is simply raw text.  (NOT YET
 IMPLEMENTED.)
 """)
+
+  if (eval_format == "internal") {
+    if (eval_file.length > 0)
+      ap.error("--eval-file should not be given when --eval-format=internal")
+  } else if (eval_file.length == 0)
+    ap.error("Must specify evaluation file(s) using --eval-file")
+
 //'pcl-travel' is another alternative.  It assumes that each evaluation file
 //is in PCL-Travel XML format, and uses each chapter in the evaluation
 //file as a document to evaluate.""")
@@ -398,69 +450,6 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   override type TParam <: GeolocateParameters
 
   def deserialize_coord(coord: String) = SphereCoord.deserialize(coord)
-
-  override def handle_parameters() {
-    super.handle_parameters()
-
-    // Handle different ways of specifying grid size
-
-    def check_set(value: Double, desc: String) = {
-      if (value < 0)
-        param_error(desc + " must be positive if specified")
-      if (value > 0)
-        1
-      else 
-        0
-    }
-    val num_set =
-      check_set(params.miles_per_cell, "Miles per cell") +
-      check_set(params.km_per_cell, "Kilometers per cell") +
-      check_set(params.degrees_per_cell, "Degrees per cell")
-    if (num_set == 0)
-      params.degrees_per_cell = 1.0
-    else if (num_set > 1)
-      param_error("Only one of --miles-per-cell, --km-per-cell, --degrees-per-cell may be given")
-    val (computed_dpc, computed_mpc, computed_kpc) =
-      (params.degrees_per_cell, params.miles_per_cell, params.km_per_cell) match {
-        case (deg, miles, km) if deg > 0 =>
-          (deg, deg * miles_per_degree, deg * km_per_degree)
-        case (deg, miles, km) if miles > 0 =>
-          (miles / miles_per_degree, miles, miles * km_per_mile)
-        case (deg, miles, km) if km > 0 =>
-          (km / km_per_degree, km / km_per_mile, km)
-      }
-
-    // NOTE! Setting this will NOT change the values returned using the
-    // argparser programmatic interface onto iterating through params or
-    // retrieving them by name. That requires reflection and is difficult
-    // or impossible (given current Scala limitations) to implement in a way
-    // that works cleanly, interfaces with the desired way of retrieving/
-    // setting parameters as variables (so that type-checking works, etc.)
-    // and doesn't require needless extra boilerplate.
-    params.degrees_per_cell = computed_dpc
-    params.km_per_cell = computed_kpc
-    params.miles_per_cell = computed_mpc
-
-
-    // The *-most-common-toponym rankers require case preserving
-    // (as if set by --preseve-case-words), while most other rankers want
-    // the opposite.  So check to make sure we don't have a clash.
-    if (params.ranker endsWith "most-common-toponym") {
-      errprint("Forcibly setting --preseve-case-words to true")
-      params.preserve_case_words = true
-    }
-
-    if (params.eval_format == "raw-text") {
-      // FIXME!!!!
-      param_error("Raw-text reading not implemented yet")
-    }
-
-    if (params.eval_format == "internal") {
-      if (params.eval_file.length > 0)
-        param_error("--eval-file should not be given when --eval-format=internal")
-    } else
-      need_seq(params.eval_file, "eval-file", "evaluation file(s)")
-  }
 
   protected def create_document_factory(
       lang_model_factory: DocLangModelFactory) =

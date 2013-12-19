@@ -111,6 +111,34 @@ unigram counts and add a new 'unigram-counts' field containing
 those counts.""")
 
   val frobbers = mutable.Buffer[RecordFrobber]()
+
+  def parse_add_field_by(value: String) = {
+    val Array(destfield, srcfield, pairs@_*) = value.split(",")
+    val split_pairs = pairs.map { pair =>
+      pair.split(":") match {
+        case Array(name,valstr) => (name, valstr)
+        case Array(name) => (name, "")
+      }
+    }
+    (destfield, srcfield, split_pairs)
+  }
+
+  if (add_field_by_range != null) {
+    val (destfield, srcfield, split_pairs) =
+      parse_add_field_by(add_field_by_range)
+    frobbers +=
+      new AddFieldByRange(destfield, srcfield, split_pairs)
+  }
+  if (add_field_by_index != null) {
+    val (destfield, srcfield, split_pairs) =
+      parse_add_field_by(add_field_by_index)
+    frobbers +=
+      new AddFieldByIndex(destfield, srcfield, split_pairs)
+  }
+  if (convert_to_unigram_counts)
+    frobbers += new ConvertToUnigramCounts
+  if (output_suffix == null)
+    output_suffix = input_suffix
 }
 
 /**
@@ -369,37 +397,6 @@ class FrobTextDB(
 class FrobTextDBDriver extends
     ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = FrobTextDBParameters
-
-  def parse_add_field_by(value: String) = {
-    val Array(destfield, srcfield, pairs@_*) = value.split(",")
-    val split_pairs = pairs.map { pair =>
-      pair.split(":") match {
-        case Array(name,valstr) => (name, valstr)
-        case Array(name) => (name, "")
-      }
-    }
-    (destfield, srcfield, split_pairs)
-  }
-  
-  override def handle_parameters() {
-    if (params.add_field_by_range != null) {
-      val (destfield, srcfield, split_pairs) =
-        parse_add_field_by(params.add_field_by_range)
-      params.frobbers +=
-        new AddFieldByRange(destfield, srcfield, split_pairs)
-    }
-    if (params.add_field_by_index != null) {
-      val (destfield, srcfield, split_pairs) =
-        parse_add_field_by(params.add_field_by_index)
-      params.frobbers +=
-        new AddFieldByIndex(destfield, srcfield, split_pairs)
-    }
-    if (params.convert_to_unigram_counts)
-      params.frobbers += new ConvertToUnigramCounts
-    if (params.output_suffix == null)
-      params.output_suffix = params.input_suffix
-    super.handle_parameters()
-  }
 
   override def run() {
     super.run()

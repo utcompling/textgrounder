@@ -52,12 +52,6 @@ class ScoobiProcessFilesParams(val ap: ArgParser) {
     must = be_specified,
     help = "Destination directory to place files in.")
 
-  /**
-   * Check usage of command-line parameters and use `ap.usageError` to
-   * signal that an error occurred.
-   */
-  def check_usage() {}
-
   def non_default_params = {
     for (name <- ap.argNames if (ap.specified(name))) yield
       (name, ap(name))
@@ -222,21 +216,20 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     // prefixes, they easily disappear.
     errprint("Parsing args: %s" format (args mkString " "))
     ap.parse(args)
-    val Opts = catch_parser_errors { create_params(ap) }
-    catch_parser_errors { Opts.check_usage() }
+    val params = catch_parser_errors { create_params(ap) }
     enableCounterLogging()
-    if (Opts.debug) {
+    if (params.debug) {
       HadoopLogFactory.setQuiet(false)
       HadoopLogFactory.setLogLevel(HadoopLogFactory.TRACE)
       LogManager.getRootLogger().setLevel(JLevel.DEBUG.asInstanceOf[JLevel])
     }
-    if (Opts.debug_file != null)
-      set_errout_file(Opts.debug_file)
+    if (params.debug_file != null)
+      set_errout_file(params.debug_file)
     output_command_line_parameters(ap)
-    Opts
+    params
   }
 
-  def finish_scoobi_app(Opts: ParamType) {
+  def finish_scoobi_app(params: ParamType) {
     errprint("All done with everything.")
     errprint("")
     output_resource_usage()

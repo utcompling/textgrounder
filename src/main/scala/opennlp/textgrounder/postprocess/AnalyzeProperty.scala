@@ -56,9 +56,6 @@ object AnalyzeProperty extends ExperimentApp("AnalyzeProperty") {
 
   def create_param_object(ap: ArgParser) = new AnalyzePropertyParameters(ap)
 
-  def initialize_parameters() {
-  }
-
   def output_quantiles[T : Ordering](origvals: IndexedSeq[T]) {
     val vals = origvals.sorted
     val size = vals.size

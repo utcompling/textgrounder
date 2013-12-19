@@ -193,6 +193,9 @@ class HadoopGeolocateParameters(
       help = """Directory to use in place of TEXTGROUNDER_DIR environment
 variable (e.g. in Hadoop).""")
 
+  if (ap.parsedValues)
+    TextGrounderInfo.set_textgrounder_dir(textgrounder_dir)
+
   var outfile =
     ap.positional[String]("outfile",
       must = be_specified,
@@ -209,11 +212,6 @@ variable (e.g. in Hadoop).""")
 trait HadoopGeolocateDriver extends
     GeolocateDriver with HadoopExperimentDriver {
   override type TParam <: HadoopGeolocateParameters
-
-  override def handle_parameters() {
-    super.handle_parameters()
-    TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
-  }
 }
 
 /**

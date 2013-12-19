@@ -135,6 +135,26 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
   var ideological_users_conservative: Map[String, Double] = _
   var ideological_categories: Seq[String] = _
 
+  if (ap.parsedValues) {
+    if (ideological_user_corpus != null) {
+      val rows = TextDB.read_textdb(io.localfh,
+          ideological_user_corpus, suffix_re = "ideo-users")
+      val users =
+        (for (row <- rows) yield {
+          val user = row.gets("user")
+          val ideology = row.get[Double]("ideology")
+          (user, ideology)
+        }).toMap
+      ideological_users = users
+      ideological_users_liberal =
+        users filter { case (u, ideo) => ideo < 0.33 }
+      ideological_users_conservative =
+        users filter { case (u, ideo) => ideo > 0.66 }
+      ideological_categories = Seq("liberal", "conservative")
+    } else
+      ideological_categories = Seq("all")
+  }
+
   // Unused, determined by --ideological-user-corpus.
 //  var mode = ap.option[String]("m", "mode",
 //    default = "combined",
@@ -159,38 +179,6 @@ class PoligrounderDriver extends
 
   def deserialize_coord(coord: String) = TimeCoord.deserialize(coord)
 
-  override def handle_parameters() {
-    def parse_interval(param: String) = {
-      parse_date_interval(param) match {
-        case (Some((start, end)), "") => (start, end)
-        case (None, errmess) => param_error(errmess)
-        case _ => internal_error("Should never get here")
-      }
-    }
-    from_chunk = parse_interval(params.from)
-    to_chunk = parse_interval(params.to)
-
-    if (params.ideological_user_corpus != null) {
-      val rows = TextDB.read_textdb(io.localfh,
-          params.ideological_user_corpus, suffix_re = "ideo-users")
-      val users =
-        (for (row <- rows) yield {
-          val user = row.gets("user")
-          val ideology = row.get[Double]("ideology")
-          (user, ideology)
-        }).toMap
-      params.ideological_users = users
-      params.ideological_users_liberal =
-        users filter { case (u, ideo) => ideo < 0.33 }
-      params.ideological_users_conservative =
-        users filter { case (u, ideo) => ideo > 0.66 }
-      params.ideological_categories = Seq("liberal", "conservative")
-    } else
-      params.ideological_categories = Seq("all")
-
-    super.handle_parameters()
-  }
-
   protected def create_document_factory(lang_model_factory: DocLangModelFactory) =
     new TimeDocFactory(this, lang_model_factory)
 
@@ -211,6 +199,15 @@ class PoligrounderDriver extends
   }
 
   def run() {
+    def parse_interval(param: String) = {
+      parse_date_interval(param) match {
+        case (Some((start, end)), "") => (start, end)
+        case (None, errmess) => param_error(errmess)
+        case _ => ???
+      }
+    }
+    from_chunk = parse_interval(params.from)
+    to_chunk = parse_interval(params.to)
     val grid = initialize_grid
     if (params.ideological_user_corpus == null)
       LangModelComparer.compare_cells_2way(

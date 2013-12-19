@@ -108,6 +108,20 @@ are computed.""")
   val files =
     ap.multiPositional[String]("files",
       help = """File(s) to process for input.""")
+
+  if (output_all_stats) {
+    output_stats = true
+    user_stats = true
+    user_to_userid_stats = true
+    reply_user_stats = true
+  }
+  if (reply_user_stats) {
+    user_stats = true
+  }
+  if (output_stats) {
+    user_stats = true
+    output_min_stats = true
+  }
 }
 
 trait TwitterInfochimpsFileProcessor {
@@ -500,24 +514,6 @@ class ConvertTwitterInfochimpsDriver extends
     ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = ConvertTwitterInfochimpsParameters
   
-  override def handle_parameters() {
-    if (params.output_all_stats) {
-      params.output_stats = true
-      params.user_stats = true
-      params.user_to_userid_stats = true
-      params.reply_user_stats = true
-    }
-    if (params.reply_user_stats) {
-      params.user_stats = true
-    }
-    if (params.output_stats) {
-      params.user_stats = true
-      params.output_min_stats = true
-    }
-    if (!params.output_min_stats)
-      super.handle_parameters()
-  }
-
   override def run() {
     val filehand = get_file_handler
     if (params.output_min_stats)

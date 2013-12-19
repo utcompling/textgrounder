@@ -128,6 +128,11 @@ Wikipedia article, etc.).
 
 Multiple such files can be given by specifying the option multiple
 times.""")
+
+  if (ap.parsedValues) {
+    if (input.length == 0)
+      ap.error("Must specify input file(s) using --input")
+  }
 }
 
 trait GridLocateLangModelParameters {
@@ -858,6 +863,11 @@ values of the parameter (called "C") at C = 100 have very little restriction,
 while C = 0.001 has a great deal of restriction and is useful with notably
 noisy training data.  We choose C = 1 as a compromise.""")
 
+  if (perceptron_aggressiveness == 0.0) // If default ...
+    // Currently same for both regular and pa-perceptron, despite
+    // differing interpretations.
+    perceptron_aggressiveness = 1.0
+
   var perceptron_rounds =
     ap.option[Int]("perceptron-rounds",
       metavar = "INT",
@@ -926,6 +936,28 @@ commontop: Extra info for debugging
 
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
+
+  // Debug flags (from SphereGridEvaluator) -- need to set them
+  // here before we parse the command-line debug settings. (FIXME, should
+  // be a better way that introduces fewer long-range dependencies like
+  // this)
+  //
+  //  gridrank: For the given test document number (starting at 1), output
+  //            a grid of the predicted rank for cells around the true
+  //            cell.  Multiple documents can have the rank output, e.g.
+  //
+  //            --debug 'gridrank=45,58'
+  //
+  //            (This will output info for documents 45 and 58.)
+  //
+  //  gridranksize: Size of the grid, in numbers of documents on a side.
+  //                This is a single number, and the grid will be a square
+  //                centered on the correct cell.
+  register_list_debug_param("gridrank")
+  debugval("gridranksize") = GridLocateConstants.default_gridranksize.toString
+
+  if (debug != null)
+    parse_debug_spec(debug)
 }
 
 /**
@@ -947,8 +979,7 @@ trait GridLocateParameters extends ArgParserParameters with
  * language model associated with each cell and initialized from a corpus
  * of documents by concatenating all documents located within the cell.
  *
- * Driver classes like this have `handle_parameters` to check the
- * passed-in parameter values and `run` to do the main operation.
+ * Driver classes like this have `run` to do the main operation.
  * A subclass of GridLocateApp is often used to wrap the driver and
  * initialize parameters from the command line.
  */
@@ -956,45 +987,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   override type TParam <: GridLocateParameters
 
   def deserialize_coord(coord: String): Co
-
-  /**
-   * Set the options to those as given.  NOTE: Currently, some of the
-   * fields in this structure will be changed (canonicalized).  See above.
-   * If options are illegal, an error will be signaled.
-   *
-   * @param options Object holding options to set
-   */
-  def handle_parameters() {
-    // Debug flags (from SphereGridEvaluator) -- need to set them
-    // here before we parse the command-line debug settings. (FIXME, should
-    // be a better way that introduces fewer long-range dependencies like
-    // this)
-    //
-    //  gridrank: For the given test document number (starting at 1), output
-    //            a grid of the predicted rank for cells around the true
-    //            cell.  Multiple documents can have the rank output, e.g.
-    //
-    //            --debug 'gridrank=45,58'
-    //
-    //            (This will output info for documents 45 and 58.)
-    //
-    //  gridranksize: Size of the grid, in numbers of documents on a side.
-    //                This is a single number, and the grid will be a square
-    //                centered on the correct cell.
-    register_list_debug_param("gridrank")
-    debugval("gridranksize") =
-      GridLocateConstants.default_gridranksize.toString
-
-    if (params.debug != null)
-      parse_debug_spec(params.debug)
-
-    need_seq(params.input, "input")
-
-    if (params.perceptron_aggressiveness == 0.0) // If default ...
-      // Currently same for both regular and pa-perceptron, despite
-      // differing interpretations.
-      params.perceptron_aggressiveness = 1.0
-  }
 
   /**
    * Field in textdb corpus used to access proper type of lang model.

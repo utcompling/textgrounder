@@ -117,8 +117,7 @@ class ParseTweetsParams(ap: ArgParser) extends
     must = be_>(0.0),
     help="""Number of seconds per timeslice when `--grouping=time`.
     Can be a fractional number.  Default %default.""")
-  // The following is set based on --timeslice
-  var timeslice: Long = _
+  var timeslice = (timeslice_float * 1000).toLong
   var filter_tweets = ap.option[String]("filter-tweets",
     help="""Boolean expression used to filter tweets to be output.
 Expression consists of one or more expressions, joined by the operators
@@ -342,6 +341,24 @@ Look for any tweets containing the word "clinton" as well as either the words
     following within [5, 1000].  This is an attempt to filter out
     "spammers", i.e. accounts not associated with normal users.""")
 
+  /* Whether we are doing tweet-level filtering.  To check whether doing
+     group-level filtering, check whether filter_grouping == "none". */
+  val has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
+  val has_group_filtering = filter_groups != null || cfilter_groups != null
+
+  if (filter_grouping == "default") {
+    if (has_group_filtering)
+      filter_grouping = grouping
+    else
+      filter_grouping = "none"
+  }
+  if (has_group_filtering && filter_grouping == "none")
+    ap.usageError("group-level filtering not possible when `--filter-grouping=none`")
+  if (!has_group_filtering && filter_grouping != "none")
+    ap.usageError("when not doing group-level filtering, `--filter-grouping` must be `none`")
+  if (output_format == "json" && grouping != "none")
+    ap.usageError("output grouping (--grouping) not possible when output format is JSON")
+
   import ParseTweets.Tweet
 
   private def match_field(field: String) =
@@ -405,12 +422,8 @@ Look for any tweets containing the word "clinton" as well as either the words
     }
   }
 
-  var included_fields: Iterable[String] = _
+  val included_fields = parse_output_fields(output_fields)
   var input_schema: Schema = _
-
-  /* Whether we are doing tweet-level filtering.  To check whether doing
-     group-level filtering, check whether filter_grouping == "none". */
-  var has_tweet_filtering: Boolean = _
 
   /** Return whether we need to compute the given field. This is only
     * accurate for fields that consist of sequences or maps.
@@ -428,25 +441,6 @@ Look for any tweets containing the word "clinton" as well as either the words
         included_fields contains field
       case _ => true
     }
-  }
-
-  override def check_usage() {
-    timeslice = (timeslice_float * 1000).toLong
-    has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
-    val has_group_filtering = filter_groups != null || cfilter_groups != null
-    if (filter_grouping == "default") {
-      if (has_group_filtering)
-        filter_grouping = grouping
-      else
-        filter_grouping = "none"
-    }
-    if (has_group_filtering && filter_grouping == "none")
-      ap.usageError("group-level filtering not possible when `--filter-grouping=none`")
-    if (!has_group_filtering && filter_grouping != "none")
-      ap.usageError("when not doing group-level filtering, `--filter-grouping` must be `none`")
-    if (output_format == "json" && grouping != "none")
-      ap.usageError("output grouping (--grouping) not possible when output format is JSON")
-    included_fields = parse_output_fields(output_fields)
   }
 }
 

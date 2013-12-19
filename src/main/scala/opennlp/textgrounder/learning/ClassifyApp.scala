@@ -128,9 +128,6 @@ object Classify extends ExperimentApp("Classify") {
 
   def create_param_object(ap: ArgParser) = new ClassifyParameters(ap)
 
-  def initialize_parameters() {
-  }
-
   def run_program(args: Array[String]) = {
     val trainSource = io.localfh.openr(params.trainSource)
     val predictSource = io.localfh.openr(params.predictSource)

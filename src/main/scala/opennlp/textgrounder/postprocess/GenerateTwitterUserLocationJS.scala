@@ -50,6 +50,9 @@ if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
 list-valued; multiple values are specified by including the parameter
 multiple times, or by separating values by a comma.
 """)
+
+  if (ap.parsedValues && debug != null)
+    parse_debug_spec(debug)
 }
 
 /**
@@ -62,11 +65,6 @@ object GenerateTwitterUserLocationJS extends ExperimentApp("GenerateTwitterUserL
   type TParam = GenerateTwitterUserLocationJSParameters
 
   def create_param_object(ap: ArgParser) = new GenerateTwitterUserLocationJSParameters(ap)
-
-  def initialize_parameters() {
-    if (params.debug != null)
-      parse_debug_spec(params.debug)
-  }
 
   def output_freq_of_freq(filehand: io.FileHandler, file: String,
       map: collection.Map[String, Int]) {
