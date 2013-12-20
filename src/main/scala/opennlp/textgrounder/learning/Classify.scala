@@ -66,6 +66,39 @@ Default %default.""")
       must = be_specified,
       help = """(Labeled) file to make predictions on.""")
 
+  var label_specific =
+    ap.flag("label-specific",
+      help = """If true, features are label-specific, i.e. for a given
+instance there are different features for each possible label. This
+requires a different format for the training file.""")
+
+  var split_re =
+    ap.option[String]("split-re", "sre", "sr",
+      default = """[\s,]+""",
+      help = """Regexp for splitting a line into column values. By default,
+split on whitespace or commas.""")
+
+  var label_column =
+    ap.option[Int]("label-column", "lc",
+      default = -1,
+      help = """Column specifying the label of the instance. Numeric,
+zero-based. If negative, count from the end.""")
+
+  var instance_index_column =
+    ap.option[Int]("instance-index-column", "iic",
+      default = 0,
+      help = """Column specifying the index of the instance in question,
+when doing label-specific classification. Numeric, zero-based. If negative,
+count from the end. The indices themselves should be numeric.""")
+
+  var label_yesno_column =
+    ap.option[Int]("label-yesno-column", "lyc",
+      default = 1,
+      help = """Column specifying, for a given row in a label-specific
+training set, whether the label in the index of the instance in question,
+when doing label-specific classification. Numeric, zero-based. If negative,
+count from the end. The indices themselves should be numeric.""")
+
   var output =
     ap.option[String]("o", "out",
       metavar = "FILE",
@@ -141,62 +174,121 @@ object Classify extends ExperimentApp("Classify") {
         io.localfh.openw(params.output)
     }
 
-    // Train the classifier
-    val factory = new SparseNominalInstanceFactory
-    val training_instances =
-      factory.get_csv_labeled_instances(trainSource, is_training = true).
-        toIndexedSeq
-    val test_instances =
-      factory.get_csv_labeled_instances(predictSource, is_training = false).
-        toIndexedSeq
-    val numlabs = factory.number_of_labels
-    if (numlabs < 2) {
-      println("Found %s different labels, when at least 2 are needed." format
-        numlabs)
-      System.exit(0)
-    }
+    val (classifier, test_instances, factory) =
+      if (params.label_specific) {
+        // Read in the data instances and create feature vectors
+        val factory = new SparseAggregateInstanceFactory
+        val training_instances =
+          factory.get_labeled_instances(trainSource,
+            params.split_re,
+            params.instance_index_column,
+            params.label_column,
+            params.label_yesno_column,
+            is_training = true).
+            toIndexedSeq
+        val test_instances =
+          factory.get_labeled_instances(predictSource,
+            params.split_re,
+            params.instance_index_column,
+            params.label_column,
+            params.label_yesno_column,
+            is_training = false).
+            toIndexedSeq
+        val numlabs = factory.number_of_labels
+        if (numlabs < 2) {
+          println("Found %s different labels, when at least 2 are needed." format
+            numlabs)
+          System.exit(0)
+        }
 
-    // Train a classifer
-    val trainer = params.method match {
-      case "pa-perceptron" if numlabs > 2 || debug("multilabel") => {
-        errprint("Using passive-aggressive multi-label perceptron")
-        new PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[
-          FeatureVector
-        ](ArrayVector, numlabs, params.variant,
-          params.aggressiveness,
-          error_threshold = params.error_threshold,
-          max_iterations = params.rounds)
+        // Train a classifer
+        val trainer = params.method match {
+          case "pa-perceptron" => {
+            errprint("Using passive-aggressive multi-label perceptron")
+            new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[
+              FeatureVector
+            ](ArrayVector, params.variant,
+              params.aggressiveness,
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+          case _ => {
+            errprint("Using basic multi-label perceptron")
+            new BasicSingleWeightMultiLabelPerceptronTrainer[
+              FeatureVector
+            ](ArrayVector, params.aggressiveness,
+              averaged = params.method == "avg-perceptron",
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+        }
+        val classifier = trainer(training_instances)
+        (classifier, test_instances, factory)
+      } else {
+        // Read in the data instances and create feature vectors
+        val factory = new SparseSimpleInstanceFactory
+        val training_instances =
+          factory.get_labeled_instances(trainSource,
+            params.split_re,
+            params.label_column,
+            is_training = true).
+            toIndexedSeq
+        val test_instances =
+          factory.get_labeled_instances(predictSource,
+            params.split_re,
+            params.label_column,
+            is_training = false).
+            toIndexedSeq
+        val numlabs = factory.number_of_labels
+        if (numlabs < 2) {
+          println("Found %s different labels, when at least 2 are needed." format
+            numlabs)
+          System.exit(0)
+        }
+
+        // Train a classifer
+        val trainer = params.method match {
+          case "pa-perceptron" if numlabs > 2 || debug("multilabel") => {
+            errprint("Using passive-aggressive multi-label perceptron")
+            new PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[
+              FeatureVector
+            ](ArrayVector, numlabs, params.variant,
+              params.aggressiveness,
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+          case "pa-perceptron" => {
+            errprint("Using passive-aggressive binary perceptron")
+            new PassiveAggressiveBinaryPerceptronTrainer(
+              ArrayVector, params.variant, params.aggressiveness,
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+          case _ if numlabs > 2 || debug("multilabel") => {
+            errprint("Using basic multi-label perceptron")
+            new BasicMultiWeightMultiLabelPerceptronTrainer[
+              FeatureVector
+            ](ArrayVector, numlabs, params.aggressiveness,
+              averaged = params.method == "avg-perceptron",
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+          case _ => {
+            errprint("Using basic binary perceptron")
+            new BasicBinaryPerceptronTrainer(
+              ArrayVector, params.aggressiveness,
+              averaged = params.method == "avg-perceptron",
+              error_threshold = params.error_threshold,
+              max_iterations = params.rounds)
+          }
+        }
+        val classifier = trainer(training_instances)
+        (classifier, test_instances, factory)
       }
-      case "pa-perceptron" => {
-        errprint("Using passive-aggressive binary perceptron")
-        new PassiveAggressiveBinaryPerceptronTrainer(
-          ArrayVector, params.variant, params.aggressiveness,
-          error_threshold = params.error_threshold,
-          max_iterations = params.rounds)
-      }
-      case _ if numlabs > 2 || debug("multilabel") => {
-        errprint("Using basic multi-label perceptron")
-        new BasicMultiWeightMultiLabelPerceptronTrainer[
-          FeatureVector
-        ](ArrayVector, numlabs, params.aggressiveness,
-          averaged = params.method == "avg-perceptron",
-          error_threshold = params.error_threshold,
-          max_iterations = params.rounds)
-      }
-      case _ => {
-        errprint("Using basic binary perceptron")
-        new BasicBinaryPerceptronTrainer(
-          ArrayVector, params.aggressiveness,
-          averaged = params.method == "avg-perceptron",
-          error_threshold = params.error_threshold,
-          max_iterations = params.rounds)
-      }
-    }
-    val classifier = trainer(training_instances)
 
     // Run classifier on each instance to get the predictions, and output
     // them in reverse sorted order, tab separated
-    val predheader = ((1 to numlabs)
+    val predheader = ((1 to factory.number_of_labels)
              map (num => "Pred%s\tScore%s" format (num, num))
              mkString "\t")
     output.println("Corr?\tConf\tTruelab\t%s" format predheader)

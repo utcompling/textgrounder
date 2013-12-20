@@ -247,8 +247,9 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     val len = check_sequence_lengths(data)
     val weights = new_weights(len)
     for ((inst, label) <- data) {
-      assert(label >= 0 && label <=
-        (weights.max_label min inst.feature_vector.max_label))
+      val max_label = weights.max_label min inst.feature_vector.max_label
+      require(label >= 0 && label <= max_label,
+        "Label %s out of bounds: [%s,%s]" format (label, 0, max_label))
     } 
     weights
   }

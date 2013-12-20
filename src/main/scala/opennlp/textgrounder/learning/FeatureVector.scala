@@ -28,6 +28,7 @@ package learning
 import collection.mutable
 import io.Source
 
+import util.collection._
 import util.memoizer._
 import util.print._
 import util.debug._
@@ -94,6 +95,8 @@ trait FeatureVector extends DataInstance {
 
   /** Display the feature at the given index as a string. */
   def format_feature(index: Int) = index.toString
+
+  def pretty_print(prefix: String): String
 }
 
 object FeatureVector {
@@ -178,6 +181,8 @@ class ArrayFeatureVector(
   final def apply(i: Int) = values(i)
 
   final def update(i: Int, value: Double) { values(i) = value }
+
+  def pretty_print(prefix: String) = "  %s: %s" format (prefix, values)
 }
 
 trait SparseFeatureVectorLike extends SimpleFeatureVector {
@@ -336,6 +341,9 @@ class FeatureMapper extends ToIntMemoizer[String] {
   val intercept_feature = memoize("$intercept")
 }
 
+class LabelMapper extends ToIntMemoizer[String] {
+}
+
 /**
  * A factory object for creating sparse feature vectors for classification.
  * Sparse feature vectors store only the features with non-zero values.
@@ -345,6 +353,13 @@ class FeatureMapper extends ToIntMemoizer[String] {
  * the intercept term.
  */
 class SparseFeatureVectorFactory { self =>
+  val label_mapper = new LabelMapper
+  def label_to_index(label: String) =
+    label_mapper.memoize(label) - label_mapper.minimum_index
+  def index_to_label(index: Int) =
+    label_mapper.unmemoize(index + label_mapper.minimum_index)
+  def number_of_labels = label_mapper.number_of_valid_indices
+
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
             "ShortCompressed" | "TupleArray" | "Map") => f
@@ -365,7 +380,7 @@ class SparseFeatureVectorFactory { self =>
 
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
     override def format_feature(index: Int) = feature_mapper.unmemoize(index)
-    def length = feature_mapper.number_of_valid_indices
+    def length = feature_mapper.maximum_index + 1
   }
 
   /**
@@ -417,34 +432,255 @@ class SparseFeatureVectorFactory { self =>
   }
 }
 
-/**
- * A factory object for creating sparse nominal instances for classification,
- * consisting of a nominal label and a set of nominal features.  Nominal
- * labels have no ordering or other numerical significance.
- */
-class SparseNominalInstanceFactory extends SparseFeatureVectorFactory {
-  val label_mapper = new FeatureMapper
-  def label_to_index(label: String) = label_mapper.memoize(label)
-  def index_to_label(index: Int) = label_mapper.unmemoize(index)
-  def number_of_labels = label_mapper.number_of_valid_indices
+sealed abstract class FeatureType
+case object NominalFeature extends FeatureType
+case object NumericFeature extends FeatureType
 
-  def make_labeled_instance(features: Iterable[String], label: String,
-      is_training: Boolean) = {
-    val featvals = features.map((_, 1.0))
-    val featvec = make_feature_vector(featvals, is_training)
-    // FIXME: What about labels not seen during training?
-    val labelind = label_to_index(label)
-    (featvec, labelind)
+class SparseInstanceFactory extends SparseFeatureVectorFactory {
+  // Format a series of lines for debug display.
+  def format_lines(lines: TraversableOnce[Array[String]]) = {
+    lines.map(line => errfmt(line mkString "\t")).mkString("\n")
   }
 
-  def get_csv_labeled_instances(lines: Iterator[String],
-      is_training: Boolean) = {
-    for (line <- lines) yield {
-      val atts = line.split(",", -1)
-      val label = atts.last
-      val features = atts.dropRight(1)
-      make_labeled_instance(features, label, is_training)
+  def get_index(numcols: Int, index: Int) = {
+    val retval =
+      if (index < 0) numcols + index
+      else index
+    require(retval >= 0 && retval < numcols,
+      "Index %s out of bounds: Should be in [%s,%s)" format (
+        index, -numcols, numcols))
+    retval
+  }
+
+  def get_columns(lines_iter: Iterator[String], split_re: String) = {
+    val all_lines = lines_iter.toIterable
+    val columns = all_lines.head.split(split_re)
+    val coltype = mutable.Map[String, FeatureType]()
+    for (col <- columns) {
+      coltype(col) = NumericFeature
     }
+    // Figure out whether features are nominal or numeric
+    val numcols = columns.size
+    val lines = all_lines.tail.map(_.split(split_re))
+    for (line <- lines) {
+      require(line.size == numcols, "Expected %s columns but saw %s: %s"
+        format (numcols, line.size, line mkString "\t"))
+      for ((value, col) <- (line zip columns)) {
+        try {
+          value.toDouble
+        } catch {
+          case e: Exception => coltype(col) = NominalFeature
+        }
+      }
+    }
+    val column_types = columns map { col =>
+      (col, coltype(col))
+    }
+    (lines, column_types)
+  }
+
+  def raw_linefeats_to_featvec(
+      raw_linefeats: Iterable[(String, (String, FeatureType))],
+      is_training: Boolean
+  ) = {
+    // Generate appropriate features based on column values, names, types.
+    val linefeats = raw_linefeats.map { case (value, (colname, coltype)) =>
+      coltype match {
+        case NumericFeature => (colname, value.toDouble)
+        case NominalFeature => ("%s$%s" format (colname, value), 1.0)
+      }
+    }
+
+    // Create feature vector
+    make_feature_vector(linefeats, is_training)
+  }
+}
+
+
+/**
+ * A factory object for creating sparse aggregate instances for
+ * classification or ranking, consisting of a nominal label and a
+ * set of features, which may be nominal or numeric. Nominal values
+ * have no ordering or other numerical significance.
+ */
+class SparseSimpleInstanceFactory extends SparseInstanceFactory {
+  /**
+   * Return a pair of `(aggregate, label)` where `aggregate` is an
+   * aggregate feature vector derived from the given lines.
+   *
+   * @param line Line specifying feature values.
+   * @param columns Names of columns and corresponding feature type.
+   *   There should be the same number of columns as items in each of the
+   *   arrays.
+   * @param choice_column Column specifying the choice; used to fetch
+   *   the label and removed before creating features.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def get_labeled_instance(line: Array[String],
+      columns: Iterable[(String, FeatureType)], choice_column: Int,
+      is_training: Boolean) = {
+
+    // Check the right length for the line
+    require(line.size == columns.size, "Expected %s columns but saw %s: %s"
+      format (columns.size, line.size, line mkString "\t"))
+
+    val label = label_to_index(line(choice_column))
+
+    // Filter out the columns we don't use, pair each with its column spec.
+    val raw_linefeats = line.zip(columns).zipWithIndex.filter {
+      case (value, index) => index != choice_column
+    }.map(_._1)
+
+    // Generate feature vector based on column values, names, types.
+    val featvec = raw_linefeats_to_featvec(raw_linefeats, is_training)
+
+    // Return instance
+    if (debug("features")) {
+      errprint("Label: %s(%s)", label, index_to_label(label))
+      errprint("Featvec: %s", featvec.pretty_print(""))
+    }
+    (featvec, label)
+  }
+
+  /**
+   * Return a sequence of pairs of `(aggregate, label)` where `aggregate`
+   * is an aggregate feature vector derived from the given lines. The
+   * first line should list the column headings.
+   *
+   * @param lines_iter Iterator over lines in the file.
+   * @param split_re Regexp to split columns in a line.
+   * @param choice_column Column specifying the choice; used to fetch
+   *   the label and removed before creating features.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def get_labeled_instances(lines_iter: Iterator[String],
+      split_re: String, choice_column: Int,
+      is_training: Boolean) = {
+    val (lines, column_types) = get_columns(lines_iter, split_re)
+    val numcols = column_types.size
+    val choice_colind = get_index(numcols, choice_column)
+    for (inst <- lines) yield {
+      get_labeled_instance(inst, column_types, choice_colind, is_training)
+    }
+  }
+}
+
+/**
+ * A factory object for creating sparse aggregate instances for
+ * classification or ranking, consisting of a nominal label and a
+ * set of features, which may be nominal or numeric. Nominal values
+ * have no ordering or other numerical significance.
+ */
+class SparseAggregateInstanceFactory extends SparseInstanceFactory {
+  /**
+   * Return a pair of `(aggregate, label)` where `aggregate` is an
+   * aggregate feature vector derived from the given lines.
+   *
+   * @param lines Lines corresponding to different choices of an individual.
+   * @param columns Names of columns and corresponding feature type.
+   *   There should be the same number of columns as items in each of the
+   *   arrays.
+   * @param indiv_colind Column specifying the individual index; removed
+   *   before creating features. This is a zero-based index into the
+   *   list of columns.
+   * @param choice_colind Column specifying the choice; used to fetch
+   *   the label and removed before creating features.
+   * @param choice_yesno_colind Column specifying "yes" or "no" identifying
+   *   whether the choice on this line was made by this individual. There
+   *   should be exactly one per set of lines.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def get_labeled_instance(lines: Iterable[Array[String]],
+      columns: Iterable[(String, FeatureType)],
+      indiv_colind: Int, choice_colind: Int, choice_yesno_colind: Int,
+      is_training: Boolean) = {
+
+    val numcols = columns.size
+
+    // Check the right lengths for the lines
+    for (line <- lines) {
+      require(line.size == numcols, "Expected %s columns but saw %s: %s"
+        format (numcols, line.size, line mkString "\t"))
+    }
+
+    // Retrieve the label, make sure there's exactly 1
+    val choice_yesno = lines.map { line =>
+      (label_to_index(line(choice_colind)), line(choice_yesno_colind))
+    }
+    val label_lines = choice_yesno.filter { _._2 == "yes" }
+    require(label_lines.size == 1,
+      "Expected exactly one label but saw %s: %s: lines:\n%s\n" format (
+        label_lines.size, label_lines.map(_._1), format_lines(lines)))
+    val label = label_lines.head._1
+
+    // Make sure all possible choices seen.
+    val choices_seen = choice_yesno.map(_._1)
+    val num_choices_seen = choices_seen.toSet.size
+    require(num_choices_seen == number_of_labels,
+      "Not all choices found: Expected %s choices but saw %s: %s" format
+      (number_of_labels, num_choices_seen, choices_seen.toSeq.sorted))
+
+    // Extract the feature vectors
+    val fvs = lines.map { line =>
+      // Filter out the columns we don't use, pair each with its column spec.
+      val raw_linefeats = line.zip(columns).zipWithIndex.filter {
+        case (value, index) =>
+          index != indiv_colind && index != choice_colind &&
+          index != choice_yesno_colind
+      }.map(_._1)
+
+      // Generate feature vector based on column values, names, types.
+      raw_linefeats_to_featvec(raw_linefeats, is_training)
+    }
+
+    // Order by increasing label so that all aggregates have the choices in
+    // the same order.
+    assert(fvs.size == choices_seen.size)
+    val sorted_fvs = (fvs zip choices_seen).toSeq.sortBy(_._2).map(_._1)
+
+    // Aggregate feature vectors, return aggregate with label
+    val agg = new AggregateFeatureVector(fvs.toIndexedSeq)
+    if (debug("features")) {
+      errprint("Label: %s(%s)", label, index_to_label(label))
+      errprint("Feature vector: %s", agg.pretty_print(""))
+    }
+    (agg, label)
+  }
+
+  /**
+   * Return a sequence of pairs of `(aggregate, label)` where `aggregate`
+   * is an aggregate feature vector derived from the given lines. The
+   * first line should list the column headings.
+   *
+   * @param lines_iter Iterator over lines in the file.
+   * @param split_re Regexp to split columns in a line.
+   * @param indiv_column Column specifying the individual index; removed
+   *   before creating features. This is a zero-based index into the
+   *   list of columns.
+   * @param choice_column Column specifying the choice; used to fetch
+   *   the label and removed before creating features.
+   * @param choice_yesno_column Column specifying "yes" or "no" identifying
+   *   whether the choice on this line was made by this individual. There
+   *   should be exactly one per set of lines.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def get_labeled_instances(lines_iter: Iterator[String],
+      split_re: String,
+      indiv_column: Int, choice_column: Int, choice_yesno_column: Int,
+      is_training: Boolean) = {
+    val (lines, column_types) = get_columns(lines_iter, split_re)
+    val numcols = column_types.size
+    val indiv_colind = get_index(numcols, indiv_column)
+    val choice_colind = get_index(numcols, choice_column)
+    val choice_yesno_colind = get_index(numcols, choice_yesno_column)
+
+    val grouped_instances = new GroupByIterator(lines.toIterator,
+      { line: Array[String] => line(indiv_column).toInt })
+    (for ((_, inst) <- grouped_instances) yield {
+      get_labeled_instance(inst.toIterable, column_types,
+        indiv_column, choice_column, choice_yesno_column,
+        is_training)
+    }).toIterable
   }
 }
 
@@ -492,4 +728,10 @@ class AggregateFeatureVector(val fv: IndexedSeq[FeatureVector])
 
   /** Display the feature at the given index as a string. */
   override def format_feature(index: Int) = fv.head.format_feature(index)
+
+  def pretty_print(prefix: String) = {
+    (for (d <- 0 until depth) yield
+      "Featvec at depth %s: %s" format (
+        d, fv(d).pretty_print(prefix))).mkString("\n")
+  }
 }

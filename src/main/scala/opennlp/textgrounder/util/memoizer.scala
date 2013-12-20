@@ -115,9 +115,9 @@ trait ToIntMemoizer[T] {
     * other purposes. */
   val minimum_index: Int = 1
   protected var next_index: Int = minimum_index
+  def maximum_index = next_index - 1
 
-  def number_of_valid_indices = next_index
-  def number_of_stored_entries = next_index - minimum_index
+  def number_of_valid_indices = next_index - minimum_index
   
   // For replacing items with ints.  This should save space on 64-bit
   // machines (object pointers are 8 bytes, ints are 4 bytes) and might
