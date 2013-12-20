@@ -95,33 +95,36 @@ protected class PrintCollection {
     set_errout_stream(get_errout_stream(file))
   }
 
-  protected def format_outtext(format: String, args: Any*) = {
+  def errfmt(format: String, args: Any*) = {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
     import scala.runtime.ScalaRunTime.stringOf
-    val outtext =
-      if (args.length == 0) format
-      else {
-        val strargs = args.map { x =>
-          x match {
-            case null => stringOf(x)
-            case _: Boolean => x
-            case _: Byte => x
-            case _: Char => x
-            case _: Short => x
-            case _: Int => x
-            case _: Long => x
-            case _: Float => x
-            case _: Double => x
-            case _: BigInt => x
-            case _: BigDecimal => x
-            case _: String => x
-            case _ => stringOf(x)
-          }
+    if (args.length == 0) format
+    else {
+      val strargs = args.map { x =>
+        x match {
+          case null => stringOf(x)
+          case _: Boolean => x
+          case _: Byte => x
+          case _: Char => x
+          case _: Short => x
+          case _: Int => x
+          case _: Long => x
+          case _: Float => x
+          case _: Double => x
+          case _: BigInt => x
+          case _: BigDecimal => x
+          case _: String => x
+          case _ => stringOf(x)
         }
-        format format (strargs: _*)
       }
+      format format (strargs: _*)
+    }
+  }
+
+  protected def format_outtext(format: String, args: Any*) = {
+    val outtext = errfmt(format, args: _*)
     if (need_prefix)
       errout_prefix + outtext
     else
