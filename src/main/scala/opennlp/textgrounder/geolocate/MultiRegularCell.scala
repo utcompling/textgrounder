@@ -195,6 +195,7 @@ class MultiRegularCell(
  */
 class MultiRegularGrid(
   val degrees_per_cell: Double,
+  val cell_offset_degrees: SphereCoord,
   val width_of_multi_cell: Int,
   docfact: SphereDocFactory
 ) extends SphereGrid(docfact) {
@@ -213,6 +214,8 @@ class MultiRegularGrid(
      end up with the North Pole in a cell by itself, something we probably
      don't want.
    */
+  val modded_cod = SphereCoord(cell_offset_degrees.lat % degrees_per_cell,
+    cell_offset_degrees.long % degrees_per_cell)
   val maximum_index =
     coord_to_tiling_cell_index(SphereCoord(maximum_latitude - 1e-10,
       maximum_longitude))
@@ -222,6 +225,7 @@ class MultiRegularGrid(
     coord_to_tiling_cell_index(SphereCoord(minimum_latitude, minimum_longitude))
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
+
 
   /**
    * Mapping from index of southwest corner of multi cell to corresponding
@@ -246,8 +250,8 @@ class MultiRegularGrid(
    * corresponding tiling cell.
    */
   def coord_to_tiling_cell_index(coord: SphereCoord) = {
-    val latind = floor(coord.lat / degrees_per_cell).toInt
-    val longind = floor(coord.long / degrees_per_cell).toInt
+    val latind = floor((coord.lat - modded_cod.lat) / degrees_per_cell).toInt
+    val longind = floor((coord.long - modded_cod.long) / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
   }
 
@@ -282,8 +286,8 @@ class MultiRegularGrid(
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
       method: String = "coerce-warn") = {
-    SphereCoord(index.latind * degrees_per_cell,
-      index.longind * degrees_per_cell, method)
+    SphereCoord(index.latind * degrees_per_cell + modded_cod.lat,
+      index.longind * degrees_per_cell + modded_cod.long, method)
   }
 
   /**
@@ -429,7 +433,7 @@ class MultiRegularGrid(
    * else, return None.  If a cell is created, record it in the
    * grid if `record_created_cell` is true.
    */
-  protected def find_cell_for_cell_index(index: RegularCellIndex,
+  def find_cell_for_cell_index(index: RegularCellIndex,
       create: Boolean, record_created_cell: Boolean) = {
     corner_to_multi_cell.get(index) match {
       case x@Some(cell) => x

@@ -283,6 +283,14 @@ is used.""")
     preserve_case_words = true
   }
 
+  //// Lat/long offset of cells from (0,0)
+  var cell_offset_degrees =
+    ap.option[String]("cell-offset-degrees", "cod", metavar = "LATLONG",
+      default="0.0,0.0",
+      help = """Latitude/longtitude offset (in degrees, as two floating-point
+numbers separated by a comma) of the corner of any grid cell. This ensures
+that the given coordinate falls on a corner between four grid cells.""")
+
   var width_of_multi_cell =
     ap.option[Int]("width-of-multi-cell", metavar = "CELLS", default = 1,
       must = be_>(0),
@@ -292,6 +300,7 @@ NOTE: It's unlikely you want to change this.  It may be removed entirely in
 later versions.  In normal circumstances, the value is 1, i.e. use a single
 tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
+
 
   //// Options for using KD trees, and related parameters
   var kd_tree =
@@ -457,20 +466,24 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
 
   protected def create_grid(docfact: GridDocFactory[SphereCoord]) = {
     val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
-    if (params.combined_kd_grid) {
-      val kdcg =
-        KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
-          params.kd_use_backoff, params.kd_interpolate_weight)
-      val mrcg =
-        new MultiRegularGrid(params.degrees_per_cell,
-          params.width_of_multi_cell, sphere_docfact)
-      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
-    } else if (params.kd_tree) {
+    val cod = SphereCoord.deserialize(params.cell_offset_degrees)
+    def create_multi_regular_grid = {
+      new MultiRegularGrid(params.degrees_per_cell,
+        cod,
+        params.width_of_multi_cell, sphere_docfact)      
+    }
+    def create_kd_tree_grid = {
       KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
+    }
+    if (params.combined_kd_grid) {
+      val kdcg = create_kd_tree_grid
+      val mrcg = create_multi_regular_grid
+      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
+    } else if (params.kd_tree) {
+      create_kd_tree_grid
     } else {
-      new MultiRegularGrid(params.degrees_per_cell,
-        params.width_of_multi_cell, sphere_docfact)
+      create_multi_regular_grid
     }
   }
 
