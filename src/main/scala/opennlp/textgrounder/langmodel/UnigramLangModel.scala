@@ -131,7 +131,7 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def gram_to_string(gram: Gram) = Unigram.unmemoize(gram)
+  def gram_to_string(gram: Gram) = Unigram.to_string(gram)
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -323,7 +323,7 @@ class DefaultUnigramLangModelBuilder(
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
-      lm.add_gram(Unigram.memoize(lword), count)
+      lm.add_gram(Unigram.to_index(lword), count)
       true
     }
     else
@@ -380,7 +380,7 @@ class DefaultUnigramLangModelBuilder(
   }
 
   def finish_before_global(lm: LangModel) {
-    val oov = Unigram.memoize("-OOV-")
+    val oov = Unigram.to_index("-OOV-")
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -437,7 +437,7 @@ class FilterUnigramLangModelBuilder(
   override def finish_before_global(lm: LangModel) {
     super.finish_before_global(lm)
 
-    val oov = Unigram.memoize("-OOV-")
+    val oov = Unigram.to_index("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
     for ((word, count) <- lm.iter_grams_for_modify

@@ -1236,7 +1236,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
           val word = row.gets("word")
           val weight = row.get[Double]("weight")
-          val wordint = Unigram.memoize(word)
+          val wordint = Unigram.to_index(word)
           if (word_weights contains wordint)
             warning("Word %s with weight %s already seen with weight %s",
               word, weight, word_weights(wordint))
@@ -1562,7 +1562,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
            * reason for this is that creating a new feature would increase
            * the total size of the feature vectors and weight vector(s),
            * which we can't do after training has completed. Typically
-           * the difference down to 'memoize()' vs. 'memoize_if()'.
+           * the difference down to 'to_index()' vs. 'to_index_if()'
+           * when memoizing.
            */
           protected def create_candidate_eval_featvec(query: GridDoc[Co],
               candidate: GridCell[Co], initial_score: Double,

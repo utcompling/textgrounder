@@ -70,7 +70,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   val model = new NGramModel()
 
   protected def get_sl_ngram(ngram: Gram) =
-    new StringList(Ngram.unmemoize(ngram).toSeq: _*)
+    new StringList(Ngram.to_string(ngram).toSeq: _*)
 
   /**************************** Abstract functions ***********************/
 
@@ -138,7 +138,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
     for (x <- model.iterator.toIterable)
-      yield Ngram.memoize(x.iterator.toArray)
+      yield Ngram.to_index(x.iterator.toArray)
   }
 
   /**
@@ -152,7 +152,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
     for (x <- model.iterator.toIterable)
-      yield (Ngram.memoize(x.iterator.toArray),
+      yield (Ngram.to_index(x.iterator.toArray),
         model.getCount(x).toDouble)
   }
 
@@ -218,7 +218,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   */
 //  def record_encoded_ngram(egram: String, count: GramCount) {
 //    val n = egram.count(_ == ':') + 1
-//    val mgram = memoizer.memoize(egram)
+//    val mgram = memoizer.to_index(egram)
 //    ensure_ngram_fits(n)
 //    counts(n)(mgram) += count
 //    num_tokens(n) += count
@@ -265,7 +265,7 @@ abstract class NgramLangModel(
   ) extends LangModel(factory) with FastSlowKLDivergence {
   val model = new OpenNLPNgramStorer
 
-  def gram_to_string(gram: Gram) = Ngram.unmemoize(gram) mkString " "
+  def gram_to_string(gram: Gram) = Ngram.to_string(gram) mkString " "
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -361,7 +361,7 @@ class DefaultNgramLangModelBuilder(
       // FIXME: Not right with stopwords or whitelist
       //if (!stopwords.contains(lgram) &&
       //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-        lm.add_gram(Ngram.memoize(lgram.toArray), count)
+        lm.add_gram(Ngram.to_index(lgram.toArray), count)
         true
       //}
       //else
@@ -392,7 +392,7 @@ class DefaultNgramLangModelBuilder(
       // way rather than directly calling lm.add_gram() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
-      add_ngram_with_count(lm, Ngram.unmemoize(ngram), count)
+      add_ngram_with_count(lm, Ngram.to_string(ngram), count)
   }
 
   /**
@@ -434,10 +434,10 @@ class DefaultNgramLangModelBuilder(
     if (minimum_word_count > 1) {
       for ((ngram, count) <- lm.iter_grams_for_modify if count < minimum_word_count) {
         lm.remove_gram(ngram)
-        val siz = Ngram.unmemoize(ngram).size
+        val siz = Ngram.to_string(ngram).size
         val oov = oov_hash.getOrElse(siz, {
           val newoov =
-            Ngram.memoize((1 to siz).map(_ => "-OOV-").toArray)
+            Ngram.to_index((1 to siz).map(_ => "-OOV-").toArray)
           oov_hash(siz) = newoov
           newoov
         } )

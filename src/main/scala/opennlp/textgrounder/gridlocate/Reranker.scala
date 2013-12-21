@@ -528,7 +528,7 @@ abstract class NgramByNgramCandidateFeatVecFactory[Co](
       // conceivably lead to clashes if a word actually has the
       // separator in it, but that's unlikely and doesn't really matter
       // anyway.
-      yield ("%s$%s" format (Ngram.unmemoize(ngram) mkString "|", suff),
+      yield ("%s$%s" format (Ngram.to_string(ngram) mkString "|", suff),
         featval)
   }
 }

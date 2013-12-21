@@ -86,21 +86,22 @@ trait Memoizer[T,U] {
   /**
    * Map a value to its memoized form.
    */
-  def memoize(value: T): U
+  def to_index(value: T): U
   /**
    * Map a value to its memoized form but only if it has already been seen.
    */
-  def memoize_if(value: T): Option[U]
+  def to_index_if(value: T): Option[U]
   /**
    * Map a value out of its memoized form.
    */
-  def unmemoize(value: U): T
+  def to_string(value: U): T
 }
 
 /**
- * Standard memoizer for mapping values to Ints.  Specialization of
+ * Standard memoizer for mapping values to Ints. Specialization of
  * `Memoizer` for Ints, without boxing or unboxing. Uses
- * TroveHashTableFactory for efficiency.
+ * TroveHashTableFactory for efficiency. Lowest index returned is always
+ * 0, so that indices can be directly used in an array.
  */
 trait ToIntMemoizer[T] {
   // Use Trove for fast, efficient hash tables.
@@ -108,17 +109,27 @@ trait ToIntMemoizer[T] {
   // Alternatively, just use the normal Scala hash tables.
   // val hashfact = new ScalaHashTableFactory
 
+  /* The raw indices used in the hash table aren't the same as the
+   * external indices because TroveHashTableFactory by default uses 0
+   * to indicate that an item wasn't found in an x->int map. So we
+   * add 1 to the external index to get the raw index.
+   *
+   * FIXME: Can we set the not-found item differently, e.g. -1?
+   * (Yes but only at object-creation time, and we need to modify
+   * trove-scala to allow it to be set, and figure out how to retrieve
+   * the DEFAULT_CAPACITY and DEFAULT_LOAD_FACTOR values from Trove,
+   * because they must be specified if we are to set the not-found item.)
+   */
+  type RawIndex = Int
   // Don't set minimum_index to 0. I think this causes problems because
   // TroveHashTableFactory by default returns 0 when an item isn't found
   // in an x->int map.
-  /** Smallest index returned. Can be changed to reserve some indices for
-    * other purposes. */
-  val minimum_index: Int = 1
-  protected var next_index: Int = minimum_index
-  def maximum_index = next_index - 1
+  // Smallest index returned.
+  protected val minimum_raw_index: RawIndex = 1
+  protected var next_raw_index: RawIndex = minimum_raw_index
+  def number_of_indices = next_raw_index - minimum_raw_index
+  def maximum_index = number_of_indices - 1
 
-  def number_of_valid_indices = next_index - minimum_index
-  
   // For replacing items with ints.  This should save space on 64-bit
   // machines (object pointers are 8 bytes, ints are 4 bytes) and might
   // also speed lookup.
@@ -127,24 +138,28 @@ trait ToIntMemoizer[T] {
   // Map in the opposite direction.
   protected val id_value_map = hashfact.create_int_object_map[T]
 
-  def memoize_if(value: T) = synchronized { value_id_map.get(value) }
+  def to_index_if(value: T) = synchronized {
+    value_id_map.get(value).map(_ - minimum_raw_index)
+  }
 
-  def memoize(value: T) = synchronized {
-    val lookup = memoize_if(value)
+  def to_index(value: T) = synchronized {
+    val lookup = to_index_if(value)
     // println("Saw value=%s, index=%s" format (value, lookup))
     lookup match {
       case Some(index) => index
       case None => {
-        val newind = next_index
-        next_index += 1
+        val newind = next_raw_index
+        next_raw_index += 1
         value_id_map(value) = newind
         id_value_map(newind) = value
-        newind
+        newind - minimum_raw_index
       }
     }
   }
 
-  def unmemoize(index: Int) = synchronized { id_value_map(index) }
+  def to_string(index: Int) = synchronized {
+    id_value_map(index + minimum_raw_index)
+  }
 }
 
 // Doesn't currently work because overriding this way leads to error
@@ -160,25 +175,25 @@ trait ToIntMemoizer[T] {
  * Version for debugging the String-to-Int memoizer.
  */
 trait TestStringIntMemoizer extends ToIntMemoizer[String] {
-  override def memoize(value: String) = {
+  override def to_index(value: String) = {
     // if (debug("memoize")) {
     val retval =
-      memoize_if(value) match {
+      to_index_if(value) match {
         case Some(index) => {
           errprint("Memoizing existing string %s to ID %s", value, index)
           index
         }
         case None => {
-          val index = super.memoize(value)
+          val index = super.to_index(value)
           errprint("Memoizing new string %s to ID %s", value, index)
           index
         }
       }
-    assert(super.unmemoize(retval) == value)
+    assert(super.to_string(retval) == value)
     retval
   }
 
-  override def unmemoize(value: Int) = {
+  override def to_string(value: Int) = {
     if (!(id_value_map contains value)) {
       errprint("Can't find ID %s in id_value_map", value)
       errprint("Word map:")
@@ -188,12 +203,12 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
       assert(false, "Exiting due to bad code in unmemoize")
       null
     } else {
-      val string = super.unmemoize(value)
+      val string = super.to_string(value)
 
       // if (debug("memoize"))
         errprint("Unmemoizing existing ID %s to string %s", value, string)
 
-      assert(super.memoize(string) == value)
+      assert(super.to_index(string) == value)
       string
     }
   }
@@ -204,8 +219,8 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
  * values are the same as the unmemoized values.
  */
 trait IdentityMemoizer[T] extends Memoizer[T,T] {
-  def memoize(value: T) = value
-  def memoize_if(value: T) = Some(value)
-  def unmemoize(value: T) = value
+  def to_index(value: T) = value
+  def to_index_if(value: T) = Some(value)
+  def to_string(value: T) = value
 }
 

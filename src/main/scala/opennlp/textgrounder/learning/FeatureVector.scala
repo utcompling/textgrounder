@@ -338,13 +338,11 @@ abstract class TupleArraySparseFeatureVector(
 }
 
 class FeatureMapper extends ToIntMemoizer[String] {
-  val intercept_feature = memoize("$intercept")
+  val intercept_feature = to_index("$intercept")
+  def vector_length = number_of_indices
 }
 
 class LabelMapper extends ToIntMemoizer[String] {
-  def to_index(label: String) = memoize(label) - minimum_index
-  def to_label(index: Int) = unmemoize(index + minimum_index)
-  def number_of_labels = number_of_valid_indices
 }
 
 /**
@@ -377,8 +375,8 @@ class SparseFeatureVectorFactory { self =>
   })
 
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
-    override def format_feature(index: Int) = feature_mapper.unmemoize(index)
-    def length = feature_mapper.maximum_index + 1
+    override def format_feature(index: Int) = feature_mapper.to_string(index)
+    def length = feature_mapper.vector_length
   }
 
   /**
@@ -395,11 +393,11 @@ class SparseFeatureVectorFactory { self =>
       Iterable(feature_mapper.intercept_feature -> 1.0) ++: (
         if (is_training)
           feature_values.map {
-            case (name, value) => (feature_mapper.memoize(name), value)
+            case (name, value) => (feature_mapper.to_index(name), value)
           }
          else
           for { (name, value) <- feature_values;
-                 index = feature_mapper.memoize_if(name);
+                 index = feature_mapper.to_index_if(name);
                  if index != None }
             yield (index.get, value)
       )
@@ -534,7 +532,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
 
     // Return instance
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_label(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_string(label))
       errprint("Featvec: %s", featvec.pretty_print(""))
     }
     (featvec, label)
@@ -614,9 +612,9 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // Make sure all possible choices seen.
     val choices_seen = choice_yesno.map(_._1)
     val num_choices_seen = choices_seen.toSet.size
-    require(num_choices_seen == label_mapper.number_of_labels,
+    require(num_choices_seen == label_mapper.number_of_indices,
       "Not all choices found: Expected %s choices but saw %s: %s" format (
-        label_mapper.number_of_labels, num_choices_seen,
+        label_mapper.number_of_indices, num_choices_seen,
         choices_seen.toSeq.sorted))
 
     // Extract the feature vectors
@@ -641,7 +639,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val agg = new AggregateFeatureVector(fvs.toIndexedSeq,
       feature_mapper, label_mapper)
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_label(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_string(label))
       errprint("Feature vector: %s", agg.pretty_print(""))
     }
     (agg, label)
@@ -718,15 +716,10 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // This is easier than in the other direction.
     (for ((fv, label) <- inst.fv.zipWithIndex) yield {
       val indiv = index + 1
-      val choice = label_mapper.to_label(label)
+      val choice = label_mapper.to_string(label)
       val choice_yesno = if (label == correct_label) "yes" else "no"
-      // Feature vectors are currently indexed directly by the memoized
-      // index (even though index 0 isn't used).
-      assert(fv.length == feature_mapper.maximum_index + 1)
-      val nums =
-        // Discard invalid indices (currently, index 0)
-        (for (i <- feature_mapper.minimum_index until fv.length)
-          yield fv(i, label)).toArray
+      assert(fv.length == feature_mapper.vector_length)
+      val nums = (for (i <- 0 until fv.length) yield fv(i, label)).toArray
       ((indiv, choice, choice_yesno), nums)
     }).toArray
   }
@@ -753,8 +746,8 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
   def put_labeled_instances(insts: Iterable[(AggregateFeatureVector, Int)]) = {
     // This is easier than in the other direction.
     val headers =
-      for (i <- feature_mapper.minimum_index to feature_mapper.maximum_index)
-        yield feature_mapper.unmemoize(i)
+      for (i <- 0 to feature_mapper.maximum_index)
+        yield feature_mapper.to_string(i)
     val rows =
       insts.zipWithIndex.flatMap {
         case ((inst, correct_label), index) =>
@@ -763,8 +756,8 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val (extra_props, data_rows) = rows.unzip
     val (indiv, choice, choice_yesno) = extra_props.unzip3
     val N = insts.size
-    val L = label_mapper.number_of_labels
-    val F = feature_mapper.number_of_valid_indices
+    val L = label_mapper.number_of_indices
+    val F = feature_mapper.number_of_indices
     assert(headers.size == F)
     assert(choice.size == N*L)
     assert(choice_yesno.size == N*L)
@@ -826,7 +819,7 @@ case class AggregateFeatureVector(
   def pretty_print(prefix: String) = {
     (for (d <- 0 until depth) yield
       "Featvec at depth %s(%s): %s" format (
-        d, label_mapper.to_label(d),
+        d, label_mapper.to_string(d),
         fv(d).pretty_print(prefix))).mkString("\n")
   }
 }

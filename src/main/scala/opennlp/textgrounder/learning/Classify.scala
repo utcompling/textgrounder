@@ -202,7 +202,7 @@ object Classify extends ExperimentApp("Classify") {
             params.label_yesno_column,
             is_training = false).
             toIndexedSeq
-        val numlabs = factory.label_mapper.number_of_labels
+        val numlabs = factory.label_mapper.number_of_indices
         if (numlabs < 2) {
           println("Found %s different labels, when at least 2 are needed." format
             numlabs)
@@ -249,7 +249,7 @@ object Classify extends ExperimentApp("Classify") {
             params.label_column,
             is_training = false).
             toIndexedSeq
-        val numlabs = factory.label_mapper.number_of_labels
+        val numlabs = factory.label_mapper.number_of_indices
         if (numlabs < 2) {
           println("Found %s different labels, when at least 2 are needed." format
             numlabs)
@@ -303,7 +303,7 @@ object Classify extends ExperimentApp("Classify") {
     // Run classifier on each instance to get the predictions, and output
     // them in reverse sorted order, tab separated
     val pred_column_headings = Seq("Corr?", "Conf", "Truelab") ++
-      (1 to factory.label_mapper.number_of_labels).toSeq.flatMap { num =>
+      (1 to factory.label_mapper.number_of_indices).toSeq.flatMap { num =>
         Seq(s"Pred$num", s"Score$num") }
 
     val results_insts_lines =
@@ -315,11 +315,11 @@ object Classify extends ExperimentApp("Classify") {
         // Map to labels
         val scorelabs = scores.flatMap {
           case (lab, pred) => Seq(
-            factory.label_mapper.to_label(lab), min_format_float(pred))
+            factory.label_mapper.to_string(lab), min_format_float(pred))
         }
         val corrstr = if (correct) "CORRECT" else "WRONG"
         val confstr = min_format_float(conf)
-        val truelabstr = factory.label_mapper.to_label(truelab)
+        val truelabstr = factory.label_mapper.to_string(truelab)
         val line = Seq(corrstr, confstr, truelabstr) ++ scorelabs
         (correct, (inst, line))
       }

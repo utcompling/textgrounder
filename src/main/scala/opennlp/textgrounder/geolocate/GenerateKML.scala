@@ -133,7 +133,7 @@ class GenerateKMLDriver extends
     val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
-      val celldist = cdist_factory.get_cell_dist(grid, Unigram.memoize(word))
+      val celldist = cdist_factory.get_cell_dist(grid, Unigram.to_index(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
