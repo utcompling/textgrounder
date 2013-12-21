@@ -105,6 +105,18 @@ package object text {
       retval
   }
 
+  /**
+   * Format a floating-point number, dropping final zeros so it takes the
+   * minimum amount of space.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def min_format_float(x: Double, sigdigits: Int = 2,
+      include_plus: Boolean = false) =
+    format_float(x, sigdigits, include_plus, drop_zeros = true)
+
   ////////////////////////////////////////////////////////////////////////////
   //                           Other string functions                       //
   ////////////////////////////////////////////////////////////////////////////

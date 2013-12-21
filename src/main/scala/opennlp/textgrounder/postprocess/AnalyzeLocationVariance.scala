@@ -30,7 +30,7 @@ import util.json._
 import util.math._
 import util.print._
 import util.spherical._
-import util.text.format_float
+import util.text.min_format_float
 import util.textdb._
 import util.time._
 
@@ -511,9 +511,9 @@ par(mfrow=c($height,$width))
           Seq(x, x*10, x*100, x*1000, x*10000, x*100000)
         }.flatten
         val possible_factors = possible_mult_factors.map { x =>
-          (x, if (x == 1) "" else s" (x${format_float(x, drop_zeros = true)})") 
+          (x, if (x == 1) "" else s" (x${min_format_float(x)})")
         } ++ possible_mult_factors.map { x =>
-          (1.0/x, if (x == 1) "" else s" (/${format_float(x, drop_zeros = true)})")
+          (1.0/x, if (x == 1) "" else s" (/${min_format_float(x)})")
         }
         val raw_mult_factor =
           limit/LocationVarianceParams.limit_downscale/potential_lim
@@ -588,7 +588,7 @@ par(mfrow=c($height,$width))
             val xticks = (bins.min to bins.max).map {_.toDouble}.toArray
             val xticklabs = xticks map { bin =>
               val x = if (bin == 0) 0.0 else math.pow(base, bin)
-              format_float(x, drop_zeros = true)
+              min_format_float(x)
             }
             (xruns, yruns, xlab, ylab, xticks, xticklabs)
           }
