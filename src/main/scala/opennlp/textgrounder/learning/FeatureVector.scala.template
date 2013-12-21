@@ -49,6 +49,7 @@ abstract class makespec(CompressedSparseFeatureVector) private[learning] (
   def stored_entries = keys.length
 
   def apply(index: Int) = {
+    assert(index >= 0 && index < length)
     val keyind = java.util.Arrays.binarySearch(keys, index)
     if (keyind < 0) 0.0 else values(keyind)
   }
