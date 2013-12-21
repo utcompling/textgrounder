@@ -22,6 +22,7 @@ import util.argparser._
 import util.experiment._
 import util.io
 import util.print._
+import util.text._
 
 import perceptron._
 
@@ -301,32 +302,40 @@ object Classify extends ExperimentApp("Classify") {
 
     // Run classifier on each instance to get the predictions, and output
     // them in reverse sorted order, tab separated
-    val predheader = ((1 to factory.number_of_labels)
-             map (num => "Pred%s\tScore%s" format (num, num))
-             mkString "\t")
-    output.println("Corr?\tConf\tTruelab\t%s" format predheader)
-    val results =
+    val pred_column_headings = Seq("Corr?", "Conf", "Truelab") ++
+      (1 to factory.number_of_labels).toSeq.flatMap { num =>
+        Seq(s"Pred$num", s"Score$num") }
+
+    val results_insts_lines =
       for ((inst, truelab) <- test_instances) yield {
         // Scores in reverse sorted order
         val scores = classifier.sorted_scores(inst)
         val correct = scores(0)._1 == truelab
-        val corrstr = if (correct) "CORRECT" else "WRONG"
         val conf = scores(0)._2 - scores(1)._2
         // Map to labels
-        val scorelabs = scores map {
-          case (lab, pred) => (factory.index_to_label(lab), pred)
+        val scorelabs = scores.flatMap {
+          case (lab, pred) => Seq(
+            factory.index_to_label(lab), min_format_float(pred))
         }
-        val preds = scorelabs.map { case (l, p) => l + " " + p }.
-                    mkString("\t")
-        val line = "%s\t%s\t%s\t%s" format (corrstr, conf, truelab, preds)
-        (correct, conf, line)
+        val corrstr = if (correct) "CORRECT" else "WRONG"
+        val confstr = min_format_float(conf)
+        val truelabstr = factory.index_to_label(truelab)
+        val line = Seq(corrstr, confstr, truelabstr) ++ scorelabs
+        (correct, (inst, line))
       }
-    val accuracy = results.map {
-      case (correct, _, _) => if (correct) 1 else 0
-    }.sum.toDouble / results.size
-    for ((correct, conf, line) <- results) {
-      output.println(line)
+
+    val (results, insts_lines) = results_insts_lines.unzip
+    val (_, lines) = insts_lines.unzip
+    val fmt = table_column_format(pred_column_headings +: lines)
+
+    output.println(fmt.format(pred_column_headings: _*))
+    for (((inst, line), index) <- insts_lines.zipWithIndex) {
+      if (debug("features"))
+        output.println(inst.pretty_print(s"#${index + 1}"))
+      output.println(fmt.format(line: _*))
     }
+    val accuracy =
+      results.map { if (_) 1 else 0 }.sum.toDouble / results.size
     output.println("Accuracy: %.2f%%" format (accuracy * 100))
 
     output.flush

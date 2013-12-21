@@ -118,6 +118,40 @@ package object text {
     format_float(x, sigdigits, include_plus, drop_zeros = true)
 
   ////////////////////////////////////////////////////////////////////////////
+  //                           Table-output functions                       //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Return the printf-style format for formatting a table consisting of a
+   * series of lines, each of which contains a series of columns. First
+   * computes the maximum size of each column and then formats appropriately
+   * so everything fits.
+   *
+   * @param lines Lines of column values to format.
+   * @param maxcolsize Maximum size of a column.
+   */
+  def table_column_format(lines: Iterable[Iterable[String]],
+      maxcolsize: Int = 40) = {
+    val maxsize = lines.transpose.map { line =>
+      line.map { _.length}.max min maxcolsize
+    }
+    maxsize.map { size => s"%-${size}s" } mkString " "
+  }
+
+  /**
+   * Format a table consisting of a series of lines, each of which contains
+   * a series of columns. First computes the maximum size of each column
+   * and then formats appropriately so everything fits.
+   *
+   * @param lines Lines of column values to format.
+   * @param maxcolsize Maximum size of a column.
+   */
+  def format_table(lines: Iterable[Iterable[String]], maxcolsize: Int = 40) = {
+    val fmt = table_column_format(lines, maxcolsize)
+    lines.map { line => fmt.format(line.toSeq: _*) } mkString "\n"
+  }
+
+  ////////////////////////////////////////////////////////////////////////////
   //                           Other string functions                       //
   ////////////////////////////////////////////////////////////////////////////
 
