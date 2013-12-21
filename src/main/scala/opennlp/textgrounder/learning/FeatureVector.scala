@@ -676,11 +676,102 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     val grouped_instances = new GroupByIterator(lines.toIterator,
       { line: Array[String] => line(indiv_column).toInt })
-    (for ((_, inst) <- grouped_instances) yield {
+    val retval = (for ((_, inst) <- grouped_instances) yield {
       get_labeled_instance(inst.toIterable, column_types,
         indiv_column, choice_column, choice_yesno_column,
         is_training)
     }).toIterable
+
+    if (debug("put-instances")) {
+      val (headers, indiv, choice, choice_yesno, data_rows) =
+        put_labeled_instances(retval)
+      errprint("Headers: %s", headers mkString " ")
+      errprint("Indiv (column vector): %s", indiv mkString " ")
+      errprint("Choice (column vector): %s", choice mkString " ")
+      errprint("Choice-yesno (column vector): %s", choice_yesno mkString " ")
+      errprint("Data rows:")
+      errprint(data_rows.map(_ mkString " ") mkString "\n")
+    }
+
+    retval
+  }
+
+  /**
+   * Undo the conversion in `get_labeled_instance`, converting the instance
+   * back to the 2-d matrix format used in R's mlogit() function. For F
+   * features and L labels this will have the following type:
+   *
+   * Array[(Int, String, String), Array[Double]]
+   *
+   * where there are L elements ("rows") in the first-level array and
+   * F elements ("columns") in the second-level array. The tuple is of
+   * `(indiv-index, choice, choice-yesno)` where `indiv-index` is the
+   * index of the instance (same for all rows), `choice` is the label name,
+   * and `choice-yesno` is "yes" if this is the correct label, "no"
+   * otherwise. This format is returned to make it possible to generate
+   * the right sort of data frame in R using the current Scala-to-R
+   * interface, which can only pass arrays and arrays of arrays, of
+   * fixed type.
+   */
+  def put_labeled_instance(inst: AggregateFeatureVector,
+      correct_label: Int, index: Int) = {
+    // This is easier than in the other direction.
+    (for ((fv, label) <- inst.fv.zipWithIndex) yield {
+      val indiv = index + 1
+      val choice = label_mapper.to_label(label)
+      val choice_yesno = if (label == correct_label) "yes" else "no"
+      // Feature vectors are currently indexed directly by the memoized
+      // index (even though index 0 isn't used).
+      assert(fv.length == feature_mapper.maximum_index + 1)
+      val nums =
+        // Discard invalid indices (currently, index 0)
+        (for (i <- feature_mapper.minimum_index until fv.length)
+          yield fv(i, label)).toArray
+      ((indiv, choice, choice_yesno), nums)
+    }).toArray
+  }
+
+  /**
+   * Undo the conversion in `get_labeled_instances` to get the long-format
+   * 2-d matrix used in R's mlogit() function. The return value is of the
+   * following type:
+   *
+   * (headers: Array[String], indiv:Array[Int], choices:Array[String],
+   *   choices_yesno:Array[String], data_rows:Array[Array[Double]])
+   *
+   * where `data_rows` has N*L rows and F columns, `headers` is a size-F
+   * row vector listing column headers, `indiv` is a size-N*L column
+   * vector identifying the instance (from 1 to N) each row occurs in,
+   * `choice` is a size-N*L column vector specifying the label of each
+   * row (cycling through all labels repeated N times), and `choices_yesno`
+   * is a size-N*L column vector specifying "yes" for the rows with
+   * correct labels and "no" otherwise. This format is used to make it
+   * possible to generate the right sort of data frame in R using the
+   * current Scala-to-R interface, which can only pass arrays and arrays
+   * of arrays, of fixed type.
+   */
+  def put_labeled_instances(insts: Iterable[(AggregateFeatureVector, Int)]) = {
+    // This is easier than in the other direction.
+    val headers =
+      for (i <- feature_mapper.minimum_index to feature_mapper.maximum_index)
+        yield feature_mapper.unmemoize(i)
+    val rows =
+      insts.zipWithIndex.flatMap {
+        case ((inst, correct_label), index) =>
+          put_labeled_instance(inst, correct_label, index)
+      }
+    val (extra_props, data_rows) = rows.unzip
+    val (indiv, choice, choice_yesno) = extra_props.unzip3
+    val N = insts.size
+    val L = label_mapper.number_of_labels
+    val F = feature_mapper.number_of_valid_indices
+    assert(headers.size == F)
+    assert(choice.size == N*L)
+    assert(choice_yesno.size == N*L)
+    assert(indiv.size == N*L)
+    assert(data_rows.size == N*L)
+    data_rows.map { row => assert(row.size == F) }
+    (headers, indiv, choice, choice_yesno, data_rows)
   }
 }
 
