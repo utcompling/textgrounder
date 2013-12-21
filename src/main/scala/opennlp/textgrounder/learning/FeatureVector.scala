@@ -342,6 +342,9 @@ class FeatureMapper extends ToIntMemoizer[String] {
 }
 
 class LabelMapper extends ToIntMemoizer[String] {
+  def to_index(label: String) = memoize(label) - minimum_index
+  def to_label(index: Int) = unmemoize(index + minimum_index)
+  def number_of_labels = number_of_valid_indices
 }
 
 /**
@@ -354,11 +357,6 @@ class LabelMapper extends ToIntMemoizer[String] {
  */
 class SparseFeatureVectorFactory { self =>
   val label_mapper = new LabelMapper
-  def label_to_index(label: String) =
-    label_mapper.memoize(label) - label_mapper.minimum_index
-  def index_to_label(index: Int) =
-    label_mapper.unmemoize(index + label_mapper.minimum_index)
-  def number_of_labels = label_mapper.number_of_valid_indices
 
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
@@ -524,7 +522,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
     require(line.size == columns.size, "Expected %s columns but saw %s: %s"
       format (columns.size, line.size, line mkString "\t"))
 
-    val label = label_to_index(line(choice_column))
+    val label = label_mapper.to_index(line(choice_column))
 
     // Filter out the columns we don't use, pair each with its column spec.
     val raw_linefeats = line.zip(columns).zipWithIndex.filter {
@@ -536,7 +534,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
 
     // Return instance
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, index_to_label(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_label(label))
       errprint("Featvec: %s", featvec.pretty_print(""))
     }
     (featvec, label)
@@ -605,7 +603,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     // Retrieve the label, make sure there's exactly 1
     val choice_yesno = lines.map { line =>
-      (label_to_index(line(choice_colind)), line(choice_yesno_colind))
+      (label_mapper.to_index(line(choice_colind)), line(choice_yesno_colind))
     }
     val label_lines = choice_yesno.filter { _._2 == "yes" }
     require(label_lines.size == 1,
@@ -616,9 +614,10 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // Make sure all possible choices seen.
     val choices_seen = choice_yesno.map(_._1)
     val num_choices_seen = choices_seen.toSet.size
-    require(num_choices_seen == number_of_labels,
-      "Not all choices found: Expected %s choices but saw %s: %s" format
-      (number_of_labels, num_choices_seen, choices_seen.toSeq.sorted))
+    require(num_choices_seen == label_mapper.number_of_labels,
+      "Not all choices found: Expected %s choices but saw %s: %s" format (
+        label_mapper.number_of_labels, num_choices_seen,
+        choices_seen.toSeq.sorted))
 
     // Extract the feature vectors
     val fvs = lines.map { line =>
@@ -639,9 +638,10 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val sorted_fvs = (fvs zip choices_seen).toSeq.sortBy(_._2).map(_._1)
 
     // Aggregate feature vectors, return aggregate with label
-    val agg = new AggregateFeatureVector(fvs.toIndexedSeq)
+    val agg = new AggregateFeatureVector(fvs.toIndexedSeq,
+      feature_mapper, label_mapper)
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, index_to_label(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_label(label))
       errprint("Feature vector: %s", agg.pretty_print(""))
     }
     (agg, label)
@@ -688,8 +688,11 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
  * An aggregate feature vector that stores a separate individual feature
  * vector for each of a set of labels.
  */
-class AggregateFeatureVector(val fv: IndexedSeq[FeatureVector])
-    extends FeatureVector {
+case class AggregateFeatureVector(
+    fv: IndexedSeq[FeatureVector],
+    feature_mapper: FeatureMapper,
+    label_mapper: LabelMapper
+) extends FeatureVector {
   FeatureVector.check_same_length(fv)
 
   def length = fv.head.length
@@ -731,7 +734,8 @@ class AggregateFeatureVector(val fv: IndexedSeq[FeatureVector])
 
   def pretty_print(prefix: String) = {
     (for (d <- 0 until depth) yield
-      "Featvec at depth %s: %s" format (
-        d, fv(d).pretty_print(prefix))).mkString("\n")
+      "Featvec at depth %s(%s): %s" format (
+        d, label_mapper.to_label(d),
+        fv(d).pretty_print(prefix))).mkString("\n")
   }
 }

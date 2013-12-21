@@ -1512,6 +1512,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val top_n = params.rerank_top_n
           val number_of_splits = params.rerank_num_training_splits
 
+          val feature_mapper =
+            candidate_featvec_factory.featvec_factory.feature_mapper
+          val label_mapper = new LabelMapper
+          for (i <- 0 until params.rerank_top_n) {
+            label_mapper.to_index(s"#${i + 1}")
+          }
+
           protected def query_training_data_to_rerank_training_instances(
             data: Iterable[QueryTrainingData]
           ): Iterable[(GridRankerInst[Co], Int)] = {

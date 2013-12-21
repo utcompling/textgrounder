@@ -133,6 +133,9 @@ trait PointwiseClassifyingReranker[Query, Candidate]
   /** Scoring classifier for use in reranking. */
   protected def rerank_classifier: ScoringClassifier
 
+  val feature_mapper: FeatureMapper
+  val label_mapper: LabelMapper
+
   /**
    * Create a candidate feature vector to feed to the classifier during
    * evaluation, given a query item, a potential candidate from the
@@ -151,7 +154,9 @@ trait PointwiseClassifyingReranker[Query, Candidate]
     val cand_featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
-    val query_featvec = new AggregateFeatureVector(cand_featvecs.toIndexedSeq)
+    val query_featvec =
+      new AggregateFeatureVector(cand_featvecs.toIndexedSeq, feature_mapper,
+        label_mapper)
     val new_scores = rerank_classifier.score(query_featvec).toIndexedSeq
     val candidates = scored_candidates.map(_._1).toIndexedSeq
     candidates zip new_scores sortWith (_._2 > _._2)
@@ -279,12 +284,14 @@ trait PointwiseClassifyingRerankerTrainer[
      *    feature vector.
      */
     def aggregate_featvec(
-      create_candidate_featvec: (Query, Candidate, Double, Int) => FeatureVector
+      create_candidate_featvec: (Query, Candidate, Double, Int) =>
+        FeatureVector
     ) = {
       val featvecs =
         for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
           create_candidate_featvec(query, cand, score, rank)
-      new AggregateFeatureVector(featvecs.toIndexedSeq)
+      new AggregateFeatureVector(featvecs.toIndexedSeq, feature_mapper,
+        label_mapper)
     }
 
     /**
@@ -306,6 +313,11 @@ trait PointwiseClassifyingRerankerTrainer[
    * Number of splits used in the training data, to create the reranker.
    */
   val number_of_splits: Int
+
+  /** Feature mapper used to memoize features. */
+  val feature_mapper: FeatureMapper
+  /** Label mapper used to memoize labels, or simulated. */
+  val label_mapper: LabelMapper
 
   /**
    * Create the classifier used for reranking, given training data.
@@ -491,6 +503,8 @@ trait PointwiseClassifyingRerankerTrainer[
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
+      val feature_mapper = self.feature_mapper
+      val label_mapper = self.label_mapper
       protected def create_candidate_eval_featvec(query: Query,
           candidate: Candidate, initial_score: Double, initial_rank: Int) = {
         self.create_candidate_eval_featvec(query, candidate,

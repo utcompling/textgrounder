@@ -694,6 +694,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
+      val feature_mapper = self.feature_mapper
+      val label_mapper = self.label_mapper
       protected def create_candidate_eval_featvec(query: GridDoc[Co],
           candidate: GridCell[Co], initial_score: Double, initial_rank: Int
       ) = self.create_candidate_eval_featvec(query, candidate,
