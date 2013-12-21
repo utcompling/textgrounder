@@ -130,6 +130,13 @@ count from the end. The indices themselves should be numeric.""")
       must = be_>(0.0),
       help = """For perceptron: aggressiveness factor > 0.0 (default: %default).""")
 
+  var decay =
+    ap.option[Double]("decay",
+      metavar = "DOUBLE",
+      default = 0.0,
+      must = be_>=(0.0),
+      help = """For perceptron: decay of aggressiveness factor each round (default: %default).""")
+
   var rounds =
     ap.option[Int]("r", "rounds",
       default = 10000,
@@ -209,6 +216,7 @@ object Classify extends ExperimentApp("Classify") {
               FeatureVector
             ](ArrayVector, params.variant,
               params.aggressiveness,
+              decay = params.decay,
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
@@ -217,6 +225,7 @@ object Classify extends ExperimentApp("Classify") {
             new BasicSingleWeightMultiLabelPerceptronTrainer[
               FeatureVector
             ](ArrayVector, params.aggressiveness,
+              decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
@@ -254,6 +263,7 @@ object Classify extends ExperimentApp("Classify") {
               FeatureVector
             ](ArrayVector, numlabs, params.variant,
               params.aggressiveness,
+              decay = params.decay,
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
@@ -261,6 +271,7 @@ object Classify extends ExperimentApp("Classify") {
             errprint("Using passive-aggressive binary perceptron")
             new PassiveAggressiveBinaryPerceptronTrainer(
               ArrayVector, params.variant, params.aggressiveness,
+              decay = params.decay,
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
@@ -269,6 +280,7 @@ object Classify extends ExperimentApp("Classify") {
             new BasicMultiWeightMultiLabelPerceptronTrainer[
               FeatureVector
             ](ArrayVector, numlabs, params.aggressiveness,
+              decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
@@ -277,6 +289,7 @@ object Classify extends ExperimentApp("Classify") {
             errprint("Using basic binary perceptron")
             new BasicBinaryPerceptronTrainer(
               ArrayVector, params.aggressiveness,
+              decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
