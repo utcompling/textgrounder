@@ -684,7 +684,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     if (debug("put-instances")) {
       val (headers, indiv, label, choice, data_rows) =
-        put_labeled_instances(retval)
+        AggregateFeatureVector.labeled_instances_to_R(retval)
       errprint("Headers: %s", headers mkString " ")
       errprint("Indiv (column vector): %s", indiv mkString " ")
       errprint("Label (column vector): %s", label mkString " ")
@@ -695,7 +695,9 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     retval
   }
+}
 
+object AggregateFeatureVector {
   /**
    * Undo the conversion in `get_labeled_instance`, converting the instance
    * back to the 2-d matrix format used in R's mlogit() function. For F
@@ -728,10 +730,78 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
   /**
    * Undo the conversion in `get_labeled_instances` to get the long-format
+   * 2-d matrix used in R's mlogit() function. For F features, L labels and
+   * N instances, The return value is of the following type:
+   *
+   * (headers:Array[String], rows:Array[((Int,String,Boolean),Array[Double]])]
+   *
+   * where `headers` is a size-F row vector listing column headers and
+   * `rows` is of size N*L, where each row specifies a value for `indiv`
+   * (identifying the instance, from 1 to N), `label` (as a string, cycling
+   * through all L labels N times), `choice` (a boolean, specifying 'true' for
+   * the raws whose label is the correct one and 'false' otherwise) and
+   * `datarow` (a size-F row vector specifing the values in this row for the
+   * F features).
+   *
+   * This format in turn can be converted into separate variables for
+   * `indiv`, `label` and `choice` for easier stuffing into R (the current
+   * Scala-to-R interface can only pass 1-d and 2-d arrays of fixed type),
+   * or made into a 2-d array of strings for outputting to a file.
+   */
+  def put_labeled_instances(insts: Iterable[(AggregateFeatureVector, Int)]) = {
+    // This should force evaluation of `insts` if it's a stream.
+    val N = insts.size
+    val head = insts.head._1
+    for (((inst, label), index) <- insts.zipWithIndex) {
+      // Equivalent to assert but adds the instance index and the inst itself
+      def check(cond: Boolean, msg: => String) {
+        assert(cond, "Instance #%s: %s: %s" format (index + 1, msg, inst))
+      }
+      check(inst.depth == head.depth,
+        "has depth %s instead of %s" format (inst.depth, head.depth))
+      check(inst.length == head.length,
+        "has length %s instead of %s" format (inst.length, head.length))
+      check(inst.feature_mapper == head.feature_mapper, "wrong feature mapper")
+      check(inst.label_mapper == head.label_mapper, "wrong label mapper")
+      check(inst.feature_mapper.number_of_indices == inst.length,
+        "feature mapper has length %s instead of %s" format (
+          inst.feature_mapper.number_of_indices, inst.length))
+      check(inst.label_mapper.number_of_indices == inst.depth,
+        "label mapper has depth %s instead of %s" format (
+          inst.label_mapper.number_of_indices, inst.depth))
+      check(label >= 0 && label <= inst.label_mapper.maximum_index,
+        "label %s out of bounds [0,%s]" format (label,
+          inst.label_mapper.maximum_index))
+      for (i <- 0 until inst.depth) {
+        assert(inst.fv(i).length == inst.length,
+          "feature vector %s has length %s instead of %s" format (
+            i, inst.fv(i).length, inst.length))
+      }
+    }
+
+    // This is easier than in the other direction.
+    val headers =
+      for (i <- 0 to head.feature_mapper.maximum_index)
+        yield head.feature_mapper.to_string(i)
+    val rows =
+      insts.zipWithIndex.flatMap {
+        case ((inst, correct_label), index) =>
+          put_labeled_instance(inst, correct_label, index)
+      }
+    val L = head.label_mapper.number_of_indices
+    val F = head.feature_mapper.number_of_indices
+    assert(headers.size == F)
+    assert(rows.size == N*L)
+    rows.foreach { case (extraprops, datarow) => assert(datarow.size == F) }
+    (headers.toArray, rows.toArray)
+  }
+
+  /**
+   * Undo the conversion in `get_labeled_instances` to get the long-format
    * 2-d matrix used in R's mlogit() function. The return value is of the
    * following type:
    *
-   * (headers: Array[String], indiv:Array[Int], labels:Array[String],
+   * (headers:Array[String], indiv:Array[Int], labels:Array[String],
    *   choices:Array[Boolean], data_rows:Array[Array[Double]])
    *
    * where `data_rows` has N*L rows and F columns, `headers` is a size-F
@@ -745,29 +815,39 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * current Scala-to-R interface, which can only pass arrays and arrays
    * of arrays, of fixed type.
    */
-  def put_labeled_instances(insts: Iterable[(AggregateFeatureVector, Int)]) = {
-    // This is easier than in the other direction.
-    val headers =
-      for (i <- 0 to feature_mapper.maximum_index)
-        yield feature_mapper.to_string(i)
-    val rows =
-      insts.zipWithIndex.flatMap {
-        case ((inst, correct_label), index) =>
-          put_labeled_instance(inst, correct_label, index)
-      }
+  def labeled_instances_to_R(
+      insts: Iterable[(AggregateFeatureVector, Int)]
+  ) = {
+    val (headers, rows) = put_labeled_instances(insts)
     val (extra_props, data_rows) = rows.unzip
     val (indiv, label, choice) = extra_props.unzip3
-    val N = insts.size
-    val L = label_mapper.number_of_indices
-    val F = feature_mapper.number_of_indices
-    assert(headers.size == F)
-    assert(label.size == N*L)
-    assert(choice.size == N*L)
-    assert(indiv.size == N*L)
-    assert(data_rows.size == N*L)
-    data_rows.map { row => assert(row.size == F) }
-    (headers.toArray, indiv.toArray, label.toArray, choice.toArray,
+    // FIXME! Bug in unzip, unzip3 makes it return Vectors instead of
+    // Arrays when unzipping Arrays.
+    (headers, indiv.toArray, label.toArray, choice.toArray,
       data_rows.toArray)
+  }
+
+  /**
+   * Undo the conversion in `get_labeled_instances` to get the long-format
+   * 2-d matrix used in R's mlogit() function. The return value is:
+   *
+   * (header:Array[String], data:Array[Array[String]])
+   *
+   * i.e. a header line followed by a 2-d array of strings, all ready to
+   * be directly output to a file with spaces in between columns.
+   */
+  def labeled_instances_to_file(
+      insts: Iterable[(AggregateFeatureVector, Int)]
+  ): (Array[String], Array[Array[String]]) = {
+    val (headers, rows) = put_labeled_instances(insts)
+    val data =
+      rows.toArray.map { case ((indiv, labelstr, choice), datarow) =>
+        val indivstr = indiv.toString
+        val choicestr = if (choice) "TRUE" else "FALSE"
+        val datastr = datarow.map(_.toString).toArray
+        Array(indivstr, labelstr, choicestr) ++ datastr
+      }
+    (headers, data)
   }
 }
 
