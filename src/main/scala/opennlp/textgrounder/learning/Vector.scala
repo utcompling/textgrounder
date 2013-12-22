@@ -92,7 +92,7 @@ trait BasicSimpleVectorImpl extends SimpleVector {
 /**
  * Basic implementation of vector using Java array.
  */
-class ArrayVector(array: Array[Double]) extends BasicSimpleVectorImpl {
+case class ArrayVector(array: Array[Double]) extends BasicSimpleVectorImpl {
   final def length = array.length
 
   def max = array.max
@@ -158,7 +158,7 @@ trait VectorAggregateFactory {
   def empty(len: Int): VectorAggregate
 }
 
-class SingleVectorAggregate(vec: SimpleVector) extends VectorAggregate {
+case class SingleVectorAggregate(vec: SimpleVector) extends VectorAggregate {
   def length = vec.length
   def depth = 1
   def max_label = Int.MaxValue
@@ -166,7 +166,7 @@ class SingleVectorAggregate(vec: SimpleVector) extends VectorAggregate {
   def apply(label: Int) = vec
 }
 
-class MultiVectorAggregate(vecs: IndexedSeq[SimpleVector])
+case class MultiVectorAggregate(vecs: IndexedSeq[SimpleVector])
     extends VectorAggregate {
   def length = vecs(0).length
   def depth = vecs.length

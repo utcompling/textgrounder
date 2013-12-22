@@ -169,7 +169,7 @@ trait BasicFeatureVectorImpl extends FeatureVector {
  * are used exactly as the values of the feature; no additional term is
  * inserted to handle a "bias" or "intercept" weight.
  */
-class ArrayFeatureVector(
+case class ArrayFeatureVector(
   values: SimpleVector
 ) extends BasicFeatureVectorImpl with SimpleFeatureVector {
   /** Return the length of the feature vector. */
