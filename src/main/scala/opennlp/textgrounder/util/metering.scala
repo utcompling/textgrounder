@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package util
 
 import scala.util.control.Breaks._
-import scala.collection.{GenTraversable, GenTraversableOnce}
+import scala.collection.{GenTraversable, GenTraversableOnce, GenTraversableLike}
 import scala.collection.generic.CanBuildFrom
 
 import collection.{InterruptibleIterator, SideEffectIterator}
@@ -183,7 +183,7 @@ protected class MeteringPackage {
       errprint("--------------------------------------------------------")
     }
 
-    def foreach[T](trav: GenTraversable[T])(f: T => Unit) {
+    def foreach[T, Repr](trav: GenTraversableLike[T, Repr])(f: T => Unit) {
       start()
       breakable {
         trav.foreach {
@@ -207,12 +207,14 @@ protected class MeteringPackage {
     }
   }
 
-  implicit class MeteredGenTraversablePimp[T, C[T] <: GenTraversable[T]](trav: C[T]) {
+  implicit class MeteredGenTraversablePimp[T, Repr](
+      trav: GenTraversableLike[T, Repr]
+    ) {
     def foreachMetered(m: Meter)(f: T => Unit) =
       m.foreach(trav)(f)
 
-    def mapMetered[B, That](m: Meter)(f: (T) => B)(
-      implicit bf: CanBuildFrom[GenTraversable[T], B, That]
+    def mapMetered[B, That](m: Meter)(f: T => B)(
+      implicit bf: CanBuildFrom[Repr, B, That]
     ): That = {
       m.start()
       try {
@@ -225,7 +227,7 @@ protected class MeteringPackage {
     }
 
     def flatMapMetered[B, That](m: Meter)(f: (T) => GenTraversableOnce[B])(
-      implicit bf: CanBuildFrom[GenTraversable[T], B, That]
+      implicit bf: CanBuildFrom[Repr, B, That]
     ): That = {
       m.start()
       try {

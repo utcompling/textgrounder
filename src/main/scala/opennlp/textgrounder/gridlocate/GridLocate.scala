@@ -1543,7 +1543,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               val label = qtd.label
               val candidates = qtd.cand_scores.map(_._1).toIndexedSeq
               (GridRankerInst(qtd.query, candidates, agg_fv), label)
-            }.toIterable.seq
+            }.seq
           }
 
           /* Create the candidate feature vector during evaluation, by
