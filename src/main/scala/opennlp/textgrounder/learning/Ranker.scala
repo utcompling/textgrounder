@@ -226,6 +226,11 @@ trait PointwiseClassifyingReranker[Query, Candidate]
  *    The candidate list in the QTD is determined by taking the top-ranked N
  *    candidates (N = `top_n`) from the ranking produced by the initial
  *    ranker, and augmenting if necessary with the correct candidate.
+ *    We take one other candidate away when doing this; although it's not
+ *    always necessary (a single-weight classifier in general can handle
+ *    a variable number of classes since it treats them all the same),
+ *    it's required for some classifiers (e.g. those based on R's mlogit()
+ *    function).
  *
  * 5. Once the entire set of QTD's is generated for all slices, convert each
  *    QTD into an RTI (see above). The RTI describes the same data as the
@@ -412,7 +417,9 @@ trait PointwiseClassifyingRerankerTrainer[
       if (top_candidates.find(_._1 == correct) != None)
         top_candidates
       else
-        top_candidates ++
+        // Augment with correct candidate, but take one of the other
+        // candidates away so we have the same number.
+        top_candidates.take(top_n - 1) ++
           Iterable(initial_candidates.find(_._1 == correct).get)
 
     QueryTrainingData(query, correct, cand_scores)
