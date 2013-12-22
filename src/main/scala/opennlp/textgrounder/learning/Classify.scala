@@ -92,13 +92,14 @@ zero-based. If negative, count from the end.""")
 when doing label-specific classification. Numeric, zero-based. If negative,
 count from the end. The indices themselves should be numeric.""")
 
-  var label_yesno_column =
-    ap.option[Int]("label-yesno-column", "lyc",
+  var choice_column =
+    ap.option[Int]("choice-column", "lyc",
       default = 1,
       help = """Column specifying, for a given row in a label-specific
-training set, whether the label in the index of the instance in question,
-when doing label-specific classification. Numeric, zero-based. If negative,
-count from the end. The indices themselves should be numeric.""")
+training set, whether the label on this line is the correct label for
+this instance. There should be exactly one per set of lines. Numeric,
+zero-based. If negative, count from the end. The values themselves should
+be "yes", "no", "true" or "false", optionally upper-cased.""")
 
   var output =
     ap.option[String]("o", "out",
@@ -191,7 +192,7 @@ object Classify extends ExperimentApp("Classify") {
             params.split_re,
             params.instance_index_column,
             params.label_column,
-            params.label_yesno_column,
+            params.choice_column,
             is_training = true).
             toIndexedSeq
         val test_instances =
@@ -199,7 +200,7 @@ object Classify extends ExperimentApp("Classify") {
             params.split_re,
             params.instance_index_column,
             params.label_column,
-            params.label_yesno_column,
+            params.choice_column,
             is_training = false).
             toIndexedSeq
         val numlabs = factory.label_mapper.number_of_indices

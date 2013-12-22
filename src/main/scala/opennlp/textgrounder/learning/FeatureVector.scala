@@ -508,23 +508,23 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
    * @param columns Names of columns and corresponding feature type.
    *   There should be the same number of columns as items in each of the
    *   arrays.
-   * @param choice_column Column specifying the choice; used to fetch
+   * @param label_column Column specifying the label; used to fetch
    *   the label and removed before creating features.
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instance(line: Array[String],
-      columns: Iterable[(String, FeatureType)], choice_column: Int,
+      columns: Iterable[(String, FeatureType)], label_column: Int,
       is_training: Boolean) = {
 
     // Check the right length for the line
     require(line.size == columns.size, "Expected %s columns but saw %s: %s"
       format (columns.size, line.size, line mkString "\t"))
 
-    val label = label_mapper.to_index(line(choice_column))
+    val label = label_mapper.to_index(line(label_column))
 
     // Filter out the columns we don't use, pair each with its column spec.
     val raw_linefeats = line.zip(columns).zipWithIndex.filter {
-      case (value, index) => index != choice_column
+      case (value, index) => index != label_column
     }.map(_._1)
 
     // Generate feature vector based on column values, names, types.
@@ -545,18 +545,18 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
    *
    * @param lines_iter Iterator over lines in the file.
    * @param split_re Regexp to split columns in a line.
-   * @param choice_column Column specifying the choice; used to fetch
+   * @param label_column Column specifying the label; used to fetch
    *   the label and removed before creating features.
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instances(lines_iter: Iterator[String],
-      split_re: String, choice_column: Int,
+      split_re: String, label_column: Int,
       is_training: Boolean) = {
     val (lines, column_types) = get_columns(lines_iter, split_re)
     val numcols = column_types.size
-    val choice_colind = get_index(numcols, choice_column)
+    val label_colind = get_index(numcols, label_column)
     for (inst <- lines) yield {
-      get_labeled_instance(inst, column_types, choice_colind, is_training)
+      get_labeled_instance(inst, column_types, label_colind, is_training)
     }
   }
 }
@@ -572,23 +572,23 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * Return a pair of `(aggregate, label)` where `aggregate` is an
    * aggregate feature vector derived from the given lines.
    *
-   * @param lines Lines corresponding to different choices of an individual.
+   * @param lines Lines corresponding to different labels of an individual.
    * @param columns Names of columns and corresponding feature type.
    *   There should be the same number of columns as items in each of the
    *   arrays.
    * @param indiv_colind Column specifying the individual index; removed
    *   before creating features. This is a zero-based index into the
    *   list of columns.
-   * @param choice_colind Column specifying the choice; used to fetch
+   * @param label_colind Column specifying the label; used to fetch
    *   the label and removed before creating features.
-   * @param choice_yesno_colind Column specifying "yes" or "no" identifying
-   *   whether the choice on this line was made by this individual. There
-   *   should be exactly one per set of lines.
+   * @param choice_colind Column specifying "yes" or "no" (or "true" or
+   *   "false") identifying whether the label on this line was chosen by
+   *   this individual. There should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instance(lines: Iterable[Array[String]],
       columns: Iterable[(String, FeatureType)],
-      indiv_colind: Int, choice_colind: Int, choice_yesno_colind: Int,
+      indiv_colind: Int, label_colind: Int, choice_colind: Int,
       is_training: Boolean) = {
 
     val numcols = columns.size
@@ -600,40 +600,42 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     }
 
     // Retrieve the label, make sure there's exactly 1
-    val choice_yesno = lines.map { line =>
-      (label_mapper.to_index(line(choice_colind)), line(choice_yesno_colind))
+    val choice = lines.map { line =>
+      (label_mapper.to_index(line(label_colind)), line(choice_colind))
     }
-    val label_lines = choice_yesno.filter { _._2 == "yes" }
+    val label_lines = choice.filter {
+      Seq("yes", "true") contains _._2.toLowerCase
+    }
     require(label_lines.size == 1,
       "Expected exactly one label but saw %s: %s: lines:\n%s\n" format (
         label_lines.size, label_lines.map(_._1), format_lines(lines)))
     val label = label_lines.head._1
 
-    // Make sure all possible choices seen.
-    val choices_seen = choice_yesno.map(_._1)
-    val num_choices_seen = choices_seen.toSet.size
-    require(num_choices_seen == label_mapper.number_of_indices,
-      "Not all choices found: Expected %s choices but saw %s: %s" format (
-        label_mapper.number_of_indices, num_choices_seen,
-        choices_seen.toSeq.sorted))
+    // Make sure all possible labels seen.
+    val labels_seen = choice.map(_._1)
+    val num_labels_seen = labels_seen.toSet.size
+    require(num_labels_seen == label_mapper.number_of_indices,
+      "Not all labels found: Expected %s labels but saw %s: %s" format (
+        label_mapper.number_of_indices, num_labels_seen,
+        labels_seen.toSeq.sorted))
 
     // Extract the feature vectors
     val fvs = lines.map { line =>
       // Filter out the columns we don't use, pair each with its column spec.
       val raw_linefeats = line.zip(columns).zipWithIndex.filter {
         case (value, index) =>
-          index != indiv_colind && index != choice_colind &&
-          index != choice_yesno_colind
+          index != indiv_colind && index != label_colind &&
+          index != choice_colind
       }.map(_._1)
 
       // Generate feature vector based on column values, names, types.
       raw_linefeats_to_featvec(raw_linefeats, is_training)
     }
 
-    // Order by increasing label so that all aggregates have the choices in
+    // Order by increasing label so that all aggregates have the labels in
     // the same order.
-    assert(fvs.size == choices_seen.size)
-    val sorted_fvs = (fvs zip choices_seen).toSeq.sortBy(_._2).map(_._1)
+    assert(fvs.size == labels_seen.size)
+    val sorted_fvs = (fvs zip labels_seen).toSeq.sortBy(_._2).map(_._1)
 
     // Aggregate feature vectors, return aggregate with label
     val agg = new AggregateFeatureVector(fvs.toIndexedSeq,
@@ -655,38 +657,38 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * @param indiv_column Column specifying the individual index; removed
    *   before creating features. This is a zero-based index into the
    *   list of columns.
-   * @param choice_column Column specifying the choice; used to fetch
+   * @param label_column Column specifying the label; used to fetch
    *   the label and removed before creating features.
-   * @param choice_yesno_column Column specifying "yes" or "no" identifying
-   *   whether the choice on this line was made by this individual. There
+   * @param choice_column Column specifying "yes" or "no" identifying
+   *   whether the label on this line was chosen by this individual. There
    *   should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instances(lines_iter: Iterator[String],
       split_re: String,
-      indiv_column: Int, choice_column: Int, choice_yesno_column: Int,
+      indiv_column: Int, label_column: Int, choice_column: Int,
       is_training: Boolean) = {
     val (lines, column_types) = get_columns(lines_iter, split_re)
     val numcols = column_types.size
     val indiv_colind = get_index(numcols, indiv_column)
+    val label_colind = get_index(numcols, label_column)
     val choice_colind = get_index(numcols, choice_column)
-    val choice_yesno_colind = get_index(numcols, choice_yesno_column)
 
     val grouped_instances = new GroupByIterator(lines.toIterator,
       { line: Array[String] => line(indiv_column).toInt })
     val retval = (for ((_, inst) <- grouped_instances) yield {
       get_labeled_instance(inst.toIterable, column_types,
-        indiv_column, choice_column, choice_yesno_column,
+        indiv_column, label_column, choice_column,
         is_training)
     }).toIterable
 
     if (debug("put-instances")) {
-      val (headers, indiv, choice, choice_yesno, data_rows) =
+      val (headers, indiv, label, choice, data_rows) =
         put_labeled_instances(retval)
       errprint("Headers: %s", headers mkString " ")
       errprint("Indiv (column vector): %s", indiv mkString " ")
+      errprint("Label (column vector): %s", label mkString " ")
       errprint("Choice (column vector): %s", choice mkString " ")
-      errprint("Choice-yesno (column vector): %s", choice_yesno mkString " ")
       errprint("Data rows:")
       errprint(data_rows.map(_ mkString " ") mkString "\n")
     }
@@ -699,13 +701,13 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * back to the 2-d matrix format used in R's mlogit() function. For F
    * features and L labels this will have the following type:
    *
-   * Array[(Int, String, String), Array[Double]]
+   * Array[(Int, String, Boolean), Array[Double]]
    *
    * where there are L elements ("rows") in the first-level array and
    * F elements ("columns") in the second-level array. The tuple is of
-   * `(indiv-index, choice, choice-yesno)` where `indiv-index` is the
-   * index of the instance (same for all rows), `choice` is the label name,
-   * and `choice-yesno` is "yes" if this is the correct label, "no"
+   * `(indiv-index, label, choice)` where `indiv-index` is the
+   * index of the instance (same for all rows), `label` is the label name,
+   * and `choice` is "yes" if this is the correct label, "no"
    * otherwise. This format is returned to make it possible to generate
    * the right sort of data frame in R using the current Scala-to-R
    * interface, which can only pass arrays and arrays of arrays, of
@@ -716,11 +718,11 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // This is easier than in the other direction.
     (for ((fv, label) <- inst.fv.zipWithIndex) yield {
       val indiv = index + 1
-      val choice = label_mapper.to_string(label)
-      val choice_yesno = if (label == correct_label) "yes" else "no"
-      assert(fv.length == feature_mapper.vector_length)
+      val labelstr = inst.label_mapper.to_string(label)
+      val choice = label == correct_label
+      assert(fv.length == inst.feature_mapper.vector_length)
       val nums = (for (i <- 0 until fv.length) yield fv(i, label)).toArray
-      ((indiv, choice, choice_yesno), nums)
+      ((indiv, labelstr, choice), nums)
     }).toArray
   }
 
@@ -729,16 +731,16 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * 2-d matrix used in R's mlogit() function. The return value is of the
    * following type:
    *
-   * (headers: Array[String], indiv:Array[Int], choices:Array[String],
-   *   choices_yesno:Array[String], data_rows:Array[Array[Double]])
+   * (headers: Array[String], indiv:Array[Int], labels:Array[String],
+   *   choices:Array[Boolean], data_rows:Array[Array[Double]])
    *
    * where `data_rows` has N*L rows and F columns, `headers` is a size-F
    * row vector listing column headers, `indiv` is a size-N*L column
    * vector identifying the instance (from 1 to N) each row occurs in,
-   * `choice` is a size-N*L column vector specifying the label of each
-   * row (cycling through all labels repeated N times), and `choices_yesno`
-   * is a size-N*L column vector specifying "yes" for the rows with
-   * correct labels and "no" otherwise. This format is used to make it
+   * `labels` is a size-N*L column vector specifying the label of each
+   * row (cycling through all labels repeated N times), and `choices`
+   * is a size-N*L column vector specifying 'true' for the rows with
+   * correct labels and 'false' otherwise. This format is used to make it
    * possible to generate the right sort of data frame in R using the
    * current Scala-to-R interface, which can only pass arrays and arrays
    * of arrays, of fixed type.
@@ -754,17 +756,18 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
           put_labeled_instance(inst, correct_label, index)
       }
     val (extra_props, data_rows) = rows.unzip
-    val (indiv, choice, choice_yesno) = extra_props.unzip3
+    val (indiv, label, choice) = extra_props.unzip3
     val N = insts.size
     val L = label_mapper.number_of_indices
     val F = feature_mapper.number_of_indices
     assert(headers.size == F)
+    assert(label.size == N*L)
     assert(choice.size == N*L)
-    assert(choice_yesno.size == N*L)
     assert(indiv.size == N*L)
     assert(data_rows.size == N*L)
     data_rows.map { row => assert(row.size == F) }
-    (headers, indiv, choice, choice_yesno, data_rows)
+    (headers.toArray, indiv.toArray, label.toArray, choice.toArray,
+      data_rows.toArray)
   }
 }
 
