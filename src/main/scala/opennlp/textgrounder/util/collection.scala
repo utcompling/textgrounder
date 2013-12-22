@@ -40,7 +40,7 @@ import scala.collection.mutable
 import scala.collection.immutable
 import mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
-import scala.collection.{Map => BaseMap}
+import scala.collection.{Map => BaseMap, GenTraversableLike, GenTraversable}
 import scala.reflect.ClassTag
 
 /**
@@ -789,8 +789,8 @@ protected class CollectionPackage {
  //             Intersect/Union/Diff by key and specified combiner          //
  /////////////////////////////////////////////////////////////////////////////
 
-  implicit class IntersectUnionWithPimp[K, A](a: Traversable[(K, A)]) {
-    private def occItems[B](sq: Traversable[(K, B)]) = {
+  implicit class IntersectUnionWithPimp[K, A, Repr](a: GenTraversableLike[(K, A), Repr]) {
+    private def occItems[B](sq: GenTraversable[(K, B)]) = {
       val occ = new mutable.HashMap[K, mutable.Buffer[B]] {
         override def default(key: K) = {
           val newbuf = mutable.Buffer[B]()
@@ -798,8 +798,9 @@ protected class CollectionPackage {
           newbuf
         }
       }
-      for ((k, v) <- sq)
+      sq.foreach { case (k, v) =>
         occ(k) += v
+      }
       occ
     }
 
@@ -811,8 +812,9 @@ protected class CollectionPackage {
      * @param b Other collection to intersect with.
      * @param combine Function to combine values from the two collections.
      */
-    def intersectWithKey[B, R](b: Traversable[(K, B)])(
-        combine: (K, A, B) => R): Traversable[(K, R)] = {
+    def intersectWithKey[B, R, That](b: GenTraversable[(K, B)])(
+        combine: (K, A, B) => R)(
+        implicit bf: CanBuildFrom[Repr, (K, R), That]): That = {
       (a, b) match {
         // FIXME! Should use implicit functions to handle this. But
         // then need to be careful to define special implicit versions of
@@ -826,17 +828,17 @@ protected class CollectionPackage {
         case (x: immutable.IntMap[A], y: immutable.IntMap[B]) =>
           x.intersectionWith[B, R](y, (k, p, q) =>
             combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
-            asInstanceOf[Traversable[(K, R)]]
+            asInstanceOf[That]
         case (x: immutable.LongMap[A], y: immutable.LongMap[B]) =>
           x.intersectionWith[B, R](y, (k, p, q) =>
             combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
-            asInstanceOf[Traversable[(K, R)]]
+            asInstanceOf[That]
         case _ => {
-          val buf = mutable.Buffer[(K, R)]()
+          val buf = bf()
           val occ = b.toMap
           if (occ.size == b.size) {
             // The easy way: no repeated items in `b`.
-            for ((key, value) <- a) {
+            a.foreach { case (key, value) =>
               if (occ contains key)
                 buf += key -> combine(key, value, occ(key))
             }
@@ -845,10 +847,13 @@ protected class CollectionPackage {
             // key in `b`. Every time we find a key in `a`, iterate over
             // all occurrences in `b`.
             val occb = occItems(b)
-            for ((key, value) <- a; value2 <- occb(key))
-              buf += key -> combine(key, value, value2)
+            a.foreach { case (key, value) =>
+              occb(key).foreach { value2 =>
+                buf += key -> combine(key, value, value2)
+              }
+            }
           }
-          buf.toTraversable
+          buf.result
         }
       }
     }
@@ -865,9 +870,10 @@ protected class CollectionPackage {
      * @param b Other collection to intersect with.
      * @param combine Function to combine values from the two collections.
      */
-    def intersectWith[B, R](b: Traversable[(K, B)])(
-        combine: (A, B) => R): Traversable[(K, R)] =
-      a.intersectWithKey(b) { case (_, x, y) => combine(x, y) }
+    def intersectWith[B, R, That](b: GenTraversable[(K, B)])(
+        combine: (A, B) => R)(
+        implicit bf: CanBuildFrom[Repr, (K, R), That]): That =
+      a.intersectWithKey(b){ case (_, x, y) => combine(x, y) }(bf)
 
     /**
      * Union two collections by their keys. This is identical to
@@ -877,8 +883,9 @@ protected class CollectionPackage {
      * @param b Other collection to union with.
      * @param combine Function to combine values from the two collections.
      */
-    def unionWithKey[B >: A](b: Traversable[(K, B)])(
-        combine: (K, A, B) => B): Traversable[(K, B)] = {
+    def unionWithKey[B >: A, That](b: GenTraversable[(K, B)])(
+        combine: (K, A, B) => B)(
+        implicit bf: CanBuildFrom[Repr, (K, B), That]): That = {
       // One way to write:
       // a.intersectWith(b)(combine) ++ a.diffWith(b) ++ b.diffWith(a)
       // Instead, we expand out the code to avoid extra work.
@@ -887,21 +894,22 @@ protected class CollectionPackage {
       (a, b) match {
         case (x: immutable.HashMap[K, A], y: immutable.HashMap[K, B]) =>
           x.merged(y) { (p, q) =>
-            (p._1, combine(p._1, p._2.asInstanceOf[A], q._2)) }
+            (p._1, combine(p._1, p._2.asInstanceOf[A], q._2)) }.
+            asInstanceOf[That]
         case (x: immutable.IntMap[A], y: immutable.IntMap[B]) =>
           x.unionWith[B](y, (k, p, q) =>
             combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
-            asInstanceOf[Traversable[(K, B)]]
+            asInstanceOf[That]
         case (x: immutable.LongMap[A], y: immutable.LongMap[B]) =>
           x.unionWith[B](y, (k, p, q) =>
             combine(k.asInstanceOf[K], p.asInstanceOf[A], q)).
-            asInstanceOf[Traversable[(K, B)]]
+            asInstanceOf[That]
         case _ => {
-          val buf = mutable.Buffer[(K, B)]()
+          val buf = bf()
           val occ = b.toMap
           if (occ.size == b.size) {
             // The easy way: no repeated items in `b`.
-            for ((key, value) <- a) {
+            a.foreach { case (key, value) =>
               if (occ contains key)
                 buf += key -> combine(key, value, occ(key))
               else
@@ -909,23 +917,27 @@ protected class CollectionPackage {
             }
           } else {
             val occb = occItems(b)
-            for ((key, value) <- a) {
+            a.foreach { case (key, value) =>
               // The hard way. See above.
               val values_b = occb(key)
               if (values_b.size > 0) {
-                for (value2 <- values_b)
+                values_b.foreach { value2 =>
                   buf += key -> combine(key, value, value2)
+                }
               } else
                 buf += key -> value
             }
           }
           // Finally handle items in `b` but not `a`.
-          val occa = a.map(_._1).toSet
-          for ((key, value) <- b) {
+          val occa = new mutable.HashSet[K]
+          a.foreach { case (key, value) =>
+            occa += key
+          }
+          b.foreach { case (key, value) =>
             if (!(occa contains key))
               buf += key -> value
           }
-          buf.toTraversable
+          buf.result
         }
       }
     }
@@ -950,9 +962,10 @@ protected class CollectionPackage {
      * @param b Other collection to union with.
      * @param combine Function to combine values from the two collections.
      */
-    def unionWith[B >: A](b: Traversable[(K, B)])(
-        combine: (A, B) => B): Traversable[(K, B)] =
-      a.unionWithKey(b) { case (_, x, y) => combine(x, y) }
+    def unionWith[B >: A, That](b: Traversable[(K, B)])(
+        combine: (A, B) => B)(
+        implicit bf: CanBuildFrom[Repr, (K, B), That]): That =
+      a.unionWithKey(b){ case (_, x, y) => combine(x, y) }(bf)
 
     /**
      * Difference two collections by their keys. Keep the ordering of
@@ -968,14 +981,15 @@ protected class CollectionPackage {
      *
      * @param b Other collection to difference with.
      */
-    def diffWith[B >: A](b: Traversable[(K, B)]): Traversable[(K, B)] = {
+    def diffWith[B >: A, That](b: Traversable[(K, B)])(
+        implicit bf: CanBuildFrom[Repr, (K, B), That]): That = {
       val occ = b.map(_._1).toSet
-      val buf = mutable.Buffer[(K, B)]()
-      for ((key, value) <- a) {
+      val buf = bf()
+      a.foreach { case (key, value) =>
         if (!(occ contains key))
           buf += key -> value
       }
-      buf.toTraversable
+      buf.result
     }
   }
 
