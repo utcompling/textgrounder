@@ -1088,6 +1088,18 @@ protected class CollectionPackage {
     else (too to from)
   }
 
+  /**
+   * Return true if sequence is sorted.
+   */
+  def is_sorted[T: Ordering](l: Iterable[T]) =
+    l.view.zip(l.tail).forall(x => implicitly[Ordering[T]].lteq(x._1, x._2))
+
+  /**
+   * Return true if sequence is reverse-sorted.
+   */
+  def is_reverse_sorted[T: Ordering](l: Iterable[T]) =
+    l.view.zip(l.tail).forall(x => implicitly[Ordering[T]].gteq(x._1, x._2))
+
   // Return an iterator over all elements in all the given sequences, omitting
   // elements seen more than once and keeping the order.
   def merge_numbered_sequences_uniquely[A, B](seqs: Iterable[(A, B)]*) = {

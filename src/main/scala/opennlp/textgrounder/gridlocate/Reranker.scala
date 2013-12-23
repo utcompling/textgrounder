@@ -40,7 +40,7 @@ abstract class GridRanker[Co](
       include: Iterable[GridCell[Co]]):
     Iterable[(GridCell[Co], Double)]
 
-  def evaluate(item: GridDoc[Co], include: Iterable[GridCell[Co]]) =
+  def imp_evaluate(item: GridDoc[Co], include: Iterable[GridCell[Co]]) =
     return_ranked_cells(item.grid_lm, include)
 }
 

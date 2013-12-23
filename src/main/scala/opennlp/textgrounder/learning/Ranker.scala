@@ -19,6 +19,7 @@
 package opennlp.textgrounder
 package learning
 
+import util.collection.is_reverse_sorted
 import util.metering._
 import util.print._
 import learning._
@@ -56,8 +57,14 @@ trait Ranker[Query, Candidate] {
    * candidate to the next one.  Any candidates mentioned in `include` must be
    * included in the returned list.
    */
-  def evaluate(item: Query, include: Iterable[Candidate]):
+  def imp_evaluate(item: Query, include: Iterable[Candidate]):
     Iterable[(Candidate, Double)]
+
+  final def evaluate(item: Query, include: Iterable[Candidate]) = {
+    val scored_cands = imp_evaluate(item, include)
+    assert(is_reverse_sorted(scored_cands.map(_._2)))
+    scored_cands
+  }
 }
 
 /**
@@ -99,7 +106,7 @@ trait Reranker[Query, Candidate]
     (initial_ranking, reranking)
   }
 
-  override def evaluate(item: Query, include: Iterable[Candidate]) = {
+  override def imp_evaluate(item: Query, include: Iterable[Candidate]) = {
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, include)
     reranking
@@ -274,7 +281,8 @@ trait PointwiseClassifyingRerankerTrainer[
       val maybe_label = cand_scores.zipWithIndex.find {
         case ((cand, featvec), index) => cand == correct
       }
-      assert(maybe_label != None, "Correct candidate should be in candidate list")
+      assert(maybe_label != None,
+        "Correct candidate should be in candidate list")
       val (_, the_label) = maybe_label.get
       the_label
     }
