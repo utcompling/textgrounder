@@ -702,6 +702,10 @@ object GeolocateDocumentTag extends
      */
     def omit = echo("")
     /**
+     * Default handling of param.
+     */
+    def default = null
+    /**
      * Return tail of filename.
      */
     def filetail = (value: Any) => value match {
@@ -750,27 +754,39 @@ object GeolocateDocumentTag extends
         case "no" => "backoff"
         case _ => ""
       }),
-      ("jelinek-factor", valonly),
-      ("dirichlet-factor", valonly),
-      ("tf-idf", echo("tfidf")),
-      ("rerank", x => x match {
-        case "pointwise" => "rerank"
-        case _ => "no-rerank"
-      }),
+      ("tf-idf", default),
+      ("rerank", default),
+      ("rerank-optimizer", valonly),
+      ("rerank-features", full("feats")),
+      ("rerank-binning", full("bin")),
       ("rerank-top-n", short("top")),
-      ("rerank-instance", valonly),
-      ("rerank-classifier", valonly),
-      ("pa-variant", short("var")),
-      ("perceptron-aggressiveness", short("aggr")),
-      ("perceptron-error-threshold", short("errthresh")),
-      ("perceptron-rounds", short("rounds")),
+      ("rerank-num-training-splits", short("nsplits")),
+      ("rerank-initial-weights", full("initweights")),
+      ("rerank-random-restart", short("random-restart")),
+      ("rerank-lang-model", xs => xs match {
+        case (x:String, y:String) => "rerank-" + x + y
+      }),
+      ("rerank-interpolate", x => x match {
+        case "yes" => "rerank-interpolate"
+        case "no" => "rerank-backoff"
+        case _ => ""
+      }),
+      ("pa-cost-type", full("pa-cost")),
+      ("pa-variant", short("pa-var")),
+      ("perceptron-aggressiveness", short("perceptron-aggr")),
+      ("perceptron-error-threshold", short("perceptron-errthresh")),
+      ("perceptron-rounds", short("perceptron-rounds")),
+      ("perceptron-decay", short("perceptron-decay")),
       ("degrees-per-cell", short("deg")),
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
-      ("kd-tree", echo("kdtree")),
+      ("cell-offset-degrees", full("offsetdeg")),
+      ("kd-tree", default),
       ("kd-split-method", valonly),
-      ("kd-backoff", echo("kdbackoff")),
+      ("kd-backoff", default),
       ("kd-bucket-size", short("bucketsize")),
+      ("kd-interpolate-weight", short("kd-interpweight")),
+      ("combined-kd-grid", default),
       ("center-method", valonly),
       ("language", full("lang")),
       ("num-nearest-neighbors", short("knn")),
@@ -802,10 +818,15 @@ object GeolocateDocumentTag extends
     // omitted entirely.
     val tag =
       (for ((name, value) <- params) yield {
-        if (handling_map.contains(name))
-          handling_map(name)(value)
-        else
-          full(name)(value)
+        val fn =
+          if (handling_map.contains(name) &&
+              handling_map(name) != null)
+            handling_map(name)
+          else if (arg_parser.getType(name) == classOf[Boolean])
+            echo(name)
+          else
+            full(name)
+        fn(value)
       }) filter { _ != "" } mkString "."
 
     // Output tag, but convert any slashes to underscores; otherwise attempts
