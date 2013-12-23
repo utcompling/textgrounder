@@ -728,15 +728,16 @@ object AggregateFeatureVector {
    * 2-d matrix used in R's mlogit() function. For F features, L labels and
    * N instances, The return value is of the following type:
    *
-   * (headers:Array[String], rows:Array[((Int,String,Boolean),Array[Double]])]
+   * (headers: Array[String], extraprops: Iterable[(Int,String,Boolean)],
+   *   data: Array[Array[Double]])
    *
-   * where `headers` is a size-F row vector listing column headers and
-   * `rows` is of size N*L, where each row specifies a value for `indiv`
-   * (identifying the instance, from 1 to N), `label` (as a string, cycling
-   * through all L labels N times), `choice` (a boolean, specifying 'true' for
-   * the raws whose label is the correct one and 'false' otherwise) and
-   * `datarow` (a size-F row vector specifing the values in this row for the
-   * F features).
+   * where `headers` is a size-F row vector listing column headers,
+   * `rows` is a N*L by F matrix of values, and `extraprops` is of
+   * size N*L and specifies three columns * `(indiv, label, choice)`,
+   * where `indiv` identifies the instance (from 1 to N), `label` is
+   * a string identifying the label of the row (cycling through all L
+   * labels N times), and `choice` is a boolean, specifying 'true' for
+   * the rows whose label is the correct one and 'false' otherwise.
    *
    * This format in turn can be converted into separate variables for
    * `indiv`, `label` and `choice` for easier stuffing into R (the current
@@ -787,8 +788,9 @@ object AggregateFeatureVector {
     val F = head.feature_mapper.number_of_indices
     assert(headers.size == F)
     assert(rows.size == N*L)
-    rows.foreach { case (extraprops, datarow) => assert(datarow.size == F) }
-    (headers.toArray, rows.toArray)
+    val (extraprops, data) = rows.unzip
+    data.foreach { row => assert(row.size == F) }
+    (headers.toArray, extraprops, data.toArray)
   }
 
   /**
@@ -813,36 +815,12 @@ object AggregateFeatureVector {
   def labeled_instances_to_R(
       insts: Iterable[(AggregateFeatureVector, Int)]
   ) = {
-    val (headers, rows) = put_labeled_instances(insts)
-    val (extra_props, data_rows) = rows.unzip
-    val (indiv, label, choice) = extra_props.unzip3
+    val (headers, extraprops, data) = put_labeled_instances(insts)
+    val (indiv, label, choice) = extraprops.unzip3
     // FIXME! Bug in unzip, unzip3 makes it return Vectors instead of
-    // Arrays when unzipping Arrays.
-    (headers, indiv.toArray, label.toArray, choice.toArray,
-      data_rows.toArray)
-  }
-
-  /**
-   * Undo the conversion in `get_labeled_instances` to get the long-format
-   * 2-d matrix used in R's mlogit() function. The return value is:
-   *
-   * (header:Array[String], data:Array[Array[String]])
-   *
-   * i.e. a header line followed by a 2-d array of strings, all ready to
-   * be directly output to a file with spaces in between columns.
-   */
-  def labeled_instances_to_file(
-      insts: Iterable[(AggregateFeatureVector, Int)]
-  ): (Array[String], Array[Array[String]]) = {
-    val (headers, rows) = put_labeled_instances(insts)
-    val data =
-      rows.toArray.map { case ((indiv, labelstr, choice), datarow) =>
-        val indivstr = indiv.toString
-        val choicestr = if (choice) "TRUE" else "FALSE"
-        val datastr = datarow.map(_.toString).toArray
-        Array(indivstr, labelstr, choicestr) ++ datastr
-      }
-    (headers, data)
+    // Arrays when unzipping Arrays (although we aren't currently
+    // returned an array).
+    (headers, indiv.toArray, label.toArray, choice.toArray, data)
   }
 }
 

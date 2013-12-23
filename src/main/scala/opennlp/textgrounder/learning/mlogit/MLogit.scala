@@ -21,6 +21,7 @@ package learning.mlogit
 
 import learning._
 import util.debug._
+import util.io.localfh
 import util.print.{errprint,internal_error}
 
 import org.ddahl.jvmr.RInScala
@@ -180,13 +181,44 @@ class RConditionalLogitTrainer[DI <: DataInstance](
   }
 
   /**
+   * Undo the conversion in `get_labeled_instances` to get the long-format
+   * 2-d matrix used in R's mlogit() function. The return value is:
+   *
+   * (header:Array[String], data:Array[Array[String]])
+   *
+   * i.e. a header line followed by a 2-d array of strings, all ready to
+   * be directly output to a file with spaces in between columns.
+   */
+  def training_data_to_file(headers: Array[String],
+      extraprops: Iterable[(Int, String, Boolean)],
+      data: Array[Array[Double]]) = {
+    val rheaders = Array("indiv", "label", "choice") ++ headers
+    val sep = " "
+    val filename =
+      java.io.File.createTempFile("textgrounder.mlogit", null).toString
+    val file = localfh.openw(filename)
+    file.println(rheaders mkString sep)
+    (data zip extraprops).map { case (datarow, (indiv, labelstr, choice)) =>
+      assert(headers.size == datarow.size)
+      val indivstr = indiv.toString
+      val choicestr = if (choice) "TRUE" else "FALSE"
+      val datastr = datarow.map(_.toString).toArray
+      val line = (Array(indivstr, "\"" + labelstr + "\"", choicestr) ++
+        datastr) mkString sep
+      file.println(line)
+    }
+    file.close()
+    filename
+  }
+
+  /**
    * Convert the set of instances into a long-style data frame in R with
    * the name `framename`, for use with the `mlogit` function.
    */
-  def do_mlogit(data: Iterable[(DI, Int)]) = {
+  def do_mlogit(rawdata: Iterable[(DI, Int)]) = {
     val R = RInScala()
 
-    val agg_fv_data = data.map { case (di, label) =>
+    val agg_fv_data = rawdata.map { case (di, label) =>
       val fv = di.feature_vector
       val aggfv = fv match {
         case agg: AggregateFeatureVector => agg
@@ -196,10 +228,10 @@ class RConditionalLogitTrainer[DI <: DataInstance](
     }
 
     val frame = "frame" // Name of variable to use for data, etc.
-    val (headers, indiv, label, choice, data_rows) =
-      AggregateFeatureVector.labeled_instances_to_R(agg_fv_data)
+    val (headers, extraprops, data) =
+      AggregateFeatureVector.put_labeled_instances(agg_fv_data)
     val nlabel = agg_fv_data.head._1.depth
-    val singular_columns = check_singularity(data_rows, nlabel)
+    val singular_columns = check_singularity(data, nlabel)
     val singular_headers = filter_array(headers, singular_columns)
     val nonsingular_headers = filter_array_not(headers, singular_columns)
     val nonsingular_indices = filter_array_not((0 until headers.size).toArray,
@@ -209,29 +241,41 @@ class RConditionalLogitTrainer[DI <: DataInstance](
       _.replaceAll("[^A-Za-z0-9_]", ".")
     }
 
-    // errprint("#0")
-    val rdata = data_rows map { row =>
+    val rdata = data map { row =>
       filter_array_not(row, singular_columns)
     }
 
     // errprint("#1")
     R.eval("require(mlogit)")
-    // errprint("#2")
-    R.update(s"$frame.headers", rheaders)
-    // errprint("#3")
-    R.update(s"$frame.indiv", indiv)
-    // errprint("#4")
-    R.update(s"$frame.label", label)
-    // errprint("#5")
-    R.update(s"$frame.choice", choice)
-    // errprint("#6")
-    R.update(s"$frame.data", rdata)
-    // errprint("#7")
-    val N = data_rows.size
-    // errprint("#8")
-    R.eval(s"dimnames($frame.data) = list(1:$N, $frame.headers)")
-    // errprint("#9")
-    R.eval(s"$frame = data.frame(indiv=$frame.indiv, label=$frame.label, choice=$frame.choice, $frame.data)")
+
+    if (true) { // Stuff using a file
+      val filename = training_data_to_file(rheaders, extraprops, rdata)
+      errprint("Filename: %s", filename)
+      R.eval(s"""$frame = read.table("$filename", header=TRUE)""")
+    }
+    else { // Stuff using JVMR
+      // FIXME! Bug in unzip, unzip3 makes it return Vectors instead of
+      // Arrays when unzipping Arrays (although we aren't currently
+      // returned an array).
+      val (indiv, label, choice) = extraprops.unzip3
+
+      // errprint("#2")
+      R.update(s"$frame.headers", rheaders)
+      // errprint("#3")
+      R.update(s"$frame.indiv", indiv.toArray)
+      // errprint("#4")
+      R.update(s"$frame.label", label.toArray)
+      // errprint("#5")
+      R.update(s"$frame.choice", choice.toArray)
+      // errprint("#6")
+      R.update(s"$frame.data", rdata)
+      // errprint("#7")
+      val N = data.size
+      // errprint("#8")
+      R.eval(s"dimnames($frame.data) = list(1:$N, $frame.headers)")
+      // errprint("#9")
+      R.eval(s"$frame = data.frame(indiv=$frame.indiv, label=$frame.label, choice=$frame.choice, $frame.data)")
+    }
     // errprint("#10")
     R.eval(s"""$frame = mlogit.data(choice="choice", shape="long", alt.var="label", chid.var="indiv", $frame)""")
     // errprint("#11")
