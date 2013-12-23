@@ -265,9 +265,6 @@ class MiscCandidateFeatVecFactory[Co](
       ib("$cell-numtypes", celllm.num_types),
       ib("$cell-numtokens", celllm.num_tokens),
       ib("$cell-salience", cell.salience),
-      ib("$doc-numtypes", doclm.num_types),
-      ib("$doc-numtokens", doclm.num_tokens),
-      ib("$doc-salience", doc.salience.getOrElse(0.0)),
       ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
       ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
       ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0))
@@ -410,10 +407,7 @@ abstract class WordByWordCandidateFeatVecFactory[Co](
  *
  * @param feattype How to compute the value assigned to the words:
  *
- * - `unigram-binary`: always assign 1
- * - `unigram-doc-count`: use document word count
  * - `unigram-cell-count`: use cell word count
- * - `unigram-doc-prob`: use document word probability
  * - `unigram-cell-prob`: use cell word probability
  * - any of the above with `-binned` added, which bins logarithmically
  */
@@ -427,10 +421,7 @@ class WordCandidateFeatVecFactory[Co](
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
     val wordval = basetype match {
-      case "unigram-binary" => 1.0
-      case "unigram-doc-count" => doccount
       case "unigram-cell-count" => celllm.get_gram(word)
-      case "unigram-doc-prob" => doclm.gram_prob(word)
       case "unigram-cell-prob" => celllm.gram_prob(word)
     }
     if (binned)
@@ -543,10 +534,7 @@ abstract class NgramByNgramCandidateFeatVecFactory[Co](
  *
  * @param feattype How to compute the value assigned to the ngrams:
  *
- * - `ngram-binary`: always assign 1
- * - `ngram-doc-count`: use document ngram count
  * - `ngram-cell-count`: use cell ngram count
- * - `ngram-doc-prob`: use document ngram probability
  * - `ngram-cell-prob`: use cell ngram probability
  * - any of the above with `-binned` added, which bins logarithmically
  */
@@ -560,10 +548,7 @@ class NgramCandidateFeatVecFactory[Co](
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
     val ngramval = basetype match {
-      case "ngram-binary" => 1.0
-      case "ngram-doc-count" => doccount
       case "ngram-cell-count" => celllm.get_gram(ngram)
-      case "ngram-doc-prob" => doclm.gram_prob(ngram)
       case "ngram-cell-prob" => celllm.gram_prob(ngram)
     }
     if (binned)

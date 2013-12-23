@@ -603,9 +603,7 @@ For the perceptron optimizers, see also `--pa-variant`,
     feats flatMap { f => Seq(f, f + "-binned") }
 
   val rerank_features_simple_unigram_choices =
-    (Seq("binary") ++
-      with_binned("doc-count", "doc-prob", "cell-count", "cell-prob")
-    ).map { "unigram-" + _ }
+    with_binned("cell-count", "cell-prob").map { "unigram-" + _ }
 
   val rerank_features_matching_unigram_choices =
     (Seq("binary") ++ with_binned(
@@ -615,9 +613,7 @@ For the perceptron optimizers, see also `--pa-variant`,
     ).map { "matching-unigram-" + _ }
 
   val rerank_features_simple_ngram_choices =
-    (Seq("binary") ++
-      with_binned("doc-count", "doc-prob", "cell-count", "cell-prob")
-    ).map { "ngram-" + _ }
+    with_binned("cell-count", "cell-prob").map { "ngram-" + _ }
 
   val rerank_features_matching_ngram_choices =
     (Seq("binary") ++ with_binned(
@@ -649,15 +645,6 @@ respective language models). Possibilities are:
 'trivial' (no features, for testing purposes);
 
 'rank-score' (use the original rank and ranking score);
-
-'unigram-binary' (use the value 1 when a word exists in the document,
-  0 otherwise);
-
-'unigram-doc-count' (use the document word count when a word exists in
-  the document);
-
-'unigram-doc-prob' (use the document word probability when a word exists in
-  the document);
 
 'unigram-cell-count' (use the cell word count when a word exists in
   the document);
@@ -711,7 +698,7 @@ respective language models). Possibilities are:
   cell: KL-divergence, symmetric KL-divergence, cosine similarity, Naive Bayes)
 
 'misc' (other non-word-specific features, e.g. number of documents in a cell,
-  number of word types/tokens in a document/cell, etc.; should be fairly fast
+  number of word types/tokens in a cell, etc.; should be fairly fast
   to compute)
 
 Multiple feature types can be specified, separated by spaces or commas.
