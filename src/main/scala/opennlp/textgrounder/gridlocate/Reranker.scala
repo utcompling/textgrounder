@@ -1,7 +1,7 @@
 package opennlp.textgrounder
 package gridlocate
 
-import math.log
+import math.{log,exp}
 
 import langmodel._
 import util.debug._
@@ -270,10 +270,11 @@ class MiscCandidateFeatVecFactory[Co](
       ib("$doc-salience", doc.salience.getOrElse(0.0)),
       ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
       ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
-      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0)),
-      ib("$numtypes-diff", celllm.num_types - doclm.num_types),
-      ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
-      ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0))
+      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0))
+      // These apparently cause near-singular issues.
+      //ib("$numtypes-diff", celllm.num_types - doclm.num_types),
+      //ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
+      //ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
       //FIXME: TOO SLOW!!!
       // ib("$types-in-common", types_in_common(doclm, celllm)),
       // ib("$kldiv", doclm.kl_divergence(celllm)),
@@ -341,6 +342,8 @@ class RankScoreCandidateFeatVecFactory[Co](
       initial_rank: Int) = {
     Iterable(
       ib("$initial-score", initial_score),
+      ib("$log-initial-score", log(1+initial_score)),
+      ib("$exp-initial-score", exp(initial_score)),
       ib("$initial-rank", initial_rank)
     ).flatten
   }
