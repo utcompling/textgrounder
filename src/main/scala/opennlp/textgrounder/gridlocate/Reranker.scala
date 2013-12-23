@@ -286,7 +286,7 @@ class MiscCandidateFeatVecFactory[Co](
 
 /**
  * A factory for generating features for a doc-cell candidate, specifically
- * the $types-in-common feature, which is currently very slow. (FIXME!!
+ * the \$types-in-common feature, which is currently very slow. (FIXME!!
  * Should be possible to implement in O(N log N) with sorting.)
  */
 class TypesInCommonCandidateFeatVecFactory[Co](

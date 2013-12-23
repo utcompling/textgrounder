@@ -309,7 +309,7 @@ protected class PrintCollection {
    * bigger to smaller.  Within a given number, normally sort the items
    * alphabetically.
    *
-   * @param, keep_secondary_order If true, the original order of items is
+   * @param keep_secondary_order If true, the original order of items is
    *   left instead of sorting secondarily.
    * @param outfile If specified, send output to this stream instead of
    *   stdout.
@@ -333,7 +333,7 @@ protected class PrintCollection {
    * the numbers from bigger to smaller.  Within a given number, normally
    * sort the items alphabetically.
    *
-   * @param, keep_secondary_order If true, the original order of items is
+   * @param keep_secondary_order If true, the original order of items is
    *   left instead of sorting secondarily.
    * @param outfile If specified, send output to this stream instead of
    *   stdout.

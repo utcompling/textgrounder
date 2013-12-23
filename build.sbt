@@ -15,6 +15,8 @@ crossPaths := false
 
 retrieveManaged := true
 
+autoAPIMappings := true
+
 (sourceGenerators in Compile) <+= (sourceManaged in Compile) map GenFeatureVector.gen
 
 resolvers ++= Seq(

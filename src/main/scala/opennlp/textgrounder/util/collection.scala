@@ -1004,7 +1004,7 @@ protected class CollectionPackage {
      * @param b Other collection to intersect with.
      * @param key1fn Function to select the comparison key for the first
      *   collection.
-     * @param key1fn Function to select the comparison key for the first
+     * @param key2fn Function to select the comparison key for the first
      *   collection.
      * @param combine Function to combine values from the two collections.
      */

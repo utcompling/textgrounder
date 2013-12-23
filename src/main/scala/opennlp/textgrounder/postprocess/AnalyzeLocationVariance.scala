@@ -345,7 +345,7 @@ dev.off()
    * @param file File to output to; will be in PDF format.
    * @param width Number of plots to display across.
    * @param height Number of plots to display down.
-   * @returns Object representing connection to R.
+   * @return Object representing connection to R.
    */
   def begin_plot_R(file: String, width: Int, height: Int) = {
     val R = RInScala()

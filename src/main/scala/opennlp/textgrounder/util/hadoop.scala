@@ -392,7 +392,7 @@ package hadoop {
     def create_param_object(ap: ArgParser): TParam
     def create_driver: TDriver
 
-    /** Originally this was simply called 'setup', but used only for a
+    /* Originally this was simply called 'setup', but used only for a
      * trait that could be mixed into a mapper.  Expanding this to allow
      * it to be mixed into both a mapper and a reducer didn't cause problems
      * but creating a subtrait that override this function did cause problems,
