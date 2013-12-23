@@ -641,7 +641,7 @@ For the perceptron optimizers, see also `--pa-variant`,
 
   var rerank_features =
     ap.option[String]("rerank-features",
-      default = "misc,rank-score",
+      default = "rank-score,misc",
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
 respective language models). Possibilities are:
