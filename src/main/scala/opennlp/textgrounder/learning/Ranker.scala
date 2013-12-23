@@ -20,6 +20,7 @@ package opennlp.textgrounder
 package learning
 
 import util.collection.is_reverse_sorted
+import util.{math => umath}
 import util.metering._
 import util.print._
 import learning._
@@ -100,9 +101,24 @@ trait Reranker[Query, Candidate]
 
   def evaluate_with_initial_ranking(item: Query,
       include: Iterable[Candidate]) = {
+    // Do initial ranking.
     val initial_ranking = initial_ranker.evaluate(item, include)
+    // Split into candidates to rerank and others.
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
-    val reranking = rerank_candidates(item, to_rerank) ++ others
+    // Standardize the initial scores so they are comparable across
+    // different instances.
+    val (cands, scores) = to_rerank.unzip
+    val std_to_rerank = cands zip umath.standardize(scores)
+    // Rerank the candidates.
+    val reranked = rerank_candidates(item, std_to_rerank)
+    // Adjust the scores of the reranked candidates to be above all
+    // the others.
+    val min_rerank = reranked.map(_._2).min
+    val max_others = others.map(_._2).max
+    val adjust = -min_rerank + max_others + 1
+    val adjusted_reranked = reranked.map { case (cand, score) =>
+      (cand, score + adjust) }
+    val reranking = adjusted_reranked ++ others
     (initial_ranking, reranking)
   }
 
@@ -429,8 +445,10 @@ trait PointwiseClassifyingRerankerTrainer[
         // candidates away so we have the same number.
         top_candidates.take(top_n - 1) ++
           Iterable(initial_candidates.find(_._1 == correct).get)
+    val (cands, scores) = cand_scores.unzip
+    val std_cand_scores = cands zip umath.standardize(scores)
 
-    QueryTrainingData(query, correct, cand_scores)
+    QueryTrainingData(query, correct, std_cand_scores)
   }
 
   /**

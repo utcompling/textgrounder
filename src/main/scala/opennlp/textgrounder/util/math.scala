@@ -78,21 +78,21 @@ package object math {
   }
 
   /**
-   *  Return the mean (average) of a collection.
+   * Return the mean (average) of a collection.
    */
   def mean(x: Traversable[Double]) = {
     x.sum / x.size
   }
 
   /**
-   *  Return the mode (most common value) of a collection.
+   * Return the mode (most common value) of a collection.
    */
   def mode[T](x: Traversable[T]) = {
     (argmax(x.countItems) { _._2 })._1
   }
 
   /**
-   *  Return the variance of a collection.
+   * Return the variance of a collection.
    */
   def variance(x: Traversable[Double]) = {
     val m = mean(x)
@@ -100,9 +100,18 @@ package object math {
   }
 
   /**
-   *  Return the standard deviation (square root of the variance) of a collection.
+   * Return the standard deviation (square root of the variance) of a collection.
    */
   def stddev(x: Traversable[Double]) = sqrt(variance(x))
+
+  /**
+   * Standardize a sequence so that it has mean 0, std dev 1.
+   */
+  def standardize(x: Iterable[Double]) = {
+    val xmean = mean(x)
+    val xstddev = stddev(x)
+    x map { z => (z - xmean) / xstddev }
+  }
 
   private val log2_value = log(2)
   def log2(x: Double) = log(x) / log2_value
