@@ -165,9 +165,8 @@ trait BasicFeatureVectorImpl extends FeatureVector {
 }
 
 /**
- * A vector of real-valued features, stored explicitly.  The values passed in
- * are used exactly as the values of the feature; no additional term is
- * inserted to handle a "bias" or "intercept" weight.
+ * A vector of real-valued features, stored explicitly. If you want a "bias"
+ * or "intercept" weight, you need to add it yourself.
  */
 case class ArrayFeatureVector(
   values: SimpleVector
@@ -338,7 +337,6 @@ abstract class TupleArraySparseFeatureVector(
 }
 
 class FeatureMapper extends ToIntMemoizer[String] {
-  val intercept_feature = to_index("$intercept")
   def vector_length = number_of_indices
 }
 
@@ -350,8 +348,6 @@ class LabelMapper extends ToIntMemoizer[String] {
  * Sparse feature vectors store only the features with non-zero values.
  * The features are indexed by entities of type T, which are internally
  * mapped to integers, using the mapping stored in `feature_mapper`.
- * There will always be a feature with the index 0, value 1.0, to handle
- * the intercept term.
  */
 class SparseFeatureVectorFactory { self =>
   val label_mapper = new LabelMapper
@@ -389,18 +385,17 @@ class SparseFeatureVectorFactory { self =>
   def make_feature_vector(feature_values: Iterable[(String, Double)],
       is_training: Boolean) = {
     val memoized_features =
-      // Include an intercept term
-      Iterable(feature_mapper.intercept_feature -> 1.0) ++: (
-        if (is_training)
-          feature_values.map {
-            case (name, value) => (feature_mapper.to_index(name), value)
-          }
-         else
-          for { (name, value) <- feature_values;
-                 index = feature_mapper.to_index_if(name);
-                 if index != None }
-            yield (index.get, value)
-      )
+      // DON'T include an intercept term. Not helpful since it's non-
+      // label-specific.
+      if (is_training)
+        feature_values.map {
+          case (name, value) => (feature_mapper.to_index(name), value)
+        }
+       else
+        for { (name, value) <- feature_values;
+               index = feature_mapper.to_index_if(name);
+               if index != None }
+          yield (index.get, value)
     vector_impl match {
       case "TupleArray" =>
         new TupleArraySparseFeatureVector(memoized_features.toBuffer) with SparseFeatureVectorMixin
