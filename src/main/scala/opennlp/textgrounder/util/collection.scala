@@ -962,7 +962,7 @@ protected class CollectionPackage {
      * @param b Other collection to union with.
      * @param combine Function to combine values from the two collections.
      */
-    def unionWith[B >: A, That](b: Traversable[(K, B)])(
+    def unionWith[B >: A, That](b: GenTraversable[(K, B)])(
         combine: (A, B) => B)(
         implicit bf: CanBuildFrom[Repr, (K, B), That]): That =
       a.unionWithKey(b){ case (_, x, y) => combine(x, y) }(bf)
@@ -981,7 +981,7 @@ protected class CollectionPackage {
      *
      * @param b Other collection to difference with.
      */
-    def diffWith[B >: A, That](b: Traversable[(K, B)])(
+    def diffWith[B >: A, That](b: GenTraversable[(K, B)])(
         implicit bf: CanBuildFrom[Repr, (K, B), That]): That = {
       val occ = b.map(_._1).toSet
       val buf = bf()
@@ -993,7 +993,7 @@ protected class CollectionPackage {
     }
   }
 
-  implicit class IntersectUnionByPimp[A](a: Traversable[A]) {
+  implicit class IntersectUnionByPimp[A, Repr](a: GenTraversableLike[A, Repr]) {
     /**
      * Intersect two collections by their keys, with separate key-selection
      * functions for the two collections. This is identical to
@@ -1008,11 +1008,19 @@ protected class CollectionPackage {
      *   collection.
      * @param combine Function to combine values from the two collections.
      */
-    def intersectBy2[K, B, R](b: Traversable[B])(key1fn: A => K
-        )(key2fn: B => K)(combine: (A, B) => R): Traversable[R] = {
-      val keyed_a = a.map { x => (key1fn(x), x) }
+    def intersectBy2[K, B, R, That](b: GenTraversable[B])(key1fn: A => K)(
+        key2fn: B => K)(combine: (A, B) => R)(
+        implicit bf: CanBuildFrom[Repr, R, That]): That = {
+      // It appears we can't call map() on `a`.
+      val keyed_a = mutable.Buffer[(K, A)]()
+      a.foreach { x => keyed_a += ((key1fn(x), x)) }
       val keyed_b = b.map { x => (key2fn(x), x) }
-      keyed_a.intersectWith(keyed_b)(combine).map(_._2)
+      // Nor can we return the value of map() here. Need to use a builder
+      // instead.
+      val bu = bf()
+      for ((_, r) <- keyed_a.intersectWith(keyed_b)(combine))
+        bu += r
+      bu.result
     }
 
     /**
@@ -1028,11 +1036,16 @@ protected class CollectionPackage {
      * @param keyfn Function to select the comparison key.
      * @param combine Function to combine values from the two collections.
      */
-    def intersectBy[K, B >: A](b: Traversable[B])(keyfn: B => K)(
-        combine: (A, B) => B): Traversable[B] = {
-      val keyed_a = a.map { x => (keyfn(x), x) }
+    def intersectBy[K, B >: A, That](b: GenTraversable[B])(keyfn: B => K)(
+        combine: (A, B) => B)(
+        implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val keyed_a = mutable.Buffer[(K, A)]()
+      a.foreach { x => keyed_a += ((keyfn(x), x)) }
       val keyed_b = b.map { x => (keyfn(x), x) }
-      keyed_a.intersectWith(keyed_b)(combine).map(_._2)
+      val bu = bf()
+      for ((_, r) <- keyed_a.intersectWith(keyed_b)(combine))
+        bu += r
+      bu.result
     }
 
     /**
@@ -1049,11 +1062,16 @@ protected class CollectionPackage {
      * @param keyfn Function to select the comparison key.
      * @param combine Function to combine values from the two collections.
      */
-    def unionBy[K, B >: A](b: Traversable[B])(keyfn: B => K)(
-        combine: (A, B) => B): Traversable[B] = {
-      val keyed_a = a.map { x => (keyfn(x), x) }
+    def unionBy[K, B >: A, That](b: GenTraversable[B])(keyfn: B => K)(
+        combine: (A, B) => B)(
+        implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val keyed_a = mutable.Buffer[(K, A)]()
+      a.foreach { x => keyed_a += ((keyfn(x), x)) }
       val keyed_b = b.map { x => (keyfn(x), x) }
-      keyed_a.unionWith(keyed_b)(combine).map(_._2)
+      val bu = bf()
+      for ((_, r) <- keyed_a.unionWith(keyed_b)(combine))
+        bu += r
+      bu.result
     }
 
     /**
@@ -1071,11 +1089,15 @@ protected class CollectionPackage {
      * @param b Other collection to difference with.
      * @param keyfn Function to select the comparison key.
      */
-    def diffBy[K, B >: A](b: Traversable[B])(keyfn: B => K
-        ): Traversable[B] = {
-      val keyed_a = a.map { x => (keyfn(x), x) }
+    def diffBy[K, B >: A, That](b: GenTraversable[B])(keyfn: B => K)(
+        implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val keyed_a = mutable.Buffer[(K, A)]()
+      a.foreach { x => keyed_a += ((keyfn(x), x)) }
       val keyed_b = b.map { x => (keyfn(x), x) }
-      keyed_a.diffWith(keyed_b).map(_._2)
+      val bu = bf()
+      for ((_, r) <- keyed_a.diffWith(keyed_b))
+        bu += r
+      bu.result
     }
   }
 
