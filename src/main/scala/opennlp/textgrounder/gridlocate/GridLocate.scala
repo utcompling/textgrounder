@@ -1640,6 +1640,11 @@ abstract class GridLocateApp(appname: String) extends
         errprint("Caught abrupt exit throw, exiting")
         0
       }
+      case e:java.lang.OutOfMemoryError => {
+        errprint("Caught java.lang.OutOfMemoryError")
+        output_resource_usage()
+        throw e
+      }
     }
   }
 }
