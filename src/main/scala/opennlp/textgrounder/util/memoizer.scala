@@ -56,7 +56,7 @@ import print.errprint
 //  def create_object_int_map[T]: mutable.Map[T, Int]
 //}
 
-class ScalaHashTableFactory /* extends HashTableFactory */ {
+object ScalaHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = intmap[Int]()
   def create_int_double_map = doublemap[Int]()
   def create_int_object_map[T] = mutable.Map[Int,T]()
@@ -67,7 +67,7 @@ class ScalaHashTableFactory /* extends HashTableFactory */ {
  * Use Trove for extremely fast and memory-efficient hash tables, making use of
  * the Trove-Scala interface for easy access to the Trove hash tables.
  */
-class TroveHashTableFactory /* extends HashTableFactory */ {
+object TroveHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = trovescala.IntIntMap()
   def create_int_double_map = trovescala.IntDoubleMap()
   def create_int_object_map[T] = trovescala.IntObjectMap[T]()
@@ -105,9 +105,9 @@ trait Memoizer[T,U] {
  */
 trait ToIntMemoizer[T] {
   // Use Trove for fast, efficient hash tables.
-  val hashfact = new TroveHashTableFactory
+  val hashfact = TroveHashTableFactory
   // Alternatively, just use the normal Scala hash tables.
-  // val hashfact = new ScalaHashTableFactory
+  // val hashfact = ScalaHashTableFactory
 
   /* The raw indices used in the hash table aren't the same as the
    * external indices because TroveHashTableFactory by default uses 0
