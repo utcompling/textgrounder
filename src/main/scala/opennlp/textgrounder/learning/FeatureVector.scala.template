@@ -42,19 +42,19 @@ import util.memoizer._
  * is possible using binary search.
  */
 abstract class makespec(CompressedSparseFeatureVector) private[learning] (
-  val keys: Array[Int], val values: Array[VECTY]
+  val keys: Array[FeatIndex], val values: Array[VECTY]
 ) extends SparseFeatureVectorLike {
   assert(keys.length == values.length)
 
   def stored_entries = keys.length
 
-  def apply(index: Int) = {
+  def apply(index: FeatIndex) = {
     assert(index >= 0 && index < length)
     val keyind = java.util.Arrays.binarySearch(keys, index)
     if (keyind < 0) 0.0 else values(keyind)
   }
 
-  def squared_magnitude(label: Int) = {
+  def squared_magnitude(label: LabelIndex) = {
     var i = 0
     var res = 0.0
     while (i < keys.length) {
@@ -64,7 +64,7 @@ abstract class makespec(CompressedSparseFeatureVector) private[learning] (
     res
   }
 
-  def dot_product(weights: SimpleVector, label: Int) = {
+  def dot_product(weights: SimpleVector, label: LabelIndex) = {
     assert(length == weights.length)
     var i = 0
     var res = 0.0
@@ -75,7 +75,7 @@ abstract class makespec(CompressedSparseFeatureVector) private[learning] (
     res
   }
 
-  def update_weights(weights: SimpleVector, scale: Double, label: Int) {
+  def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex) {
     assert(length == weights.length)
     var i = 0
     while (i < keys.length) {
@@ -90,7 +90,7 @@ abstract class makespec(CompressedSparseFeatureVector) private[learning] (
 }
 
 class makespec(BasicCompressedSparseFeatureVector) private[learning] (
-  keys: Array[Int], values: Array[VECTY], val length: Int
+  keys: Array[FeatIndex], values: Array[VECTY], val length: Int
 ) extends makespec(CompressedSparseFeatureVector)(keys, values) {
   override val include_displayed_feature = false
 }

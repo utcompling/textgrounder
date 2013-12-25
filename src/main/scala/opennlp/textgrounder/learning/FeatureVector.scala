@@ -62,39 +62,39 @@ trait FeatureVector extends DataInstance {
   /** Return maximum label index compatible with this feature vector.  For
     * feature vectors that ignore the label, return a large number, e.g.
     * `Int.MaxValue`. */
-  def max_label: Int
+  def max_label: LabelIndex
 
   /** Return the number of items stored in the vector.  This will be different
     * from the length in the case of sparse vectors. */
   def stored_entries: Int
 
   /** Return the value at index `i`, for class `label`. */
-  def apply(i: Int, label: Int): Double
+  def apply(i: FeatIndex, label: LabelIndex): Double
 
   /** Return the squared magnitude of the feature vector for class `label`,
     * i.e. dot product of feature vector with itself */
-  def squared_magnitude(label: Int): Double
+  def squared_magnitude(label: LabelIndex): Double
 
   /** Return the squared magnitude of the difference between the values of
     * this feature vector for the two labels `label1` and `label2`. */
-  def diff_squared_magnitude(label1: Int, label2: Int): Double
+  def diff_squared_magnitude(label1: LabelIndex, label2: LabelIndex): Double
 
   /** Return the squared magnitude of the difference between the values of
     * this feature vector for `label1` and another feature vector for
     * `label2`. */
-  def diff_squared_magnitude_2(label1: Int, other: FeatureVector,
-    label2: Int): Double
+  def diff_squared_magnitude_2(label1: LabelIndex, other: FeatureVector,
+    label2: LabelIndex): Double
 
   /** Return the dot product of the given weight vector with the feature
     * vector for class `label`. */
-  def dot_product(weights: SimpleVector, label: Int): Double
+  def dot_product(weights: SimpleVector, label: LabelIndex): Double
 
   /** Update a weight vector by adding a scaled version of the feature vector,
     * with class `label`. */
-  def update_weights(weights: SimpleVector, scale: Double, label: Int)
+  def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex)
 
   /** Display the feature at the given index as a string. */
-  def format_feature(index: Int) = index.toString
+  def format_feature(index: FeatIndex) = index.toString
 
   def pretty_print(prefix: String): String
 }
@@ -120,21 +120,22 @@ object FeatureVector {
  */
 trait SimpleFeatureVector extends FeatureVector {
   /** Return the value at index `i`. */
-  def apply(i: Int): Double
+  def apply(i: FeatIndex): Double
 
-  def apply(i: Int, label: Int) = apply(i)
+  def apply(i: FeatIndex, label: LabelIndex) = apply(i)
 
   /** Return the squared magnitude of the difference between the values of
     * this feature vector for the two labels `label1` and `label2`. */
-  override def diff_squared_magnitude(label1: Int, label2: Int) = 0
+  override def diff_squared_magnitude(label1: LabelIndex, label2: LabelIndex
+  ) = 0
 
   val depth = 1
   val max_label = Int.MaxValue
 }
 
 object BasicFeatureVectorImpl {
-  def diff_squared_magnitude_2(fv1: FeatureVector, label1: Int,
-      fv2: FeatureVector, label2: Int) = {
+  def diff_squared_magnitude_2(fv1: FeatureVector, label1: LabelIndex,
+      fv2: FeatureVector, label2: LabelIndex) = {
     assert(fv1.length == fv2.length)
     (for (i <- 0 until fv1.length; va = fv1(i, label1) - fv2(i, label2))
        yield va*va).sum
@@ -146,20 +147,21 @@ object BasicFeatureVectorImpl {
  * should always work (although not necessarily efficiently).
  */
 trait BasicFeatureVectorImpl extends FeatureVector {
-  def dot_product(weights: SimpleVector, label: Int) =
+  def dot_product(weights: SimpleVector, label: LabelIndex) =
     (for (i <- 0 until length) yield apply(i, label)*weights(i)).sum
 
-  def squared_magnitude(label: Int) =
+  def squared_magnitude(label: LabelIndex) =
     (for (i <- 0 until length; va = apply(i, label)) yield va*va).sum
 
-  def diff_squared_magnitude(label1: Int, label2: Int) =
+  def diff_squared_magnitude(label1: LabelIndex, label2: LabelIndex) =
     (for (i <- 0 until length; va = apply(i, label1) - apply(i, label2))
        yield va*va).sum
 
-  def diff_squared_magnitude_2(label1: Int, other: FeatureVector, label2: Int) =
+  def diff_squared_magnitude_2(label1: LabelIndex, other: FeatureVector,
+      label2: LabelIndex) =
     BasicFeatureVectorImpl.diff_squared_magnitude_2(this, label1, other, label2)
 
-  def update_weights(weights: SimpleVector, scale: Double, label: Int) {
+  def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex) {
     (0 until length).foreach { i => weights(i) += scale*apply(i, label) }
   }
 }
@@ -177,9 +179,9 @@ case class ArrayFeatureVector(
   def stored_entries = length
 
   /** Return the value at index `i`. */
-  final def apply(i: Int) = values(i)
+  final def apply(i: FeatIndex) = values(i)
 
-  final def update(i: Int, value: Double) { values(i) = value }
+  final def update(i: FeatIndex, value: Double) { values(i) = value }
 
   def pretty_print(prefix: String) = "  %s: %s" format (prefix, values)
 }
@@ -188,7 +190,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
   def include_displayed_feature: Boolean = true
 
   def compute_toString(prefix: String,
-      feature_values: Iterable[(Int, Double)]) =
+      feature_values: Iterable[(FeatIndex, Double)]) =
     "%s(%s)" format (prefix,
       feature_values.toSeq.sorted.map {
           case (index, value) => {
@@ -201,7 +203,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
     )
 
   def pretty_feature_string(prefix: String,
-      feature_values: Iterable[(Int, Double)]) =
+      feature_values: Iterable[(FeatIndex, Double)]) =
     feature_values.toSeq.sorted.map {
       case (index, value) => {
         val featstr =
@@ -213,7 +215,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
       }
     }.mkString("\n")
 
-  def toIterable: Iterable[(Int, Double)]
+  def toIterable: Iterable[(FeatIndex, Double)]
 
   def string_prefix: String
 
@@ -226,8 +228,8 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
 
   // Simple implementation of this to optimize in the common case
   // where the other vector is sparse.
-  def diff_squared_magnitude_2(label1: Int, other: FeatureVector,
-      label2: Int) = {
+  def diff_squared_magnitude_2(label1: LabelIndex, other: FeatureVector,
+      label2: LabelIndex) = {
     other match {
       // When the other vector is sparse, we need to handle: first, all
       // the indices defined in this vector, and second, all the
@@ -261,13 +263,13 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
 }
 
 // abstract class CompressedSparseFeatureVector private[learning] (
-//   keys: Array[Int], values: Array[Double]
+//   keys: Array[FeatIndex], values: Array[Double]
 // ) extends SparseFeatureVectorLike {
 // (in FeatureVector.scala.template)
 // }
 
 // class BasicCompressedSparseFeatureVector private[learning] (
-//   keys: Array[Int], values: Array[Double], val length: Int
+//   keys: Array[FeatIndex], values: Array[Double], val length: Int
 // ) extends CompressedSparseFeatureVector(keys, values) {
 // (in FeatureVector.scala.template)
 // }
@@ -287,21 +289,21 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
  * other types, e.g. strings, should use a memoizer to convert to integers.)
  */
 abstract class SimpleSparseFeatureVector(
-  feature_values: Iterable[(Int, Double)]
+  feature_values: Iterable[(FeatIndex, Double)]
 ) extends SparseFeatureVectorLike {
   def stored_entries = feature_values.size
 
-  def squared_magnitude(label: Int) =
+  def squared_magnitude(label: LabelIndex) =
     feature_values.map {
       case (index, value) => value * value
     }.sum
 
-  def dot_product(weights: SimpleVector, label: Int) =
+  def dot_product(weights: SimpleVector, label: LabelIndex) =
     feature_values.map {
       case (index, value) => value * weights(index)
     }.sum
 
-  def update_weights(weights: SimpleVector, scale: Double, label: Int) {
+  def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex) {
     feature_values.map {
       case (index, value) => weights(index) += scale * value
     }
@@ -315,20 +317,20 @@ abstract class SimpleSparseFeatureVector(
  * features in a `Map`.
  */
 abstract class MapSparseFeatureVector(
-  feature_values: collection.Map[Int, Double]
+  feature_values: collection.Map[FeatIndex, Double]
 ) extends SimpleSparseFeatureVector(feature_values) {
-  def apply(index: Int) = feature_values.getOrElse(index, 0.0)
+  def apply(index: FeatIndex) = feature_values.getOrElse(index, 0.0)
 
   def string_prefix = "MapSparseFeatureVector"
 }
 
 abstract class TupleArraySparseFeatureVector(
-  feature_values: mutable.Buffer[(Int, Double)]
+  feature_values: mutable.Buffer[(FeatIndex, Double)]
 ) extends SimpleSparseFeatureVector(feature_values) {
   // Use an O(n) algorithm to look up a value at a given index.  Luckily,
   // this operation isn't performed very often (if at all).  We could
   // speed it up by storing the items sorted and use binary search.
-  def apply(index: Int) = feature_values.find(_._1 == index) match {
+  def apply(index: FeatIndex) = feature_values.find(_._1 == index) match {
     case Some((index, value)) => value
     case None => 0.0
   }
@@ -411,7 +413,8 @@ class SparseFeatureVectorFactory { self =>
   })
 
   trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
-    override def format_feature(index: Int) = feature_mapper.to_string(index)
+    override def format_feature(index: FeatIndex) =
+      feature_mapper.to_string(index)
     def length = feature_mapper.vector_length
   }
 
@@ -440,9 +443,11 @@ class SparseFeatureVectorFactory { self =>
           yield (index.get, value)
     vector_impl match {
       case "TupleArray" =>
-        new TupleArraySparseFeatureVector(memoized_features.toBuffer) with SparseFeatureVectorMixin
+        new TupleArraySparseFeatureVector(memoized_features.toBuffer) with
+          SparseFeatureVectorMixin
       case "Map" =>
-        new MapSparseFeatureVector(memoized_features.toMap) with SparseFeatureVectorMixin
+        new MapSparseFeatureVector(memoized_features.toMap) with
+          SparseFeatureVectorMixin
       case _ => {
         val (keys, values) =
           memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
@@ -471,13 +476,13 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
     lines.map(line => errfmt(line mkString "\t")).mkString("\n")
   }
 
-  def get_index(numcols: Int, index: Int) = {
+  def get_index(numcols: Int, colind: Int) = {
     val retval =
-      if (index < 0) numcols + index
-      else index
+      if (colind < 0) numcols + colind
+      else colind
     require(retval >= 0 && retval < numcols,
-      "Index %s out of bounds: Should be in [%s,%s)" format (
-        index, -numcols, numcols))
+      "Column index %s out of bounds: Should be in [%s,%s)" format (
+        colind, -numcols, numcols))
     retval
   }
 
@@ -741,16 +746,21 @@ object AggregateFeatureVector {
    *
    * where there are L elements ("rows") in the first-level array and
    * F elements ("columns") in the second-level array. The tuple is of
-   * `(indiv-index, label, choice)` where `indiv-index` is the
+   * `(indiv, label, choice)` where `indiv` is the 1-based
    * index of the instance (same for all rows), `label` is the label name,
    * and `choice` is "yes" if this is the correct label, "no"
    * otherwise. This format is returned to make it possible to generate
    * the right sort of data frame in R using the current Scala-to-R
    * interface, which can only pass arrays and arrays of arrays, of
    * fixed type.
+   *
+   * @param inst Instance, as an aggregate feature vector, to convert into
+   *   a matrix.
+   * @param correct_label Correct label of instance.
+   * @param index 0-based index of the instance.
    */
   def put_labeled_instance(inst: AggregateFeatureVector,
-      correct_label: Int, index: Int) = {
+      correct_label: LabelIndex, index: Int) = {
     // This is easier than in the other direction.
     (for ((fv, label) <- inst.fv.zipWithIndex) yield {
       val indiv = index + 1
@@ -783,7 +793,9 @@ object AggregateFeatureVector {
    * Scala-to-R interface can only pass 1-d and 2-d arrays of fixed type),
    * or made into a 2-d array of strings for outputting to a file.
    */
-  def put_labeled_instances(insts: Iterable[(AggregateFeatureVector, Int)]) = {
+  def put_labeled_instances(
+      insts: Iterable[(AggregateFeatureVector, LabelIndex)]
+  ) = {
     // This should force evaluation of `insts` if it's a stream.
     val N = insts.size
     val head = insts.head._1
@@ -881,20 +893,20 @@ case class AggregateFeatureVector(
 
   def stored_entries = fv.map(_.stored_entries).sum
 
-  def apply(i: Int, label: Int) = fv(label)(i, label)
+  def apply(i: Int, label: LabelIndex) = fv(label)(i, label)
 
   /** Return the squared magnitude of the feature vector for class `label`,
     * i.e. dot product of feature vector with itself */
-  def squared_magnitude(label: Int) = fv(label).squared_magnitude(label)
+  def squared_magnitude(label: LabelIndex) = fv(label).squared_magnitude(label)
 
   /** Return the squared magnitude of the difference between the values of
     * this feature vector for the two labels `label1` and `label2`. */
-  def diff_squared_magnitude(label1: Int, label2: Int) =
+  def diff_squared_magnitude(label1: LabelIndex, label2: LabelIndex) =
     fv(label1).diff_squared_magnitude_2(label1, fv(label2), label2)
 
   /** Return the squared magnitude of the difference between the values of
     * this feature vector for the two labels `label1` and `label2`. */
-  def diff_squared_magnitude_2(label1: Int, other: FeatureVector, label2: Int) = {
+  def diff_squared_magnitude_2(label1: LabelIndex, other: FeatureVector, label2: LabelIndex) = {
     val fv2 = other match {
       case afv2: AggregateFeatureVector => afv2.fv(label2)
       case _ => other
@@ -902,14 +914,14 @@ case class AggregateFeatureVector(
     fv(label1).diff_squared_magnitude_2(label1, fv2, label2)
   }
 
-  def dot_product(weights: SimpleVector, label: Int) =
+  def dot_product(weights: SimpleVector, label: LabelIndex) =
     fv(label).dot_product(weights, label)
 
-  def update_weights(weights: SimpleVector, scale: Double, label: Int) =
-    fv(label).update_weights(weights, scale, label)
+  def update_weights(weights: SimpleVector, scale: Double,
+      label: LabelIndex) = fv(label).update_weights(weights, scale, label)
 
   /** Display the feature at the given index as a string. */
-  override def format_feature(index: Int) = fv.head.format_feature(index)
+  override def format_feature(index: FeatIndex) = fv.head.format_feature(index)
 
   def pretty_print(prefix: String) = {
     (for (d <- 0 until depth) yield

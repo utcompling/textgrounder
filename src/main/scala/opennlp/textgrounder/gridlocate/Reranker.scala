@@ -681,7 +681,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     GridDoc[Co], GridCell[Co], DocStatus[Row], GridRankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
-    data: Iterable[(GridRankerInst[Co], Int)]
+    data: Iterable[(GridRankerInst[Co], LabelIndex)]
   ) = {
     errprint("Training linear classifier ...")
     errprint("Number of training items: %s", data.size)

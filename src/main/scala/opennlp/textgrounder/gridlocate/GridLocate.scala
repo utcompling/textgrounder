@@ -1410,7 +1410,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           max_iterations = params.perceptron_rounds) {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
-            def cost(inst: GridRankerInst[Co], correct: Int, predicted: Int) = {
+            def cost(inst: GridRankerInst[Co], correct: LabelIndex,
+                predicted: LabelIndex) = {
               // Is this checking for correctness itself correct?  Is there a
               // problem with always returning a non-zero cost even when we
               // choose the "correct" cell?  This makes sense in that a candidate
@@ -1511,7 +1512,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
           protected def query_training_data_to_rerank_training_instances(
             data: Iterable[QueryTrainingData]
-          ): Iterable[(GridRankerInst[Co], Int)] = {
+          ): Iterable[(GridRankerInst[Co], LabelIndex)] = {
 
             val task = new Meter("converting QTD's to", "RTI'")
 

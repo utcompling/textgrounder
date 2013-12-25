@@ -244,7 +244,7 @@ trait BinaryPerceptronTrainer
   def get_scale_factor(inst: FeatureVector, symmetric_label: Int,
       margin: Double): Double
 
-  def debug_get_weights(data: Iterable[(FeatureVector, Int)]
+  def debug_get_weights(data: Iterable[(FeatureVector, LabelIndex)]
       ): (VectorAggregate, Int) = {
     val weight_aggr = initialize(data)
     val weights = weight_aggr(0)
@@ -280,7 +280,7 @@ trait BinaryPerceptronTrainer
     }
   }
 
-  def get_weights(data: Iterable[(FeatureVector, Int)]
+  def get_weights(data: Iterable[(FeatureVector, LabelIndex)]
       ): (VectorAggregate, Int) = {
     if (debug("perceptron"))
       return debug_get_weights(data)
@@ -507,10 +507,10 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     * @param margin Signed margin between minimum yes-label score and
     *   maximum no-label score.
     */
-  def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
-      max_no_label: Int, margin: Double): Double
+  def get_scale_factor(inst: FeatureVector, min_yes_label: LabelIndex,
+      max_no_label: LabelIndex, margin: Double): Double
 
-  def debug_get_weights(data: Iterable[(DI, Int)]
+  def debug_get_weights(data: Iterable[(DI, LabelIndex)]
       ): (VectorAggregate, Int) = {
     val weights = initialize(data)
     iterate_averaged(data, weights, averaged, error_threshold, max_iterations) {
@@ -522,7 +522,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
         errprint("Instance %s, correct label %s", inst, correct)
-        def dotprod(x: Int) = {
+        def dotprod(x: LabelIndex) = {
           val res = fv.dot_product(weights(x), x)
           errprint("Dot product inst . weights(%s) = %s", x, res)
           res
@@ -554,7 +554,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     }
   }
 
-  def get_weights(data: Iterable[(DI, Int)]
+  def get_weights(data: Iterable[(DI, LabelIndex)]
       ): (VectorAggregate, Int) = {
     if (debug("perceptron"))
       return debug_get_weights(data)
@@ -566,7 +566,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
       var num_adjustments = 0
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
-        def dotprod(x: Int) =
+        def dotprod(x: LabelIndex) =
           fv.dot_product(weights(x), x)
         val yeslabs = yes_labels(inst, correct)
         val nolabs = no_labels(inst, correct)
@@ -629,8 +629,8 @@ trait BasicNoCostMultiLabelPerceptronTrainer {
     alpha *= 1.0 - decay
   }
 
-  def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
-      max_no_label: Int, margin: Double) = {
+  def get_scale_factor(inst: FeatureVector, min_yes_label: LabelIndex,
+      max_no_label: LabelIndex, margin: Double) = {
     if (margin > 0)
       0.0
     else
@@ -679,8 +679,8 @@ class BasicMultiWeightMultiLabelPerceptronTrainer[DI <: DataInstance](
  */
 trait PassiveAggressiveSingleWeightMultiLabelPerceptronTrainer
     extends PassiveAggressivePerceptronTrainer {
-  def scale_factor_from_loss(inst: FeatureVector, correct: Int, predicted: Int,
-      loss: Double) = {
+  def scale_factor_from_loss(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double) = {
     val sqmagdiff = inst.diff_squared_magnitude(correct, predicted)
     compute_update_factor(loss, sqmagdiff)
   }
@@ -692,8 +692,8 @@ trait PassiveAggressiveSingleWeightMultiLabelPerceptronTrainer
  */
 trait PassiveAggressiveMultiWeightMultiLabelPerceptronTrainer
     extends PassiveAggressivePerceptronTrainer {
-  def scale_factor_from_loss(inst: FeatureVector, correct: Int, predicted: Int,
-      loss: Double) = {
+  def scale_factor_from_loss(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double) = {
     val rmag = inst.squared_magnitude(correct)
     val smag = inst.squared_magnitude(predicted)
     val sqmagdiff = rmag + smag
@@ -706,11 +706,11 @@ trait PassiveAggressiveMultiWeightMultiLabelPerceptronTrainer
  * perceptron.
  */
 trait PassiveAggressiveNoCostMultiLabelPerceptronTrainer {
-  def scale_factor_from_loss(inst: FeatureVector, correct: Int, predicted: Int,
-      loss: Double): Double
+  def scale_factor_from_loss(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double): Double
 
-  def get_scale_factor(inst: FeatureVector, min_yes_label: Int,
-      max_no_label: Int, margin: Double) = {
+  def get_scale_factor(inst: FeatureVector, min_yes_label: LabelIndex,
+      max_no_label: LabelIndex, margin: Double) = {
     val loss = 0.0 max (1.0 - margin)
     scale_factor_from_loss(inst, min_yes_label, max_no_label, loss)
   }
@@ -775,8 +775,8 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     * @param loss Loss from choosing predicted in place of correct label
     *   (includes cost from the `cost` function).
     */
-  def get_scale_factor(inst: FeatureVector, correct: Int, predicted: Int,
-    loss: Double): Double
+  def get_scale_factor(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double): Double
 
   /** Return the cost of predicting an incorrect label for a given instance.
     *
@@ -784,12 +784,12 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     * @param correct Correct label.
     * @param predicted Predicted label.
     */
-  def cost(inst: DI, correct: Int, predicted: Int): Double
+  def cost(inst: DI, correct: LabelIndex, predicted: LabelIndex): Double
 
-  def debug_get_weights(data: Iterable[(DI, Int)]
+  def debug_get_weights(data: Iterable[(DI, LabelIndex)]
       ): (VectorAggregate, Int) = {
     val weights = initialize(data)
-    def get_cost(inst: DI, correct: Int, predicted: Int) = {
+    def get_cost(inst: DI, correct: LabelIndex, predicted: LabelIndex) = {
       val costval = cost(inst, correct, predicted)
       errprint("Cost (correct = %s, predicted = %s): %s",
         correct, predicted, costval)
@@ -807,7 +807,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
         errprint("Instance %s, correct label %s", inst, correct)
         val all_labs = 0 until number_of_labels(inst)
         errprint("All labels: %s", all_labs)
-        def dotprod(x: Int) = {
+        def dotprod(x: LabelIndex) = {
           val res = fv.dot_product(weights(x), x)
           errprint("Dot product inst . weights(%s) = %s", x, res)
           res
@@ -845,7 +845,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     }
   }
 
-  def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int) = {
+  def get_weights(data: Iterable[(DI, LabelIndex)]): (VectorAggregate, Int) = {
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weights = initialize(data)
@@ -857,7 +857,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
       for ((inst, correct) <- data) {
         val fv = inst.feature_vector
         val all_labs = 0 until number_of_labels(inst)
-        def dotprod(x: Int) = fv.dot_product(weights(x), x)
+        def dotprod(x: LabelIndex) = fv.dot_product(weights(x), x)
         val goldscore = dotprod(correct)
         val predicted =
           if (prediction_based)
@@ -909,11 +909,11 @@ trait CostSensitiveMultiWeightMultiLabelPerceptronTrainer[DI <: DataInstance]
  * perceptron.
  */
 trait PassiveAggressiveCostSensitiveMultiLabelPerceptronTrainer {
-  def scale_factor_from_loss(inst: FeatureVector, correct: Int, predicted: Int,
-      loss: Double): Double
+  def scale_factor_from_loss(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double): Double
 
-  def get_scale_factor(inst: FeatureVector, correct: Int, predicted: Int,
-      loss: Double) =
+  def get_scale_factor(inst: FeatureVector, correct: LabelIndex,
+      predicted: LabelIndex, loss: Double) =
     scale_factor_from_loss(inst, correct, predicted, loss)
 }
 

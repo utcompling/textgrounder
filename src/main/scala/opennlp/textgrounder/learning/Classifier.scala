@@ -95,12 +95,12 @@ trait DataInstance {
 trait Classifier extends ClassifierLike[FeatureVector] {
   /** Classify a given instance, returning the label (from 0 to
     * `number_of_labels`-1). */
-  def classify(inst: FeatureVector): Int
+  def classify(inst: FeatureVector): LabelIndex
 }
 
 trait ScoringClassifier extends Classifier {
   /** Score a given instance for a single label. */
-  def score_label(inst: FeatureVector, label: Int): Double
+  def score_label(inst: FeatureVector, label: LabelIndex): Double
 
   /** Return the best label. */
   def classify(inst: FeatureVector) =
@@ -132,7 +132,7 @@ trait LinearClassifierLike {
     * @param num_items Number of items to print. If &lt;= 0, print all items.
     */
   def debug_print_weights(weights: VectorAggregate,
-      format_feature: Int => String, num_items: Int) {
+      format_feature: FeatIndex => String, num_items: Int) {
     errprint("Weights: length=%s, depth=%s, max=%s, min=%s",
        weights.length, weights.depth, weights.max, weights.min)
     for (depth <- 0 until weights.depth) {
@@ -151,7 +151,7 @@ trait LinearClassifierLike {
   }
 
   def debug_print_weights(weights: VectorAggregate,
-      format_feature: Int => String) {
+      format_feature: FeatIndex => String) {
     val weights_to_print_str = debugval("weights-to-print")
     val weights_to_print =
       if (weights_to_print_str == "")
@@ -165,7 +165,7 @@ trait LinearClassifierLike {
 abstract class LinearClassifier(
   val weights: VectorAggregate
 ) extends ScoringClassifier with LinearClassifierLike {
-  def score_label(inst: FeatureVector, label: Int) =
+  def score_label(inst: FeatureVector, label: LabelIndex) =
     inst.dot_product(weights(label), label)
 }
 
@@ -243,7 +243,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
-  def initialize(data: Iterable[(DI, Int)]) = {
+  def initialize(data: Iterable[(DI, LabelIndex)]) = {
     val len = check_sequence_lengths(data)
     val weights = new_weights(len)
     for ((inst, label) <- data) {
@@ -265,7 +265,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   }
 
   /** Check that all instances have the same length, and return it. */
-  def check_sequence_lengths(data: Iterable[(DI, Int)]) =
+  def check_sequence_lengths(data: Iterable[(DI, LabelIndex)]) =
     FeatureVector.check_same_length(data.map(d => d._1.feature_vector))
 
   /** Iterate over a function to train a linear classifier.
@@ -307,8 +307,9 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *   total_adjustment) where `num_errors` is the number of errors made on
     *   the training data and `total_adjustment` is the total sum of the
     *   scaling factors used to update the weights when a mistake is made. */
-  def iterate_averaged(data: Iterable[(DI, Int)], weights: VectorAggregate,
-        averaged: Boolean, error_threshold: Double, max_iterations: Int)(
+  def iterate_averaged(data: Iterable[(DI, LabelIndex)],
+      weights: VectorAggregate, averaged: Boolean, error_threshold: Double,
+      max_iterations: Int)(
       fun: (VectorAggregate, Int) => (Int, Int, Double)) = {
     def do_iterate(coda: => Unit) =
       iterate(error_threshold, max_iterations){ iter =>
@@ -335,13 +336,13 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *
     * @return Tuple of weights and number of iterations required
     *   to compute them. */
-  def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int)
+  def get_weights(data: Iterable[(DI, LabelIndex)]): (VectorAggregate, Int)
 
   /** Create a linear classifier. */
   def create_classifier(weights: VectorAggregate): LinearClassifier
 
   /** Train a linear classifier given a set of labeled instances. */
-  def apply(data: Iterable[(DI, Int)]) = {
+  def apply(data: Iterable[(DI, LabelIndex)]) = {
     val (weights, _) = get_weights(data)
     val cfier = create_classifier(weights)
     if (debug("weights")) {
@@ -363,12 +364,12 @@ trait MultiCorrectLabelClassifierTrainer[DI <: DataInstance]
   /** Return set of "yes" labels associated with an instance.  Currently only
     * one yes label per instance, but this could be changed by redoing this
     * function. */
-  def yes_labels(inst: DI, label: Int) =
+  def yes_labels(inst: DI, label: LabelIndex) =
     (0 until 0) ++ (label to label)
 
   /** Return set of "no" labels associated with an instance -- complement of
     * the set of "yes" labels. */
-  def no_labels(inst: DI, label: Int) =
+  def no_labels(inst: DI, label: LabelIndex) =
     (0 until label) ++ ((label + 1) until number_of_labels(inst))
 }
  

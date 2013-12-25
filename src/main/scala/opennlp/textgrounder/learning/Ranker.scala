@@ -293,7 +293,7 @@ trait PointwiseClassifyingRerankerTrainer[
      * candidate list.  Assertion failure if not found, since correct candidate
      * should always be in candidate list.
      */
-    def label: Int = {
+    def label: LabelIndex = {
       val maybe_label = cand_scores.zipWithIndex.find {
         case ((cand, featvec), index) => cand == correct
       }
@@ -426,7 +426,7 @@ trait PointwiseClassifyingRerankerTrainer[
    * candidate (corresponding to an index into the RTI's aggregate feature
    * vector).
    */
-  protected def create_rerank_classifier(data: Iterable[(RTI, Int)]
+  protected def create_rerank_classifier(data: Iterable[(RTI, LabelIndex)]
   ): ScoringClassifier
 
   /**
@@ -481,7 +481,7 @@ trait PointwiseClassifyingRerankerTrainer[
    */
   protected def query_training_data_to_rerank_training_instances(
     data: Iterable[QueryTrainingData]
-  ): Iterable[(RTI, Int)]
+  ): Iterable[(RTI, LabelIndex)]
 
   /**
    * Display a query item (typically for debugging purposes).

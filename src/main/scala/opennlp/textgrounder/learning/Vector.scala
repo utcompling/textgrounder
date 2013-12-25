@@ -120,7 +120,7 @@ trait VectorAggregate {
   def depth: Int
   def max_label: Int
 
-  def apply(label: Int): SimpleVector
+  def apply(label: LabelIndex): SimpleVector
 
   def foreach[U](f: SimpleVector => U) {
     for (i <- 0 until depth) {
@@ -163,7 +163,7 @@ case class SingleVectorAggregate(vec: SimpleVector) extends VectorAggregate {
   def depth = 1
   def max_label = Int.MaxValue
 
-  def apply(label: Int) = vec
+  def apply(label: LabelIndex) = vec
 }
 
 case class MultiVectorAggregate(vecs: IndexedSeq[SimpleVector])
@@ -172,7 +172,7 @@ case class MultiVectorAggregate(vecs: IndexedSeq[SimpleVector])
   def depth = vecs.length
   def max_label = depth - 1
 
-  def apply(label: Int) = vecs(label)
+  def apply(label: LabelIndex) = vecs(label)
 }
 
 class SingleVectorAggregateFactory(
