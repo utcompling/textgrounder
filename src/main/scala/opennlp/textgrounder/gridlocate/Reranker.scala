@@ -11,7 +11,7 @@ import util.metering._
 import util.textdb.Row
 import learning._
 
-abstract class BinningStatus
+sealed abstract class BinningStatus
 case object BinningOnly extends BinningStatus
 case object BinningAlso extends BinningStatus
 case object BinningNo extends BinningStatus
@@ -78,7 +78,9 @@ case class GridRankerInst[Co](
 trait CandidateFeatVecFactory[Co] extends (
   (GridDoc[Co], GridCell[Co], Double, Int, Boolean) => FeatureVector
 ) {
+  /** Underlying feature-vector factory for generating features. */
   val featvec_factory: SparseFeatureVectorFactory
+  /** Whether to create binned, non-binned or both types of features. */
   val binning_status: BinningStatus
 
   /**
@@ -92,13 +94,19 @@ trait CandidateFeatVecFactory[Co] extends (
    * @param initial_rank Rank of this cell in the initial ranking (0-based).
    */
   def get_features(doc: GridDoc[Co], cell: GridCell[Co],
-      initial_score: Double, initial_rank: Int): Iterable[(String, Double)]
+      initial_score: Double, initial_rank: Int
+  ): Iterable[(FeatureValue, String, Double)]
 
   val logarithmic_base = 2.0
 
   def disallowed_value(value: Double) = value.isNaN || value.isInfinity
 
-  def bin_logarithmically(feat: String, value: Double) = {
+  /** Add a feature with the given value, binned logarithmically, i.e.
+   * in place of directly including the feature's value we put the value
+   * in one of a series of logarithmically-spaced bins and include a
+   * binary feature indicating the presence in the correct bin.
+   */
+  protected def bin_logarithmically(feat: String, value: Double) = {
     // We have separate bins for the values that will cause problems (NaN,
     // positive and negative infinity, 0). In addition, we create separate
     // bins for negative values, using the same binning scheme as for
@@ -107,25 +115,31 @@ trait CandidateFeatVecFactory[Co] extends (
     // depending on whether the value is greater or less than 1, and log
     // of negative values is disallowed.)
     if (disallowed_value(value))
-      ("%s!%s" format (feat, value), 1.0)
+      (FeatBinary, "%s!%s" format (feat, value), 1.0)
     else if (value == 0.0)
-      ("%s!zero" format feat, 1.0)
+      (FeatBinary, "%s!zero" format feat, 1.0)
     else if (value > 0) {
       val log = logn(value, logarithmic_base).toInt
-      ("%s!%s" format (feat, log), 1.0)
+      (FeatBinary, "%s!%s" format (feat, log), 1.0)
     } else {
       val log = logn(-value, logarithmic_base).toInt
-      ("%s!%s!neg" format (feat, log), 1.0)
+      (FeatBinary, "%s!%s!neg" format (feat, log), 1.0)
     }
   }
 
-  def include_and_bin_logarithmically(feat: String, value: Double) = {
+  /** Add a feature with the given value, binned logarithmically, i.e.
+   * in place of directly including the feature's value we put the value
+   * in one of a series of logarithmically-spaced bins and include a
+   * binary feature indicating the presence in the correct bin.
+   */
+  protected def include_and_bin_logarithmically(fvtype: FeatureValue,
+      feat: String, value: Double) = {
     // We cannot allow NaN, +Inf or -Inf as a feature value, as they will
     // wreak havoc on error calculations. However, we can still create
     // bins noting the fact that such values were encountered.
     if (binning_status eq BinningNo) {
       if (!disallowed_value(value))
-        Seq(feat -> value)
+        Seq((fvtype, feat, value))
       else
         Seq()
     } else {
@@ -133,32 +147,33 @@ trait CandidateFeatVecFactory[Co] extends (
       if ((binning_status eq BinningOnly) || disallowed_value(value))
         Seq(bin)
       else
-        Seq(feat -> value, bin_logarithmically(feat, value))
+        Seq((fvtype, feat, value), bin_logarithmically(feat, value))
     }
   }
 
   // Shorthand for include_and_bin_logarithmically, which may need to be
   // called repeatedly.
-  def ib(feat: String, value: Double) =
-    include_and_bin_logarithmically(feat, value)
+  protected def ib(fvtype: FeatureValue, feat: String, value: Double) =
+    include_and_bin_logarithmically(fvtype, feat, value)
 
   val fractional_increment = 0.1
 
-  def bin_fractionally(feat: String, value: Double) = {
+  protected def bin_fractionally(feat: String, value: Double) = {
     assert(value >= 0 && value <= 1)
     val incr = (value / fractional_increment).toInt
-    ("%s!%s" format (feat, incr), 1.0)
+    (FeatBinary, "%s!%s" format (feat, incr), 1.0)
   }
 
-  def include_and_bin_fractionally(feat: String, value: Double) = {
+  protected def include_and_bin_fractionally(fvtype: FeatureValue,
+      feat: String, value: Double) = {
     if (binning_status eq BinningNo)
-      Seq(feat -> value)
+      Seq((fvtype, feat, value))
     else {
       val bin = bin_fractionally(feat, value)
       if (binning_status eq BinningOnly)
         Seq(bin)
       else
-        Seq(feat -> value, bin)
+        Seq((fvtype, feat, value), bin)
     }
   }
 
@@ -174,9 +189,10 @@ trait CandidateFeatVecFactory[Co] extends (
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
       initial_rank: Int, is_training: Boolean) = {
     val feats = get_features(doc, cell, score, initial_rank)
-    feats.foreach { case (feat, value) =>
+    feats.foreach { case (fvtype, feat, value) =>
       assert(!disallowed_value(value),
-        "feature %s has disallowed value %s" format (feat, value))
+        "feature %s (%s) has disallowed value %s"
+          format (feat, fvtype, value))
     }
     featvec_factory.make_feature_vector(feats, is_training)
   }
@@ -216,7 +232,7 @@ class CombiningCandidateFeatVecFactory[Co](
         val feats = fact.get_features(doc, cell, initial_score, initial_rank)
         if (!debug("show-combined-features") && !debug("tag-combined-features"))
           feats
-        else feats map { case (item, count) =>
+        else feats map { case (ty, item, count) =>
           val featname =
             // Obsolete comment:
             // [FIXME! May not be necessary to memoize like this. I don't
@@ -235,7 +251,7 @@ class CombiningCandidateFeatVecFactory[Co](
           if (debug("show-combined-features")) {
             errprint("%s = %s", featname, count)
           }
-          (featname, count)
+          (ty, featname, count)
         }
       }
     }
@@ -261,23 +277,26 @@ class MiscCandidateFeatVecFactory[Co](
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
-      ib("$cell-numdocs", cell.num_docs),
-      ib("$cell-numtypes", celllm.num_types),
-      ib("$cell-numtokens", celllm.num_tokens),
-      ib("$cell-salience", cell.salience),
-      ib("$numtypes-quotient", celllm.num_types/doclm.num_types),
-      ib("$numtokens-quotient", celllm.num_tokens/doclm.num_tokens),
-      ib("$salience-quotient", cell.salience/doc.salience.getOrElse(0.0))
+      ib(FeatCount, "$cell-numdocs", cell.num_docs),
+      ib(FeatCount, "$cell-numtypes", celllm.num_types),
+      ib(FeatCount, "$cell-numtokens", celllm.num_tokens),
+      ib(FeatScore, "$cell-salience", cell.salience),
+      ib(FeatFraction, "$numtypes-quotient",
+        celllm.num_types/doclm.num_types),
+      ib(FeatFraction, "$numtokens-quotient",
+        celllm.num_tokens/doclm.num_tokens),
+      ib(FeatFraction, "$salience-quotient",
+        cell.salience/doc.salience.getOrElse(0.0))
       // These apparently cause near-singular issues.
-      //ib("$numtypes-diff", celllm.num_types - doclm.num_types),
-      //ib("$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
-      //ib("$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
+      //ib(FeatCount, "$numtypes-diff", celllm.num_types - doclm.num_types),
+      //ib(FeatCount, "$numtokens-diff", celllm.num_tokens - doclm.num_tokens),
+      //ib(FeatCount, "$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
       //FIXME: TOO SLOW!!!
-      // ib("$types-in-common", types_in_common(doclm, celllm)),
-      // ib("$kldiv", doclm.kl_divergence(celllm)),
-      // ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
-      // ib("$cossim", doclm.cosine_similarity(celllm)),
-      // ib("$nb-logprob", doclm.model_logprob(celllm))
+      // ib(FeatCount, "$types-in-common", types_in_common(doclm, celllm)),
+      // ib(FeatScore, "$kldiv", doclm.kl_divergence(celllm)),
+      // ib(FeatScore, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      // ib(FeatScore, "$cossim", doclm.cosine_similarity(celllm)),
+      // ib(FeatLogProb, "$nb-logprob", doclm.model_logprob(celllm))
     ).flatten
   }
 }
@@ -301,7 +320,7 @@ class TypesInCommonCandidateFeatVecFactory[Co](
       initial_rank: Int) = {
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
-    ib("$types-in-common", types_in_common(doclm, celllm))
+    ib(FeatCount, "$types-in-common", types_in_common(doclm, celllm))
   }
 }
 
@@ -319,10 +338,10 @@ class ModelCompareCandidateFeatVecFactory[Co](
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
-      ib("$kldiv", doclm.kl_divergence(celllm)),
-      ib("$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
-      ib("$cossim", doclm.cosine_similarity(celllm)),
-      ib("$nb-logprob", doclm.model_logprob(celllm))
+      ib(FeatScore, "$kldiv", doclm.kl_divergence(celllm)),
+      ib(FeatScore, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      ib(FeatScore, "$cossim", doclm.cosine_similarity(celllm)),
+      ib(FeatLogProb, "$nb-logprob", doclm.model_logprob(celllm))
     ).flatten
   }
 }
@@ -338,10 +357,10 @@ class RankScoreCandidateFeatVecFactory[Co](
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     Iterable(
-      ib("$initial-score", initial_score),
-      ib("$log-initial-score", log(1+initial_score)),
-      ib("$exp-initial-score", exp(initial_score)),
-      ib("$initial-rank", initial_rank)
+      ib(FeatScore, "$initial-score", initial_score),
+      ib(FeatScore, "$log-initial-score", log(1+initial_score)),
+      ib(FeatScore, "$exp-initial-score", exp(initial_score)),
+      ib(FeatCount, "$initial-rank", initial_rank)
     ).flatten
   }
 }
@@ -365,7 +384,8 @@ abstract class UnigramCandidateFeatVecFactory[Co](
    * @param celllm Unigram rerank language model of cell.
    */
   def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
-    cell: GridCell[Co], celllm: UnigramLangModel): Iterable[(String, Double)]
+    cell: GridCell[Co], celllm: UnigramLangModel
+  ): Iterable[(FeatureValue, String, Double)]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
@@ -390,13 +410,13 @@ abstract class WordByWordCandidateFeatVecFactory[Co](
     * class being returned, and feature value. The suffix will be appended
     * to the word itself to form the feature name. */
   def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
-    celllm: UnigramLangModel): Option[(String, Double)]
+    celllm: UnigramLangModel): Option[(FeatureValue, String, Double)]
 
   def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
     cell: GridCell[Co], celllm: UnigramLangModel) = {
     for ((word, count) <- doclm.iter_grams;
-         (suff, featval) <- get_word_feature(word, count, doclm, celllm))
-      yield ("%s$%s" format (doclm.gram_to_string(word), suff), featval)
+         (fvtype, suff, value) <- get_word_feature(word, count, doclm, celllm))
+      yield (fvtype, "%s$%s" format (doclm.gram_to_string(word), suff), value)
   }
 }
 
@@ -420,14 +440,14 @@ class WordCandidateFeatVecFactory[Co](
       celllm: UnigramLangModel) = {
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
-    val wordval = basetype match {
-      case "unigram-cell-count" => celllm.get_gram(word)
-      case "unigram-cell-prob" => celllm.gram_prob(word)
+    val (fvtype, wordval) = basetype match {
+      case "unigram-cell-count" => (FeatCount, celllm.get_gram(word))
+      case "unigram-cell-prob" => (FeatProb, celllm.gram_prob(word))
     }
     if (binned)
       Some(bin_logarithmically(feattype, wordval))
     else
-      Some((feattype, wordval))
+      Some((fvtype, feattype, wordval))
   }
 }
 
@@ -464,33 +484,38 @@ class WordMatchingCandidateFeatVecFactory[Co](
     else {
       val binned = feattype.endsWith("-binned")
       val basetype = feattype.replace("-binned", "")
-      val wordval = basetype match {
-        case "matching-unigram-binary" => 1.0
-        case "matching-unigram-doc-count" => doccount
-        case "matching-unigram-cell-count" => cellcount
-        case "matching-unigram-count-product" => doccount * cellcount
-        case "matching-unigram-count-quotient" => cellcount / doccount
+      val (fvtype, wordval) = basetype match {
+        case "matching-unigram-binary" =>
+          (FeatBinary, 1.0)
+        case "matching-unigram-doc-count" =>
+          (FeatCount, doccount)
+        case "matching-unigram-cell-count" =>
+          (FeatCount, cellcount)
+        case "matching-unigram-count-product" =>
+          (FeatCount, doccount * cellcount)
+        case "matching-unigram-count-quotient" =>
+          (FeatFraction, cellcount / doccount)
         case _ => {
           val docprob = doclm.gram_prob(word)
           val cellprob = celllm.gram_prob(word)
           basetype match {
             case "matching-unigram-doc-prob" =>
-              docprob
+              (FeatProb, docprob)
             case "matching-unigram-cell-prob" =>
-              cellprob
+              (FeatProb, cellprob)
             case "matching-unigram-prob-product" =>
-              docprob * cellprob
+              (FeatProb, docprob * cellprob)
             case "matching-unigram-prob-quotient" =>
-              cellprob / docprob
+              (FeatScore, cellprob / docprob)
             case "matching-unigram-kl" =>
-              docprob*(log(docprob/cellprob))
+              (FeatScore, docprob*(log(docprob/cellprob)))
           }
         }
       }
       if (binned)
         Some(bin_logarithmically(feattype, wordval))
       else
-        Some((feattype, wordval))
+        Some((fvtype, feattype, wordval))
     }
   }
 }
@@ -509,7 +534,7 @@ abstract class NgramByNgramCandidateFeatVecFactory[Co](
     * class being returned, and feature value. The suffix will be appended
     * to the ngram itself to form the feature name. */
   def get_ngram_feature(word: Gram, doccount: Double, doclm: NgramLangModel,
-    celllm: NgramLangModel): Option[(String, Double)]
+    celllm: NgramLangModel): Option[(FeatureValue, String, Double)]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
@@ -517,13 +542,14 @@ abstract class NgramByNgramCandidateFeatVecFactory[Co](
     val celllm =
       Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
     for ((ngram, count) <- doclm.iter_grams;
-         (suff, featval) <- get_ngram_feature(ngram, count, doclm, celllm))
+         (fvtype, suff, value) <-
+           get_ngram_feature(ngram, count, doclm, celllm))
       // Generate a feature name by concatenating the words. This may
       // conceivably lead to clashes if a word actually has the
       // separator in it, but that's unlikely and doesn't really matter
       // anyway.
-      yield ("%s$%s" format (Ngram.to_string(ngram) mkString "|", suff),
-        featval)
+      yield (fvtype,
+        "%s$%s" format (Ngram.to_string(ngram) mkString "|", suff), value)
   }
 }
 
@@ -547,14 +573,14 @@ class NgramCandidateFeatVecFactory[Co](
       celllm: NgramLangModel) = {
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
-    val ngramval = basetype match {
-      case "ngram-cell-count" => celllm.get_gram(ngram)
-      case "ngram-cell-prob" => celllm.gram_prob(ngram)
+    val (fvtype, ngramval) = basetype match {
+      case "ngram-cell-count" => (FeatCount, celllm.get_gram(ngram))
+      case "ngram-cell-prob" => (FeatProb, celllm.gram_prob(ngram))
     }
     if (binned)
       Some(bin_logarithmically(feattype, ngramval))
     else
-      Some((feattype, ngramval))
+      Some((fvtype, feattype, ngramval))
   }
 }
 
@@ -591,33 +617,38 @@ class NgramMatchingCandidateFeatVecFactory[Co](
     else {
       val binned = feattype.endsWith("-binned")
       val basetype = feattype.replace("-binned", "")
-      val ngramval = basetype match {
-        case "matching-ngram-binary" => 1.0
-        case "matching-ngram-doc-count" => doccount
-        case "matching-ngram-cell-count" => cellcount
-        case "matching-ngram-count-product" => doccount * cellcount
-        case "matching-ngram-count-quotient" => cellcount / doccount
+      val (fvtype, ngramval) = basetype match {
+        case "matching-ngram-binary" =>
+          (FeatBinary, 1.0)
+        case "matching-ngram-doc-count" =>
+          (FeatCount, doccount)
+        case "matching-ngram-cell-count" =>
+          (FeatCount, cellcount)
+        case "matching-ngram-count-product" =>
+          (FeatCount, doccount * cellcount)
+        case "matching-ngram-count-quotient" =>
+          (FeatFraction, cellcount / doccount)
         case _ => {
           val docprob = doclm.gram_prob(ngram)
           val cellprob = celllm.gram_prob(ngram)
           basetype match {
             case "matching-ngram-doc-prob" =>
-              docprob
+              (FeatProb, docprob)
             case "matching-ngram-cell-prob" =>
-              cellprob
+              (FeatProb, cellprob)
             case "matching-ngram-prob-product" =>
-              docprob * cellprob
+              (FeatProb, docprob * cellprob)
             case "matching-ngram-prob-quotient" =>
-              cellprob / docprob
+              (FeatScore, cellprob / docprob)
             case "matching-ngram-kl" =>
-              docprob*(log(docprob/cellprob))
+              (FeatScore, docprob*(log(docprob/cellprob)))
           }
         }
       }
       if (binned)
         Some(bin_logarithmically(feattype, ngramval))
       else
-        Some((feattype, ngramval))
+        Some((fvtype, feattype, ngramval))
     }
   }
 }

@@ -19,13 +19,13 @@
 package opennlp.textgrounder
 package learning
 
-import util.collection.is_reverse_sorted
+import util.collection._
+import util.debug._
 import util.{math => umath}
 import util.metering._
 import util.print._
-import learning._
 
-import util.debug._
+import scala.math
 
 /**
  * A basic ranker. This is a machine-learning object that is given a query
@@ -303,6 +303,74 @@ trait PointwiseClassifyingRerankerTrainer[
       the_label
     }
 
+    def standardize_featvecs(featvecs: IndexedSeq[FeatureVector]) = {
+      // Retrieve as DoubleCompressedSparseFeatureVector, i.e. compressed
+      // sparse feature vectors whose values of are type Double.
+      val sparse_vecs =
+        featvecs map { x => x match {
+          case y:DoubleCompressedSparseFeatureVector => y
+          case _ => ???
+        } }
+      // Get the sum and count of all features seen in any of the keys.
+      // Here and below, when computing mean, std dev, etc., we ignore
+      // unseen features rather than counting them as 0's. This wouldn't
+      // work well for binary features, where we normally only store the
+      // features with a value of 1, but we don't adjust those features
+      // in any case. For other features, we assume that features that
+      // are meant to be present and happen to have a value of 0 will be
+      // noted as such. This means that we calculate mean and stddev
+      // only for features that are present, and likewise standardize
+      // only features that are present. Otherwise, we'd end up converting
+      // all the absent features to present features with some non-zero
+      // value, which seems non-sensical besides making the coding more
+      // difficult as we currently can't expand a sparse feature vector,
+      // only change the value of an existing feature.
+      val (keycount, keysum) =
+        sparse_vecs.foldLeft((intmap[Int](), doublemap[Int]())) {
+          (maps, vec) =>
+            val (countmap, summap) = maps
+            for ((k, v) <- (vec.keys zip vec.values)) {
+              countmap(k) += 1
+              summap(k) += v
+            }
+            maps
+        }
+      // Compute the mean of all seen instances of a feature.
+      // Unseen features are ignored rather than counted as 0's.
+      val keymean =
+        keysum map { case (key, sum) => (key, sum / keycount(key)) }
+      // Compute the sum of squared differences from the mean of all seen
+      // instances of a feature.
+      // Unseen features are ignored rather than counted as 0's.
+      val keysumsq =
+        sparse_vecs.foldLeft(doublemap[Int]()) {
+          (sumsqmap, vec) =>
+            for ((k, v) <- (vec.keys zip vec.values)) {
+              val mean = keymean(k)
+              sumsqmap(k) += (v - mean) * (v - mean)
+            }
+            sumsqmap
+        }
+
+      // Compute the standard deviation of all instances
+      // Unseen features are ignored rather than counted as 0's.
+      val keystddev =
+        keysumsq map { case (key, sumsq) =>
+          (key, math.sqrt(sumsq / keycount(key))) }
+
+      // Now standardize the features that need to be.
+      for (vec <- sparse_vecs) {
+        for (i <- 0 until vec.keys.size) {
+          val key = vec.keys(i)
+          if (feature_mapper.features_to_standardize contains key) {
+            vec.values(i) = (vec.values(i) - keymean(key))/keystddev(key)
+          }
+        }
+      }
+
+      featvecs
+    }
+
     /**
      * Convert the data in the object into an aggregate feature vector
      * describing the candidates for a query. This is the primary data in an
@@ -316,10 +384,12 @@ trait PointwiseClassifyingRerankerTrainer[
       create_candidate_featvec: (Query, Candidate, Double, Int) =>
         FeatureVector
     ) = {
+      // Get sequence of feature vectors
       val featvecs =
-        for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
-          create_candidate_featvec(query, cand, score, rank)
-      new AggregateFeatureVector(featvecs.toIndexedSeq, feature_mapper,
+        (for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
+          create_candidate_featvec(query, cand, score, rank)).toIndexedSeq
+      val standardized_featvecs = standardize_featvecs(featvecs)
+      new AggregateFeatureVector(standardized_featvecs, feature_mapper,
         label_mapper)
     }
 

@@ -336,12 +336,52 @@ abstract class TupleArraySparseFeatureVector(
   def string_prefix = "TupleArraySparseFeatureVector"
 }
 
+/** Classification of the different types of values used for features.
+ * Some of them need to be standardized (scaled to have mean 0, std dev 1).
+ * This perhaps can be done on all of them but it doesn't seem to make
+ * much sense when done esp. on binary and probability features,
+ * which have an inherent scale.
+ */
+sealed abstract class FeatureValue
+case object FeatBinary extends FeatureValue
+case object FeatProb extends FeatureValue
+case object FeatLogProb extends FeatureValue
+/** A count of words or similar. Needs to be standardized, which in this
+ * case is vaguely similar to what happens when it's converted to a
+ * probability.
+ */
+case object FeatCount extends FeatureValue
+/** An arbitrary-scale score used for comparing cells. The prototypical
+ * value that needs to be standardized.
+ */
+case object FeatScore extends FeatureValue
+case object FeatFraction extends FeatureValue
+/** A numeric feature value of unknown nature that should not be
+ * standardized (from external data).
+ */
+case object FeatRaw extends FeatureValue
+/** Some other type of feature value, which *will* get standardized. */
+case object FeatOther extends FeatureValue
+
 class FeatureMapper extends ToIntMemoizer[String] {
   def vector_length = number_of_indices
+  val features_to_standardize = mutable.BitSet()
+  def note_feature(feattype: FeatureValue, feature: String) = {
+    val index = to_index(feature)
+    feattype match {
+      case FeatBinary | FeatProb | FeatLogProb => ()
+      case _ => features_to_standardize += index
+    }
+    index
+  }
 }
 
 class LabelMapper extends ToIntMemoizer[String] {
 }
+
+sealed abstract class FeatureClass
+case object NominalFeature extends FeatureClass
+case object NumericFeature extends FeatureClass
 
 /**
  * A factory object for creating sparse feature vectors for classification.
@@ -382,17 +422,19 @@ class SparseFeatureVectorFactory { self =>
    * containing a non-existent index, causing a crash during lookup (e.g.
    * during the dot-product operation).
    */
-  def make_feature_vector(feature_values: Iterable[(String, Double)],
+  def make_feature_vector(
+      feature_values: Iterable[(FeatureValue, String, Double)],
       is_training: Boolean) = {
     val memoized_features =
       // DON'T include an intercept term. Not helpful since it's non-
       // label-specific.
       if (is_training)
         feature_values.map {
-          case (name, value) => (feature_mapper.to_index(name), value)
+          case (ty, name, value) =>
+            (feature_mapper.note_feature(ty, name), value)
         }
        else
-        for { (name, value) <- feature_values;
+        for { (_, name, value) <- feature_values;
                index = feature_mapper.to_index_if(name);
                if index != None }
           yield (index.get, value)
@@ -423,10 +465,6 @@ class SparseFeatureVectorFactory { self =>
   }
 }
 
-sealed abstract class FeatureType
-case object NominalFeature extends FeatureType
-case object NumericFeature extends FeatureType
-
 class SparseInstanceFactory extends SparseFeatureVectorFactory {
   // Format a series of lines for debug display.
   def format_lines(lines: TraversableOnce[Array[String]]) = {
@@ -446,7 +484,7 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
   def get_columns(lines_iter: Iterator[String], split_re: String) = {
     val all_lines = lines_iter.toIterable
     val columns = all_lines.head.split(split_re)
-    val coltype = mutable.Map[String, FeatureType]()
+    val coltype = mutable.Map[String, FeatureClass]()
     for (col <- columns) {
       coltype(col) = NumericFeature
     }
@@ -471,14 +509,15 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
   }
 
   def raw_linefeats_to_featvec(
-      raw_linefeats: Iterable[(String, (String, FeatureType))],
+      raw_linefeats: Iterable[(String, (String, FeatureClass))],
       is_training: Boolean
   ) = {
     // Generate appropriate features based on column values, names, types.
     val linefeats = raw_linefeats.map { case (value, (colname, coltype)) =>
       coltype match {
-        case NumericFeature => (colname, value.toDouble)
-        case NominalFeature => ("%s$%s" format (colname, value), 1.0)
+        case NumericFeature => (FeatRaw, colname, value.toDouble)
+        case NominalFeature =>
+          (FeatBinary, "%s$%s" format (colname, value), 1.0)
       }
     }
 
@@ -508,7 +547,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instance(line: Array[String],
-      columns: Iterable[(String, FeatureType)], label_column: Int,
+      columns: Iterable[(String, FeatureClass)], label_column: Int,
       is_training: Boolean) = {
 
     // Check the right length for the line
@@ -582,7 +621,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    * @param is_training Whether we are currently training or testing a model.
    */
   def get_labeled_instance(lines: Iterable[Array[String]],
-      columns: Iterable[(String, FeatureType)],
+      columns: Iterable[(String, FeatureClass)],
       indiv_colind: Int, label_colind: Int, choice_colind: Int,
       is_training: Boolean) = {
 
