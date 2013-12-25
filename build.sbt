@@ -118,6 +118,8 @@ scalacOptions ++= Seq("-deprecation", "-Xlint", "-unchecked", "-language:_")
 // Add optimization
 scalacOptions ++= Seq("-optimise")
 
+// scalacOptions ++= Seq("-print")
+
 seq(assemblySettings: _*)
 
 // Don't try to compile or run test code.
