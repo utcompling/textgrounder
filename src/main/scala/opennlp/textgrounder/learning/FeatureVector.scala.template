@@ -42,8 +42,8 @@ import util.memoizer._
  * is possible using binary search.
  */
 abstract class makespec(CompressedSparseFeatureVector) private[learning] (
-  val keys: Array[FeatIndex], val values: Array[VECTY]
-) extends SparseFeatureVectorLike {
+  var keys: Array[FeatIndex], var values: Array[VECTY]
+) extends SparseFeatureVector {
   assert(keys.length == values.length)
 
   def stored_entries = keys.length

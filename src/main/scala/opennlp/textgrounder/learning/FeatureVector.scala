@@ -186,7 +186,7 @@ case class ArrayFeatureVector(
   def pretty_print(prefix: String) = "  %s: %s" format (prefix, values)
 }
 
-trait SparseFeatureVectorLike extends SimpleFeatureVector {
+trait SparseFeatureVector extends SimpleFeatureVector {
   def include_displayed_feature: Boolean = true
 
   def compute_toString(prefix: String,
@@ -241,7 +241,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
       // If the other vector has a value at that index, it will be
       // handled when we loop over the other vector. (Otherwise, the
       // index is 0 in both vectors and contributes nothing.)
-      case sp2: SparseFeatureVectorLike => {
+      case sp2: SparseFeatureVector => {
         var res = 0.0
         for ((ind, value) <- toIterable) {
           if (value != 0.0) {
@@ -264,7 +264,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
 
 // abstract class CompressedSparseFeatureVector private[learning] (
 //   keys: Array[FeatIndex], values: Array[Double]
-// ) extends SparseFeatureVectorLike {
+// ) extends SparseFeatureVector {
 // (in FeatureVector.scala.template)
 // }
 
@@ -290,7 +290,7 @@ trait SparseFeatureVectorLike extends SimpleFeatureVector {
  */
 abstract class SimpleSparseFeatureVector(
   feature_values: Iterable[(FeatIndex, Double)]
-) extends SparseFeatureVectorLike {
+) extends SparseFeatureVector {
   def stored_entries = feature_values.size
 
   def squared_magnitude(label: LabelIndex) =
@@ -412,7 +412,7 @@ class SparseFeatureVectorFactory { self =>
     case "Map" => "map-backed sparse vectors"
   })
 
-  trait SparseFeatureVectorMixin extends SparseFeatureVectorLike {
+  trait SparseFeatureVectorMixin extends SparseFeatureVector {
     override def format_feature(index: FeatIndex) =
       feature_mapper.to_string(index)
     def length = feature_mapper.vector_length
