@@ -737,10 +737,10 @@ object AggregateFeatureVector {
   }
 
   /**
-   * Remove all features that have the same values among all components of
-   * each aggregate feature vector (even if they have different values
-   * among different aggregate feature vectors). Features that don't differ
-   * at all within any aggregate feature vector aren't useful for
+   * Destructively remove all features that have the same values among all
+   * components of each aggregate feature vector (even if they have different
+   * values among different aggregate feature vectors). Features that don't
+   * differ at all within any aggregate feature vector aren't useful for
    * distinguishing one candidate from another and may cause singularity
    * errors in R's mlogit() function, so need to be deleted.
    *
@@ -981,12 +981,8 @@ case class AggregateFeatureVector(
   }
 
   /**
-   * Find all features that have different values in at least one pair
-   * of component feature vectors in at least one aggregate feature
-   * vector. Return a set of such features. Features that don't differ
-   * at all within any aggregate feature vector aren't useful for
-   * distinguishing one candidate from another and may cause singularity
-   * errors in R's mlogit() function, so need to be deleted.
+   * Destructively remove columns that are non-choice-specific, i.e.
+   * not listed among the list of choice-specific features passed in.
    */
   def remove_non_choice_specific_columns(diff_features: Set[FeatIndex]) {
     val sparsevecs = fetch_sparse_featvecs
@@ -1002,19 +998,18 @@ case class AggregateFeatureVector(
   }
 
   /**
-   * Standardize the appropriate features in the given feature vectors by
-   * subtracting their mean and then dividing by their standard deviation.
-   * This destructively modifies the feature vectors and only operates
-   * on features that have been marked as needing standardization.
-   * Standardization is done to make it easier to compare numeric feature
-   * values across different query documents, which otherwise may differ
-   * greatly in scale. (This is the case for KL-divergence scores, for
-   * example.) Whether standardization is done depends on the type of the
-   * feature's value. For example, binary features definitely don't need
-   * to be standardized and probabilities aren't currently standardized,
-   * either. Features of only a candidate also don't need to be standardized
-   * as they don't suffer from the problem of being compared with different
-   * query documents.)
+   * Destructively standardize the appropriate features in the given
+   * feature vectors by subtracting their mean and then dividing by their
+   * standard deviation. This only operates on features that have been
+   * marked as needing standardization. Standardization is done to make it
+   * easier to compare numeric feature values across different query
+   * documents, which otherwise may differ greatly in scale. (This is the
+   * case for KL-divergence scores, for example.) Whether standardization
+   * is done depends on the type of the feature's value. For example,
+   * binary features definitely don't need to be standardized and
+   * probabilities aren't currently standardized, either. Features of only
+   * a candidate also don't need to be standardized as they don't suffer
+   * from the problem of being compared with different query documents.)
    */
   def standardize_featvecs() {
     val sparsevecs = fetch_sparse_featvecs
@@ -1060,7 +1055,7 @@ case class AggregateFeatureVector(
           sumsqmap
       }
 
-    // Compute the standard deviation of all instances
+    // Compute the standard deviation of all features.
     // Unseen features are ignored rather than counted as 0's.
     val keystddev =
       keysumsq map { case (key, sumsq) =>
