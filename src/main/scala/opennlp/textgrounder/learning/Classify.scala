@@ -25,6 +25,7 @@ import util.print._
 import util.text._
 
 import perceptron._
+import mlogit._
 
 import util.debug._
 
@@ -44,7 +45,7 @@ import util.debug._
 class ClassifyParameters(ap: ArgParser) {
   var method =
     ap.option[String]("method", "m",
-       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron"),
+       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron", "mlogit"),
        default = "perceptron",
        help = """Method to use for classification: 'perceptron'
 (perceptron using the basic algorithm); 'avg-perceptron' (perceptron using
@@ -52,8 +53,9 @@ the basic algorithm, where the weights from the various rounds are averaged
 -- this usually improves results if the weights oscillate around a certain
 error rate, rather than steadily improving); 'pa-perceptron'
 (passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds).
-Default %default.""")
+dropping-off error rate improvements with increased number of rounds);
+'mlogit' (use a conditional logit model implemented by R's 'mlogit()'
+function). Default %default.""")
 
   var trainSource =
     ap.option[String]("t", "train",
@@ -217,6 +219,10 @@ object Classify extends ExperimentApp("Classify") {
 
         // Train a classifer
         val trainer = params.method match {
+          case "mlogit" => {
+            errprint("Using conditional logit")
+            new RConditionalLogitTrainer[FeatureVector](ArrayVector)
+          }
           case "pa-perceptron" => {
             errprint("Using passive-aggressive multi-label perceptron")
             new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[
@@ -263,6 +269,8 @@ object Classify extends ExperimentApp("Classify") {
 
         // Train a classifer
         val trainer = params.method match {
+          case "mlogit" =>
+            error("Currently `mlogit` only works when --label-specific")
           case "pa-perceptron" if numlabs > 2 || debug("multilabel") => {
             errprint("Using passive-aggressive multi-label perceptron")
             new PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[

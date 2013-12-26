@@ -18,7 +18,15 @@
 
 package opennlp.textgrounder
 package learning.mlogit
+
 import learning._
+import util.debug._
+import util.print.{errprint,internal_error}
+
+import org.ddahl.jvmr.RInScala
+
+import scala.collection.mutable
+import scala.reflect.ClassTag
 
 /**
  * A conditional logit (a type of multinomial logit, which is a type of
@@ -103,7 +111,145 @@ trait ConditionalLogitTrainer[DI <: DataInstance]
 class RConditionalLogitTrainer[DI <: DataInstance](
   val vector_factory: SimpleVectorFactory
 ) extends ConditionalLogitTrainer[DI] {
-  def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int) =
-    ???
+
+  /**
+   * Filter the array to contain only the values for which the
+   * corresponding entry in `specs` is true.
+   */
+  def filter_array[T : ClassTag](data: Array[T], specs: Array[Boolean]) = {
+    assert(data.size == specs.size)
+    (data zip specs).filter(_._2).map(_._1).toArray
+  }
+
+  /**
+   * Filter the array to contain only the values for which the
+   * corresponding entry in `specs` is false.
+   */
+  def filter_array_not[T : ClassTag](data: Array[T], specs: Array[Boolean]) = {
+    assert(data.size == specs.size)
+    (data zip specs).filter(!_._2).map(_._1).toArray
+  }
+
+  /**
+   * Determine which columns in the data don't vary at all depending on the
+   * label. This means that, within an instance, the value for all labels is
+   * the same. This happens primarily with columns referring to inherent
+   * properties of the instance in question (in an instance that's a
+   * query-candidate pair, such columns are features only of the query).
+   * These columns aren't helpful in a model like this because, with only
+   * one weight for all labels, and one value for all labels, the
+   * corresponding term in the dot product will be the same for all labels
+   * and hence the column has no discriminative power. In a perceptron
+   * model, the weights for these columns generally end up zero. In R's
+   * mlogit() function, such columns actually cause a singularity error.
+   *
+   * FIXME: Properly they should be specified separately as non-
+   * choice-specific variables, with choice-specific weights. But that
+   * requires more cleverness in handling the combination of choice-specific
+   * and non-choice-specific weights, and in a reranking model it doesn't
+   * make much sense to have choice-specific weights because the different
+   * choices are in a sense equivalent to each other and generally have no
+   * defining properties that can distinguish them, in the aggregate, from
+   * other choices.
+   */
+  def check_singularity(data: Array[Array[Double]], nlabels: Int
+  ): Array[Boolean] = {
+    assert(data.size % nlabels == 0,
+      "Size of data %s should be a multiple of %s" format(data.size, nlabels))
+    // First, group by instance, check if all values in a given column
+    // in the instance's data are the same. Result is an array of booleans
+    // for each group, listing, for each column in the group, if all the
+    // value are the same.
+    val groups_same = data.
+      grouped(nlabels).toArray.        // group by instance
+      map { group =>                   // map over each group
+        val head = group.head          // get first row
+        group.transpose.               // array of rows -> array of cols
+          zip(head).                   // zip col vals with first col val
+          map { case (all, first) =>   // map over each zipped column
+            all.forall(_ == first)     // true if all vals same as first
+          }
+      }
+
+    // Then check for a given column if all groups have entirely the same
+    // data across labels, i.e. all the values in a column are true. We
+    // transpose to convert array of groups into array of columns so we
+    // can easily map across columns, checking if all values in the column
+    // are true.
+    groups_same.transpose.map { col => col.forall(_ == true) }
+  }
+
+  /**
+   * Convert the set of instances into a long-style data frame in R with
+   * the name `framename`, for use with the `mlogit` function.
+   */
+  def do_mlogit(data: Iterable[(DI, Int)]) = {
+    val R = RInScala()
+
+    val agg_fv_data = data.map { case (di, label) =>
+      val fv = di.feature_vector
+      val aggfv = fv match {
+        case agg: AggregateFeatureVector => agg
+        case _ => internal_error("Only operates with AggregateFeatureVectors")
+      }
+      (aggfv, label)
+    }
+
+    val frame = "frame" // Name of variable to use for data, etc.
+    val (headers, indiv, label, choice, data_rows) =
+      AggregateFeatureVector.labeled_instances_to_R(agg_fv_data)
+    val nlabel = agg_fv_data.head._1.depth
+    val singular_columns = check_singularity(data_rows, nlabel)
+    val singular_headers = filter_array(headers, singular_columns)
+    val nonsingular_headers = filter_array_not(headers, singular_columns)
+    val nonsingular_indices = filter_array_not((0 until headers.size).toArray,
+      singular_columns)
+    errprint(s"""Warning: Skipping non-choice-specific features: ${singular_headers mkString " "}""")
+    val rheaders = nonsingular_headers.map {
+      _.replaceAll("[^A-Za-z0-9_]", ".")
+    }
+
+    // errprint("#0")
+    val rdata = data_rows map { row =>
+      filter_array_not(row, singular_columns)
+    }
+
+    // errprint("#1")
+    R.eval("require(mlogit)")
+    // errprint("#2")
+    R.update(s"$frame.headers", rheaders)
+    // errprint("#3")
+    R.update(s"$frame.indiv", indiv)
+    // errprint("#4")
+    R.update(s"$frame.label", label)
+    // errprint("#5")
+    R.update(s"$frame.choice", choice)
+    // errprint("#6")
+    R.update(s"$frame.data", rdata)
+    // errprint("#7")
+    val N = data_rows.size
+    // errprint("#8")
+    R.eval(s"dimnames($frame.data) = list(1:$N, $frame.headers)")
+    // errprint("#9")
+    R.eval(s"$frame = data.frame(indiv=$frame.indiv, label=$frame.label, choice=$frame.choice, $frame.data)")
+    // errprint("#10")
+    R.eval(s"""$frame = mlogit.data(choice="choice", shape="long", alt.var="label", chid.var="indiv", $frame)""")
+    // errprint("#11")
+    R.eval(s"""m.$frame = mlogit(choice ~ ${rheaders mkString " + "} | -1, $frame)""")
+    // errprint("#12")
+    val weights = R.toVector[Double](s"as.vector(m.$frame$$coefficients)")
+    val expanded_buffer = mutable.Buffer.fill(headers.length)(0.0)
+    for ((weight, index) <- (weights zip nonsingular_indices))
+      expanded_buffer(index) = weight
+    expanded_buffer.toArray
+  }
+
+  def get_weights(data: Iterable[(DI, Int)]): (VectorAggregate, Int) = {
+    val rweights = do_mlogit(data)
+    if (debug("weights"))
+      errprint("Weights: %s", rweights)
+    val vecagg = SingleVectorAggregate(ArrayVector(rweights))
+    (vecagg, 1)
+  }
 }
 

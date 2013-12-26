@@ -33,6 +33,7 @@ import util.debug._
 
 import learning._
 import learning.perceptron._
+import learning.mlogit._
 import langmodel._
 
 /*
@@ -590,7 +591,7 @@ trait GridLocateRerankParameters {
 
 'mlogit' (use a generalized linear model, specifically a conditional logit
   model -- similar to a multinomial logistic regression or maximum entropy
-  model).
+  model -- using R's mlogit() function).
 
 Default %default.
 
@@ -1433,6 +1434,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
                      inst.candidates(predicted).get_central_point)
             }
         }
+      case "mlogit" =>
+        new RConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
     }
   }
 
