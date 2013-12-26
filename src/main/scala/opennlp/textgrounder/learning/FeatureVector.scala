@@ -545,7 +545,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
    *   the label and removed before creating features.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def get_labeled_instance(line: Array[String],
+  def import_labeled_instance(line: Array[String],
       columns: Iterable[(String, FeatureClass)], label_column: Int,
       is_training: Boolean) = {
 
@@ -582,14 +582,14 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
    *   the label and removed before creating features.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def get_labeled_instances(lines_iter: Iterator[String],
+  def import_labeled_instances(lines_iter: Iterator[String],
       split_re: String, label_column: Int,
       is_training: Boolean) = {
     val (lines, column_types) = get_columns(lines_iter, split_re)
     val numcols = column_types.size
     val label_colind = get_index(numcols, label_column)
     for (inst <- lines) yield {
-      get_labeled_instance(inst, column_types, label_colind, is_training)
+      import_labeled_instance(inst, column_types, label_colind, is_training)
     }
   }
 }
@@ -619,7 +619,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    *   this individual. There should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def get_labeled_instance(lines: Iterable[Array[String]],
+  def import_labeled_instance(lines: Iterable[Array[String]],
       columns: Iterable[(String, FeatureClass)],
       indiv_colind: Int, label_colind: Int, choice_colind: Int,
       is_training: Boolean) = {
@@ -696,7 +696,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    *   should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def get_labeled_instances(lines_iter: Iterator[String],
+  def import_labeled_instances(lines_iter: Iterator[String],
       split_re: String,
       indiv_column: Int, label_column: Int, choice_column: Int,
       is_training: Boolean) = {
@@ -709,7 +709,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val grouped_instances = new GroupByIterator(lines.toIterator,
       { line: Array[String] => line(indiv_column).toInt })
     val retval = (for ((_, inst) <- grouped_instances) yield {
-      get_labeled_instance(inst.toIterable, column_types,
+      import_labeled_instance(inst.toIterable, column_types,
         indiv_column, label_column, choice_column,
         is_training)
     }).toIterable
@@ -766,7 +766,7 @@ object AggregateFeatureVector {
   }
 
   /**
-   * Undo the conversion in `get_labeled_instance`, converting the instance
+   * Undo the conversion in `import_labeled_instance`, converting the instance
    * back to the 2-d matrix format used in R's mlogit() function. For F
    * features and L labels this will have the following type:
    *
@@ -804,7 +804,7 @@ object AggregateFeatureVector {
   }
 
   /**
-   * Undo the conversion in `get_labeled_instances` to get the long-format
+   * Undo the conversion in `import_labeled_instances` to get the long-format
    * 2-d matrix used in R's mlogit() function. For F features, L labels and
    * N instances, The return value is of the following type:
    *

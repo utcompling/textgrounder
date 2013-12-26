@@ -114,7 +114,7 @@ class RConditionalLogitTrainer[DI <: DataInstance](
 ) extends ConditionalLogitTrainer[DI] {
 
   /**
-   * Undo the conversion in `get_labeled_instances` to get the long-format
+   * Undo the conversion in `import_labeled_instances` to get the long-format
    * 2-d matrix used in R's mlogit() function. The return value is:
    *
    * (header:Array[String], data:Array[Array[String]])

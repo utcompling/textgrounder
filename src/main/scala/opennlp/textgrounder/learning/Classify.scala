@@ -196,7 +196,7 @@ object Classify extends ExperimentApp("Classify") {
         // Read in the data instances and create feature vectors
         val factory = new SparseAggregateInstanceFactory
         val training_instances =
-          factory.get_labeled_instances(trainSource,
+          factory.import_labeled_instances(trainSource,
             params.split_re,
             params.instance_index_column,
             params.label_column,
@@ -204,7 +204,7 @@ object Classify extends ExperimentApp("Classify") {
             is_training = true).
             toIndexedSeq
         val test_instances =
-          factory.get_labeled_instances(predictSource,
+          factory.import_labeled_instances(predictSource,
             params.split_re,
             params.instance_index_column,
             params.label_column,
@@ -250,13 +250,13 @@ object Classify extends ExperimentApp("Classify") {
         // Read in the data instances and create feature vectors
         val factory = new SparseSimpleInstanceFactory
         val training_instances =
-          factory.get_labeled_instances(trainSource,
+          factory.import_labeled_instances(trainSource,
             params.split_re,
             params.label_column,
             is_training = true).
             toIndexedSeq
         val test_instances =
-          factory.get_labeled_instances(predictSource,
+          factory.import_labeled_instances(predictSource,
             params.split_re,
             params.label_column,
             is_training = false).
