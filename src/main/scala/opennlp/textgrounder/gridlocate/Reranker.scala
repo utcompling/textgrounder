@@ -681,14 +681,15 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     GridDoc[Co], GridCell[Co], DocStatus[Row], GridRankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
-    data: Iterable[(GridRankerInst[Co], LabelIndex)]
+    training_data: TrainingData[GridRankerInst[Co]]
   ) = {
+    val data = training_data.data
     errprint("Training linear classifier ...")
     errprint("Number of training items: %s", data.size)
     val num_total_feats =
-      data.map(_._1.feature_vector.length.toLong).sum
+      data.view.map(_._1.feature_vector.length.toLong).sum
     val num_total_stored_feats =
-      data.map(_._1.feature_vector.stored_entries.toLong).sum
+      data.view.map(_._1.feature_vector.stored_entries.toLong).sum
     errprint("Total number of features in all training items: %s",
       num_total_feats)
     errprint("Avg number of features per training item: %.2f",
@@ -697,7 +698,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       num_total_stored_feats)
     errprint("Avg number of stored features per training item: %.2f",
       num_total_stored_feats.toDouble / data.size)
-    trainer(data)
+    trainer(training_data)
   }
 
   /**
@@ -713,8 +714,6 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      val feature_mapper = self.feature_mapper
-      val label_mapper = self.label_mapper
       protected def create_candidate_eval_featvec(query: GridDoc[Co],
           candidate: GridCell[Co], initial_score: Double, initial_rank: Int
       ) = self.create_candidate_eval_featvec(query, candidate,

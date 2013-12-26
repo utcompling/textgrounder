@@ -58,6 +58,68 @@ trait DataInstance {
   def feature_vector: FeatureVector
 }
 
+object TrainingData {
+  def apply[DI <: DataInstance](data: Iterable[(DI, LabelIndex)]):
+      TrainingData[DI] = {
+    assert(data.size > 0)
+    data.head._1.feature_vector match {
+      case agg: AggregateFeatureVector =>
+        val removed_features =
+          AggregateFeatureVector.remove_all_non_choice_specific_columns(data)
+        apply(data, removed_features)
+      case _ =>
+        apply(data, Set[FeatIndex]())
+    }
+  }
+}
+
+case class TrainingData[DI <: DataInstance](
+  data: Iterable[(DI, LabelIndex)],
+  removed_features: Set[FeatIndex]
+) {
+  def check_valid() {
+    val head = data.head._1.feature_vector
+    // This should force evaluation of `insts` if it's a stream
+    // (necessary to ensure we end up outputting the correct length of
+    // vector).
+    val N = data.size
+    val L = head.label_mapper.number_of_indices
+    val F = head.feature_mapper.number_of_indices
+    for (((inst, label), index) <- data.view.zipWithIndex) {
+      val fv = inst.feature_vector
+      // Equivalent to assert but adds the instance index and the fv itself
+      def check(cond: Boolean, msg: => String) {
+        assert(cond, "Instance #%s: %s: %s" format (index + 1, msg, fv))
+      }
+      check(fv.depth == head.depth,
+        "has depth %s instead of %s" format (fv.depth, fv.depth))
+      check(fv.length == head.length,
+        "has length %s instead of %s" format (fv.length, head.length))
+      check(fv.feature_mapper == head.feature_mapper, "wrong feature mapper")
+      check(fv.label_mapper == head.label_mapper, "wrong label mapper")
+      check(F == fv.length,
+        "feature mapper has length %s instead of %s" format (F, fv.length))
+      check(L == fv.depth,
+        "label mapper has depth %s instead of %s" format (L, fv.depth))
+      check(label >= 0 && label < L,
+        "label %s out of bounds [0,%s)" format (label, L))
+
+      fv match {
+        case agg: AggregateFeatureVector =>
+          for (i <- 0 until agg.depth) {
+            assert(agg.fv(i).length == agg.length,
+              "feature vector %s has length %s instead of %s" format (
+                i, agg.fv(i).length, agg.length))
+          }
+        // assert each row in instance has size == F
+        case _ => {}
+      }
+    }
+  }
+
+  check_valid()
+}
+
 /**
  * A basic classifier.
  *
@@ -244,7 +306,8 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
   def initialize(data: Iterable[(DI, LabelIndex)]) = {
-    val len = check_sequence_lengths(data)
+    FeatureVector.check_same_mappers(data.view.map(_._1.feature_vector))
+    val len = data.head._1.feature_vector.length
     val weights = new_weights(len)
     for ((inst, label) <- data) {
       val max_label = weights.max_label min inst.feature_vector.max_label
@@ -263,10 +326,6 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     errprint("Length of weight vector: %s", len)
     factory.empty(len)
   }
-
-  /** Check that all instances have the same length, and return it. */
-  def check_sequence_lengths(data: Iterable[(DI, LabelIndex)]) =
-    FeatureVector.check_same_length(data.map(d => d._1.feature_vector))
 
   /** Iterate over a function to train a linear classifier.
     * @param error_threshold Maximum allowable error
@@ -336,17 +395,19 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *
     * @return Tuple of weights and number of iterations required
     *   to compute them. */
-  def get_weights(data: Iterable[(DI, LabelIndex)]): (VectorAggregate, Int)
+  def get_weights(training_data: TrainingData[DI]): (VectorAggregate, Int)
 
   /** Create a linear classifier. */
   def create_classifier(weights: VectorAggregate): LinearClassifier
 
   /** Train a linear classifier given a set of labeled instances. */
-  def apply(data: Iterable[(DI, LabelIndex)]) = {
-    val (weights, _) = get_weights(data)
+  def apply(training_data: TrainingData[DI]) = {
+    val (weights, _) = get_weights(training_data)
+
     val cfier = create_classifier(weights)
     if (debug("weights")) {
-      val format_feature_fn = data.head._1.feature_vector.format_feature _
+      val format_feature_fn =
+        training_data.data.head._1.feature_vector.format_feature _
       cfier.debug_print_weights(cfier.weights, format_feature_fn)
     }
     cfier

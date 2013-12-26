@@ -44,11 +44,17 @@ import util.debug._
 trait FeatureVector extends DataInstance {
   final def feature_vector = this
 
+  def mappers: FeatureLabelMapper
+
+  final def feature_mapper = mappers.feature_mapper
+
+  final def label_mapper = mappers.label_mapper
+
   /** Return the length of the feature vector.  This is the number of weights
     * that need to be created -- not necessarily the actual number of items
     * stored in the vector (which will be different especially in the case
     * of sparse vectors). */
-  def length: Int
+  def length: Int = feature_mapper.vector_length
 
   /** Return number of labels for which label-specific information is stored.
     * For a simple feature vector that ignores the label, this will be 1.
@@ -94,24 +100,21 @@ trait FeatureVector extends DataInstance {
   def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex)
 
   /** Display the feature at the given index as a string. */
-  def format_feature(index: FeatIndex) = index.toString
+  def format_feature(index: FeatIndex) = feature_mapper.to_string(index)
+
+  /** Display the label at the given index as a string. */
+  def format_label(index: FeatIndex) = label_mapper.to_string(index)
 
   def pretty_print(prefix: String): String
 }
 
 object FeatureVector {
-  /** Check that all feature vectors have the same length, and return it. */
-  def check_same_length(fvs: Iterable[FeatureVector]) = {
-    // Written this way because the length might change as we iterate
-    // the first time through the data (this will be the case if we are
-    // using SparseFeatureVector). The call to `max` iterates through the
-    // whole data first before checking the length again. (Previously we
-    // compared the first against the rest, which ran into problems.)
-    val len = fvs.map(_.length).max
+  /** Check that all feature vectors have the same mappers. */
+  def check_same_mappers(fvs: Iterable[FeatureVector]) {
+    val mappers = fvs.head.mappers
     for (fv <- fvs) {
-      assert(fv.length == len)
+      assert(fv.mappers == mappers)
     }
-    len
   }
 }
 
@@ -171,10 +174,10 @@ trait BasicFeatureVectorImpl extends FeatureVector {
  * or "intercept" weight, you need to add it yourself.
  */
 case class ArrayFeatureVector(
-  values: SimpleVector
+  values: SimpleVector,
+  mappers: FeatureLabelMapper
 ) extends BasicFeatureVectorImpl with SimpleFeatureVector {
-  /** Return the length of the feature vector. */
-  final def length = values.length
+  assert(values.length == length)
 
   def stored_entries = length
 
@@ -274,14 +277,6 @@ trait SparseFeatureVector extends SimpleFeatureVector {
 // (in FeatureVector.scala.template)
 // }
 
-//object SparseFeatureVector {
-//  def apply(len: Int, fvs: (Int, Double)*) = {
-//    val (keys, values) =
-//      fvs.toIndexedSeq.sortWith(_._1 < _._1).unzip
-//    new BasicCompressedSparseFeatureVector(keys.toArray, values.toArray, len)
-//  }
-//}
-
 /**
  * A feature vector in which the features are stored sparsely, i.e. only
  * the features with non-zero values are stored, using a hash table or
@@ -316,16 +311,18 @@ abstract class SimpleSparseFeatureVector(
  * An implementation of a sparse feature vector storing the non-zero
  * features in a `Map`.
  */
-abstract class MapSparseFeatureVector(
-  feature_values: collection.Map[FeatIndex, Double]
+class MapSparseFeatureVector(
+  feature_values: collection.Map[FeatIndex, Double],
+  val mappers: FeatureLabelMapper
 ) extends SimpleSparseFeatureVector(feature_values) {
   def apply(index: FeatIndex) = feature_values.getOrElse(index, 0.0)
 
   def string_prefix = "MapSparseFeatureVector"
 }
 
-abstract class TupleArraySparseFeatureVector(
-  feature_values: mutable.Buffer[(FeatIndex, Double)]
+class TupleArraySparseFeatureVector(
+  feature_values: mutable.Buffer[(FeatIndex, Double)],
+  val mappers: FeatureLabelMapper
 ) extends SimpleSparseFeatureVector(feature_values) {
   // Use an O(n) algorithm to look up a value at a given index.  Luckily,
   // this operation isn't performed very often (if at all).  We could
@@ -381,6 +378,11 @@ class FeatureMapper extends ToIntMemoizer[String] {
 class LabelMapper extends ToIntMemoizer[String] {
 }
 
+case class FeatureLabelMapper(
+  feature_mapper: FeatureMapper = new FeatureMapper,
+  label_mapper: LabelMapper = new LabelMapper
+)
+
 sealed abstract class FeatureClass
 case object NominalFeature extends FeatureClass
 case object NumericFeature extends FeatureClass
@@ -392,15 +394,15 @@ case object NumericFeature extends FeatureClass
  * mapped to integers, using the mapping stored in `feature_mapper`.
  */
 class SparseFeatureVectorFactory { self =>
-  val label_mapper = new LabelMapper
+  val mappers = new FeatureLabelMapper
+  def feature_mapper = mappers.feature_mapper
+  def label_mapper = mappers.label_mapper
 
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
             "ShortCompressed" | "TupleArray" | "Map") => f
     case "" => "DoubleCompressed"
   }
-
-  val feature_mapper = new FeatureMapper
 
   errprint("Feature vector implementation: %s", vector_impl match {
     case "DoubleCompressed" => "compressed feature vectors, using doubles"
@@ -411,12 +413,6 @@ class SparseFeatureVectorFactory { self =>
     case "TupleArray" => "tuple-array-backed sparse vectors"
     case "Map" => "map-backed sparse vectors"
   })
-
-  trait SparseFeatureVectorMixin extends SparseFeatureVector {
-    override def format_feature(index: FeatIndex) =
-      feature_mapper.to_string(index)
-    def length = feature_mapper.vector_length
-  }
 
   /**
    * Generate a feature vector.  If not at training time, we need to be
@@ -443,27 +439,25 @@ class SparseFeatureVectorFactory { self =>
           yield (index.get, value)
     vector_impl match {
       case "TupleArray" =>
-        new TupleArraySparseFeatureVector(memoized_features.toBuffer) with
-          SparseFeatureVectorMixin
+        new TupleArraySparseFeatureVector(memoized_features.toBuffer, mappers)
       case "Map" =>
-        new MapSparseFeatureVector(memoized_features.toMap) with
-          SparseFeatureVectorMixin
+        new MapSparseFeatureVector(memoized_features.toMap, mappers)
       case _ => {
         val (keys, values) =
           memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
         vector_impl match {
           case "DoubleCompressed" =>
             new DoubleCompressedSparseFeatureVector(keys.toArray,
-              values.toArray) with SparseFeatureVectorMixin
+              values.toArray, mappers)
           case "FloatCompressed" =>
             new FloatCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toFloat).toArray) with SparseFeatureVectorMixin
+              values.map(_.toFloat).toArray, mappers)
           case "IntCompressed" =>
             new IntCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toInt).toArray) with SparseFeatureVectorMixin
+              values.map(_.toInt).toArray, mappers)
           case "ShortCompressed" =>
             new ShortCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toShort).toArray) with SparseFeatureVectorMixin
+              values.map(_.toShort).toArray, mappers)
         }
       }
     }
@@ -677,8 +671,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val sorted_fvs = (fvs zip labels_seen).toSeq.sortBy(_._2).map(_._1)
 
     // Aggregate feature vectors, return aggregate with label
-    val agg = new AggregateFeatureVector(fvs.toIndexedSeq,
-      feature_mapper, label_mapper)
+    val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", label, label_mapper.to_string(label))
       errprint("Feature vector: %s", agg.pretty_print(""))
@@ -721,15 +714,13 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
         is_training)
     }).toIterable
 
-    if (debug("put-instances")) {
-      val (headers, indiv, label, choice, data_rows) =
-        AggregateFeatureVector.labeled_instances_to_R(retval)
+    if (debug("export-instances")) {
+      val (headers, datarows) =
+        AggregateFeatureVector.export_training_data(
+          TrainingData(retval, Set[FeatIndex]()))
       errprint("Headers: %s", headers mkString " ")
-      errprint("Indiv (column vector): %s", indiv mkString " ")
-      errprint("Label (column vector): %s", label mkString " ")
-      errprint("Choice (column vector): %s", choice mkString " ")
       errprint("Data rows:")
-      errprint(data_rows.map(_ mkString " ") mkString "\n")
+      errprint(datarows.map(_.toString) mkString "\n")
     }
 
     retval
@@ -737,12 +728,49 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 }
 
 object AggregateFeatureVector {
+  def check_aggregate(di: DataInstance) = {
+    val fv = di.feature_vector
+    fv match {
+      case agg: AggregateFeatureVector => agg
+      case _ => internal_error("Only operates with AggregateFeatureVectors")
+    }
+  }
+
+  /**
+   * Remove all features that have the same values among all components of
+   * each aggregate feature vector (even if they have different values
+   * among different aggregate feature vectors). Features that don't differ
+   * at all within any aggregate feature vector aren't useful for
+   * distinguishing one candidate from another and may cause singularity
+   * errors in R's mlogit() function, so need to be deleted.
+   *
+   * Return the set of removed features.
+   */
+  def remove_all_non_choice_specific_columns(
+      featvecs: Iterable[(DataInstance, LabelIndex)]
+  ) = {
+    val agg_featvecs = featvecs.view.map { x => check_aggregate(x._1) }
+    // Find the set of all features that have different values in at least
+    // one pair of component feature vectors in at least one aggregate
+    // feature vector.
+    val diff_features =
+      agg_featvecs.map(_.find_diff_features).reduce(_ union _)
+    val all_features =
+      agg_featvecs.map(_.find_all_features).reduce(_ union _)
+    val removed_features = all_features diff diff_features
+    val headfv = featvecs.head._1.feature_vector
+    errprint("Removing non-choice-specific features: %s",
+      removed_features.toSeq.sorted.map(headfv.format_feature(_)) mkString " ")
+    agg_featvecs.foreach(_.remove_non_choice_specific_columns(diff_features))
+    removed_features
+  }
+
   /**
    * Undo the conversion in `get_labeled_instance`, converting the instance
    * back to the 2-d matrix format used in R's mlogit() function. For F
    * features and L labels this will have the following type:
    *
-   * Array[(Int, String, Boolean), Array[Double]]
+   * Iterable[(Int, String, Boolean), Iterable[Double]]
    *
    * where there are L elements ("rows") in the first-level array and
    * F elements ("columns") in the second-level array. The tuple is of
@@ -759,17 +787,20 @@ object AggregateFeatureVector {
    * @param correct_label Correct label of instance.
    * @param index 0-based index of the instance.
    */
-  def put_labeled_instance(inst: AggregateFeatureVector,
-      correct_label: LabelIndex, index: Int) = {
+  def export_aggregate_labeled_instance(inst: AggregateFeatureVector,
+      correct_label: LabelIndex, index: Int, removed_features: Set[FeatIndex]
+  ) = {
     // This is easier than in the other direction.
-    (for ((fv, label) <- inst.fv.zipWithIndex) yield {
+    for ((fv, label) <- inst.fv.view.zipWithIndex) yield {
       val indiv = index + 1
       val labelstr = inst.label_mapper.to_string(label)
       val choice = label == correct_label
       assert(fv.length == inst.feature_mapper.vector_length)
-      val nums = (for (i <- 0 until fv.length) yield fv(i, label)).toArray
+      val nums =
+        for (i <- 0 until fv.length if !(removed_features contains i)) yield
+          fv(i, label)
       ((indiv, labelstr, choice), nums)
-    }).toArray
+    }
   }
 
   /**
@@ -777,8 +808,8 @@ object AggregateFeatureVector {
    * 2-d matrix used in R's mlogit() function. For F features, L labels and
    * N instances, The return value is of the following type:
    *
-   * (headers: Array[String], extraprops: Iterable[(Int,String,Boolean)],
-   *   data: Array[Array[Double]])
+   * (headers: Iterable[String],
+   *   data: Iterable[((Int,String,Boolean), Iterable[Double])])
    *
    * where `headers` is a size-F row vector listing column headers,
    * `rows` is a N*L by F matrix of values, and `extraprops` is of
@@ -793,85 +824,31 @@ object AggregateFeatureVector {
    * Scala-to-R interface can only pass 1-d and 2-d arrays of fixed type),
    * or made into a 2-d array of strings for outputting to a file.
    */
-  def put_labeled_instances(
-      insts: Iterable[(AggregateFeatureVector, LabelIndex)]
+
+  def export_training_data[DI <: DataInstance](
+      training_data: TrainingData[DI]
   ) = {
-    // This should force evaluation of `insts` if it's a stream.
-    val N = insts.size
-    val head = insts.head._1
-    for (((inst, label), index) <- insts.zipWithIndex) {
-      // Equivalent to assert but adds the instance index and the inst itself
-      def check(cond: Boolean, msg: => String) {
-        assert(cond, "Instance #%s: %s: %s" format (index + 1, msg, inst))
-      }
-      check(inst.depth == head.depth,
-        "has depth %s instead of %s" format (inst.depth, head.depth))
-      check(inst.length == head.length,
-        "has length %s instead of %s" format (inst.length, head.length))
-      check(inst.feature_mapper == head.feature_mapper, "wrong feature mapper")
-      check(inst.label_mapper == head.label_mapper, "wrong label mapper")
-      check(inst.feature_mapper.number_of_indices == inst.length,
-        "feature mapper has length %s instead of %s" format (
-          inst.feature_mapper.number_of_indices, inst.length))
-      check(inst.label_mapper.number_of_indices == inst.depth,
-        "label mapper has depth %s instead of %s" format (
-          inst.label_mapper.number_of_indices, inst.depth))
-      check(label >= 0 && label <= inst.label_mapper.maximum_index,
-        "label %s out of bounds [0,%s]" format (label,
-          inst.label_mapper.maximum_index))
-      for (i <- 0 until inst.depth) {
-        assert(inst.fv(i).length == inst.length,
-          "feature vector %s has length %s instead of %s" format (
-            i, inst.fv(i).length, inst.length))
-      }
-    }
+    val insts = training_data.data
+    val removed_features = training_data.removed_features
+
+    val frame = "frame" // Name of variable to use for data, etc.
 
     // This is easier than in the other direction.
-    val headers =
-      for (i <- 0 to head.feature_mapper.maximum_index)
-        yield head.feature_mapper.to_string(i)
-    val rows =
-      insts.zipWithIndex.flatMap {
-        case ((inst, correct_label), index) =>
-          put_labeled_instance(inst, correct_label, index)
-      }
-    val L = head.label_mapper.number_of_indices
-    val F = head.feature_mapper.number_of_indices
-    assert(headers.size == F)
-    assert(rows.size == N*L)
-    val (extraprops, data) = rows.unzip
-    data.foreach { row => assert(row.size == F) }
-    (headers.toArray, extraprops, data.toArray)
-  }
 
-  /**
-   * Undo the conversion in `get_labeled_instances` to get the long-format
-   * 2-d matrix used in R's mlogit() function. The return value is of the
-   * following type:
-   *
-   * (headers:Array[String], indiv:Array[Int], labels:Array[String],
-   *   choices:Array[Boolean], data_rows:Array[Array[Double]])
-   *
-   * where `data_rows` has N*L rows and F columns, `headers` is a size-F
-   * row vector listing column headers, `indiv` is a size-N*L column
-   * vector identifying the instance (from 1 to N) each row occurs in,
-   * `labels` is a size-N*L column vector specifying the label of each
-   * row (cycling through all labels repeated N times), and `choices`
-   * is a size-N*L column vector specifying 'true' for the rows with
-   * correct labels and 'false' otherwise. This format is used to make it
-   * possible to generate the right sort of data frame in R using the
-   * current Scala-to-R interface, which can only pass arrays and arrays
-   * of arrays, of fixed type.
-   */
-  def labeled_instances_to_R(
-      insts: Iterable[(AggregateFeatureVector, Int)]
-  ) = {
-    val (headers, extraprops, data) = put_labeled_instances(insts)
-    val (indiv, label, choice) = extraprops.unzip3
-    // FIXME! Bug in unzip, unzip3 makes it return Vectors instead of
-    // Arrays when unzipping Arrays (although we aren't currently
-    // returned an array).
-    (headers, indiv.toArray, label.toArray, choice.toArray, data)
+    val head = insts.head._1.feature_vector
+    val F = head.feature_mapper.number_of_indices
+    val headers =
+      for (i <- 0 until F if !(removed_features contains i))
+        yield head.feature_mapper.to_string(i)
+    (headers, insts.view.zipWithIndex.flatMap {
+      case ((inst, correct_label), index) =>
+        inst.feature_vector match {
+          case agg: AggregateFeatureVector =>
+            export_aggregate_labeled_instance(agg, correct_label, index,
+              removed_features)
+          case _ => ???
+        }
+    })
   }
 }
 
@@ -880,13 +857,11 @@ object AggregateFeatureVector {
  * vector for each of a set of labels.
  */
 case class AggregateFeatureVector(
-    fv: IndexedSeq[FeatureVector],
-    feature_mapper: FeatureMapper,
-    label_mapper: LabelMapper
+    fv: Array[FeatureVector]
 ) extends FeatureVector {
-  FeatureVector.check_same_length(fv)
+  FeatureVector.check_same_mappers(fv)
 
-  def length = fv.head.length
+  def mappers = fv.head.mappers
 
   def depth = fv.length
   def max_label = depth - 1
@@ -928,5 +903,177 @@ case class AggregateFeatureVector(
       "Featvec at depth %s(%s): %s" format (
         d, label_mapper.to_string(d),
         fv(d).pretty_print(prefix))).mkString("\n")
+  }
+
+  /**
+   * Return the component feature vectors as a sequence of compressed sparse
+   * feature vectors, by casting each item. Will throw an error if
+   * the feature vectors are of the wrong type.
+   */
+  def fetch_sparse_featvecs = {
+    // Retrieve as DoubleCompressedSparseFeatureVector, i.e. compressed
+    // sparse feature vectors whose values of are type Double.
+    fv map { x => x match {
+      case y:DoubleCompressedSparseFeatureVector => y
+      case _ => ???
+    } }
+  }
+
+  /**
+   * Return the set of all features found in the aggregate.
+   */
+  def find_all_features = {
+    val sparsevecs = fetch_sparse_featvecs
+    sparsevecs.foldLeft(Set[FeatIndex]()) { _ union _.keys.toSet }
+  }
+
+  /**
+   * Find the features that have different values from one component
+   * feature vector to another. Return a set of such features.
+   */
+  def find_diff_features = {
+    val sparsevecs = fetch_sparse_featvecs
+    val nvecs = sparsevecs.size
+
+    // OK, we do this in a purely iterative fashion to create as little
+    // garbage as possible, because we may be working with very large
+    // arrays. The basic idea, since there may be different features in
+    // different sparse feature vectors, is that we keep track of the
+    // number of times each feature has been seen and the max and min
+    // value of the feature. Then, a feature is the same across all
+    // feature vectors if either:
+    //
+    // 1. It hasn't been seen at all (its count is 0); or,
+    // 2. Its maxval and minval are the same and either
+    //    a. both are 0, or
+    //    b. both are non-zero and the feature was seen in every vector.
+    //
+    // We return a set of the features that aren't the same, because
+    // all unseen features by definition are the same across all
+    // feature vectors. Then, to compute the total set of features that
+    // aren't the same, we take the union of the individual results --
+    // something we can do incrementally to save memory.
+    val head = sparsevecs.head
+    val countmap = intmap[Int]()
+    val minmap = doublemap[Int]()
+    val maxmap = doublemap[Int]()
+    for (i <- 0 until head.keys.size) {
+      val k = head.keys(i)
+      val v = head.values(i)
+      countmap(k) += 1
+      minmap(k) = v
+      maxmap(k) = v
+    }
+    for (j <- 1 until sparsevecs.size; vec = sparsevecs(j)) {
+      for (i <- 0 until vec.keys.size) {
+        val k = vec.keys(i)
+        val v = vec.values(i)
+        countmap(k) += 1
+        if (v < minmap(k)) minmap(k) = v
+        if (v > maxmap(k)) maxmap(k) = v
+      }
+    }
+    (
+      for ((k, count) <- countmap; same = minmap(k) == maxmap(k) && (
+           minmap(k) == 0 || count == nvecs); if !same)
+        yield k
+    ).toSet
+  }
+
+  /**
+   * Find all features that have different values in at least one pair
+   * of component feature vectors in at least one aggregate feature
+   * vector. Return a set of such features. Features that don't differ
+   * at all within any aggregate feature vector aren't useful for
+   * distinguishing one candidate from another and may cause singularity
+   * errors in R's mlogit() function, so need to be deleted.
+   */
+  def remove_non_choice_specific_columns(diff_features: Set[FeatIndex]) {
+    val sparsevecs = fetch_sparse_featvecs
+    for (i <- 0 until sparsevecs.size; vec = sparsevecs(i)) {
+      val need_to_remove = vec.keys.exists(!diff_features.contains(_))
+      if (need_to_remove) {
+        val feats =
+          (vec.keys zip vec.values).filter(diff_features contains _._1)
+        vec.keys = feats.map(_._1).toArray
+        vec.values = feats.map(_._2).toArray
+      }
+    }
+  }
+
+  /**
+   * Standardize the appropriate features in the given feature vectors by
+   * subtracting their mean and then dividing by their standard deviation.
+   * This destructively modifies the feature vectors and only operates
+   * on features that have been marked as needing standardization.
+   * Standardization is done to make it easier to compare numeric feature
+   * values across different query documents, which otherwise may differ
+   * greatly in scale. (This is the case for KL-divergence scores, for
+   * example.) Whether standardization is done depends on the type of the
+   * feature's value. For example, binary features definitely don't need
+   * to be standardized and probabilities aren't currently standardized,
+   * either. Features of only a candidate also don't need to be standardized
+   * as they don't suffer from the problem of being compared with different
+   * query documents.)
+   */
+  def standardize_featvecs() {
+    val sparsevecs = fetch_sparse_featvecs
+
+    // Get the sum and count of all features seen in any of the keys.
+    // Here and below, when computing mean, std dev, etc., we ignore
+    // unseen features rather than counting them as 0's. This wouldn't
+    // work well for binary features, where we normally only store the
+    // features with a value of 1, but we don't adjust those features
+    // in any case. For other features, we assume that features that
+    // are meant to be present and happen to have a value of 0 will be
+    // noted as such. This means that we calculate mean and stddev
+    // only for features that are present, and likewise standardize
+    // only features that are present. Otherwise, we'd end up converting
+    // all the absent features to present features with some non-zero
+    // value, which seems non-sensical besides making the coding more
+    // difficult as we currently can't expand a sparse feature vector,
+    // only change the value of an existing feature.
+    val (keycount, keysum) =
+      sparsevecs.foldLeft((intmap[Int](), doublemap[Int]())) {
+        (maps, vec) =>
+          val (countmap, summap) = maps
+          for ((k, v) <- (vec.keys zip vec.values)) {
+            countmap(k) += 1
+            summap(k) += v
+          }
+          maps
+      }
+    // Compute the mean of all seen instances of a feature.
+    // Unseen features are ignored rather than counted as 0's.
+    val keymean =
+      keysum map { case (key, sum) => (key, sum / keycount(key)) }
+    // Compute the sum of squared differences from the mean of all seen
+    // instances of a feature.
+    // Unseen features are ignored rather than counted as 0's.
+    val keysumsq =
+      sparsevecs.foldLeft(doublemap[Int]()) {
+        (sumsqmap, vec) =>
+          for ((k, v) <- (vec.keys zip vec.values)) {
+            val mean = keymean(k)
+            sumsqmap(k) += (v - mean) * (v - mean)
+          }
+          sumsqmap
+      }
+
+    // Compute the standard deviation of all instances
+    // Unseen features are ignored rather than counted as 0's.
+    val keystddev =
+      keysumsq map { case (key, sumsq) =>
+        (key, math.sqrt(sumsq / keycount(key))) }
+
+    // Now standardize the features that need to be.
+    for (vec <- sparsevecs) {
+      for (i <- 0 until vec.keys.size) {
+        val key = vec.keys(i)
+        if (feature_mapper.features_to_standardize contains key) {
+          vec.values(i) = (vec.values(i) - keymean(key))/keystddev(key)
+        }
+      }
+    }
   }
 }

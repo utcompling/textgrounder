@@ -1503,9 +1503,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val top_n = params.rerank_top_n
           val number_of_splits = params.rerank_num_training_splits
 
-          val feature_mapper =
-            candidate_featvec_factory.featvec_factory.feature_mapper
-          val label_mapper = new LabelMapper
+          val label_mapper =
+            candidate_featvec_factory.featvec_factory.label_mapper
+          assert(label_mapper.number_of_indices == 0)
           for (i <- 0 until params.rerank_top_n) {
             label_mapper.to_index(s"#${i + 1}")
           }

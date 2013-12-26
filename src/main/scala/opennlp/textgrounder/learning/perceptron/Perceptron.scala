@@ -280,8 +280,9 @@ trait BinaryPerceptronTrainer
     }
   }
 
-  def get_weights(data: Iterable[(FeatureVector, LabelIndex)]
-      ): (VectorAggregate, Int) = {
+  def get_weights(training_data: TrainingData[FeatureVector]
+  ): (VectorAggregate, Int) = {
+    val data = training_data.data
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weight_aggr = initialize(data)
@@ -554,8 +555,8 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
     }
   }
 
-  def get_weights(data: Iterable[(DI, LabelIndex)]
-      ): (VectorAggregate, Int) = {
+  def get_weights(training_data: TrainingData[DI]): (VectorAggregate, Int) = {
+    val data = training_data.data
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weights = initialize(data)
@@ -845,7 +846,8 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
     }
   }
 
-  def get_weights(data: Iterable[(DI, LabelIndex)]): (VectorAggregate, Int) = {
+  def get_weights(training_data: TrainingData[DI]): (VectorAggregate, Int) = {
+    val data = training_data.data
     if (debug("perceptron"))
       return debug_get_weights(data)
     val weights = initialize(data)

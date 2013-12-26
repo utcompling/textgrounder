@@ -244,7 +244,7 @@ object Classify extends ExperimentApp("Classify") {
               max_iterations = params.rounds)
           }
         }
-        val classifier = trainer(training_instances)
+        val classifier = trainer(TrainingData(training_instances))
         (classifier, test_instances, factory)
       } else {
         // Read in the data instances and create feature vectors
@@ -310,7 +310,7 @@ object Classify extends ExperimentApp("Classify") {
               max_iterations = params.rounds)
           }
         }
-        val classifier = trainer(training_instances)
+        val classifier = trainer(TrainingData(training_instances))
         (classifier, test_instances, factory)
       }
 

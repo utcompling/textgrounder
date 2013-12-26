@@ -156,9 +156,6 @@ trait PointwiseClassifyingReranker[Query, Candidate]
   /** Scoring classifier for use in reranking. */
   protected def rerank_classifier: ScoringClassifier
 
-  val feature_mapper: FeatureMapper
-  val label_mapper: LabelMapper
-
   /**
    * Create a candidate feature vector to feed to the classifier during
    * evaluation, given a query item, a potential candidate from the
@@ -178,8 +175,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
     val query_featvec =
-      new AggregateFeatureVector(cand_featvecs.toIndexedSeq, feature_mapper,
-        label_mapper)
+      new AggregateFeatureVector(cand_featvecs.toArray)
     val new_scores = rerank_classifier.score(query_featvec).toIndexedSeq
     val candidates = scored_candidates.map(_._1).toIndexedSeq
     candidates zip new_scores sortWith (_._2 > _._2)
@@ -303,74 +299,6 @@ trait PointwiseClassifyingRerankerTrainer[
       the_label
     }
 
-    def standardize_featvecs(featvecs: IndexedSeq[FeatureVector]) = {
-      // Retrieve as DoubleCompressedSparseFeatureVector, i.e. compressed
-      // sparse feature vectors whose values of are type Double.
-      val sparse_vecs =
-        featvecs map { x => x match {
-          case y:DoubleCompressedSparseFeatureVector => y
-          case _ => ???
-        } }
-      // Get the sum and count of all features seen in any of the keys.
-      // Here and below, when computing mean, std dev, etc., we ignore
-      // unseen features rather than counting them as 0's. This wouldn't
-      // work well for binary features, where we normally only store the
-      // features with a value of 1, but we don't adjust those features
-      // in any case. For other features, we assume that features that
-      // are meant to be present and happen to have a value of 0 will be
-      // noted as such. This means that we calculate mean and stddev
-      // only for features that are present, and likewise standardize
-      // only features that are present. Otherwise, we'd end up converting
-      // all the absent features to present features with some non-zero
-      // value, which seems non-sensical besides making the coding more
-      // difficult as we currently can't expand a sparse feature vector,
-      // only change the value of an existing feature.
-      val (keycount, keysum) =
-        sparse_vecs.foldLeft((intmap[Int](), doublemap[Int]())) {
-          (maps, vec) =>
-            val (countmap, summap) = maps
-            for ((k, v) <- (vec.keys zip vec.values)) {
-              countmap(k) += 1
-              summap(k) += v
-            }
-            maps
-        }
-      // Compute the mean of all seen instances of a feature.
-      // Unseen features are ignored rather than counted as 0's.
-      val keymean =
-        keysum map { case (key, sum) => (key, sum / keycount(key)) }
-      // Compute the sum of squared differences from the mean of all seen
-      // instances of a feature.
-      // Unseen features are ignored rather than counted as 0's.
-      val keysumsq =
-        sparse_vecs.foldLeft(doublemap[Int]()) {
-          (sumsqmap, vec) =>
-            for ((k, v) <- (vec.keys zip vec.values)) {
-              val mean = keymean(k)
-              sumsqmap(k) += (v - mean) * (v - mean)
-            }
-            sumsqmap
-        }
-
-      // Compute the standard deviation of all instances
-      // Unseen features are ignored rather than counted as 0's.
-      val keystddev =
-        keysumsq map { case (key, sumsq) =>
-          (key, math.sqrt(sumsq / keycount(key))) }
-
-      // Now standardize the features that need to be.
-      for (vec <- sparse_vecs) {
-        for (i <- 0 until vec.keys.size) {
-          val key = vec.keys(i)
-          if (feature_mapper.features_to_standardize contains key) {
-            vec.values(i) = (vec.values(i) - keymean(key))/keystddev(key)
-          }
-        }
-      }
-
-      featvecs
-    }
-
     /**
      * Convert the data in the object into an aggregate feature vector
      * describing the candidates for a query. This is the primary data in an
@@ -387,10 +315,10 @@ trait PointwiseClassifyingRerankerTrainer[
       // Get sequence of feature vectors
       val featvecs =
         (for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
-          create_candidate_featvec(query, cand, score, rank)).toIndexedSeq
-      val standardized_featvecs = standardize_featvecs(featvecs)
-      new AggregateFeatureVector(standardized_featvecs, feature_mapper,
-        label_mapper)
+          create_candidate_featvec(query, cand, score, rank)).toArray
+      val agg = new AggregateFeatureVector(featvecs)
+      agg.standardize_featvecs()
+      agg
     }
 
     /**
@@ -413,11 +341,6 @@ trait PointwiseClassifyingRerankerTrainer[
    */
   val number_of_splits: Int
 
-  /** Feature mapper used to memoize features. */
-  val feature_mapper: FeatureMapper
-  /** Label mapper used to memoize labels, or simulated. */
-  val label_mapper: LabelMapper
-
   /**
    * Create the classifier used for reranking, given training data.
    * Each data instance describes a training document in a form
@@ -426,8 +349,8 @@ trait PointwiseClassifyingRerankerTrainer[
    * candidate (corresponding to an index into the RTI's aggregate feature
    * vector).
    */
-  protected def create_rerank_classifier(data: Iterable[(RTI, LabelIndex)]
-  ): ScoringClassifier
+  protected def create_rerank_classifier(data: TrainingData[RTI]
+    ): ScoringClassifier
 
   /**
    * Create a candidate feature vector (see above) to feed to
@@ -591,7 +514,7 @@ trait PointwiseClassifyingRerankerTrainer[
     val rerank_training_data = get_rerank_training_data(training_data)
     val rerank_instances =
       query_training_data_to_rerank_training_instances(rerank_training_data)
-    create_rerank_classifier(rerank_instances)
+    create_rerank_classifier(TrainingData(rerank_instances))
   }
 
   /**
@@ -606,8 +529,6 @@ trait PointwiseClassifyingRerankerTrainer[
       protected val rerank_classifier = _rerank_classifier
       protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
-      val feature_mapper = self.feature_mapper
-      val label_mapper = self.label_mapper
       protected def create_candidate_eval_featvec(query: Query,
           candidate: Candidate, initial_score: Double, initial_rank: Int) = {
         self.create_candidate_eval_featvec(query, candidate,
