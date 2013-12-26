@@ -170,6 +170,12 @@ object Classify extends ExperimentApp("Classify") {
 
   def create_param_object(ap: ArgParser) = new ClassifyParameters(ap)
 
+  def error(msg: String) = {
+    System.err.println(msg)
+    System.exit(1)
+    ???
+  }
+
   def run_program(args: Array[String]) = {
     val trainSource = io.localfh.openr(params.trainSource)
     val predictSource = io.localfh.openr(params.predictSource)
@@ -205,9 +211,8 @@ object Classify extends ExperimentApp("Classify") {
             toIndexedSeq
         val numlabs = factory.label_mapper.number_of_indices
         if (numlabs < 2) {
-          println("Found %s different labels, when at least 2 are needed." format
+          error("Found %s different labels, when at least 2 are needed." format
             numlabs)
-          System.exit(0)
         }
 
         // Train a classifer
@@ -222,7 +227,7 @@ object Classify extends ExperimentApp("Classify") {
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
-          case _ => {
+          case "perceptron"|"avg-perceptron" => {
             errprint("Using basic multi-label perceptron")
             new BasicSingleWeightMultiLabelPerceptronTrainer[
               FeatureVector
@@ -252,9 +257,8 @@ object Classify extends ExperimentApp("Classify") {
             toIndexedSeq
         val numlabs = factory.label_mapper.number_of_indices
         if (numlabs < 2) {
-          println("Found %s different labels, when at least 2 are needed." format
+          error("Found %s different labels, when at least 2 are needed." format
             numlabs)
-          System.exit(0)
         }
 
         // Train a classifer
@@ -277,7 +281,8 @@ object Classify extends ExperimentApp("Classify") {
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
-          case _ if numlabs > 2 || debug("multilabel") => {
+          case "perceptron"|"avg-perceptron"
+              if numlabs > 2 || debug("multilabel") => {
             errprint("Using basic multi-label perceptron")
             new BasicMultiWeightMultiLabelPerceptronTrainer[
               FeatureVector
@@ -287,7 +292,7 @@ object Classify extends ExperimentApp("Classify") {
               error_threshold = params.error_threshold,
               max_iterations = params.rounds)
           }
-          case _ => {
+          case "perceptron"|"avg-perceptron" => {
             errprint("Using basic binary perceptron")
             new BasicBinaryPerceptronTrainer(
               ArrayVector, params.aggressiveness,
