@@ -23,5 +23,15 @@ package object learning {
   type LabelIndex = Int
   // type Vector = breeze.linalg.DenseVector[Double]
   // type Vector = Array[Double]
+
+  // If we want to use double-valued feature vectors internally, do this:
+//  type CompressedSparseFeatureVectorType = DoubleCompressedSparseFeatureVector
+//  val feature_vector_implementation = "DoubleCompressed"
+//  def to_feat_value(x: Double) = x
+
+  // If we want to use float-valued feature vectors internally, do this:
+  type CompressedSparseFeatureVectorType = FloatCompressedSparseFeatureVector
+  val feature_vector_implementation = "FloatCompressed"
+  def to_feat_value(x: Double) = x.toFloat
 }
 

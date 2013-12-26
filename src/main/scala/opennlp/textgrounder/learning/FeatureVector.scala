@@ -401,7 +401,7 @@ class SparseFeatureVectorFactory { self =>
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
             "ShortCompressed" | "TupleArray" | "Map") => f
-    case "" => "DoubleCompressed"
+    case "" => feature_vector_implementation
   }
 
   errprint("Feature vector implementation: %s", vector_impl match {
@@ -911,10 +911,11 @@ case class AggregateFeatureVector(
    * the feature vectors are of the wrong type.
    */
   def fetch_sparse_featvecs = {
-    // Retrieve as DoubleCompressedSparseFeatureVector, i.e. compressed
-    // sparse feature vectors whose values of are type Double.
+    // Retrieve as the appropriate type of compressed sparse feature vectors.
+    // This will be one of DoubleCompressedSparseFeatureVector,
+    // FloatCompressedSparseFeatureVector, etc.
     fv map { x => x match {
-      case y:DoubleCompressedSparseFeatureVector => y
+      case y:CompressedSparseFeatureVectorType => y
       case _ => ???
     } }
   }
@@ -992,7 +993,7 @@ case class AggregateFeatureVector(
         val feats =
           (vec.keys zip vec.values).filter(diff_features contains _._1)
         vec.keys = feats.map(_._1).toArray
-        vec.values = feats.map(_._2).toArray
+        vec.values = feats.view.map(_._2).map(to_feat_value(_)).toArray
       }
     }
   }
@@ -1066,7 +1067,8 @@ case class AggregateFeatureVector(
       for (i <- 0 until vec.keys.size) {
         val key = vec.keys(i)
         if (feature_mapper.features_to_standardize contains key) {
-          vec.values(i) = (vec.values(i) - keymean(key))/keystddev(key)
+          vec.values(i) =
+            to_feat_value((vec.values(i) - keymean(key))/keystddev(key))
         }
       }
     }
