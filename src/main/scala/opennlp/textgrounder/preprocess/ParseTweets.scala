@@ -54,7 +54,7 @@ import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
 import util.print._
 import util.spherical.SphereCoord
-import util.text.with_commas
+import util.text.pretty_long
 import util.time._
 
 class ParseTweetsParams(ap: ArgParser) extends
@@ -2392,19 +2392,19 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           x.ty == "user" && x.key2 == "user").toSeq(0)
         errprint("\nCombined summary:")
         errprint("%s tweets by %s users = %.2f tweets/user",
-          with_commas(userstat.num_value_occurrences),
-          with_commas(userstat.num_value_types),
+          pretty_long(userstat.num_value_occurrences),
+          pretty_long(userstat.num_value_types),
           userstat.num_value_occurrences.toDouble / userstat.num_value_types)
         val monthstat = by_type.filter(_.ty == "year/month")
         errprint("\nSummary by month:")
         for (mo <- monthstat)
           errprint("%-20s: %12s tweets", mo.key2,
-            with_commas(mo.num_value_occurrences))
+            pretty_long(mo.num_value_occurrences))
         val daystat = by_type.filter(_.ty == "year/month/day")
         errprint("\nSummary by day:")
         for (d <- daystat)
           errprint("%-20s: %12s tweets", d.key2,
-            with_commas(d.num_value_occurrences))
+            pretty_long(d.num_value_occurrences))
         errprint("\n")
       }
     }

@@ -25,7 +25,7 @@ import math._
 import collection.mutable
 
 import util.collection._
-import util.text.format_float
+import util.text.format_double
 import util.time._
 import util.print.{errout, errprint}
 import util.experiment._
@@ -211,11 +211,11 @@ class LangModelComparer(min_prob: Double, max_grams: Int) {
     for ((gram, dunning, prob) <-
         gramdiff.toSeq.sortWith(_._2 > _._2).take(max_grams)) {
       println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
-        (format_float(dunning),
+        (format_double(dunning),
          before_lm.gram_to_string(gram),
-         if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(before_lm.gram_prob(gram)),
-         format_float(after_lm.gram_prob(gram))
+         if (prob > 0) "increase" else "decrease", format_double(prob),
+         format_double(before_lm.gram_prob(gram)),
+         format_double(after_lm.gram_prob(gram))
        ))
     }
     println("")
@@ -231,10 +231,10 @@ class LangModelComparer(min_prob: Double, max_grams: Int) {
           diffs.toSeq.sortWith(_._3 > _._3).take(max_grams)) {
         println("%s: %s - %s = %s%s (LL %s)" format
           (before_lm.gram_to_string(gram),
-           format_float(before_lm.gram_prob(gram)),
-           format_float(after_lm.gram_prob(gram)),
-           updown, format_float(prob),
-           format_float(dunning)))
+           format_double(before_lm.gram_prob(gram)),
+           format_double(after_lm.gram_prob(gram)),
+           updown, format_double(prob),
+           format_double(dunning)))
       }
       println("")
     }
@@ -283,11 +283,11 @@ class LangModelComparer(min_prob: Double, max_grams: Int) {
 
     println("%24s change %7s%% (+-%7.7s) / %7s%% (+-%7.7s)" format (
       "Grams by 4-way log-lhood:", cat13, cat18, cat23, cat28))
-    def fmt(x: Double) = format_float(x, include_plus = true)
+    def fmt(x: Double) = format_double(x, include_plus = true)
     for ((gram, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
         gramdiff.toSeq.sortWith(_._2 > _._2).take(max_grams)) {
       println("%7s: %-15.15s %6s: %7s%% (%9s) / %7s%% (%9s)" format
-        (format_float(dunning),
+        (format_double(dunning),
          before_lm_1.gram_to_string(gram),
          change,
          fmt(pct1), fmt(abs1),
@@ -311,7 +311,7 @@ class LangModelComparer(min_prob: Double, max_grams: Int) {
         for ((gram, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
             diffs.toSeq.sortWith(comparefun).take(max_grams)) {
           println("%-15.15s = LL %7s (%%chg-diff %7s%% = %7s%% - %7s%%)" format
-            (before_lm_1.gram_to_string(gram), format_float(dunning),
+            (before_lm_1.gram_to_string(gram), format_double(dunning),
               fmt(pct1 - pct2), fmt(pct1), fmt(pct2)))
         }
       }

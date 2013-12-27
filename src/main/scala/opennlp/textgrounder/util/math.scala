@@ -44,6 +44,12 @@ package object math {
   }
 
   /**
+   * Return whether a double is negative, handling -0.0 correctly.
+   */
+  def is_negative(x: Double) =
+    java.lang.Double.compare(x, 0.0) < 0
+
+  /**
    *  Return the median value of a sequence.
    *
    *  @param seq Sequence of points to retrieve median of.

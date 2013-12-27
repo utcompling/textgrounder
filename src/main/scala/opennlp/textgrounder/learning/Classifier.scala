@@ -31,7 +31,7 @@ import io.Source
 import util.math.argmax
 import util.metering._
 import util.print._
-import util.text.format_float
+import util.text.format_double
 
 import util.debug._
 
@@ -373,7 +373,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     def do_iterate(coda: => Unit) =
       iterate(error_threshold, max_iterations){ iter =>
         val retval = fun(weights, iter)
-        errprint("Weight sum: %s", format_float(weights.sum))
+        errprint("Weight sum: %s", format_double(weights.sum))
         if (debug("weights-each-iteration"))
           debug_print_weights(weights,
             data.head._1.feature_vector.format_feature _)

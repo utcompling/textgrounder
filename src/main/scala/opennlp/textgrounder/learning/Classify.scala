@@ -329,10 +329,10 @@ object Classify extends ExperimentApp("Classify") {
         // Map to labels
         val scorelabs = scores.flatMap {
           case (lab, pred) => Seq(
-            factory.label_mapper.to_string(lab), min_format_float(pred))
+            factory.label_mapper.to_string(lab), min_format_double(pred))
         }
         val corrstr = if (correct) "CORRECT" else "WRONG"
-        val confstr = min_format_float(conf)
+        val confstr = min_format_double(conf)
         val truelabstr = factory.label_mapper.to_string(truelab)
         val line = Seq(corrstr, confstr, truelabstr) ++ scorelabs
         (correct, (inst, line))

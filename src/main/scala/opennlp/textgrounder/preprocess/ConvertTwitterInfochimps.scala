@@ -32,7 +32,7 @@ import util.io._
 import util.metering._
 import util.os.output_resource_usage
 import util.print._
-import util.text.with_commas
+import util.text.pretty_long
 import util.textdb._
 import util.Twokenize
 
@@ -360,9 +360,9 @@ class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
     finish_statistics()
 
     val how_many_summary = 10000
-    val how_many_summary_str = with_commas(how_many_summary)
+    val how_many_summary_str = pretty_long(how_many_summary)
     val how_many_detail = 100
-    val how_many_detail_str = with_commas(how_many_detail)
+    val how_many_detail_str = pretty_long(how_many_detail)
 
     errprint("")
     errprint("Earliest tweet: %s at %s" format

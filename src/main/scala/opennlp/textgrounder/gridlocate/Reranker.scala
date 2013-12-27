@@ -8,6 +8,7 @@ import util.debug._
 import util.print._
 import util.math.logn
 import util.metering._
+import util.text.{pretty_long, pretty_double}
 import util.textdb.Row
 import learning._
 

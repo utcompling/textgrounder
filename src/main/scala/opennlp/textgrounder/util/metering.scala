@@ -123,8 +123,8 @@ protected class MeteringPackage {
       val items_per_second = items_processed.toDouble / total_elapsed_secs
       val seconds_per_item = total_elapsed_secs / items_processed
       errprint("Processing rate: %s items per second (%s seconds per item)",
-               format_float(items_per_second),
-               format_float(seconds_per_item))
+               format_double(items_per_second),
+               format_double(seconds_per_item))
     }
 
     /**

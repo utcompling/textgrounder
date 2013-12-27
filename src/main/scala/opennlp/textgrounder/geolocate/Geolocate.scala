@@ -33,7 +33,7 @@ import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.os._
 import util.print.{errprint, outprint}
-import util.text.format_float
+import util.text.format_double
 import util.textdb.Encoder
 import util.time.format_minutes_seconds
 
@@ -624,7 +624,7 @@ abstract class GeolocateApp(appname: String) extends
     )
     for ((field, english, value) <- results) {
       driver.note_result(field, value, english)
-      errprint("%s: %s", english, format_float(value))
+      errprint("%s: %s", english, format_double(value))
     }
   }
 }
@@ -663,7 +663,7 @@ object GeolocateDocumentTag extends
       case null => ""
       case d:Double => {
         if (d == d.toLong) "%s" format d.toLong
-        else format_float(d)
+        else format_double(d)
       }
       case _ => "%s" format value
     }

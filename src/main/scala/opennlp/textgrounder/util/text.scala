@@ -23,6 +23,7 @@ import scala.util.control.Breaks._
 import scala.util.matching.Regex
 import scala.math._
 
+import math.is_negative
 import print.warning
 
 package object text {
@@ -31,28 +32,28 @@ package object text {
   //                    String functions involving numbers                  //
   ////////////////////////////////////////////////////////////////////////////
 
-  /**
-   Convert a string to floating point, but don't crash on errors;
-  instead, output a warning.
-   */
-  def safe_float(x: String) = {
-    try {
-      x.toDouble
-    } catch {
-      case _: Exception => {
-        val y = x.trim()
-        if (y != "") warning("Expected number, saw %s", y)
-        0.0
-      }
-    }
-  }
+//  /**
+//   Convert a string to floating point, but don't crash on errors;
+//  instead, output a warning.
+//   */
+//  def safe_float(x: String) = {
+//    try {
+//      x.toDouble
+//    } catch {
+//      case _: Exception => {
+//        val y = x.trim()
+//        if (y != "") warning("Expected number, saw %s", y)
+//        0.0
+//      }
+//    }
+//  }
 
   // Originally based on code from:
   // http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
-  def with_commas(x: Long): String = {
+  protected def imp_format_long_commas(x: Long): String = {
     var mx = x
     if (mx < 0)
-      "-" + with_commas(-mx)
+      "-" + imp_format_long_commas(-mx)
     else {
       var result = ""
       while (mx >= 1000) {
@@ -63,16 +64,43 @@ package object text {
       "%s%s" format (mx, result)
     }
   }
-  
-  // My own version
-  def with_commas(x: Double): String = {
-    val intpart = floor(x).toInt
-    val fracpart = x - intpart
-    with_commas(intpart) + ("%.2f" format fracpart).drop(1)
+
+  /**
+   * Format a long, optionally adding commas to separate thousands.
+   *
+   * @param with_commas If true, add commas to separate thousands.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def format_long(x: Long, include_plus: Boolean = false,
+      with_commas: Boolean = false) = {
+    val sign = if (include_plus && x >= 0) "+" else ""
+    sign + (
+      if (!with_commas) x.toString
+      else imp_format_long_commas(x)
+    )
   }
 
   /**
-   * Try to format a floating-point number using %f style (i.e. avoding
+   * Format a long, adding commas to separate thousands.
+   *
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def format_long_commas(x: Long, include_plus: Boolean = false) =
+    format_long(x, include_plus = include_plus, with_commas = true)
+
+  /**
+   * Format a long integer in a "pretty" fashion. This adds commas
+   * to separate thousands in the integral part.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def pretty_long(x: Long, include_plus: Boolean = false) =
+    format_long_commas(x, include_plus = include_plus)
+
+  /**
+   * Format a floating-point number using %f style (i.e. avoding
    * scientific notation) and with a fixed number of significant digits
    * after the decimal point. Normally this is the same as the actual
    * number of digits displayed after the decimal point, but more digits
@@ -83,26 +111,48 @@ package object text {
    *   to display.
    * @param include_plus If true, include a + sign before positive numbers.
    * @param drop_zeros If true, drop trailing zeros after decimal point.
+   * @param with_commas If true, add commas to separate thousands
+   * in the integral part.
    */
-  def format_float(x: Double, sigdigits: Int = 2,
-      include_plus: Boolean = false, drop_zeros: Boolean = false) = {
-    var precision = sigdigits
-    if (x != 0) {
-      var xx = abs(x)
-      while (xx < 0.1) {
-        xx *= 10
-        precision += 1
+  def format_double(x: Double, sigdigits: Int = 2,
+      drop_zeros: Boolean = false,
+      with_commas: Boolean = false,
+      include_plus: Boolean = false): String = {
+    if (is_negative(x)) {
+      // Don't use x.abs because it has a bug handling -0.0
+      "-" + format_double(abs(x), sigdigits = sigdigits,
+        drop_zeros = drop_zeros, with_commas = with_commas,
+        include_plus = false)
+    } else if (with_commas) {
+      val sign = if (include_plus) "+" else ""
+      val longpart = x.toLong
+      // Use 1+ so that we don't get special treatment of values near 0
+      // unless we're actually near 0
+      val fracpart = (if (longpart != 0) 1 else 0) + abs(x - longpart)
+      sign + imp_format_long_commas(longpart) +
+        format_double(fracpart, sigdigits = sigdigits,
+          drop_zeros = drop_zeros, with_commas = false,
+          include_plus = false).
+        drop(1)
+    } else {
+      var precision = sigdigits
+      if (x != 0) {
+        var xx = abs(x)
+        while (xx < 0.1) {
+          xx *= 10
+          precision += 1
+        }
       }
+      val formatstr =
+        "%%%s.%sf" format (if (include_plus) "+" else "", precision)
+      val retval = formatstr format x
+      if (drop_zeros)
+        // Drop zeros after decimal point, then drop decimal point if it's last.
+        retval.replaceAll("""\.([0-9]*?)0+$""", """.$1""").
+          replaceAll("""\.$""", "")
+      else
+        retval
     }
-    val formatstr =
-      "%%%s.%sf" format (if (include_plus) "+" else "", precision)
-    val retval = formatstr format x
-    if (drop_zeros)
-      // Drop zeros after decimal point, then drop decimal point if it's last.
-      retval.replaceAll("""\.([0-9]*?)0+$""", """.$1""").
-        replaceAll("""\.$""", "")
-    else
-      retval
   }
 
   /**
@@ -113,9 +163,53 @@ package object text {
    *   to display.
    * @param include_plus If true, include a + sign before positive numbers.
    */
-  def min_format_float(x: Double, sigdigits: Int = 2,
+  def min_format_double(x: Double, sigdigits: Int = 2,
+      with_commas: Boolean = false,
       include_plus: Boolean = false) =
-    format_float(x, sigdigits, include_plus, drop_zeros = true)
+    format_double(x, sigdigits = sigdigits, with_commas = with_commas,
+      include_plus = include_plus, drop_zeros = true)
+
+  /**
+   * Format a floating-point number, adding commas to separate thousands
+   * in the integral part.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def format_double_commas(x: Double, sigdigits: Int = 2,
+      drop_zeros: Boolean = false,
+      include_plus: Boolean = false) =
+    format_double(x, sigdigits = sigdigits, include_plus = include_plus,
+      drop_zeros = drop_zeros, with_commas = true)
+
+  /**
+   * Format a floating-point number, dropping final zeros so it takes the
+   * minimum amount of space and adding commas to separate thousands in the
+   * integral part.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def min_format_double_commas(x: Double, sigdigits: Int = 2,
+      include_plus: Boolean = false) =
+    format_double(x, sigdigits = sigdigits, include_plus = include_plus,
+      drop_zeros = true, with_commas = true)
+
+  /**
+   * Format a floating-point number in a "pretty" fashion. This drops
+   * final zeros so it takes the minimum amount of space and adds commas
+   * to separate thousands in the integral part.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def pretty_double(x: Double, sigdigits: Int = 2,
+      include_plus: Boolean = false) =
+    min_format_double_commas(x, sigdigits = sigdigits,
+      include_plus = include_plus)
 
   ////////////////////////////////////////////////////////////////////////////
   //                           Table-output functions                       //
@@ -199,8 +293,8 @@ package object text {
        )
     ) reduce (_ ++ _) filter (_ != "")
   }
- 
-  
+
+
   /**
    Pluralize an English word, using a basic but effective algorithm.
    */
