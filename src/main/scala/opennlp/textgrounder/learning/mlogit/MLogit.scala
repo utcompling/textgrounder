@@ -22,6 +22,7 @@ package learning.mlogit
 import learning._
 import util.debug._
 import util.io.localfh
+import util.metering._
 import util.print.{errprint,internal_error}
 
 import org.ddahl.jvmr.RInScala
@@ -128,9 +129,11 @@ class RConditionalLogitTrainer[DI <: DataInstance](
     val sep = " "
     val filename =
       java.io.File.createTempFile("textgrounder.mlogit", null).toString
+    errprint("Writing R data array to file: %s", filename)
     val file = localfh.openw(filename)
     file.println(rheaders mkString sep)
-    rows.foreach { case ((indiv, labelstr, choice), datarow) =>
+    val task = new Meter("writing", "rerank training instance")
+    rows.foreachMetered(task) { case ((indiv, labelstr, choice), datarow) =>
       assert(headers.size == datarow.size)
       val indivstr = indiv.toString
       val choicestr = if (choice) "TRUE" else "FALSE"
@@ -152,22 +155,26 @@ class RConditionalLogitTrainer[DI <: DataInstance](
 
     val removed_features = training_data.removed_features
     val frame = "frame" // Name of variable to use for data, etc.
+    // The `rows` returned here is a lazy view; the conversion to array
+    // rows happens in `foreachMetered` in `training_data_to_file`, on
+    // the fly.
     val (headers, rows) =
       AggregateFeatureVector.export_training_data(training_data)
     val rheaders = headers.map {
       _.replaceAll("[^A-Za-z0-9_]", ".")
     }
-    // errprint("#1")
     R.eval("require(mlogit)")
 
     val filename = training_data_to_file(rheaders, rows)
-    errprint("Filename: %s", filename)
-    R.eval(s"""$frame = read.table("$filename", header=TRUE)""")
-    // errprint("#10")
-    R.eval(s"""$frame = mlogit.data(choice="choice", shape="long", alt.var="label", chid.var="indiv", $frame)""")
-    // errprint("#11")
-    R.eval(s"""m.$frame = mlogit(choice ~ ${rheaders mkString " + "} | -1, $frame)""")
-    // errprint("#12")
+    time_action("reading data into R") {
+      R.eval(s"""$frame = read.table("$filename", header=TRUE)""")
+    }
+    time_action("reshaping data in R") {
+      R.eval(s"""$frame = mlogit.data(choice="choice", shape="long", alt.var="label", chid.var="indiv", $frame)""")
+    }
+    time_action("executing mlogit()") {
+      R.eval(s"""m.$frame = mlogit(choice ~ ${rheaders mkString " + "} | -1, $frame)""")
+    }
     val weights = R.toVector[Double](s"as.vector(m.$frame$$coefficients)")
     assert(weights.size == headers.size,
       "Weights size %s should = headers size %s" format (weights.size,
