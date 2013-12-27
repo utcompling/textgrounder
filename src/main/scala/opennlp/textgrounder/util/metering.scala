@@ -27,13 +27,53 @@ import collection.{InterruptibleIterator, SideEffectIterator}
 import os._
 import print.errprint
 import text._
-import time.format_minutes_seconds
+import time._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Metered Tasks                               //
 /////////////////////////////////////////////////////////////////////////////
 
 protected class MeteringPackage {
+  protected var started = false
+  protected var first_time: Double = _
+  protected var last_time: Double = _
+
+  class Timer(action: String) {
+    def start() {
+      errprint("--------------------------------------------------------")
+      first_time = curtimesecs
+      last_time = first_time
+      errprint("Beginning %s at %s.", action, humandate_full(first_time))
+      started = true
+    }
+
+    def print_elapsed_time(curtime: Double) {
+      val total_elapsed_secs = curtime - first_time
+      errprint("Elapsed time: %s (since start: %s)",
+               format_minutes_seconds(total_elapsed_secs,
+                 include_hours = false),
+               format_minutes_seconds(get_program_time_usage))
+    }
+
+    def finish() {
+      val curtime = curtimesecs
+      errprint("Finished %s at %s.", action, humandate_full(curtime))
+      // Don't include timestamp since we already output it.
+      print_elapsed_time(curtime)
+      output_resource_usage(omit_time = true)
+    }
+  }
+
+  def time_action[T](action: String)(fn: => T) = {
+    {
+      val timer = new Timer(action)
+      timer.start()
+      val retval = fn
+      timer.finish()
+      retval
+    }
+  }
+
   /**
    * Class for tracking number of items processed in a long task, and
    * reporting periodic status messages concerning how many items
@@ -74,12 +114,26 @@ protected class MeteringPackage {
     // Whether we've already printed stats after the most recent item
     // processed
     protected var printed_stats = false
-    protected var started = false
-    protected var first_time: Double = _
-    protected var last_time: Double = _
 
     def elapsed_time = curtimesecs - first_time
     def num_processed = items_processed
+
+    // total elapsed secs, items per second, seconds per item
+    def tes_ips_spi = {
+      val total_elapsed_secs = elapsed_time
+      (total_elapsed_secs,
+        items_processed.toDouble / total_elapsed_secs,
+        total_elapsed_secs / items_processed)
+    }
+
+    class MeterTimer(action: String) extends Timer(action) {
+      override def print_elapsed_time(curtime: Double) {
+        // Already printed timestamp.
+        print_elapsed_time_and_rate(curtime, include_timestamp = false)
+      }
+    }
+
+    val meter_timer = new MeterTimer(construct_predicate)
 
     def item_unit = {
       if (items_processed == 1)
@@ -97,13 +151,7 @@ protected class MeteringPackage {
     }
 
     def start() = {
-      errprint("--------------------------------------------------------")
-      first_time = curtimesecs
-      last_time = first_time
-      errprint("Beginning %s at %s.", construct_predicate,
-        humandate_full(first_time))
-      errprint("")
-      started = true
+      meter_timer.start()
       this
     }
 
@@ -113,18 +161,15 @@ protected class MeteringPackage {
       if (printed_stats)
         return
       printed_stats = true
-      val total_elapsed_secs = curtime - first_time
-      val attime =
-        if (!include_timestamp) "" else "At %s: " format humandate_time(curtime)
-      errprint("%sElapsed time: %s, %s %s processed",
+      val (tes, ips, spi) = tes_ips_spi
+      val attime = if (!include_timestamp) "" else
+        "At %s: " format humandate_time(curtime)
+      errprint("%sElapsed time: %s (since start: %s)",
                attime,
-               format_minutes_seconds(total_elapsed_secs, hours=false),
-               items_processed, item_unit)
-      val items_per_second = items_processed.toDouble / total_elapsed_secs
-      val seconds_per_item = total_elapsed_secs / items_processed
-      errprint("Processing rate: %s items per second (%s seconds per item)",
-               format_double(items_per_second),
-               format_double(seconds_per_item))
+               format_minutes_seconds(tes, include_hours = false),
+               format_minutes_seconds(get_program_time_usage))
+      errprint("%s %s processed, %s items/sec, %s sec/item",
+        items_processed, item_unit, format_double(ips), format_double(spi))
     }
 
     /**
@@ -137,7 +182,7 @@ protected class MeteringPackage {
       items_processed += 1
       val total_elapsed_secs = curtime - first_time
       val last_elapsed_secs = curtime - last_time
-       printed_stats = false
+      printed_stats = false
       if (last_elapsed_secs >= secs_between_output) {
         // Rather than directly recording the time, round it down to the
         // nearest multiple of secs_between_output; else we will eventually
@@ -151,7 +196,8 @@ protected class MeteringPackage {
       }
       if (maxtime > 0 && total_elapsed_secs >= maxtime) {
         errprint("Stopping processing because maximum time %s reached",
-          format_minutes_seconds(maxtime, hours=false))
+          format_minutes_seconds(maxtime,
+            include_hours = false))
         print_elapsed_time_and_rate(curtime)
         true
       } else if (maxitems > 0 && items_processed >= maxitems) {
@@ -173,14 +219,7 @@ protected class MeteringPackage {
      * "items" comes from the `item_name` constructor parameter to this
      * class. */ 
     def finish() {
-      val curtime = curtimesecs
-      errprint("")
-      errprint("Finished %s at %s.", construct_predicate,
-        humandate_full(curtime))
-      // Don't include timestamp since we already output it.
-      print_elapsed_time_and_rate(curtime, include_timestamp = false)
-      output_resource_usage()
-      errprint("--------------------------------------------------------")
+      meter_timer.finish()
     }
 
     def foreach[T, Repr](trav: GenTraversableLike[T, Repr])(f: T => Unit) {

@@ -25,24 +25,36 @@ import print.internal_error
 
 protected class TimeImpl {
 
-  def format_minutes_seconds(seconds: Double, hours: Boolean = true) = {
-    var secs = seconds
-    var mins = (secs / 60).toInt
-    secs = secs % 60
-    val hourstr = {
-      if (!hours) ""
-      else {
-        val hours = (mins / 60).toInt
-        mins = mins % 60
-        if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
-        else ""
-      }
+  protected def hrs_min_secs(seconds: Double,
+      include_hours: Boolean = true) = {
+    if (seconds < 60)
+      (0, 0, seconds)
+    else if (seconds < 3600 || !include_hours)
+      (0, (seconds / 60).toInt, seconds % 60)
+    else
+      ((seconds / 3600).toInt, ((seconds / 60) % 60).toInt, seconds % 60)
+  }
+
+  def format_minutes_seconds(seconds: Double,
+      include_hours: Boolean = true) = {
+    val (hrs, mins, secs) = hrs_min_secs(seconds, include_hours)
+    val hourstr = hrs match {
+      case 0 => ""
+      case _ => "%s hr " format hrs
     }
-    val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
-    "%s%s minute%s %s second%s" format (
-        hourstr,
-        mins, if (mins == 1) "" else "s",
-        secstr, if (secs == 1) "" else "s")
+    val minstr = mins match {
+      case 0 if hrs == 0 => ""
+      case _ => "%s min " format mins
+    }
+    val secstr = "%1.1f sec" format secs
+    hourstr + minstr + secstr
+  }
+
+  def format_minutes_seconds_short(seconds: Double,
+      include_hours: Boolean = true) = {
+    val (hrs, mins, secs) = hrs_min_secs(seconds, include_hours)
+    if (hrs == 0) "%s:%04.1f" format (mins, secs)
+    else "%s:%02d:%04.1f" format (hrs, mins, secs)
   }
 
   /**

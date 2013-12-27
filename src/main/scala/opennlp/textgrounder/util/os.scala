@@ -157,6 +157,15 @@ at the beginning of your program, in order to use get_program_time_usage""")
     return -1L
   }
   
+  def format_bytes(bytes: Long) = {
+    if (bytes >= 1000000000)
+      "%.2f GB" format (bytes / 1000000000.0)
+    else if (bytes >= 1000000)
+      "%.2f MB" format (bytes / 1000000.0)
+    else
+      "%.2f KB" format (bytes / 1000.0)
+  }
+
   def output_memory_usage(virtual: Boolean = false) {
     for (method <- List("auto", "java", "proc", "ps", "rusage")) {
       val (meth, mem) =
@@ -167,27 +176,32 @@ at the beginning of your program, in order to use get_program_time_usage""")
       if (mem <= 0)
         errprint("Unknown")
       else
-        errprint("%s bytes", pretty_long(mem))
+        errprint("%s", format_bytes(mem))
     }
   }
 
-  def output_resource_usage(dojava: Boolean = true) {
-    errprint("Total elapsed time since program start: %s",
-             format_minutes_seconds(get_program_time_usage))
+  def output_resource_usage(dojava: Boolean = true,
+      omit_time: Boolean = false) {
+    if (!omit_time)
+      errprint("Total elapsed time since program start: %s",
+               format_minutes_seconds(get_program_time_usage))
     val (vszmeth, vsz) = get_program_memory_usage(virtual = true,
       method = "auto")
-    errprint("Memory usage, virtual memory size (%s): %s bytes", vszmeth,
-      pretty_long(vsz))
     val (rssmeth, rss) = get_program_memory_usage(virtual = false,
       method = "auto")
-    errprint("Memory usage, actual (i.e. resident set) (%s): %s bytes", rssmeth,
-      pretty_long(rss))
+    // Goes a bit over 80 chars this way
+    //val memstr = "virtual (%s): %s, resident (%s): %s" format (
+    //  vszmeth, format_bytes(vsz), rssmeth, format_bytes(rss))
+    val memstr = "virtual: %s, resident: %s" format (
+      format_bytes(vsz), format_bytes(rss))
     if (dojava) {
       val (_, java) = get_program_memory_usage(virtual = false,
         method = "java")
-      errprint("Memory usage, Java heap: %s bytes", pretty_long(java))
-    } else
+      errprint("Memory usage: %s, Java heap: %s", memstr, format_bytes(java))
+    } else {
+      errprint("Memory usage: %s", memstr)
       System.gc()
+    }
   }
 
   /* For testing the output_memory_usage() function. */
