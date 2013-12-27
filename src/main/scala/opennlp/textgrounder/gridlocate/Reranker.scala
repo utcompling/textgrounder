@@ -686,19 +686,27 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   ) = {
     val data = training_data.data
     errprint("Training linear classifier ...")
-    errprint("Number of training items: %s", data.size)
+    errprint("Number of training items (aggregate feature vectors): %s",
+      pretty_long(data.size))
+    val num_indiv_training_items =
+      data.view.map(_._1.feature_vector.depth.toLong).sum
+    errprint("Number of individual feature vectors in training items: %s",
+      pretty_long(num_indiv_training_items))
     val num_total_feats =
-      data.view.map(_._1.feature_vector.length.toLong).sum
+      num_indiv_training_items * data.head._1.feature_vector.length
     val num_total_stored_feats =
       data.view.map(_._1.feature_vector.stored_entries.toLong).sum
     errprint("Total number of features in all training items: %s",
-      num_total_feats)
-    errprint("Avg number of features per training item: %.2f",
-      num_total_feats.toDouble / data.size)
+      pretty_long(num_total_feats))
+    errprint("Avg number of features per training item: %s",
+      pretty_double(num_total_feats.toDouble / data.size))
     errprint("Total number of stored features in all training items: %s",
-      num_total_stored_feats)
-    errprint("Avg number of stored features per training item: %.2f",
-      num_total_stored_feats.toDouble / data.size)
+      pretty_long(num_total_stored_feats))
+    errprint("Avg number of stored features per training item: %s",
+      pretty_double(num_total_stored_feats.toDouble / data.size))
+    errprint("Space reduction using sparse vectors: %s times",
+      pretty_double(num_total_feats.toDouble /
+        num_total_stored_feats))
     trainer(training_data)
   }
 
