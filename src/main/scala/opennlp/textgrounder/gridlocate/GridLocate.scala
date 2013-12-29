@@ -34,6 +34,7 @@ import util.debug._
 import learning._
 import learning.perceptron._
 import learning.mlogit._
+import learning.tadm._
 import langmodel._
 
 /*
@@ -572,7 +573,7 @@ trait GridLocateRerankParameters {
     ap.option[String]("rerank-optimizer",
       default = "avg-perceptron",
       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
-        "cost-perceptron", "mlogit"),
+        "cost-perceptron", "mlogit", "tadm"),
       help = """Type of optimizer to use for reranking.  Possibilities are:
 
 'perceptron' (perceptron using the basic algorithm);
@@ -591,6 +592,8 @@ trait GridLocateRerankParameters {
 
 'mlogit' (use R's mlogit() function to implement a multinomial conditional
   logit aka maxent ranking model, a type of generalized linear model);
+
+'tadm' (use TADM to implement a maxent ranking model).
 
 Default %default.
 
@@ -1423,6 +1426,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         }
       case "mlogit" =>
         new MLogitConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
+
+      case "tadm" =>
+        new TADMMaxentRankingTrainer[GridRankerInst[Co]](vec_factory)
     }
   }
 

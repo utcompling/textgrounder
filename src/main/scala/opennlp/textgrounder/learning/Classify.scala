@@ -26,6 +26,7 @@ import util.text._
 
 import perceptron._
 import mlogit._
+import tadm._
 
 import util.debug._
 
@@ -45,7 +46,8 @@ import util.debug._
 class ClassifyParameters(ap: ArgParser) {
   var method =
     ap.option[String]("method", "m",
-       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron", "mlogit"),
+       choices = Seq("perceptron", "avg-perceptron", "pa-perceptron", "mlogit",
+         "tadm"),
        default = "perceptron",
        help = """Method to use for classification: 'perceptron'
 (perceptron using the basic algorithm); 'avg-perceptron' (perceptron using
@@ -223,6 +225,10 @@ object Classify extends ExperimentApp("Classify") {
             errprint("Using mlogit() conditional logit")
             new MLogitConditionalLogitTrainer[FeatureVector](ArrayVector)
           }
+          case "tadm" => {
+            errprint("Using TADM maxent ranker")
+            new TADMMaxentRankingTrainer[FeatureVector](ArrayVector)
+          }
           case "pa-perceptron" => {
             errprint("Using passive-aggressive multi-label perceptron")
             new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[
@@ -271,6 +277,8 @@ object Classify extends ExperimentApp("Classify") {
         val trainer = params.method match {
           case "mlogit" =>
             error("Currently `mlogit` only works when --label-specific")
+          case "tadm" =>
+            error("Currently `tadm` only works when --label-specific")
           case "pa-perceptron" if numlabs > 2 || debug("multilabel") => {
             errprint("Using passive-aggressive multi-label perceptron")
             new PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[
