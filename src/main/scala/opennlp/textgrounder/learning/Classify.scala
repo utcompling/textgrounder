@@ -220,8 +220,8 @@ object Classify extends ExperimentApp("Classify") {
         // Train a classifer
         val trainer = params.method match {
           case "mlogit" => {
-            errprint("Using conditional logit")
-            new RConditionalLogitTrainer[FeatureVector](ArrayVector)
+            errprint("Using mlogit() conditional logit")
+            new MLogitConditionalLogitTrainer[FeatureVector](ArrayVector)
           }
           case "pa-perceptron" => {
             errprint("Using passive-aggressive multi-label perceptron")

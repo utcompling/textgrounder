@@ -589,9 +589,8 @@ trait GridLocateRerankParameters {
 'cost-perceptron' (cost-sensitive passive-aggressive perceptron, using the
   error distance as the cost);
 
-'mlogit' (use a generalized linear model, specifically a conditional logit
-  model -- similar to a multinomial logistic regression or maximum entropy
-  model -- using R's mlogit() function).
+'mlogit' (use R's mlogit() function to implement a multinomial conditional
+  logit aka maxent ranking model, a type of generalized linear model);
 
 Default %default.
 
@@ -1423,7 +1422,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             }
         }
       case "mlogit" =>
-        new RConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
+        new MLogitConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
     }
   }
 
