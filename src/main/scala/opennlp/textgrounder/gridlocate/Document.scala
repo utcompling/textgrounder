@@ -33,7 +33,7 @@ import util.error._
 import util.experiment._
 import util.io._
 import util.print._
-import util.Serializer
+import util.TextSerializer
 import util.text.capfirst
 import util.textdb.Row
 
@@ -396,7 +396,7 @@ class DocLangModelFactory(
  * Factory for creating documents and maintaining statistics and certain
  * other info about them.
  */
-abstract class GridDocFactory[Co : Serializer](
+abstract class GridDocFactory[Co : TextSerializer](
   val driver: GridLocateDriver[Co],
   val lang_model_factory: DocLangModelFactory
 ) {
@@ -991,12 +991,12 @@ case class DocValidationException(
  * @param lang_model_factory
  * @param lang_model Object containing language model of this document.
  */
-abstract class GridDoc[Co : Serializer](
+abstract class GridDoc[Co : TextSerializer](
   val schema: Schema,
   val lang_model: DocLangModel
 ) {
 
-  import util.Serializer._
+  import util.TextSerializer._
 
   /**
    * Title of the document -- something that uniquely identifies it,

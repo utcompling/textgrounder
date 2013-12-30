@@ -27,7 +27,7 @@ import util.experiment._
 import util.io
 import util.math._
 import util.print._
-import util.Serializer
+import util.TextSerializer
 import util.textdb._
 
 import util.debug._

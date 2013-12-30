@@ -230,7 +230,7 @@ protected class TimeImpl {
     override def toString = "%s (%s)" format (millis, format_time(millis))
   }
 
-  implicit object TimeCoord extends Serializer[TimeCoord] {
+  implicit object TimeCoord extends TextSerializer[TimeCoord] {
     def deserialize(foo: String) = TimeCoord(foo.toLong)
     def serialize(foo: TimeCoord) = "%s".format(foo.millis)
   }

@@ -22,8 +22,8 @@ package util
 import error.warning
 
 /** A type class for converting to and from values in serialized form. */
-@annotation.implicitNotFound(msg = "No implicit Serializer defined for ${T}.")
-trait Serializer[T] {
+@annotation.implicitNotFound(msg = "No implicit TextSerializer defined for ${T}.")
+trait TextSerializer[T] {
   def deserialize(foo: String): T
   def serialize(foo: T): String
   /**
@@ -45,7 +45,7 @@ trait Serializer[T] {
 //                           Conversion functions                          //
 /////////////////////////////////////////////////////////////////////////////
 
-object Serializer {
+object TextSerializer {
   def get_int_or_none(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
   def put_int_or_none(foo: Option[Int]) = {
@@ -55,27 +55,27 @@ object Serializer {
     }
   }
 
-  implicit val string_serializer = new Serializer[String] {
+  implicit val string_serializer = new TextSerializer[String] {
     def serialize(x: String) = x
     def deserialize(x: String) = x
   }
 
-  implicit val int_serializer = new Serializer[Int] {
+  implicit val int_serializer = new TextSerializer[Int] {
     def serialize(x: Int) = x.toString
     def deserialize(x: String) = x.toInt
   }
 
-  implicit val long_serializer = new Serializer[Long] {
+  implicit val long_serializer = new TextSerializer[Long] {
     def serialize(x: Long) = x.toString
     def deserialize(x: String) = x.toLong
   }
 
-  implicit val double_serializer = new Serializer[Double] {
+  implicit val double_serializer = new TextSerializer[Double] {
     def serialize(x: Double) = x.toString
     def deserialize(x: String) = x.toDouble
   }
 
-  implicit val boolean_serializer = new Serializer[Boolean] {
+  implicit val boolean_serializer = new TextSerializer[Boolean] {
     def serialize(x: Boolean) = if (x) "yes" else "no"
     def deserialize(x: String) = x match {
       case "yes" => true
@@ -90,29 +90,29 @@ object Serializer {
   /**
    * Convert an object of type `T` into a serialized (string) form, for
    * storage purposes in a text file.  Note that the construction
-   * `T : Serializer` means essentially "T must have a Serializer".
+   * `T : TextSerializer` means essentially "T must have a TextSerializer".
    * More technically, it adds an extra implicit parameter list with a
-   * single parameter of type Serializer[T].  When the compiler sees a
+   * single parameter of type TextSerializer[T].  When the compiler sees a
    * call to put_x[X] for some type X, it looks in the lexical environment
-   * to see if there is an object in scope of type Serializer[X] that is
+   * to see if there is an object in scope of type TextSerializer[X] that is
    * marked `implicit`, and if so, it gives the implicit parameter
    * the value of that object; otherwise, you get a compile error.  The
    * function can then retrieve the implicit parameter's value using the
-   * construction `implicitly[Serializer[T]]`.  The `T : Serializer`
+   * construction `implicitly[TextSerializer[T]]`.  The `T : TextSerializer`
    * construction is technically known as a *context bound*.
    */
-  def put_x[T : Serializer](foo: T) =
-    implicitly[Serializer[T]].serialize(foo)
+  def put_x[T : TextSerializer](foo: T) =
+    implicitly[TextSerializer[T]].serialize(foo)
   /**
    * Convert the serialized form of the value of an object of type `T`
    * back into that type.  Throw an error if an invalid string was seen.
-   * See `put_x` for a description of the `Serializer` type and the *context
-   * bound* (denoted by a colon) that ties it to `T`.
+   * See `put_x` for a description of the `TextSerializer` type and the
+   * *context bound* (denoted by a colon) that ties it to `T`.
    *
    * @see put_x
    */
-  def get_x[T : Serializer](foo: String) =
-    implicitly[Serializer[T]].deserialize(foo)
+  def get_x[T : TextSerializer](foo: String) =
+    implicitly[TextSerializer[T]].deserialize(foo)
 
   /**
    * Convert an object of type `Option[T]` into a serialized (string) form.
@@ -123,7 +123,7 @@ object Serializer {
    *
    * @see put_x
    */
-  def put_x_or_none[T : Serializer](foo: Option[T]) = {
+  def put_x_or_none[T : TextSerializer](foo: Option[T]) = {
     foo match {
       case None => ""
       case Some(x) => put_x[T](x)
@@ -137,7 +137,7 @@ object Serializer {
    * @see get_x
    * @see put_x
    */
-  def get_x_or_none[T : Serializer](foo: String) =
+  def get_x_or_none[T : TextSerializer](foo: String) =
     if (foo == "") None
     else Option[T](get_x[T](foo))
 
@@ -150,7 +150,7 @@ object Serializer {
    * @see put_x
    * @see put_x
    */
-  def put_x_or_null[T >: Null : Serializer](foo: T) = {
+  def put_x_or_null[T >: Null : TextSerializer](foo: T) = {
     if (foo == null) ""
     else put_x[T](foo)
   }
@@ -163,7 +163,7 @@ object Serializer {
    * @see get_x
    * @see put_x
    */
-  def get_x_or_null[T >: Null : Serializer](foo: String) =
+  def get_x_or_null[T >: Null : TextSerializer](foo: String) =
     if (foo == "") null
     else get_x[T](foo)
 }

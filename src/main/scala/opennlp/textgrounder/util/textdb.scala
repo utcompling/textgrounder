@@ -110,7 +110,7 @@ package textdb {
     val field_description: BaseMap[String, String] = Map[String, String](),
     val split_text: String = "\t"
   ) {
-    import Serializer._
+    import TextSerializer._
 
     override def toString =
       "Schema(%s, %s, %s, %s)" format (
@@ -129,7 +129,7 @@ package textdb {
     /**
      * Retrieve a typed value from a raw row. Error if not found.
      */
-    def get_value[T : Serializer](fieldvals: IndexedSeq[String],
+    def get_value[T : TextSerializer](fieldvals: IndexedSeq[String],
         key: String): T = {
       get_x[T](get_field(fieldvals, key))
     }
@@ -137,7 +137,7 @@ package textdb {
     /**
      * Retrieve a typed value that may be in a raw row.
      */
-    def get_value_if[T : Serializer](fieldvals: IndexedSeq[String],
+    def get_value_if[T : TextSerializer](fieldvals: IndexedSeq[String],
         key: String): Option[T] = {
       get_field_if(fieldvals, key) flatMap { x => get_x_or_none[T](x) }
     }
@@ -146,7 +146,7 @@ package textdb {
      * Retrieve a typed value that may be in a raw row, substituting a default
      * value if not.
      */
-    def get_value_or_else[T : Serializer](fieldvals: IndexedSeq[String],
+    def get_value_or_else[T : TextSerializer](fieldvals: IndexedSeq[String],
         key: String, default: T): T = {
       get_value_if[T](fieldvals, key) match {
         case Some(x) => x
@@ -463,25 +463,25 @@ package textdb {
     schema: Schema,
     fieldvals: IndexedSeq[String]
   ) {
-    import Serializer._
+    import TextSerializer._
 
     /**
      * Retrieve a value from the row. Error if not found.
      */
-    def get[T : Serializer](key: String): T =
+    def get[T : TextSerializer](key: String): T =
       schema.get_value[T](fieldvals, key)
 
     /**
      * Retrieve a value that may be in the row.
      */
-    def get_if[T : Serializer](key: String): Option[T] =
+    def get_if[T : TextSerializer](key: String): Option[T] =
       schema.get_value_if[T](fieldvals, key)
 
     /**
      * Retrieve a value that may be in the row, substituting a default
      * value if not.
      */
-    def get_or_else[T : Serializer](key: String, default: T): T =
+    def get_or_else[T : TextSerializer](key: String, default: T): T =
       schema.get_value_or_else[T](fieldvals, key, default)
 
     /**
