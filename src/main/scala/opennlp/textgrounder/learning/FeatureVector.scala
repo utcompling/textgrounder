@@ -34,6 +34,62 @@ import util.memoizer._
 import util.print._
 import util.debug._
 
+/** Classification of the different types of values used for features.
+ * Some of them need to be standardized (scaled to have mean 0, std dev 1).
+ * This perhaps can be done on all of them but it doesn't seem to make
+ * much sense when done esp. on binary and probability features,
+ * which have an inherent scale.
+ */
+sealed abstract class FeatureValue
+case object FeatBinary extends FeatureValue
+case object FeatProb extends FeatureValue
+case object FeatLogProb extends FeatureValue
+/** A count of words or similar. Needs to be standardized, which in this
+ * case is vaguely similar to what happens when it's converted to a
+ * probability.
+ */
+case object FeatCount extends FeatureValue
+/** An arbitrary-scale score used for comparing cells. The prototypical
+ * value that needs to be standardized.
+ */
+case object FeatScore extends FeatureValue
+case object FeatFraction extends FeatureValue
+/** A numeric feature value of unknown nature that should not be
+ * standardized (from external data).
+ */
+case object FeatRaw extends FeatureValue
+/** Some other type of feature value, which *will* get standardized. */
+case object FeatOther extends FeatureValue
+
+/**
+ * A more general classification of features, just into nominal vs.
+ * numeric.
+ */
+sealed abstract class FeatureClass
+case object NominalFeature extends FeatureClass
+case object NumericFeature extends FeatureClass
+
+class FeatureMapper extends ToIntMemoizer[String] {
+  def vector_length = number_of_indices
+  val features_to_standardize = mutable.BitSet()
+  def note_feature(feattype: FeatureValue, feature: String) = {
+    val index = to_index(feature)
+    feattype match {
+      case FeatBinary | FeatProb | FeatLogProb => ()
+      case _ => features_to_standardize += index
+    }
+    index
+  }
+}
+
+class LabelMapper extends ToIntMemoizer[String] {
+}
+
+case class FeatureLabelMapper(
+  feature_mapper: FeatureMapper = new FeatureMapper,
+  label_mapper: LabelMapper = new LabelMapper
+)
+
 /**
  * A vector of real-valued features.  In general, features are indexed
  * both by a non-negative integer and by a class label (i.e. a label for
@@ -335,58 +391,6 @@ class TupleArraySparseFeatureVector(
 
   def string_prefix = "TupleArraySparseFeatureVector"
 }
-
-/** Classification of the different types of values used for features.
- * Some of them need to be standardized (scaled to have mean 0, std dev 1).
- * This perhaps can be done on all of them but it doesn't seem to make
- * much sense when done esp. on binary and probability features,
- * which have an inherent scale.
- */
-sealed abstract class FeatureValue
-case object FeatBinary extends FeatureValue
-case object FeatProb extends FeatureValue
-case object FeatLogProb extends FeatureValue
-/** A count of words or similar. Needs to be standardized, which in this
- * case is vaguely similar to what happens when it's converted to a
- * probability.
- */
-case object FeatCount extends FeatureValue
-/** An arbitrary-scale score used for comparing cells. The prototypical
- * value that needs to be standardized.
- */
-case object FeatScore extends FeatureValue
-case object FeatFraction extends FeatureValue
-/** A numeric feature value of unknown nature that should not be
- * standardized (from external data).
- */
-case object FeatRaw extends FeatureValue
-/** Some other type of feature value, which *will* get standardized. */
-case object FeatOther extends FeatureValue
-
-class FeatureMapper extends ToIntMemoizer[String] {
-  def vector_length = number_of_indices
-  val features_to_standardize = mutable.BitSet()
-  def note_feature(feattype: FeatureValue, feature: String) = {
-    val index = to_index(feature)
-    feattype match {
-      case FeatBinary | FeatProb | FeatLogProb => ()
-      case _ => features_to_standardize += index
-    }
-    index
-  }
-}
-
-class LabelMapper extends ToIntMemoizer[String] {
-}
-
-case class FeatureLabelMapper(
-  feature_mapper: FeatureMapper = new FeatureMapper,
-  label_mapper: LabelMapper = new LabelMapper
-)
-
-sealed abstract class FeatureClass
-case object NominalFeature extends FeatureClass
-case object NumericFeature extends FeatureClass
 
 /**
  * A factory object for creating sparse feature vectors for classification.
