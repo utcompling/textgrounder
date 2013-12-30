@@ -304,7 +304,7 @@ abstract class Grid[Co](
    * This is used by `find_best_cell_for_document` and `add_salient_point`.
    * If this operation doesn't make sense directly, because other properties
    * of a document are needed to locate a cell in addition to the coordinate,
-   * then it get be given a null implementation using `???`, provided that
+   * then it can be given a null implementation using `???`, provided that
    * both of the above functions are overridden.
    */
   def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean):
