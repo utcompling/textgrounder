@@ -17,6 +17,31 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
+#find_toplevel() {
+#  (
+#  while [ ! -e THIS.IS.TEXTGROUNDER ]; do
+#    if [ "`pwd`" = / ]; then
+#      echo ""
+#      exit 1
+#    fi
+#    cd ..
+#  done
+#  echo "`pwd`"
+#  )
+#}
+#
+#
+#TEXTGROUNDER_TOP=`find_toplevel`
+#if [ -z "$TEXTGROUNDER_TOP" ]; then
+#  if [ -z "$TEXTGROUNDER_DIR" ]; then
+#    dbg "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+#    exit 1
+#  fi
+#  TEXTGROUNDER_TOP="$TEXTGROUNDER_DIR"
+#fi
+#
+#echo "Top level is $TEXTGROUNDER_TOP"
+
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
