@@ -29,7 +29,8 @@ import java.io._
 import util.collection.DynamicArray
 import util.textdb
 import util.io.{FileHandler, FileFormatException}
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 
 import util.debug._
 

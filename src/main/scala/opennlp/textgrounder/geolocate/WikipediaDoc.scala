@@ -24,7 +24,8 @@ import collection.mutable
 import util.collection._
 import util.spherical._
 import util.textdb.Schema
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 import util.Serializer._
 import util.text.capfirst
 import util.textdb.Row

@@ -49,6 +49,7 @@ import com.nicta.scoobi.Scoobi._
 import util.Twokenize
 import util.argparser._
 import util.collection._
+import util.error.{internal_error,stack_trace_as_string}
 import util.textdb._
 import util.io.FileHandler
 import util.hadoop.HadoopFileHandler

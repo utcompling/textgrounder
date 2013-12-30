@@ -21,7 +21,7 @@ package util
 
 import math._
 import text.split_with_delim
-import print.internal_error
+import error.internal_error
 
 protected class TimeImpl {
 

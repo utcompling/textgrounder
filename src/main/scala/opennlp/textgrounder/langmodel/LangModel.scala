@@ -32,6 +32,7 @@ import math._
 import collection.mutable
 
 import util.collection._
+import util.error._
 import util.io.FileHandler
 import util.print._
 import util.Serializer

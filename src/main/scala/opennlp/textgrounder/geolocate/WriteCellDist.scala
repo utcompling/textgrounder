@@ -22,7 +22,7 @@ package geolocate
 import util.argparser._
 import util.spherical.SphereCoord
 import util.experiment._
-import util.print.warning
+import util.error.warning
 import util.textdb._
  
 import gridlocate._

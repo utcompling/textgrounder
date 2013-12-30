@@ -28,7 +28,7 @@ import argparser._
 import collection._
 import experiment._
 import io.FileHandler
-import print.warning
+import error.warning
 import textdb._
 
 import gridlocate.GridDoc

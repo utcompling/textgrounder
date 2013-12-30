@@ -22,7 +22,8 @@ package geolocate
 import util.spherical.spheredist
 import util.spherical.SphereCoord
 import util.experiment._
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 import util.textdb.Row
 
 import gridlocate.{GridDocFactory, DocStatus}

@@ -35,6 +35,7 @@ import com.nicta.scoobi.application.HadoopLogFactory
 
 import util.argparser._
 import util.collection._
+import util.error.stack_trace_as_string
 import util.io.FileHandler
 import util.os._
 import util.print._

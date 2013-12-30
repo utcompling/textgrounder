@@ -33,6 +33,7 @@ import java.util.NoSuchElementException
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
+import error._
 import print._
 import text._
 import os._

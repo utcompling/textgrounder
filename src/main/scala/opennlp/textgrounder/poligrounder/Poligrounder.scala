@@ -69,7 +69,8 @@ import util.collection._
 import util.io
 import util.textdb._
 import util.experiment._
-import util.print.{errprint, internal_error}
+import util.print.errprint
+import util.error.internal_error
 import util.time._
 
 import gridlocate._

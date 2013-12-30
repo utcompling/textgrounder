@@ -124,7 +124,16 @@ are computed.""")
   }
 }
 
-trait TwitterInfochimpsFileProcessor {
+trait TwitterInfochimps {
+  def print_msg_heading(msg: String, blank_lines_before: Int = 1) {
+    for (x <- 0 until blank_lines_before)
+      errprint("")
+    errprint(msg)
+    errprint("-" * msg.length)
+  }
+}
+
+trait TwitterInfochimpsFileProcessor extends TwitterInfochimps {
   def yield_fields(lines: Iterator[String]) = {
     var lineno = 0
     (for (line <- lines) yield {
@@ -202,7 +211,8 @@ class ConvertTwitterInfochimpsFileProcessor(
   }
 }
 
-class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
+class TwitterStatistics(params: ConvertTwitterInfochimpsParameters
+) extends TwitterInfochimps {
   // Over-all statistics
   var num_tweets = 0
 

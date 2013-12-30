@@ -25,7 +25,8 @@ import scala.util.control.Breaks._
 
 import java.io.PrintStream
 
-import print.{errprint, warning}
+import error.warning
+import print.errprint
 import io._
 
 /**

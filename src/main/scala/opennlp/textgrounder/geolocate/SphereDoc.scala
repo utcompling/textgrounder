@@ -23,8 +23,8 @@ import collection.mutable
 
 import util.spherical._
 import util.textdb.{Row, Schema}
-import util.print.warning_once
-import util.Serializer._
+import util.error.warning_once
+import util.TextSerializer._
 
 import gridlocate._
 

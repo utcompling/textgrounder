@@ -30,7 +30,8 @@ import util.spherical._
 import util.experiment.ExperimentDriverStats
 import util.math.{mean, median}
 import util.io.{FileHandler}
-import util.print.{errprint, warning, internal_error}
+import util.print.errprint
+import util.error.{warning, internal_error}
 import util.text.split_text_into_words
 
 import gridlocate._

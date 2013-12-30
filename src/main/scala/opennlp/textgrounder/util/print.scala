@@ -33,7 +33,7 @@ import text._
 import io._
 import os._
 
-protected class PrintCollection {
+protected class PrintImpl {
 
   ////////////////////////////////////////////////////////////////////////////
   //                            Text output functions                       //
@@ -123,7 +123,7 @@ protected class PrintCollection {
     }
   }
 
-  protected def format_outtext(format: String, args: Any*) = {
+  def format_outtext(format: String, args: Any*) = {
     val outtext = errfmt(format, args: _*)
     if (need_prefix)
       errout_prefix + outtext
@@ -165,120 +165,6 @@ protected class PrintCollection {
   def outout(format: String, args: Any*) {
     uniout(format_outtext(format, args: _*))
   }
-
-  /**
-    * Output a warning, formatting into UTF-8 as necessary.
-    */
-  def warning(format: String, args: Any*) {
-    errprint("Warning: " + format, args: _*)
-  }
-  
-  private object WarningsSeen {
-    val warnings_seen = mutable.Set[String]()
-  }
-
-  /**
-    * Output a warning, formatting into UTF-8 as necessary.
-    * But don't output if already seen.
-    */
-  def warning_once(format: String, args: Any*) {
-    val warnstr = format_outtext("Warning: " + format, args: _*)
-    if (!(WarningsSeen.warnings_seen contains warnstr)) {
-      WarningsSeen.warnings_seen += warnstr
-      errprint(warnstr)
-    }
-  }
-  
-  /**
-    Output a value, for debugging through print statements.
-    Basically same as just caling errprint() or println() or whatever,
-    but useful because the call to debprint() more clearly identifies a
-    temporary piece of debugging code that should be removed when the
-    bug has been identified.
-   */
-  def debprint(format: String, args: Any*) {
-    errprint("Debug: " + format, args: _*)
-  }
-  
-  def print_msg_heading(msg: String, blank_lines_before: Int = 1) {
-    for (x <- 0 until blank_lines_before)
-      errprint("")
-    errprint(msg)
-    errprint("-" * msg.length)
-  }
-
-  /**
-   * Return the stack trace of an exception as a string.
-   */
-  def stack_trace_as_string(e: Exception) = {
-    val writer = new StringWriter()
-    val pwriter = new PrintWriter(writer)
-    e.printStackTrace(pwriter)
-    pwriter.close()
-    writer.toString
-  }
-
-  class RethrowableRuntimeException(
-    message: String,
-    cause: Option[Throwable] = None
-  ) extends RuntimeException(message) {
-    if (cause != None)
-      initCause(cause.get)
-
-    /**
-     * Alternate constructor.
-     *
-     * @param message  exception message
-     */
-    def this(msg: String) = this(msg, None)
-
-    /**
-     * Alternate constructor.
-     *
-     * @param message  exception message
-     * @param cause    wrapped, or nested, exception
-     */
-    def this(msg: String, cause: Throwable) = this(msg, Some(cause))
-  }
-
-  /**
-   * An exception thrown to indicate an internal error (program gets to a
-   * state it should never reach, similar to an assertion failure).
-   */
-  case class InternalError(
-    message: String,
-    cause: Option[Throwable] = None
-  ) extends RethrowableRuntimeException(message, cause)
-
-  /**
-   * An exception thrown to indicate that a part of the code that
-   * isn't implemented yet, but should be.
-   */
-  case class FixmeError(
-    message: String,
-    cause: Option[Throwable] = None
-  ) extends RethrowableRuntimeException(message, cause)
-
-  /**
-   * Signal an internal error (program gets to a state it should never reach,
-   * similar to an assertion failure).
-   */
-  def internal_error(message: String) =
-    throw new InternalError(message)
-
-  /**
-   * Signal an error due to a part of the code that isn't implemented yet,
-   * but should be.
-   */
-  def fixme_error(message: String) =
-    throw new FixmeError(message)
-
-  /**
-   * Signal an error due to attempting an operation that isn't supported
-   * and will never be.
-   */
-  def unsupported(message: String = "") =
-    throw new UnsupportedOperationException(message)
 
   ////////////////////////////////////////////////////////////////////////////
   //                              Table Output                              //
@@ -367,5 +253,5 @@ protected class PrintCollection {
   }
 }
 
-package object print extends PrintCollection { }
+package object print extends PrintImpl { }
 

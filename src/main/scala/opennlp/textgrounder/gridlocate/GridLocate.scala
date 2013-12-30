@@ -23,6 +23,7 @@ import collection.mutable
 
 import util.argparser._
 import util.spherical._
+import util.error.warning
 import util.experiment._
 import util.io.FileHandler
 import util.metering._

@@ -21,10 +21,11 @@ package util
 
 import scala.math._
 
-import print.warning
-import math.MeanShift
 
 import net.liftweb
+
+import error.warning
+import math.MeanShift
 
 /*
   The coordinates of a point are spherical coordinates, indicating a

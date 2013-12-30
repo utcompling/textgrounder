@@ -22,7 +22,8 @@ package gridlocate
 import scala.collection.mutable
 
 import util.collection._
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 
 /**
  * A class used to implement user-frequency calculations. We are passed in

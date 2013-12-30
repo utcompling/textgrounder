@@ -36,6 +36,7 @@ import java.net.URI
 
 import argparser._
 import collection._
+import error.internal_error
 import experiment._
 import io._
 import print._

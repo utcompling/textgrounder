@@ -29,6 +29,7 @@ import collection.mutable
 import io.Source
 
 import util.collection._
+import util.error.internal_error
 import util.memoizer._
 import util.print._
 import util.debug._

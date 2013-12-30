@@ -19,7 +19,7 @@
 package opennlp.textgrounder
 package util
 
-import print.warning
+import error.warning
 
 /** A type class for converting to and from values in serialized form. */
 @annotation.implicitNotFound(msg = "No implicit Serializer defined for ${T}.")

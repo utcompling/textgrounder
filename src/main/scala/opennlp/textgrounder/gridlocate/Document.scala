@@ -29,6 +29,7 @@ import util.collection._
 import util.textdb._
 import util.textdb.TextDB._
 import util.spherical._
+import util.error._
 import util.experiment._
 import util.io._
 import util.print._

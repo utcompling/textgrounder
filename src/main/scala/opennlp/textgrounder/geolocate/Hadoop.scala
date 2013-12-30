@@ -32,7 +32,8 @@ import util.spherical._
 import util.hadoop._
 import util.io.FileHandler
 import util.math.{mean, median}
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 import util.textdb.Schema
 
 import gridlocate._

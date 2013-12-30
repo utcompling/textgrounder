@@ -24,7 +24,7 @@ import scala.util.matching.Regex
 import scala.math._
 
 import math.is_negative
-import print.warning
+import error.warning
 
 package object text {
 

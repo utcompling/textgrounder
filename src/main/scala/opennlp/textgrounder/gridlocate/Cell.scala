@@ -22,8 +22,9 @@ package gridlocate
 
 import collection.mutable
 
-import util.print.{errprint, warning}
+import util.error.warning
 import util.experiment._
+import util.print.errprint
 import util.textdb.{Encoder, Row}
 
 import langmodel.LangModelFactory

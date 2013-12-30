@@ -22,7 +22,8 @@ package gridlocate
 import collection.mutable
 
 import util.collection.{LRUCache, doublemap}
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 
 import langmodel.{Gram,LangModel}
 

@@ -32,7 +32,8 @@ import util.collection.DynamicArray
 import util.textdb._
 import util.experiment._
 import util.io._
-import util.print.{errprint, warning}
+import util.error.warning
+import util.print.errprint
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

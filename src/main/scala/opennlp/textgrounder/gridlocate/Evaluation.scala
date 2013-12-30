@@ -30,7 +30,8 @@ import util.experiment._
 import util.io.FileHandler
 import util.math._
 import util.os.{curtimehuman, output_resource_usage}
-import util.print.{errprint, warning, internal_error}
+import util.print.errprint
+import util.error.{warning, internal_error}
 import util.textdb.Row
 import util.debug._
 
