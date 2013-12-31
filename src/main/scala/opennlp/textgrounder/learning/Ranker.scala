@@ -500,10 +500,10 @@ trait PointwiseClassifyingRerankerTrainer[
         case (data, num) => num == rerank_split_num
       }
       val rerank_data = rerank_splits.flatMap(_._1)
-      val initrank_data = initrank_splits.flatMap(_._1).toIterable
+      val initrank_data = initrank_splits.flatMap(_._1).toIndexedSeq
       val split_initial_ranker = create_initial_ranker(initrank_data)
       get_rerank_training_data_for_split(rerank_split_num, rerank_data,
-        split_initial_ranker).toIterable
+        split_initial_ranker).toIndexedSeq
     }
   }
 
