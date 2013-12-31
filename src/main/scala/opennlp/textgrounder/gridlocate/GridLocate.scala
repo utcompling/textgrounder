@@ -905,14 +905,19 @@ trait GridLocateMiscParameters {
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
 
-  var debug =
-    ap.option[String]("d", "debug", metavar = "FLAGS",
+  // Named `debug_specs` not just `debug` to avoid possible conflict with
+  // the `debug` in package `debug`.
+  var debug_specs =
+    ap.multiOption[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
 parameters can be specified, indicating different types of info to output.
 Separate parameters by spaces, commas or semicolons.  Params can be boolean,
 if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
 list-valued; multiple values are specified by including the parameter
 multiple times, or by separating values by a colon.
+
+Multiple occurrences of `--debug` can also occur, and the debug specs from
+all occurrences of the command line argument are combined together.
 
 The best way to figure out the possible parameters is by reading the
 source code. (Look for references to debug("foo") for boolean params,
@@ -969,8 +974,8 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
   register_list_debug_param("gridrank")
   debugval("gridranksize") = GridLocateConstants.default_gridranksize.toString
 
-  if (debug != null)
-    parse_debug_spec(debug)
+  if (debug_specs != null)
+    debug_specs.map { parse_debug_spec(_) }
 }
 
 /**
