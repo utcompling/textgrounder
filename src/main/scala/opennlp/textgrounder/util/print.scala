@@ -33,7 +33,7 @@ import text._
 import io._
 import os._
 
-protected class PrintImpl {
+protected class PrintPackage {
 
   ////////////////////////////////////////////////////////////////////////////
   //                            Text output functions                       //
@@ -253,5 +253,5 @@ protected class PrintImpl {
   }
 }
 
-package object print extends PrintImpl { }
+package object print extends PrintPackage { }
 

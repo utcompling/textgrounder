@@ -62,7 +62,7 @@ import serialize.TextSerializer
      between two SphereCoords; likewise degree_dist() to compute degree
      distance between two SphereCoords
  */
-protected class SphericalImpl {
+protected class SphericalPackage {
 
   /***** Fixed values *****/
 
@@ -372,5 +372,5 @@ protected class SphericalImpl {
   }
 }
 
-package object spherical extends SphericalImpl { }
+package object spherical extends SphericalPackage { }
 

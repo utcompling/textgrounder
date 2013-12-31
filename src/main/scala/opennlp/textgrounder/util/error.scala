@@ -34,7 +34,7 @@ import io._
 import os._
 import print._
 
-protected class ErrorImpl {
+protected class ErrorPackage {
   /**
     * Output a warning, formatting into UTF-8 as necessary.
     */
@@ -143,5 +143,5 @@ protected class ErrorImpl {
     throw new UnsupportedOperationException(message)
 }
 
-package object error extends ErrorImpl { }
+package object error extends ErrorPackage { }
 

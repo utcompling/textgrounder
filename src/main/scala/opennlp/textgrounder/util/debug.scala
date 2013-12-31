@@ -2,7 +2,7 @@ package opennlp.textgrounder.util
 
 import collection._
 
-class DebugSettings {
+protected class DebugPackage {
   // Debug params.  Different params indicate different info to output.
   // Specified using --debug.  Multiple params are separated by spaces,
   // colons or semicolons.  Params can be boolean, if given alone, or
@@ -38,4 +38,4 @@ class DebugSettings {
   }
 }
 
-package object debug extends DebugSettings { }
+package object debug extends DebugPackage { }

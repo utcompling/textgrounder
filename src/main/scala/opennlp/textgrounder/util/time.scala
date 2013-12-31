@@ -23,7 +23,7 @@ import error.internal_error
 import serialize.TextSerializer
 import text.split_with_delim
 
-protected class TimeImpl {
+protected class TimePackage {
 
   protected def hrs_min_secs(seconds: Double,
       include_hours: Boolean = true) = {
@@ -236,4 +236,4 @@ protected class TimeImpl {
   }
 }
 
-package object time extends TimeImpl { }
+package object time extends TimePackage { }
