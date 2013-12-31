@@ -358,10 +358,10 @@ class RankScoreCandidateFeatVecFactory[Co](
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     Iterable(
-      ib(FeatScore, "$initial-score", initial_score),
-      ib(FeatScore, "$log-initial-score", log(1+initial_score)),
-      ib(FeatScore, "$exp-initial-score", exp(initial_score)),
-      ib(FeatCount, "$initial-rank", initial_rank)
+      ib(FeatScore, "$initial-score", initial_score)
+      //ib(FeatScore, "$log-initial-score", log(1+initial_score)),
+      //ib(FeatScore, "$exp-initial-score", exp(initial_score)),
+      //ib(FeatCount, "$initial-rank", initial_rank)
     ).flatten
   }
 }
