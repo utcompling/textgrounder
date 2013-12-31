@@ -659,13 +659,24 @@ object GeolocateDocumentTag extends
     /**
      * Output the value only. Typical for choice options.
      */
-    def valonly = (value: Any) => value match {
+    def valonly: Any => String = value => value match {
       case null => ""
       case d:Double => {
         if (d == d.toLong) "%s" format d.toLong
         else format_double(d)
       }
-      case _ => "%s" format value
+      case seq:Seq[_] => seqvalonly()(value)
+      // Eliminate embedded spaces, which cause various problems in filenames
+      case _ => ("%s" format value).replace(" ", "_")
+    }
+
+    /**
+     * Output the value only. Typical for choice options.
+     */
+    def seqvalonly(sep: String = ",") = (value: Any) => value match {
+      case null => ""
+      case seq:Seq[_] => seq.map(valonly) mkString sep
+      case _ => ???
     }
 
     /**
@@ -793,6 +804,7 @@ object GeolocateDocumentTag extends
       ("eval-set", valonly),
       ("num-training-docs", short("ntrain")),
       ("num-test-docs", short("ntest")),
+      ("debug", default),
       ("verbose", omit),
       ("results", omit),
       ("no-parallel", omit),
