@@ -36,7 +36,7 @@ import util.text.format_double
 import util.debug._
 
 object ClassifierConstants {
-  val weights_to_print = 15
+  val weights_to_print = 100
 }
 
 /**
