@@ -26,8 +26,10 @@ import scala.util.control.Breaks._
 import java.io.PrintStream
 
 import error.warning
+import io.{FileHandler,FileFormatException,iter_files_recursively,
+  iter_files_with_message}
 import print.errprint
-import io._
+import serialize.TextSerializer
 
 /**
  * Package for databases stored in "textdb" format.
@@ -110,7 +112,7 @@ package textdb {
     val field_description: BaseMap[String, String] = Map[String, String](),
     val split_text: String = "\t"
   ) {
-    import TextSerializer._
+    import serialize.TextSerializer._
 
     override def toString =
       "Schema(%s, %s, %s, %s)" format (
@@ -463,7 +465,7 @@ package textdb {
     schema: Schema,
     fieldvals: IndexedSeq[String]
   ) {
-    import TextSerializer._
+    import serialize.TextSerializer._
 
     /**
      * Retrieve a value from the row. Error if not found.

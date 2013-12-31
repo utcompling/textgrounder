@@ -25,7 +25,7 @@ import util.spherical._
 import util.textdb.{Row, Schema}
 import util.print._
 import util.time._
-import util.TextSerializer._
+import util.serialize.TextSerializer._
 
 import gridlocate._
 

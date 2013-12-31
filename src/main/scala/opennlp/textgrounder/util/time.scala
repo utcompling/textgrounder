@@ -19,9 +19,9 @@
 package opennlp.textgrounder
 package util
 
-import math._
-import text.split_with_delim
 import error.internal_error
+import serialize.TextSerializer
+import text.split_with_delim
 
 protected class TimeImpl {
 

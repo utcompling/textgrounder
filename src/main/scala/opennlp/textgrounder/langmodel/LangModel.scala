@@ -35,7 +35,7 @@ import util.collection._
 import util.error._
 import util.io.FileHandler
 import util.print._
-import util.TextSerializer
+import util.serialize.TextSerializer
 import util.memoizer._
 
 import util.debug._

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Serializer.scala
+//  serialize.scala
 //
 //  Copyright (C) 2011-2013 Ben Wing, The University of Texas at Austin
 //
@@ -18,6 +18,7 @@
 
 package opennlp.textgrounder
 package util
+package serialize
 
 import error.warning
 

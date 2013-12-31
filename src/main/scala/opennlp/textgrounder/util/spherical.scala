@@ -26,6 +26,7 @@ import net.liftweb
 
 import error.warning
 import math.MeanShift
+import serialize.TextSerializer
 
 /*
   The coordinates of a point are spherical coordinates, indicating a

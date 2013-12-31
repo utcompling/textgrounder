@@ -33,7 +33,7 @@ import util.error._
 import util.experiment._
 import util.io._
 import util.print._
-import util.TextSerializer
+import util.serialize.TextSerializer
 import util.text.capfirst
 import util.textdb.Row
 
@@ -996,7 +996,7 @@ abstract class GridDoc[Co : TextSerializer](
   val lang_model: DocLangModel
 ) {
 
-  import util.TextSerializer._
+  import util.serialize.TextSerializer._
 
   /**
    * Title of the document -- something that uniquely identifies it,
