@@ -109,6 +109,8 @@ class TADMMaxentRankingTrainer[DI <: DataInstance](
         for (i <- 0 until nfeats) {
           val k = fv.keys(i)
           val v = fv.values(i)
+          assert(!v.isNaN && !v.isInfinity,
+            s"For feature ${fv.format_feature(k)}($k), disallowed value $v")
           file.print(" " + k)
           file.print(" " + v)
         }

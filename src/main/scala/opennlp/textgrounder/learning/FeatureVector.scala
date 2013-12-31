@@ -1072,8 +1072,27 @@ case class AggregateFeatureVector(
       for (i <- 0 until vec.keys.size) {
         val key = vec.keys(i)
         if (feature_mapper.features_to_standardize contains key) {
-          vec.values(i) =
-            to_feat_value((vec.values(i) - keymean(key))/keystddev(key))
+          val stddev = keystddev(key)
+          // Must skip 0, NaN and infinity! Comparison between anything and
+          // NaN will be false and won't pass the > 0 check.
+          if (stddev > 0 && !stddev.isInfinite) {
+            vec.values(i) =
+              /*
+              to_feat_value((vec.values(i) - keymean(key))/stddev)
+              // FIXME! We add 1 here somewhat arbitrarily because TADM ignores
+              // features that have a mean of 0 (don't know why).
+              to_feat_value((vec.values(i) - keymean(key))/stddev + 1)
+              */
+              // FIXME: Try just dividing by the standard deviation so the
+              // spread is at least scaled correctly. This also ensures that
+              // 0 values would remain as 0 so no problems arise due to
+              // ignoring them. An alternative that might work for KL-divergence
+              // and similar scores is to shift so that the minimum gets a value
+              // of 0, as well as scaling by the stddev.
+              // FIXME! In the case of the initial ranking, it's also standardized
+              // and adjusted in `evaluate_with_initial_ranking`.
+              to_feat_value(vec.values(i)/stddev)
+          }
         }
       }
     }

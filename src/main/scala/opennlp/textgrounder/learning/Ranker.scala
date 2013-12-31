@@ -105,6 +105,8 @@ trait Reranker[Query, Candidate]
     val initial_ranking = initial_ranker.evaluate(item, include)
     // Split into candidates to rerank and others.
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
+    // FIXME! We also standardize the scores afterwards in
+    // standardize_featvecs.
     // Standardize the initial scores so they are comparable across
     // different instances.
     val (cands, scores) = to_rerank.unzip
