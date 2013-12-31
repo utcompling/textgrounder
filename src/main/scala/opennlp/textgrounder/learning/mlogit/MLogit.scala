@@ -184,8 +184,6 @@ class MLogitConditionalLogitTrainer[DI <: DataInstance](
 
   def get_weights(training_data: TrainingData[DI]): (VectorAggregate, Int) = {
     val rweights = do_mlogit(training_data)
-    if (debug("weights"))
-      errprint("Weights: %s", rweights)
     val vecagg = SingleVectorAggregate(ArrayVector(rweights))
     (vecagg, 1)
   }

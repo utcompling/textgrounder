@@ -149,8 +149,6 @@ class TADMMaxentRankingTrainer[DI <: DataInstance](
         weights ++ Seq.fill(F - weights.size)(0.0)
       } else
         weights
-    if (debug("weights"))
-      errprint("Weights: %s", expanded_weights)
     val vecagg = SingleVectorAggregate(ArrayVector(expanded_weights.toArray))
     // FIXME: Retrieve actual number of iterations, or just get rid of the
     // need to return this value at all.
