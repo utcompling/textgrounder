@@ -21,6 +21,9 @@ package util
 
 import scala.math._
 
+import java.io.{DataInput,DataOutput}
+import com.nicta.scoobi.core.WireFormat
+import WireFormat._
 
 import net.liftweb
 
@@ -108,6 +111,18 @@ protected class SphericalPackage {
 
   implicit val SphereCoordOrdering =
     Ordering[(Double, Double)].on((x: SphereCoord) => (x.lat, x.long))
+
+  implicit val wfSphereCoord = new WireFormat[SphereCoord] {
+    def toWire(x: SphereCoord, out: DataOutput) {
+      out.writeDouble(x.lat)
+      out.writeDouble(x.long)
+    }
+    def fromWire(in: DataInput): SphereCoord = {
+      val lat = in.readDouble()
+      val long = in.readDouble()
+      SphereCoord(lat, long)
+    }
+  }
 
   implicit object SphereCoord extends TextSerializer[SphereCoord] {
     def format_lat_long(lat: Double, long: Double) =

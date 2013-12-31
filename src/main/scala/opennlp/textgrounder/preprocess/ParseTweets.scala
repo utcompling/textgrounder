@@ -54,7 +54,7 @@ import util.textdb._
 import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
 import util.print._
-import util.spherical.SphereCoord
+import util.spherical._
 import util.text.pretty_long
 import util.time._
 
@@ -457,18 +457,6 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   type Timestamp = Long
 
   def empty_map = Map[String, Int]()
-
-  implicit def SphereCoordFmt = new WireFormat[SphereCoord] {
-    def toWire(x: SphereCoord, out: DataOutput) {
-      out.writeDouble(x.lat)
-      out.writeDouble(x.long)
-    }
-    def fromWire(in: DataInput): SphereCoord = {
-      val lat = in.readDouble()
-      val long = in.readDouble()
-      SphereCoord(lat, long)
-    }
-  }
 
   /**
    * Data for a tweet or grouping of tweets.

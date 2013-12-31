@@ -27,6 +27,10 @@ package learning
 
 import collection.mutable
 
+import java.io.{DataInput,DataOutput}
+import com.nicta.scoobi.core.WireFormat
+import WireFormat._
+
 import util.collection.{doublemap, intmap}
 import util.error.internal_error
 import util.memoizer._
@@ -79,6 +83,39 @@ case class FeatureLabelMapper(
   feature_mapper: FeatureMapper = new FeatureMapper,
   label_mapper: LabelMapper = new LabelMapper
 )
+
+class FeatureMapperWireFormat extends WireFormat[FeatureMapper] {
+  val memoizer_wire = new ToIntMemoizerWireFormat[String]
+  def toWire(x: FeatureMapper, out: DataOutput) {
+    memoizer_wire.toWire(x, out)
+    val fts = x.features_to_rescale
+    out.writeInt(fts.size)
+    for (feat <- fts)
+      out.writeInt(feat)
+  }
+
+  def fromWire(in: DataInput) = {
+    val mapper = new FeatureMapper
+    memoizer_wire.fromWire(mapper, in)
+    val nfeats = in.readInt
+    for (i <- 0 until nfeats)
+      mapper.features_to_rescale += in.readInt
+    mapper
+  }
+}
+
+class LabelMapperWireFormat extends WireFormat[LabelMapper] {
+  val memoizer_wire = new ToIntMemoizerWireFormat[String]
+  def toWire(x: LabelMapper, out: DataOutput) {
+    memoizer_wire.toWire(x, out)
+  }
+
+  def fromWire(in: DataInput) = {
+    val mapper = new LabelMapper
+    memoizer_wire.fromWire(mapper, in)
+    mapper
+  }
+}
 
 /**
  * A vector of real-valued features.  In general, features are indexed

@@ -41,7 +41,7 @@ import util.memoizer._
  * memory use, with the keys sorted so that efficient O(log n) lookup
  * is possible using binary search.
  */
-class makespec(CompressedSparseFeatureVector) private[learning] (
+case class makespec(CompressedSparseFeatureVector) private[learning] (
   var keys: Array[FeatIndex], var values: Array[VECTY],
   val mappers: FeatureLabelMapper
 ) extends SparseFeatureVector {
@@ -90,8 +90,8 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   def string_prefix = "CompressedSparseFeatureVector"
 }
 
-class makespec(BasicCompressedSparseFeatureVector) private[learning] (
-  keys: Array[FeatIndex], values: Array[VECTY], mappers: FeatureLabelMapper
-) extends makespec(CompressedSparseFeatureVector)(keys, values, mappers) {
-  override val include_displayed_feature = false
-}
+//case class makespec(BasicCompressedSparseFeatureVector) private[learning] (
+//  keys: Array[FeatIndex], values: Array[VECTY], mappers: FeatureLabelMapper
+//) extends makespec(CompressedSparseFeatureVector)(keys, values, mappers) {
+//  override val include_displayed_feature = false
+//}

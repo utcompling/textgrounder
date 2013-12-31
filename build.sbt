@@ -70,6 +70,8 @@ libraryDependencies ++= Seq(
   //
   // Trove
   "net.sf.trove4j" % "trove4j" % "3.0.3",
+  // Scala Pickling
+  // "org.scala-lang" %% "scala-pickling" % "0.8.0-SNAPSHOT",
   //
   // Scoobi
   // The following is the library we actually use, but because it's not

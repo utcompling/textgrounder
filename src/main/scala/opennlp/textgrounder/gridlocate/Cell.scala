@@ -22,6 +22,10 @@ package gridlocate
 
 import collection.mutable
 
+import java.io.{DataInput,DataOutput}
+import com.nicta.scoobi.core.WireFormat
+import WireFormat._
+
 import util.error.warning
 import util.experiment._
 import util.print.errprint
@@ -238,6 +242,27 @@ abstract class GridCell[Co](
     assert(!finished)
     lang_model.finish_before_global()
     lang_model.finish_after_global()
+  }
+}
+
+class GridCellWireFormat[Co : WireFormat](
+  grid: Grid[Co]
+) extends WireFormat[GridCell[Co]] {
+  val coord_wire = implicitly[WireFormat[Co]]
+  def toWire(x: GridCell[Co], out: DataOutput) {
+    coord_wire.toWire(x.get_true_center, out)
+  }
+
+  def fromWire(in: DataInput) = {
+    val coord = coord_wire.fromWire(in)
+    grid.find_best_cell_for_coord(coord, false) match {
+      case None => throw new SerializationError(
+  s"Attempt to deserialize nonexistent cell with center $coord")
+      case Some(cell) if cell.get_true_center != coord =>
+        throw new SerializationError(
+  s"Attempt to deserialize nonexistent cell with center $coord; coord is within cell $cell at different center ${cell.get_true_center}")
+      case Some(cell) => cell
+    }
   }
 }
 

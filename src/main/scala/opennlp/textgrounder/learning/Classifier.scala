@@ -57,6 +57,9 @@ trait ClassifierLike[DI <: DataInstance] {
 trait DataInstance {
   /** Get the feature vector corresponding to a data instance. */
   def feature_vector: FeatureVector
+
+  // def wire_format: WireFormat
+
   def pretty_print_labeled(prefix: String, correct: LabelIndex)
 }
 

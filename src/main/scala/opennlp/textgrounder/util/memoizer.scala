@@ -24,6 +24,10 @@ import scala.collection.mutable
 
 import com.codahale.trove.{mutable => trovescala}
 
+import java.io.{DataInput,DataOutput}
+import com.nicta.scoobi.core.WireFormat
+import WireFormat._
+
 import collection._
 import print.errprint
 
@@ -159,6 +163,24 @@ trait ToIntMemoizer[T] {
 
   def to_string(index: Int) = synchronized {
     id_value_map(index + minimum_raw_index)
+  }
+}
+
+class ToIntMemoizerWireFormat[T : WireFormat] {
+  def toWire(x: ToIntMemoizer[T], out: DataOutput) {
+    val nindices = x.number_of_indices
+    out.writeInt(nindices)
+    for (i <- 0 until nindices) {
+      implicitly[WireFormat[T]].toWire(x.to_string(i), out)
+    }
+  }
+
+  def fromWire(x: ToIntMemoizer[T], in: DataInput) {
+    val nindices = in.readInt()
+    for (i <- 0 until nindices) {
+      val raw = implicitly[WireFormat[T]].fromWire(in)
+      x.to_index(raw)
+    }
   }
 }
 

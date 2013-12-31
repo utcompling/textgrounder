@@ -25,6 +25,9 @@ import scala.util.control.Breaks._
 
 import java.io._
 
+import com.nicta.scoobi.core.WireFormat
+import WireFormat._
+
 import util.collection._
 import util.textdb._
 import util.textdb.TextDB._
@@ -1086,4 +1089,21 @@ abstract class GridDoc[Co : TextSerializer](
    * Output a distance with attached units
    */
   def output_distance(dist: Double): String
+}
+
+class GridDocWireFormat[Co](
+  docmap: Map[String, GridDoc[Co]]
+) extends WireFormat[GridDoc[Co]] {
+  val string_wire = implicitly[WireFormat[String]]
+  def toWire(x: GridDoc[Co], out: DataOutput) {
+    string_wire.toWire(x.title, out)
+  }
+
+  def fromWire(in: DataInput) = {
+    val title = string_wire.fromWire(in)
+    if (!docmap.contains(title))
+      throw new SerializationError(
+  s"Attempt to deserialize nonexistent document with title $title")
+    docmap(title)
+  }
 }
