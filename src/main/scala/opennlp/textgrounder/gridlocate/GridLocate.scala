@@ -1544,7 +1544,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             }
 
             val maybepar_data =
-              if (true /* params.no_parallel */) data
+              // FIXME: Not yet by default. This seems to use lots more memory
+              // and sometimes produces different results than without it,
+              // presumably indicative of a race condition.
+              if (debug("parallel-qtd-to-rti")
+                  /*params.no_parallel || debug("no-parallel-qtd-to-rti")*/) data
               else data.par
 
             maybepar_data.mapMetered(task) { qtd =>
