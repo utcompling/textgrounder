@@ -43,7 +43,7 @@ if [ -z "$sort" ]; then
 fi
 
 if [ "$verbose" != yes ]; then
-  echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime      RSS       File"
+  echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime    RSS    File"
 fi
 
 function output() {
@@ -75,17 +75,48 @@ for x in ${1+"$@"}; do
   numeval=$(echo "$results" | egrep 'Number of instances' | perl -pe 's/.*= (.*?) *$/$1/')
   numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
   finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' "$x")
-  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ hours? /:/;' -e 's/ minutes? /:/;' -e 's/ seconds?//;')
+  # Convert runtime from "24 minutes 5 seconds" or "0 minutes 6 seconds"
+  # (old style) or "24 min 5 sec" or "6 sec" (new style) to a raw version
+  # of HH:MM:SS.
+  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ (hour|hr)s? /:/;' -e 's/ min(ute)?s? /:/;' -e 's/ sec(ond)s?//;')
   if [ -n "$debug" ]; then
     echo "Runtime0: [$runtime0]"
   fi
+  # Reformat to proper HH:MM:SS, making sure to have two digits for the
+  # minutes.
   runtime=$(echo "$runtime0" | perl -ne '
-    my ($hrs, $mins, $secs) = /^(.*?:)?(.*?):(.*?)$/;
+    my ($hrs, $mins, $secs) = /^(?:(.*?):)?(?:(.*?):)?(.*?)$/;
+    # We may have only a number of seconds; check for this.
+    if (!defined($hrs)) { $hrs = 0; }
+    if (!defined($mins)) { $mins = $hrs; $hrs = 0; }
     $mins = sprintf("%02d", $mins);
     $secs = sprintf("%04.1f", $secs);
+    if ($hrs == 0) { $hrs = ""; } else { $hrs = "${hrs}:"; }
     print("$hrs$mins:$secs");
   ')
+  # Check for the old way of outputting and convert to new-style (618.63 MB).
+  # The old style had various lines beginning "Memory usage" for different
+  # usage stats, and had the resident size given as something like
+  #
+  # Memory usage, actual (i.e. resident set) (proc): 618,635,264 bytes
+  #
   rss=$(echo "$finalstats" | egrep 'Memory usage, actual' | perl -pe 's/.*: (.*?) bytes/$1/')
+  if [ -n "$rss" ]; then
+    rss=$(echo "$rss" | perl -ne '
+      my ($rss) = /^(.*)$/;
+      $rss =~ s/,//g;
+      $rss = $rss + 0; # Make sure string interpreted as number, maybe not nec
+      if ($rss >= 1_000_000_000) { printf("%.2f GB", $rss/1_000_000_000.0); }
+      elsif ($rss >= 1_000_000) { printf("%.2f MB", $rss/1_000_000.0); }
+      else { printf("%.2f KB", $rss/1_000.0); }
+    ')
+  else
+    # The new way, which lines like
+    #
+    # Memory usage: virtual: 13.51 GB, resident: 1.49 GB, Java heap: 59.61 MB
+    #
+    rss=$(echo "$finalstats" | egrep 'Memory usage:' | perl -pe 's/.*resident: (.*?B).*$/$1/')
+  fi
   if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
     skip=no
   else
@@ -98,7 +129,7 @@ for x in ${1+"$@"}; do
   median=$(printf '%7s' "$median")
   avg=$(printf '%7s' "$avg")
   runtime=$(printf '%9s' "$runtime")
-  rss=$(printf '%14s' "$rss")
+  rss=$(printf '%9s' "$rss")
   if [ -n "$debug" ]; then
     echo "Args: [$args]"
     echo "Mean: [$mean]"
