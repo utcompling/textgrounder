@@ -566,23 +566,26 @@ simple algorithms meant for comparison purposes.
 trait GridLocateRerankParameters {
   this: GridLocateParameters =>
 
-  var rerank =
-    ap.flag("rerank",
-      help = """If specified, do reranking of grid cells.""")
+  var reranker =
+    ap.option[String]("reranker",
+      default = "none",
+      choices = Seq("none", "random", "oracle", "perceptron", "avg-perceptron",
+        "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
+      help = """Type of strategy to use when reranking.  Possibilities are:
 
-  var rerank_classifier =
-    ap.option[String]("rerank-optimizer",
-      default = "avg-perceptron",
-      choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
-        "cost-perceptron", "mlogit", "tadm"),
-      help = """Type of optimizer to use for reranking.  Possibilities are:
+'none' (no reranking);
 
-'perceptron' (perceptron using the basic algorithm);
+'random' (pick randomly among the candidates to rerank);
 
-'avg-perceptron' (perceptron using the basic algorithm, where the weights
-  from the various rounds are averaged -- this usually improves results if
-  the weights oscillate around a certain error rate, rather than steadily
-  improving);
+'oracle' (always pick the correct candidate if it's among the candidates);
+
+'perceptron' (using a basic-algorithm perceptron, try to maximimize the
+  likelihood of picking the correct candidate in the training set);
+
+'avg-perceptron' (similar to 'perceptron' but averages the weights from
+  the various rounds of the perceptron computations -- this usually improves
+  results if the weights oscillate around a certain error rate, rather than
+  steadily improving);
 
 'pa-perceptron' (passive-aggressive perceptron, which usually leads to steady
   but gradually dropping-off error rate improvements with increased number
@@ -596,7 +599,7 @@ trait GridLocateRerankParameters {
 
 'tadm' (use TADM to implement a maxent ranking model).
 
-Default %default.
+Default is '%default'.
 
 For the perceptron optimizers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
@@ -772,7 +775,7 @@ A value of 'default' means use the same lang model as is specified in
     rerank_lang_model = lang_model
 
   lazy val rerank_lang_model_type = {
-    if (!rerank)
+    if (reranker == "none")
       grid_lang_model_type
     else {
       val is_ngram =
@@ -1389,14 +1392,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       }
       weights
     }
-    params.rerank_classifier match {
+    params.reranker match {
       case "perceptron" | "avg-perceptron" =>
         new BasicSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
           vec_factory, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
           max_iterations = params.perceptron_rounds,
-          averaged = params.rerank_classifier == "avg-perceptron") {
+          averaged = params.reranker == "avg-perceptron") {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
           }
@@ -1496,7 +1499,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     /* The basic ranker object. */
     def basic_ranker =
       create_ranker_from_documents(read_raw_training_documents)
-    if (!params.rerank) basic_ranker
+    if (params.reranker == "none") basic_ranker
+    else if (params.reranker == "random")
+      new RandomGridReranker[Co](basic_ranker) {
+        val top_n = params.rerank_top_n
+      }
     else {
       /* Factory object for generating candidate feature vectors
        * to be ranked. There is one such feature vector per cell to be

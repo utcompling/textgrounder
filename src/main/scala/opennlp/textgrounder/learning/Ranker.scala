@@ -26,6 +26,7 @@ import util.metering._
 import util.print._
 
 import scala.math
+import scala.util.Random
 
 /**
  * A basic ranker. This is a machine-learning object that is given a query
@@ -128,6 +129,20 @@ trait Reranker[Query, Candidate]
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, include)
     reranking
+  }
+}
+
+/**
+ * A reranker that picks randomly among the candidates to rerank.
+ */
+trait RandomReranker[Query, Candidate] extends Reranker[Query, Candidate] {
+  /**
+   * Rerank a set of top candidates, given the query and the initial score
+   * for each candidate.
+   */
+  protected def rerank_candidates(item: Query,
+      scored_candidates: Iterable[(Candidate, Double)]) = {
+    (new Random()).shuffle(scored_candidates)
   }
 }
 

@@ -660,6 +660,20 @@ class NgramMatchingCandidateFeatVecFactory[Co](
  * as possible matches for a given document).
  * See `PointwiseClassifyingReranker`.
  */
+abstract class RandomGridReranker[Co](_initial_ranker: GridRanker[Co]
+) extends GridRanker[Co](_initial_ranker.ranker_name, _initial_ranker.grid)
+  with RandomReranker[GridDoc[Co], GridCell[Co]] {
+    val initial_ranker = _initial_ranker
+    def return_ranked_cells(lang_model: LangModel,
+        include: Iterable[GridCell[Co]]) = ???
+}
+
+/**
+ * A grid reranker, i.e. a pointwise reranker for doing reranking in a
+ * GridLocate context, based on a grid ranker (for ranking cells in a grid
+ * as possible matches for a given document).
+ * See `PointwiseClassifyingReranker`.
+ */
 abstract class PointwiseGridReranker[Co](ranker_name: String,
   grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid)
