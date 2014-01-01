@@ -111,7 +111,7 @@ doing geolocation is split up into various classes:
 abstract class SphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
-) extends GridRanker[SphereCoord](ranker_name, sphere_grid) { }
+) extends SimpleGridRanker[SphereCoord](ranker_name, sphere_grid) { }
 
 class CellDistMostCommonToponymSphereGridRanker(
   ranker_name: String,

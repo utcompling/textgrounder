@@ -1501,7 +1501,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_ranker_from_documents(read_raw_training_documents)
     if (params.reranker == "none") basic_ranker
     else if (params.reranker == "random")
-      new RandomGridReranker[Co](basic_ranker) {
+      new RandomGridReranker[Co](params.reranker, basic_ranker) {
         val top_n = params.rerank_top_n
       }
     else {
@@ -1516,6 +1516,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       /* Object for training a reranker. */
       val reranker_trainer =
         new LinearClassifierGridRerankerTrainer[Co](
+          params.reranker,
           create_pointwise_classifier_trainer
         ) {
           val top_n = params.rerank_top_n

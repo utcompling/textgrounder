@@ -30,6 +30,20 @@ abstract class GridRanker[Co](
   val ranker_name: String,
   val grid: Grid[Co]
 ) extends Ranker[GridDoc[Co], GridCell[Co]] {
+}
+
+/**
+ * A grid ranker that does not use reranking.
+ *
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param grid Grid containing the cells over which this ranker operates
+ */
+abstract class SimpleGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co]
+) extends GridRanker[Co](ranker_name, grid) {
   /**
    * For a given language model (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -57,6 +71,24 @@ case class GridRankerInst[Co](
   fv: AggregateFeatureVector
 ) extends DataInstance {
   final def feature_vector = fv
+}
+
+/**
+ * A grid ranker that uses reranking.
+ *
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param initial_ranker Ranker used to compute initial ranking; the top items
+ *   are then reranked.
+ */
+abstract class GridReranker[Co](
+  ranker_name: String,
+  _initial_ranker: GridRanker[Co]
+) extends GridRanker(ranker_name + "/" + _initial_ranker.ranker_name,
+  _initial_ranker.grid
+) with Reranker[GridDoc[Co], GridCell[Co]] {
+  val initial_ranker = _initial_ranker
 }
 
 /**
@@ -660,12 +692,10 @@ class NgramMatchingCandidateFeatVecFactory[Co](
  * as possible matches for a given document).
  * See `PointwiseClassifyingReranker`.
  */
-abstract class RandomGridReranker[Co](_initial_ranker: GridRanker[Co]
-) extends GridRanker[Co](_initial_ranker.ranker_name, _initial_ranker.grid)
-  with RandomReranker[GridDoc[Co], GridCell[Co]] {
-    val initial_ranker = _initial_ranker
-    def return_ranked_cells(lang_model: LangModel,
-        include: Iterable[GridCell[Co]]) = ???
+abstract class RandomGridReranker[Co](ranker_name: String,
+  _initial_ranker: GridRanker[Co]
+) extends GridReranker[Co](ranker_name, _initial_ranker)
+    with RandomReranker[GridDoc[Co], GridCell[Co]] {
 }
 
 /**
@@ -675,13 +705,9 @@ abstract class RandomGridReranker[Co](_initial_ranker: GridRanker[Co]
  * See `PointwiseClassifyingReranker`.
  */
 abstract class PointwiseGridReranker[Co](ranker_name: String,
-  grid: Grid[Co]
-) extends GridRanker[Co](ranker_name, grid)
-  with PointwiseClassifyingReranker[GridDoc[Co], GridCell[Co]] {
-    def return_ranked_cells(lang_model: LangModel,
-        include: Iterable[GridCell[Co]]) =
-      initial_ranker.asInstanceOf[GridRanker[Co]].return_ranked_cells(
-        lang_model, include)
+  _initial_ranker: GridRanker[Co]
+) extends GridReranker[Co](ranker_name, _initial_ranker)
+    with PointwiseClassifyingReranker[GridDoc[Co], GridCell[Co]] {
 }
 
 /**
@@ -691,6 +717,7 @@ abstract class PointwiseGridReranker[Co](ranker_name: String,
  *   pointwise reranking.
  */
 abstract class LinearClassifierGridRerankerTrainer[Co](
+  ranker_name: String,
   val trainer: SingleWeightLinearClassifierTrainer[GridRankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
     GridDoc[Co], GridCell[Co], DocStatus[Row], GridRankerInst[Co]
@@ -733,9 +760,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     _initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
   ) = {
     val grid_ir = _initial_ranker.asInstanceOf[GridRanker[Co]]
-    new PointwiseGridReranker[Co](grid_ir.ranker_name, grid_ir.grid) {
+    new PointwiseGridReranker[Co](ranker_name, grid_ir) {
       protected val rerank_classifier = _rerank_classifier
-      protected val initial_ranker = _initial_ranker
       val top_n = self.top_n
       protected def create_candidate_eval_featvec(query: GridDoc[Co],
           candidate: GridCell[Co], initial_score: Double, initial_rank: Int

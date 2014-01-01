@@ -43,7 +43,7 @@ suitability of the cells of the grid for a given document.
 class RandomGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
-) extends GridRanker[Co](ranker_name, grid) {
+) extends SimpleGridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(lang_model: LangModel,
       include: Iterable[GridCell[Co]]) = {
     val cells = grid.iter_nonempty_cells_including(include)
@@ -62,7 +62,7 @@ class MostPopularGridRanker[Co] (
   ranker_name: String,
   grid: Grid[Co],
   salience: Boolean
-) extends GridRanker[Co](ranker_name, grid) {
+) extends SimpleGridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(lang_model: LangModel, include: Iterable[GridCell[Co]]) = {
     (for (cell <-
         grid.iter_nonempty_cells_including(include))
@@ -83,7 +83,7 @@ class MostPopularGridRanker[Co] (
 abstract class PointwiseScoreGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
-) extends GridRanker[Co](ranker_name, grid) {
+) extends SimpleGridRanker[Co](ranker_name, grid) {
   /**
    * Function to return the score of a document language model against a
    * cell.
@@ -279,7 +279,7 @@ class NaiveBayesGridRanker[Co](
 class AverageCellProbabilityGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
-) extends GridRanker[Co](ranker_name, grid) {
+) extends SimpleGridRanker[Co](ranker_name, grid) {
   def create_cell_dist_factory(lru_cache_size: Int) =
     new CellDistFactory[Co](lru_cache_size)
 
