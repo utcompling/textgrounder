@@ -1965,7 +1965,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    *   tweets get grouped together.
    * @param value See above.
    */
-  case class FeatureValueStats(
+  case class PropertyValueStats(
     ty: String,
     key2: String,
     value: String,
@@ -1986,10 +1986,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
   }
 
-  implicit val featureValueStatsWire =
-    mkCaseWireFormat(FeatureValueStats.apply _, FeatureValueStats.unapply _)
+  implicit val propertyValueStatsWire =
+    mkCaseWireFormat(PropertyValueStats.apply _, PropertyValueStats.unapply _)
 
-  object FeatureValueStats {
+  object PropertyValueStats {
     def row_fields =
       Seq(
         "type",
@@ -2003,7 +2003,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       import Decoder._
       val Array(ty, key2, value, num_tweets, min_timestamp, max_timestamp) =
         row.split("\t", -1)
-      FeatureValueStats(
+      PropertyValueStats(
         string(ty),
         string(key2),
         string(value),
@@ -2014,15 +2014,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def from_tweet(tweet: Tweet, ty: String, key2: String, value: String) = {
-      FeatureValueStats(ty, key2, value, 1, tweet.min_timestamp,
+      PropertyValueStats(ty, key2, value, 1, tweet.min_timestamp,
         tweet.max_timestamp)
     }
 
-    def merge_stats(x1: FeatureValueStats, x2: FeatureValueStats) = {
+    def merge_stats(x1: PropertyValueStats, x2: PropertyValueStats) = {
       assert(x1.ty == x2.ty)
       assert(x1.key2 == x2.key2)
       assert(x1.value == x2.value)
-      FeatureValueStats(x1.ty, x1.key2, x1.value,
+      PropertyValueStats(x1.ty, x1.key2, x1.value,
         x1.num_tweets + x2.num_tweets,
         math.min(x1.min_timestamp, x2.min_timestamp),
         math.max(x1.max_timestamp, x2.max_timestamp))
@@ -2030,11 +2030,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   }
 
   /**
-   * Statistics on any tweet "feature" (e.g. user, language) that can be
+   * Statistics on any tweet property (e.g. user, language) that can be
    * identified by a value of some type (e.g. string, number) and has an
-   * associated map of occurrences of values of the feature.
+   * associated map of occurrences of values of the property.
    */
-  case class FeatureStats(
+  case class PropertyStats(
     ty: String,
     key2: String,
     lowest_value_by_sort: String,
@@ -2045,8 +2045,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     least_common_count: Int,
     num_value_types: Int,
     num_value_occurrences: Int
-  ) extends Ordered[FeatureStats] {
-    def compare(that: FeatureStats) = {
+  ) extends Ordered[PropertyStats] {
+    def compare(that: PropertyStats) = {
       (ty compare that.ty) match {
         case 0 => key2 compare that.key2
         case x => x
@@ -2071,10 +2071,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
   }
 
-  implicit val featureStatsWire =
-    mkCaseWireFormat(FeatureStats.apply _, FeatureStats.unapply _)
+  implicit val propertyStatsWire =
+    mkCaseWireFormat(PropertyStats.apply _, PropertyStats.unapply _)
 
-  object FeatureStats {
+  object PropertyStats {
     def row_fields =
       Seq(
         "type",
@@ -2097,7 +2097,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         least_common_value, least_common_count,
         num_value_types, num_value_occurrences, avo) =
         row.split("\t", -1)
-      FeatureStats(
+      PropertyStats(
         string(ty),
         string(key2),
         string(lowest_value_by_sort),
@@ -2111,11 +2111,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       )
     }
 
-    def from_value_stats(vs: FeatureValueStats) =
-      FeatureStats(vs.ty, vs. key2, vs.value, vs.value, vs.value, vs.num_tweets,
+    def from_value_stats(vs: PropertyValueStats) =
+      PropertyStats(vs.ty, vs. key2, vs.value, vs.value, vs.value, vs.num_tweets,
       vs.value, vs.num_tweets, 1, vs.num_tweets)
 
-    def merge_stats(x1: FeatureStats, x2: FeatureStats) = {
+    def merge_stats(x1: PropertyStats, x2: PropertyStats) = {
       assert(x1.ty == x2.ty)
       assert(x1.key2 == x2.key2)
       val (most_common_value, most_common_count) =
@@ -2128,7 +2128,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           (x1.least_common_value, x1.least_common_count)
         else
           (x2.least_common_value, x2.least_common_count)
-      FeatureStats(x1.ty, x1.key2,
+      PropertyStats(x1.ty, x1.key2,
         if (x1.lowest_value_by_sort < x2.lowest_value_by_sort)
           x1.lowest_value_by_sort
         else x2.lowest_value_by_sort,
@@ -2216,12 +2216,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def stats_for_tweet(tweet: Tweet) = {
-      Seq(FeatureValueStats.from_tweet(tweet, "user", "user", tweet.user),
+      Seq(PropertyValueStats.from_tweet(tweet, "user", "user", tweet.user),
           // Get a summary for all languages plus a summary for each lang
-          FeatureValueStats.from_tweet(tweet, "lang", tweet.lang, ""),
-          FeatureValueStats.from_tweet(tweet, "lang", "lang", tweet.lang)) ++
+          PropertyValueStats.from_tweet(tweet, "lang", tweet.lang, ""),
+          PropertyValueStats.from_tweet(tweet, "lang", "lang", tweet.lang)) ++
         sdfs.map { case (engl, fmt) =>
-          FeatureValueStats.from_tweet(
+          PropertyValueStats.from_tweet(
             tweet, engl, format_date(tweet.min_timestamp, fmt), "") }
     }
 
@@ -2231,36 +2231,36 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def get_by_value(tweets: DList[Tweet]) = {
       /* Operations:
 
-         1. For each tweet, and for each feature we're interested in getting
+         1. For each tweet, and for each property we're interested in getting
             stats on (e.g. users, languages, etc.), generate a tuple
-            (keytype, key, value) that has the type of feature as `keytype`
-            (e.g. "user"), the value of the feature in `key` (e.g. the user
-            name), and some sort of stats object (e.g. `FeatureStats`),
+            (keytype, key, value) that has the type of property as `keytype`
+            (e.g. "user"), the value of the property in `key` (e.g. the user
+            name), and some sort of stats object (e.g. `PropertyStats`),
             giving statistics on that user (etc.) derived from the individual
             tweet.
 
          2. Take the resulting DList and group by grouping key.  Combine the
-            resulting `FeatureStats` together by adding their values or
-            taking max/min or whatever. (If there are multiple feature types,
+            resulting `PropertyStats` together by adding their values or
+            taking max/min or whatever. (If there are multiple property types,
             we might have multiple classes involved, so we need to condition
-            on the feature type.)
+            on the property type.)
 
-         3. The resulting DList has one entry per feature value, giving
-            stats on all tweets corresponding to that feature value.  We
-            want to aggregate again of feature type, to get statistics on
-            the whole type (e.g. how many different feature values, how
+         3. The resulting DList has one entry per property value, giving
+            stats on all tweets corresponding to that property value.  We
+            want to aggregate again of property type, to get statistics on
+            the whole type (e.g. how many different property values, how
             often they occur).
        */
       tweets.flatMap(x => stats_for_tweet(x)).
       groupBy(stats => (stats.ty, stats.key2, stats.value)).
-      combine(FeatureValueStats.merge_stats).
+      combine(PropertyValueStats.merge_stats).
       map(_._2)
     }
 
-    def get_by_type(values: DList[FeatureValueStats]) = {
-      values.map(FeatureStats.from_value_stats(_)).
+    def get_by_type(values: DList[PropertyValueStats]) = {
+      values.map(PropertyStats.from_value_stats(_)).
       groupBy(stats => (stats.ty, stats.key2)).
-      combine(FeatureStats.merge_stats).
+      combine(PropertyStats.merge_stats).
       map(_._2)
     }
   }
@@ -2383,7 +2383,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
-        val schema = new Schema(FeatureStats.row_fields,
+        val schema = new Schema(PropertyStats.row_fields,
           Map("corpus-name" -> opts.corpus_name,
               "textdb-type" -> "tweet-stats"))
         local_output_textdb(schema,
