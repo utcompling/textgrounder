@@ -1549,7 +1549,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
                   initial_rank)
                 errprint("%s: Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
                   prefix, query, candidate, initial_score,
-                  initial_rank, featvec.pretty_print(prefix))
+                  initial_rank, featvec.pretty_format(prefix))
               }
               featvec
             }

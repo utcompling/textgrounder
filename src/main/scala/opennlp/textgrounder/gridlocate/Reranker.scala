@@ -68,9 +68,16 @@ abstract class SimpleGridRanker[Co](
 case class GridRankerInst[Co](
   doc: GridDoc[Co],
   candidates: IndexedSeq[GridCell[Co]],
-  fv: AggregateFeatureVector
+  agg: AggregateFeatureVector
 ) extends DataInstance {
-  final def feature_vector = fv
+  final def feature_vector = agg
+  def pretty_print_labeled(prefix: String, correct: LabelIndex) {
+    errprint(s"For instance $prefix with query doc $doc:")
+    for (((cand, fv), index) <- (candidates.view zip agg.fv).zipWithIndex) {
+      errprint(s"  $prefix-${index + 1}: %s: $cand: $fv",
+        if (index == correct) "CORRECT" else "WRONG")
+    }
+  }
 }
 
 /**

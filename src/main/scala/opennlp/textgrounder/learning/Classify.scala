@@ -353,7 +353,7 @@ object Classify extends ExperimentApp("Classify") {
     output.println(fmt.format(pred_column_headings: _*))
     for (((inst, line), index) <- insts_lines.zipWithIndex) {
       if (debug("features"))
-        output.println(inst.pretty_print(s"#${index + 1}"))
+        output.println(inst.pretty_format(s"#${index + 1}"))
       output.println(fmt.format(line: _*))
     }
     val accuracy =

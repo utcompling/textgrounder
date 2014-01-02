@@ -57,6 +57,7 @@ trait ClassifierLike[DI <: DataInstance] {
 trait DataInstance {
   /** Get the feature vector corresponding to a data instance. */
   def feature_vector: FeatureVector
+  def pretty_print_labeled(prefix: String, correct: LabelIndex)
 }
 
 object TrainingData {
@@ -119,6 +120,13 @@ case class TrainingData[DI <: DataInstance](
   }
 
   check_valid()
+
+  def pretty_print() {
+    for (((inst, correct), index) <- data.view.zipWithIndex) {
+      val prefix = s"#${index + 1}"
+      inst.pretty_print_labeled(prefix, correct)
+    }
+  }
 }
 
 /**
@@ -437,6 +445,8 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
   /** Train a linear classifier given a set of labeled instances. */
   def apply(training_data: TrainingData[DI]) = {
+    if (debug("training-data"))
+      training_data.pretty_print()
     val (weights, _) = get_weights(training_data)
 
     val cfier = create_classifier(weights)

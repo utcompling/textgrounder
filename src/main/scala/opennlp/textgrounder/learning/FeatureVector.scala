@@ -154,7 +154,12 @@ trait FeatureVector extends DataInstance {
   /** Display the label at the given index as a string. */
   def format_label(index: FeatIndex) = label_mapper.to_string(index)
 
-  def pretty_print(prefix: String): String
+  def pretty_format(prefix: String): String
+
+  def pretty_print_labeled(prefix: String, correct: LabelIndex) {
+    errprint("$prefix: Label: %s(%s)", correct, label_mapper.to_string(correct))
+    errprint("$prefix: Featvec: %s", pretty_format(prefix))
+  }
 }
 
 object FeatureVector {
@@ -235,7 +240,7 @@ case class ArrayFeatureVector(
 
   final def update(i: FeatIndex, value: Double) { values(i) = value }
 
-  def pretty_print(prefix: String) = "  %s: %s" format (prefix, values)
+  def pretty_format(prefix: String) = "  %s: %s" format (prefix, values)
 }
 
 trait SparseFeatureVector extends SimpleFeatureVector {
@@ -273,7 +278,7 @@ trait SparseFeatureVector extends SimpleFeatureVector {
 
   override def toString = compute_toString(string_prefix, toIterable)
 
-  def pretty_print(prefix: String) = {
+  def pretty_format(prefix: String) = {
     "%s: %s".format(prefix, string_prefix) + "\n" +
       pretty_feature_string(prefix, toIterable)
   }
@@ -563,7 +568,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
     // Return instance
     if (debug("features")) {
       errprint("Label: %s(%s)", label, label_mapper.to_string(label))
-      errprint("Featvec: %s", featvec.pretty_print(""))
+      errprint("Featvec: %s", featvec.pretty_format(""))
     }
     (featvec, label)
   }
@@ -671,7 +676,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", label, label_mapper.to_string(label))
-      errprint("Feature vector: %s", agg.pretty_print(""))
+      errprint("Feature vector: %s", agg.pretty_format(""))
     }
     (agg, label)
   }
@@ -910,11 +915,11 @@ case class AggregateFeatureVector(
   /** Display the feature at the given index as a string. */
   override def format_feature(index: FeatIndex) = fv.head.format_feature(index)
 
-  def pretty_print(prefix: String) = {
+  def pretty_format(prefix: String) = {
     (for (d <- 0 until depth) yield
       "Featvec at depth %s(%s): %s" format (
         d, label_mapper.to_string(d),
-        fv(d).pretty_print(prefix))).mkString("\n")
+        fv(d).pretty_format(prefix))).mkString("\n")
   }
 
   /**
