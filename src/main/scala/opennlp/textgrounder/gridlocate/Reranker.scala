@@ -313,12 +313,12 @@ class MiscCandidateFeatVecFactory[Co](
       ib(FeatCount, "$cell-numdocs", cell.num_docs),
       ib(FeatCount, "$cell-numtypes", celllm.num_types),
       ib(FeatCount, "$cell-numtokens", celllm.num_tokens),
-      ib(FeatScore, "$cell-salience", cell.salience),
-      ib(FeatFraction, "$numtypes-quotient",
+      ib(FeatRaw, "$cell-salience", cell.salience),
+      ib(FeatRaw, "$numtypes-quotient",
         celllm.num_types/doclm.num_types),
-      ib(FeatFraction, "$numtokens-quotient",
+      ib(FeatRaw, "$numtokens-quotient",
         celllm.num_tokens/doclm.num_tokens),
-      ib(FeatFraction, "$salience-quotient",
+      ib(FeatRaw, "$salience-quotient",
         cell.salience/doc.salience.getOrElse(0.0))
       // These apparently cause near-singular issues.
       //ib(FeatCount, "$numtypes-diff", celllm.num_types - doclm.num_types),
@@ -326,9 +326,9 @@ class MiscCandidateFeatVecFactory[Co](
       //ib(FeatCount, "$salience-diff", cell.salience - doc.salience.getOrElse(0.0)),
       //FIXME: TOO SLOW!!!
       // ib(FeatCount, "$types-in-common", types_in_common(doclm, celllm)),
-      // ib(FeatScore, "$kldiv", doclm.kl_divergence(celllm)),
-      // ib(FeatScore, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
-      // ib(FeatScore, "$cossim", doclm.cosine_similarity(celllm)),
+      // ib(FeatRescale, "$kldiv", doclm.kl_divergence(celllm)),
+      // ib(FeatRescale, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      // ib(FeatRescale, "$cossim", doclm.cosine_similarity(celllm)),
       // ib(FeatLogProb, "$nb-logprob", doclm.model_logprob(celllm))
     ).flatten
   }
@@ -371,9 +371,9 @@ class ModelCompareCandidateFeatVecFactory[Co](
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
-      ib(FeatScore, "$kldiv", doclm.kl_divergence(celllm)),
-      ib(FeatScore, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
-      ib(FeatScore, "$cossim", doclm.cosine_similarity(celllm)),
+      ib(FeatRescale, "$kldiv", doclm.kl_divergence(celllm)),
+      ib(FeatRescale, "$symmetric-kldiv", doclm.symmetric_kldiv(celllm)),
+      ib(FeatRescale, "$cossim", doclm.cosine_similarity(celllm)),
       ib(FeatLogProb, "$nb-logprob", doclm.model_logprob(celllm))
     ).flatten
   }
@@ -390,9 +390,9 @@ class RankScoreCandidateFeatVecFactory[Co](
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     Iterable(
-      ib(FeatScore, "$initial-score", initial_score)
-      //ib(FeatScore, "$log-initial-score", log(1+initial_score)),
-      //ib(FeatScore, "$exp-initial-score", exp(initial_score)),
+      ib(FeatRescale, "$initial-score", initial_score)
+      //ib(FeatRescale, "$log-initial-score", log(1+initial_score)),
+      //ib(FeatRescale, "$exp-initial-score", exp(initial_score)),
       //ib(FeatCount, "$initial-rank", initial_rank)
     ).flatten
   }
@@ -527,7 +527,7 @@ class WordMatchingCandidateFeatVecFactory[Co](
         case "matching-unigram-count-product" =>
           (FeatCount, doccount * cellcount)
         case "matching-unigram-count-quotient" =>
-          (FeatFraction, cellcount / doccount)
+          (FeatRaw, cellcount / doccount)
         case _ => {
           val docprob = doclm.gram_prob(word)
           val cellprob = celllm.gram_prob(word)
@@ -539,9 +539,9 @@ class WordMatchingCandidateFeatVecFactory[Co](
             case "matching-unigram-prob-product" =>
               (FeatProb, docprob * cellprob)
             case "matching-unigram-prob-quotient" =>
-              (FeatScore, cellprob / docprob)
+              (FeatRescale, cellprob / docprob)
             case "matching-unigram-kl" =>
-              (FeatScore, docprob*(log(docprob/cellprob)))
+              (FeatRescale, docprob*(log(docprob/cellprob)))
           }
         }
       }
@@ -660,7 +660,7 @@ class NgramMatchingCandidateFeatVecFactory[Co](
         case "matching-ngram-count-product" =>
           (FeatCount, doccount * cellcount)
         case "matching-ngram-count-quotient" =>
-          (FeatFraction, cellcount / doccount)
+          (FeatRaw, cellcount / doccount)
         case _ => {
           val docprob = doclm.gram_prob(ngram)
           val cellprob = celllm.gram_prob(ngram)
@@ -672,9 +672,9 @@ class NgramMatchingCandidateFeatVecFactory[Co](
             case "matching-ngram-prob-product" =>
               (FeatProb, docprob * cellprob)
             case "matching-ngram-prob-quotient" =>
-              (FeatScore, cellprob / docprob)
+              (FeatRescale, cellprob / docprob)
             case "matching-ngram-kl" =>
-              (FeatScore, docprob*(log(docprob/cellprob)))
+              (FeatRescale, docprob*(log(docprob/cellprob)))
           }
         }
       }

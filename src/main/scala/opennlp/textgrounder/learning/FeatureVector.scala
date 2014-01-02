@@ -35,31 +35,23 @@ import util.print._
 import util.debug._
 
 /** Classification of the different types of values used for features.
- * Some of them need to be standardized (scaled to have mean 0, std dev 1).
- * This perhaps can be done on all of them but it doesn't seem to make
- * much sense when done esp. on binary and probability features,
- * which have an inherent scale.
+ * Currently this is only for features that will be rescaled to make
+ * them comparable across different query documents. Only features that
+ * do involve the query document are candidates for this, and even then
+ * only when the feature represents a score that differs dramatically
+ * in scale from one query to the other and where only the difference
+ * really matters (e.g. for KL-divergence). Currently only FeatRescale
+ * below will be rescaled.
  */
 sealed abstract class FeatureValue
+/** A feature value not to be scaled. */
+case object FeatRaw extends FeatureValue
+/** A feature value needing scaling. */
+case object FeatRescale extends FeatureValue
 case object FeatBinary extends FeatureValue
 case object FeatProb extends FeatureValue
 case object FeatLogProb extends FeatureValue
-/** A count of words or similar. Needs to be standardized, which in this
- * case is vaguely similar to what happens when it's converted to a
- * probability.
- */
 case object FeatCount extends FeatureValue
-/** An arbitrary-scale score used for comparing cells. The prototypical
- * value that needs to be standardized.
- */
-case object FeatScore extends FeatureValue
-case object FeatFraction extends FeatureValue
-/** A numeric feature value of unknown nature that should not be
- * standardized (from external data).
- */
-case object FeatRaw extends FeatureValue
-/** Some other type of feature value, which *will* get standardized. */
-case object FeatOther extends FeatureValue
 
 /**
  * A more general classification of features, just into nominal vs.
@@ -71,12 +63,12 @@ case object NumericFeature extends FeatureClass
 
 class FeatureMapper extends ToIntMemoizer[String] {
   def vector_length = number_of_indices
-  val features_to_standardize = mutable.BitSet()
+  val features_to_rescale = mutable.BitSet()
   def note_feature(feattype: FeatureValue, feature: String) = {
     val index = to_index(feature)
     feattype match {
-      case FeatBinary | FeatProb | FeatLogProb => ()
-      case _ => features_to_standardize += index
+      case FeatRescale => features_to_rescale += index
+      case _ => ()
     }
     index
   }
@@ -1004,7 +996,7 @@ case class AggregateFeatureVector(
   }
 
   /**
-   * Destructively standardize the appropriate features in the given
+   * Destructively rescale the appropriate features in the given
    * feature vectors by subtracting their mean and then dividing by their
    * standard deviation. This only operates on features that have been
    * marked as needing standardization. Standardization is done to make it
@@ -1012,12 +1004,12 @@ case class AggregateFeatureVector(
    * documents, which otherwise may differ greatly in scale. (This is the
    * case for KL-divergence scores, for example.) Whether standardization
    * is done depends on the type of the feature's value. For example,
-   * binary features definitely don't need to be standardized and
-   * probabilities aren't currently standardized, either. Features of only
-   * a candidate also don't need to be standardized as they don't suffer
+   * binary features definitely don't need to be rescaled and
+   * probabilities aren't currently rescaled, either. Features of only
+   * a candidate also don't need to be rescaled as they don't suffer
    * from the problem of being compared with different query documents.)
    */
-  def standardize_featvecs() {
+  def rescale_featvecs() {
     val sparsevecs = fetch_sparse_featvecs
 
     // Get the sum and count of all features seen in any of the keys.
@@ -1028,7 +1020,7 @@ case class AggregateFeatureVector(
     // in any case. For other features, we assume that features that
     // are meant to be present and happen to have a value of 0 will be
     // noted as such. This means that we calculate mean and stddev
-    // only for features that are present, and likewise standardize
+    // only for features that are present, and likewise rescale
     // only features that are present. Otherwise, we'd end up converting
     // all the absent features to present features with some non-zero
     // value, which seems non-sensical besides making the coding more
@@ -1067,11 +1059,11 @@ case class AggregateFeatureVector(
       keysumsq map { case (key, sumsq) =>
         (key, math.sqrt(sumsq / keycount(key))) }
 
-    // Now standardize the features that need to be.
+    // Now rescale the features that need to be.
     for (vec <- sparsevecs) {
       for (i <- 0 until vec.keys.size) {
         val key = vec.keys(i)
-        if (feature_mapper.features_to_standardize contains key) {
+        if (feature_mapper.features_to_rescale contains key) {
           val stddev = keystddev(key)
           // Must skip 0, NaN and infinity! Comparison between anything and
           // NaN will be false and won't pass the > 0 check.
@@ -1089,7 +1081,7 @@ case class AggregateFeatureVector(
               // ignoring them. An alternative that might work for KL-divergence
               // and similar scores is to shift so that the minimum gets a value
               // of 0, as well as scaling by the stddev.
-              // FIXME! In the case of the initial ranking, it's also standardized
+              // FIXME! In the case of the initial ranking, it's also rescaled
               // and adjusted in `evaluate_with_initial_ranking`.
               to_feat_value(vec.values(i)/stddev)
           }
