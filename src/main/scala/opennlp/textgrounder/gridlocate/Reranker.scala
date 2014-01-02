@@ -396,10 +396,17 @@ class RankScoreCandidateFeatVecFactory[Co](
 ) extends CandidateFeatVecFactory[Co] {
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
+    val frobbed_initial_score =
+      if (debug("ensure-score-positive")) {
+        if (initial_score < 0)
+          -initial_score
+        else
+          initial_score
+      } else initial_score
     Iterable(
-      ib(FeatRescale, "$initial-score", initial_score)
-      //ib(FeatRescale, "$log-initial-score", log(1+initial_score)),
-      //ib(FeatRescale, "$exp-initial-score", exp(initial_score)),
+      ib(FeatRescale, "$initial-score", frobbed_initial_score)
+      //ib(FeatRescale, "$log-initial-score", log(frobbed_initial_score)),
+      //ib(FeatRescale, "$exp-initial-score", exp(frobbed_initial_score)),
       //ib(FeatCount, "$initial-rank", initial_rank)
     ).flatten
   }
