@@ -404,10 +404,13 @@ trait GridLocateEvalParameters {
   var eval_set =
     ap.option[String]("eval-set", "es", metavar = "SET",
       default = "dev",
-      aliasedChoices = Seq(Seq("dev", "devel"), Seq("test")),
-      help = """Set to use for evaluation during document geolocation when
-when --eval-format=internal ('dev' or 'devel' for the development set,
-'test' for the test set).  Default '%default'.""")
+      // The first item of each must agree with the suffixes used, currently
+      // 'training', 'dev', 'test'.
+      aliasedChoices = Seq(Seq("training", "train"), Seq("dev", "devel"),
+        Seq("test")),
+      help = """Set of documents to evaluate ('train' or 'training' for the
+training set, 'dev' or 'devel' for the development set, 'test' for the test
+set). Default '%default'.""")
 
   var eval_file =
     ap.multiOption[String]("e", "eval-file",
