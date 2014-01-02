@@ -304,14 +304,21 @@ class MiscCandidateFeatVecFactory[Co](
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
+      // Next three measure size of cell.
       ib(FeatCount, "$cell-numdocs", cell.num_docs),
       ib(FeatCount, "$cell-numtypes", celllm.num_types),
       ib(FeatCount, "$cell-numtokens", celllm.num_tokens),
+      // Next two measure avg size of a document in the cell.
+      ib(FeatCount, "$cell-numtypes-per-doc", celllm.num_types/cell.num_docs),
+      ib(FeatCount, "$cell-numtokens-per-doc", celllm.num_tokens/cell.num_docs),
+      // Next two measure repetitiousness of words in documents in the cell.
+      ib(FeatCount, "$cell-numtokens-per-type", celllm.num_types/celllm.num_tokens),
       ib(FeatRaw, "$cell-salience", cell.salience),
+      // Next two measure avg size of doc in cell vs. query doc size.
       ib(FeatRaw, "$numtypes-quotient",
-        celllm.num_types/doclm.num_types),
+        celllm.num_types/cell.num_docs/doclm.num_types),
       ib(FeatRaw, "$numtokens-quotient",
-        celllm.num_tokens/doclm.num_tokens),
+        celllm.num_tokens/cell.num_docs/doclm.num_tokens),
       ib(FeatRaw, "$salience-quotient",
         cell.salience/doc.salience.getOrElse(0.0))
       // These apparently cause near-singular issues.
