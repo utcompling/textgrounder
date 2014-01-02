@@ -299,12 +299,6 @@ class MiscCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
-    val doctypes = doclm.iter_keys.toSeq
-    val celltypes = celllm.iter_keys.toSeq
-    (doctypes intersect celltypes).size
-  }
-
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
     val doclm = doc.rerank_lm
@@ -336,16 +330,15 @@ class MiscCandidateFeatVecFactory[Co](
 
 /**
  * A factory for generating features for a doc-cell candidate, specifically
- * the \$types-in-common feature, which is currently very slow. (FIXME!!
- * Should be possible to implement in O(N log N) with sorting.)
+ * the \$types-in-common feature.
  */
 class TypesInCommonCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
   protected def types_in_common(doclm: LangModel, celllm: LangModel) = {
-    val doctypes = doclm.iter_keys.toSeq
-    val celltypes = celllm.iter_keys.toSeq
+    val doctypes = doclm.iter_keys.toSet
+    val celltypes = celllm.iter_keys.toSet
     (doctypes intersect celltypes).size
   }
 
