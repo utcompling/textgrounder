@@ -849,6 +849,21 @@ object AggregateFeatureVector {
   }
 }
 
+class FeatureStats {
+  // Count of features
+  val count = intmap[Int]()
+  // Count of feature vectors
+  var num_fv = 0
+  // Min value of features
+  val min = doublemap[Int]()
+  // Max value of features
+  val max = doublemap[Int]()
+  // Sum of features
+  val sum = doublemap[Int]()
+  // Sum of absolute value of features
+  val abssum = doublemap[Int]()
+}
+
 /**
  * An aggregate feature vector that stores a separate individual feature
  * vector for each of a set of labels.
@@ -903,15 +918,15 @@ case class AggregateFeatureVector(
   }
 
   /**
-   * Return the component feature vectors as a sequence of compressed sparse
-   * feature vectors, by casting each item. Will throw an error if
+   * Return the component feature vectors as a lazy sequence of compressed
+   * sparse feature vectors, by casting each item. Will throw an error if
    * the feature vectors are of the wrong type.
    */
   def fetch_sparse_featvecs = {
     // Retrieve as the appropriate type of compressed sparse feature vectors.
     // This will be one of DoubleCompressedSparseFeatureVector,
     // FloatCompressedSparseFeatureVector, etc.
-    fv map { x => x match {
+    fv.view map { x => x match {
       case y:CompressedSparseFeatureVectorType => y
       case _ => ???
     } }
@@ -921,8 +936,35 @@ case class AggregateFeatureVector(
    * Return the set of all features found in the aggregate.
    */
   def find_all_features = {
-    val sparsevecs = fetch_sparse_featvecs
-    sparsevecs.foldLeft(Set[FeatIndex]()) { _ union _.keys.toSet }
+    fetch_sparse_featvecs.foldLeft(Set[FeatIndex]()) { _ union _.keys.toSet }
+  }
+
+  /**
+   * Find the features that have different values from one component
+   * feature vector to another. Return a set of such features.
+   */
+  def accumulate_stats(stats: FeatureStats, do_minmax: Boolean = false,
+      do_sum: Boolean = false, do_abssum: Boolean = false) {
+    stats.num_fv += depth
+
+    // We do this in a purely iterative fashion to create as little
+    // garbage as possible, because we may be working with very large
+    // arrays. See find_diff_features.
+    for (vec <- fetch_sparse_featvecs; i <- 0 until vec.keys.size) {
+      val k = vec.keys(i)
+      val v = vec.values(i)
+      stats.count(k) += 1
+      if (do_minmax) {
+        if (!(stats.min contains k) || v < stats.min(k))
+          stats.min(k) = v
+        if (!(stats.max contains k) || v > stats.max(k))
+          stats.max(k) = v
+      }
+      if (do_sum)
+        stats.sum(k) += v
+      if (do_abssum)
+        stats.abssum(k) += v.abs
+    }
   }
 
   /**
@@ -930,9 +972,6 @@ case class AggregateFeatureVector(
    * feature vector to another. Return a set of such features.
    */
   def find_diff_features = {
-    val sparsevecs = fetch_sparse_featvecs
-    val nvecs = sparsevecs.size
-
     // OK, we do this in a purely iterative fashion to create as little
     // garbage as possible, because we may be working with very large
     // arrays. The basic idea, since there may be different features in
@@ -951,29 +990,16 @@ case class AggregateFeatureVector(
     // feature vectors. Then, to compute the total set of features that
     // aren't the same, we take the union of the individual results --
     // something we can do incrementally to save memory.
-    val head = sparsevecs.head
-    val countmap = intmap[Int]()
-    val minmap = doublemap[Int]()
-    val maxmap = doublemap[Int]()
-    for (i <- 0 until head.keys.size) {
-      val k = head.keys(i)
-      val v = head.values(i)
-      countmap(k) += 1
-      minmap(k) = v
-      maxmap(k) = v
-    }
-    for (j <- 1 until sparsevecs.size; vec = sparsevecs(j)) {
-      for (i <- 0 until vec.keys.size) {
-        val k = vec.keys(i)
-        val v = vec.values(i)
-        countmap(k) += 1
-        if (v < minmap(k)) minmap(k) = v
-        if (v > maxmap(k)) maxmap(k) = v
-      }
-    }
+
+    val stats = new FeatureStats
+
+    accumulate_stats(stats, do_minmax = true)
+
     (
-      for ((k, count) <- countmap; same = minmap(k) == maxmap(k) && (
-           minmap(k) == 0 || count == nvecs); if !same)
+      for ((k, count) <- stats.count;
+           same = stats.min(k) == stats.max(k) &&
+             (stats.min(k) == 0 || count == depth);
+           if !same)
         yield k
     ).toSet
   }
@@ -983,8 +1009,7 @@ case class AggregateFeatureVector(
    * not listed among the list of choice-specific features passed in.
    */
   def remove_non_choice_specific_columns(diff_features: Set[FeatIndex]) {
-    val sparsevecs = fetch_sparse_featvecs
-    for (i <- 0 until sparsevecs.size; vec = sparsevecs(i)) {
+    for (vec <- fetch_sparse_featvecs) {
       val need_to_remove = vec.keys.exists(!diff_features.contains(_))
       if (need_to_remove) {
         val feats =
@@ -1026,65 +1051,55 @@ case class AggregateFeatureVector(
     // value, which seems non-sensical besides making the coding more
     // difficult as we currently can't expand a sparse feature vector,
     // only change the value of an existing feature.
-    val (keycount, keysum) =
-      sparsevecs.foldLeft((intmap[Int](), doublemap[Int]())) {
-        (maps, vec) =>
-          val (countmap, summap) = maps
-          for ((k, v) <- (vec.keys zip vec.values)) {
-            countmap(k) += 1
-            summap(k) += v
-          }
-          maps
-      }
+    val stats = new FeatureStats
+    accumulate_stats(stats, do_sum = true)
+
     // Compute the mean of all seen instances of a feature.
     // Unseen features are ignored rather than counted as 0's.
-    val keymean =
-      keysum map { case (key, sum) => (key, sum / keycount(key)) }
+    val meanmap =
+      stats.sum map { case (key, sum) => (key, sum / stats.count(key)) }
+
     // Compute the sum of squared differences from the mean of all seen
     // instances of a feature.
     // Unseen features are ignored rather than counted as 0's.
-    val keysumsq =
-      sparsevecs.foldLeft(doublemap[Int]()) {
-        (sumsqmap, vec) =>
-          for ((k, v) <- (vec.keys zip vec.values)) {
-            val mean = keymean(k)
-            sumsqmap(k) += (v - mean) * (v - mean)
-          }
-          sumsqmap
-      }
+    val sumsqmap = doublemap[Int]()
+    for (vec <- sparsevecs; i <- 0 until vec.keys.size) {
+      val k = vec.keys(i)
+      val v = vec.values(i)
+      val mean = meanmap(k)
+      sumsqmap(k) += (v - mean) * (v - mean)
+    }
 
     // Compute the standard deviation of all features.
     // Unseen features are ignored rather than counted as 0's.
-    val keystddev =
-      keysumsq map { case (key, sumsq) =>
-        (key, math.sqrt(sumsq / keycount(key))) }
+    val stddevmap =
+      sumsqmap map { case (key, sumsq) =>
+        (key, math.sqrt(sumsq / stats.count(key))) }
 
     // Now rescale the features that need to be.
-    for (vec <- sparsevecs) {
-      for (i <- 0 until vec.keys.size) {
-        val key = vec.keys(i)
-        if (feature_mapper.features_to_rescale contains key) {
-          val stddev = keystddev(key)
-          // Must skip 0, NaN and infinity! Comparison between anything and
-          // NaN will be false and won't pass the > 0 check.
-          if (stddev > 0 && !stddev.isInfinite) {
-            vec.values(i) =
-              /*
-              to_feat_value((vec.values(i) - keymean(key))/stddev)
-              // FIXME! We add 1 here somewhat arbitrarily because TADM ignores
-              // features that have a mean of 0 (don't know why).
-              to_feat_value((vec.values(i) - keymean(key))/stddev + 1)
-              */
-              // FIXME: Try just dividing by the standard deviation so the
-              // spread is at least scaled correctly. This also ensures that
-              // 0 values would remain as 0 so no problems arise due to
-              // ignoring them. An alternative that might work for KL-divergence
-              // and similar scores is to shift so that the minimum gets a value
-              // of 0, as well as scaling by the stddev.
-              // FIXME! In the case of the initial ranking, it's also rescaled
-              // and adjusted in `evaluate_with_initial_ranking`.
-              to_feat_value(vec.values(i)/stddev)
-          }
+    for (vec <- sparsevecs; i <- 0 until vec.keys.size) {
+      val key = vec.keys(i)
+      if (feature_mapper.features_to_rescale contains key) {
+        val stddev = stddevmap(key)
+        // Must skip 0, NaN and infinity! Comparison between anything and
+        // NaN will be false and won't pass the > 0 check.
+        if (stddev > 0 && !stddev.isInfinite) {
+          vec.values(i) =
+            /*
+            to_feat_value((vec.values(i) - meanmap(key))/stddev)
+            // FIXME! We add 1 here somewhat arbitrarily because TADM ignores
+            // features that have a mean of 0 (don't know why).
+            to_feat_value((vec.values(i) - meanmap(key))/stddev + 1)
+            */
+            // FIXME: Try just dividing by the standard deviation so the
+            // spread is at least scaled correctly. This also ensures that
+            // 0 values would remain as 0 so no problems arise due to
+            // ignoring them. An alternative that might work for KL-divergence
+            // and similar scores is to shift so that the minimum gets a value
+            // of 0, as well as scaling by the stddev.
+            // FIXME! In the case of the initial ranking, it's also rescaled
+            // and adjusted in `evaluate_with_initial_ranking`.
+            to_feat_value(vec.values(i)/stddev)
         }
       }
     }

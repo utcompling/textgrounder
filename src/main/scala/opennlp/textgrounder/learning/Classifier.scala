@@ -28,6 +28,7 @@ package learning
 import collection.mutable
 import io.Source
 
+import util.error.warning
 import util.math.argmax
 import util.metering._
 import util.print._
@@ -188,45 +189,79 @@ trait ScoringClassifier extends Classifier {
   }
 }
 
-trait LinearClassifierLike {
+object LinearClassifier {
   /** Print the weight coefficients with the largest absolute value.
     *
+    * @param weights Aggregate of weights to print.
+    * @param maybestats Optional feature stats, which needs to contain the
+    *   absolute sum of the values of each feature.
+    * @param format_feature Function to display feature index as a string.
     * @param num_items Number of items to print. If &lt;= 0, print all items.
     */
   def debug_print_weights(weights: VectorAggregate,
-      format_feature: FeatIndex => String, num_items: Int) {
+      format_feature: FeatIndex => String,
+      maybestats: Option[FeatureStats],
+      num_items: Int) {
     errprint("Weights: length=%s, depth=%s, max=%s, min=%s",
        weights.length, weights.depth, weights.max, weights.min)
-    for (depth <- 0 until weights.depth) {
-      val vec = weights(depth)
-      errprint("  Weights at depth %s: ", depth)
-      val all_sorted_items =
-        vec.toIterable.toIndexedSeq.zipWithIndex.sortWith(_._1.abs > _._1.abs)
-      val sorted_items =
-        if (num_items <= 0) all_sorted_items
-        else all_sorted_items.take(num_items)
-      for (((coeff, feat), index) <- sorted_items.zipWithIndex) {
-        errprint("#%s: %s (%s) = %s", index + 1, format_feature(feat),
-          feat, coeff)
+    for (depth <- 0 until weights.depth) { // Do all components in aggregate
+      val rawvec = weights(depth)
+      errprint(s"  Raw weights at depth $depth: ")
+      val vec = rawvec.toIterable.toIndexedSeq.view
+
+      { // Show the raw weights
+        val all_sorted_items =
+          vec.zipWithIndex.sortWith(_._1.abs > _._1.abs)
+        val sorted_items =
+          if (num_items <= 0) all_sorted_items
+          else all_sorted_items.take(num_items)
+        for (((coeff, feat), index) <- sorted_items.zipWithIndex) {
+          errprint("#%s: %s (%s) = %s", index + 1, format_feature(feat),
+            feat, coeff)
+        }
+      }
+      if (maybestats != None) {
+        errprint(s"  Weights at depth $depth by relative contribution: ")
+        val stats = maybestats.get
+        val scaled_weights = vec.zipWithIndex.map { case (coeff, feat) => 
+          val count = stats.count(feat)
+          val absavg =
+            if (count == 0) 0.0
+            else stats.sum(feat)/count
+          if (absavg == 0)
+            warning(s"Feature $feat (${format_feature(feat)}) " +
+              "has average 0, will be ignored")
+          (coeff, absavg, feat)
+        }
+        val all_sorted_items =
+          scaled_weights.sortBy { x => -(x._1*x._2).abs }
+        val sorted_items =
+          if (num_items <= 0) all_sorted_items
+          else all_sorted_items.take(num_items)
+        for (((coeff, absavg, feat), index) <- sorted_items.zipWithIndex) {
+          errprint("#%s: %s (%s) = %s*%s = %s", index + 1, format_feature(feat),
+            feat, coeff, absavg, coeff*absavg)
+        }
       }
     }
   }
 
   def debug_print_weights(weights: VectorAggregate,
-      format_feature: FeatIndex => String) {
+      format_feature: FeatIndex => String,
+      maybe_stats: Option[FeatureStats] = None) {
     val weights_to_print_str = debugval("weights-to-print")
     val weights_to_print =
       if (weights_to_print_str == "")
         ClassifierConstants.weights_to_print
       else
         weights_to_print_str.toInt
-    debug_print_weights(weights, format_feature, weights_to_print)
+    debug_print_weights(weights, format_feature, maybe_stats, weights_to_print)
   }
 }
 
 abstract class LinearClassifier(
   val weights: VectorAggregate
-) extends ScoringClassifier with LinearClassifierLike {
+) extends ScoringClassifier {
   def score_label(inst: FeatureVector, label: LabelIndex) =
     inst.dot_product(weights(label), label)
 }
@@ -300,7 +335,7 @@ trait ClassifierTrainer[DI <: DataInstance]
  * @tparam DI Type of data instance used in training the classifier.
  */
 trait LinearClassifierTrainer[DI <: DataInstance]
-    extends ClassifierTrainer[DI] with LinearClassifierLike {
+    extends ClassifierTrainer[DI] {
   val factory: VectorAggregateFactory
 
   /** Check that the arguments passed in are kosher, and return an array of
@@ -375,7 +410,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
         val retval = fun(weights, iter)
         errprint("Weight sum: %s", format_double(weights.sum))
         if (debug("weights-each-iteration"))
-          debug_print_weights(weights,
+          LinearClassifier.debug_print_weights(weights,
             data.head._1.feature_vector.format_feature _)
         coda
         retval
@@ -406,9 +441,15 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
     val cfier = create_classifier(weights)
     if (debug("weights")) {
+      val stats = new FeatureStats
+      for ((inst, label) <- training_data.data) {
+        val agg = AggregateFeatureVector.check_aggregate(inst)
+        agg.accumulate_stats(stats, do_sum = true)
+      }
       val format_feature_fn =
         training_data.data.head._1.feature_vector.format_feature _
-      cfier.debug_print_weights(cfier.weights, format_feature_fn)
+      LinearClassifier.debug_print_weights(cfier.weights, format_feature_fn,
+        Some(stats))
     }
     cfier
   }

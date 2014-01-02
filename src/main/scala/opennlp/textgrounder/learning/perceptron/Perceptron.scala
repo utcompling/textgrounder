@@ -249,7 +249,8 @@ trait BinaryPerceptronTrainer
     val weight_aggr = initialize(data)
     val weights = weight_aggr(0)
 
-    debug_print_weights(weight_aggr, data.head._1.format_feature _)
+    LinearClassifier.debug_print_weights(weight_aggr,
+      data.head._1.format_feature _)
     iterate_averaged(data, weight_aggr, averaged, error_threshold,
         max_iterations) { (weights, iter) =>
       var total_adjustment = 0.0
@@ -270,7 +271,7 @@ trait BinaryPerceptronTrainer
         errprint("Scale %s", scale)
         if (scale != 0) {
           fv.update_weights(weights(0), scale, 1)
-          debug_print_weights(weight_aggr, fv.format_feature _)
+          LinearClassifier.debug_print_weights(weight_aggr, fv.format_feature _)
           total_adjustment += math.abs(scale)
           num_adjustments += 1
         }
@@ -545,7 +546,7 @@ trait NoCostMultiLabelPerceptronTrainer[DI <: DataInstance]
         if (scale != 0) {
           fv.update_weights(weights(r), scale, r)
           fv.update_weights(weights(s), -scale, s)
-          debug_print_weights(weights, fv.format_feature _)
+          LinearClassifier.debug_print_weights(weights, fv.format_feature _)
           total_adjustment += math.abs(scale)
           num_adjustments += 1
         }
@@ -835,7 +836,7 @@ trait CostSensitiveMultiLabelPerceptronTrainer[DI <: DataInstance]
           if (scale != 0) {
             fv.update_weights(weights(correct), scale, correct)
             fv.update_weights(weights(predicted), -scale, predicted)
-            debug_print_weights(weights, fv.format_feature _)
+            LinearClassifier.debug_print_weights(weights, fv.format_feature _)
             total_adjustment += math.abs(scale)
             num_adjustments += 1
           }
