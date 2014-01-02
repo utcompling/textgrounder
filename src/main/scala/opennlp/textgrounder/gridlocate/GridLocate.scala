@@ -748,7 +748,7 @@ non-word-by-word feature types. See '--rerank-features'.""")
 
   var rerank_top_n =
     ap.option[Int]("rerank-top-n",
-      default = 50,
+      default = 10,
       must = be_>(0),
       help = """Number of top-ranked items to rerank.  Default is %default.""")
 
