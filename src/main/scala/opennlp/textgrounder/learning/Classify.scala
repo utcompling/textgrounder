@@ -51,11 +51,11 @@ class ClassifyParameters(ap: ArgParser) {
        default = "perceptron",
        help = """Method to use for classification: 'perceptron'
 (perceptron using the basic algorithm); 'avg-perceptron' (perceptron using
-the basic algorithm, where the weights from the various rounds are averaged
+the basic algorithm, where the weights from the various iterations are averaged
 -- this usually improves results if the weights oscillate around a certain
 error rate, rather than steadily improving); 'pa-perceptron'
 (passive-aggressive perceptron, which usually leads to steady but gradually
-dropping-off error rate improvements with increased number of rounds);
+dropping-off error rate improvements with increased number of iterations);
 'mlogit' (use a conditional logit model implemented by R's 'mlogit()'
 function). Default %default.""")
 
@@ -129,6 +129,20 @@ be "yes", "no", "true" or "false", optionally upper-cased.""")
       must = be_>(0.0),
       help = """For perceptron: Total error threshold below which training stops (default: %default).""")
 
+  var lasso =
+    ap.option[Double]("lasso",
+      metavar = "DOUBLE",
+      must = be_>=(0.0),
+      help = """For TADM: Do Lasso (L1) penalization, with specified penalty; if 0,
+use the default (default: %default).""")
+
+  var gaussian =
+    ap.option[Double]("gaussian",
+      metavar = "DOUBLE",
+      must = be_>=(0.0),
+      help = """For TADM: Do Gaussian (L2) penalization, with specified penalty; if 0,
+use the default (default: %default).""")
+
   var aggressiveness =
     ap.option[Double]("a", "aggressiveness",
       metavar = "DOUBLE",
@@ -143,11 +157,11 @@ be "yes", "no", "true" or "false", optionally upper-cased.""")
       must = be_>=(0.0),
       help = """For perceptron: decay of aggressiveness factor each round (default: %default).""")
 
-  var rounds =
-    ap.option[Int]("r", "rounds",
+  var iterations =
+    ap.option[Int]("i", "iterations",
       default = 10000,
       must = be_>(0),
-      help = """For perceptron: maximum number of training rounds (default: %default).""")
+      help = """For perceptron: maximum number of training iterations (default: %default).""")
 
   var debug =
     ap.option[String]("d", "debug", metavar = "FLAGS",
@@ -227,7 +241,10 @@ object Classify extends ExperimentApp("Classify") {
           }
           case "tadm" => {
             errprint("Using TADM maxent ranker")
-            new TADMMaxentRankingTrainer[FeatureVector](ArrayVector)
+            new TADMRankingTrainer[FeatureVector](ArrayVector,
+              max_iterations = params.iterations,
+              gaussian = params.gaussian,
+              lasso = params.lasso)
           }
           case "pa-perceptron" => {
             errprint("Using passive-aggressive multi-label perceptron")
@@ -237,7 +254,7 @@ object Classify extends ExperimentApp("Classify") {
               params.aggressiveness,
               decay = params.decay,
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
           case "perceptron"|"avg-perceptron" => {
             errprint("Using basic multi-label perceptron")
@@ -247,7 +264,7 @@ object Classify extends ExperimentApp("Classify") {
               decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
         }
         val classifier = trainer(TrainingData(training_instances))
@@ -287,7 +304,7 @@ object Classify extends ExperimentApp("Classify") {
               params.aggressiveness,
               decay = params.decay,
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
           case "pa-perceptron" => {
             errprint("Using passive-aggressive binary perceptron")
@@ -295,7 +312,7 @@ object Classify extends ExperimentApp("Classify") {
               ArrayVector, params.variant, params.aggressiveness,
               decay = params.decay,
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
           case "perceptron"|"avg-perceptron"
               if numlabs > 2 || debug("multilabel") => {
@@ -306,7 +323,7 @@ object Classify extends ExperimentApp("Classify") {
               decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
           case "perceptron"|"avg-perceptron" => {
             errprint("Using basic binary perceptron")
@@ -315,7 +332,7 @@ object Classify extends ExperimentApp("Classify") {
               decay = params.decay,
               averaged = params.method == "avg-perceptron",
               error_threshold = params.error_threshold,
-              max_iterations = params.rounds)
+              max_iterations = params.iterations)
           }
         }
         val classifier = trainer(TrainingData(training_instances))

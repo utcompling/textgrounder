@@ -823,8 +823,16 @@ set of weights will be averaged. This only makes sense when
 '--rerank-initialize-weights random', and implements random restarting.""")
 }
 
-trait GridLocatePerceptronParameters {
+trait GridLocateOptimizerParameters {
   this: GridLocateParameters =>
+  var rerank_iterations =
+    ap.option[Int]("rerank-iterations",
+      metavar = "INT",
+      default = 10000,
+      must = be_>(0),
+      help = """Maximum number of iterations (rounds) when training a
+perceptron or TADM model (default: %default).""")
+
   var pa_variant =
     ap.option[Int]("pa-variant",
       metavar = "INT",
@@ -877,14 +885,6 @@ noisy training data.  We choose C = 1 as a compromise.""")
     // differing interpretations.
     perceptron_aggressiveness = 1.0
 
-  var perceptron_rounds =
-    ap.option[Int]("perceptron-rounds",
-      metavar = "INT",
-      default = 10000,
-      must = be_>(0),
-      help = """For perceptron: maximum number of training rounds
-(default: %default).""")
-
   var perceptron_decay =
     ap.option[Double]("perceptron-decay",
       metavar = "DOUBLE",
@@ -894,6 +894,39 @@ noisy training data.  We choose C = 1 as a compromise.""")
 factor each round. For example, the value 0.01 means to decay the factor
 by 1% each round. This should be a small number, and always a number
 between 0 and 1.""")
+
+  var tadm_gaussian =
+    ap.option[Double]("tadm-gaussian",
+      metavar = "VARIANCE",
+      default = 0.0,
+      must = be_>=(0),
+      help = """If specified, give TADM a Gaussian (L2) penalty function
+(aka ridge regression, Tikhonov regularization) with the specified variance
+(smaller = more penalty). If zero (the default), don't specify any penalty,
+using the TADM default.""")
+
+  var tadm_lasso =
+    ap.option[Double]("tadm-lasso",
+      metavar = "VARIANCE",
+      default = 0.0,
+      must = be_>=(0),
+      help = """If specified, give TADM a Lasso (L1) penalty function with
+the specified variance (smaller = more penalty). If zero (the default),
+don't specify any penalty, using the TADM default.""")
+
+  var tadm_method =
+    ap.option[String]("tadm-method",
+      metavar = "METHOD",
+      default = "tao_lmvm",
+      choices = Seq("tao_lmvm", "tao_cg_prp", "iis", "gis", "steep",
+        "perceptron"),
+      help = """Optimization method in TADM: One of 'tao_lmvm', 'tao_cg_prp',
+'iis', 'gis', 'steep', 'perceptron'. Default '%default'.""")
+
+  var tadm_uniform_marginal =
+    ap.flag("tadm-uniform-marginal",
+      help = """If specified, use uniform rather than pseudo-likelihood
+marginal calculation.""")
 }
 
 trait GridLocateMiscParameters {
@@ -996,7 +1029,7 @@ trait GridLocateParameters extends ArgParserParameters with
   GridLocateBasicParameters with GridLocateLangModelParameters with
   GridLocateCellParameters with GridLocateEvalParameters with
   GridLocateRankParameters with GridLocateRerankParameters with
-  GridLocatePerceptronParameters with GridLocateMiscParameters
+  GridLocateOptimizerParameters with GridLocateMiscParameters
 
 /**
  * Driver class for creating cell grids over some coordinate space, with a
@@ -1401,7 +1434,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           vec_factory, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.perceptron_rounds,
+          max_iterations = params.rerank_iterations,
           averaged = params.reranker == "avg-perceptron") {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
@@ -1411,7 +1444,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           vec_factory, params.pa_variant, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.perceptron_rounds) {
+          max_iterations = params.rerank_iterations) {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
           }
@@ -1421,7 +1454,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           params.pa_variant, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.perceptron_rounds) {
+          max_iterations = params.rerank_iterations) {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
             def cost(inst: GridRankerInst[Co], correct: LabelIndex,
@@ -1440,7 +1473,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MLogitConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
 
       case "tadm" =>
-        new TADMMaxentRankingTrainer[GridRankerInst[Co]](vec_factory)
+        new TADMRankingTrainer[GridRankerInst[Co]](vec_factory,
+          method = params.tadm_method,
+          max_iterations = params.rerank_iterations,
+          gaussian = params.tadm_gaussian,
+          lasso = params.tadm_lasso,
+          uniform_marginal = params.tadm_uniform_marginal)
     }
   }
 

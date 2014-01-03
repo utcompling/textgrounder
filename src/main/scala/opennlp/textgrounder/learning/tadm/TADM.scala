@@ -62,8 +62,13 @@ import scala.sys.process._
 /**
  * Train a ranking model using TADM.
  */
-class TADMMaxentRankingTrainer[DI <: DataInstance](
-  val vector_factory: SimpleVectorFactory
+class TADMRankingTrainer[DI <: DataInstance](
+  val vector_factory: SimpleVectorFactory,
+  val max_iterations: Int,
+  val gaussian: Double,
+  val lasso: Double,
+  val method: String = "tao_lmvm",
+  val uniform_marginal: Boolean = false
 ) extends SingleWeightMultiLabelLinearClassifierTrainer[DI] {
   /**
    * Write out the training data to a file in the format desired by TADM.
@@ -130,9 +135,19 @@ class TADMMaxentRankingTrainer[DI <: DataInstance](
     val params_filename =
       java.io.File.createTempFile("textgrounder.tadm.params", null).toString
     training_data_to_file(training_data, events_filename)
+    val tadm_cmd_line_start =
+      Seq("tadm", "-monitor", "-method", method, "-events_in",
+        events_filename, "-params_out", params_filename, "-max_it",
+        s"$max_iterations")
+    val tadm_penalty =
+      if (gaussian > 0) Seq("-l2", s"$gaussian")
+      else if (lasso > 0) Seq("-l1", s"$lasso")
+      else Seq()
+    val tadm_marginal =
+      if (uniform_marginal) Seq("-uniform")
+      else Seq()
     time_action("running TADM") {
-      Seq("tadm", "-monitor", "-method", "tao_lmvm", "-events_in",
-        events_filename, "-params_out", params_filename) !
+      (tadm_cmd_line_start ++ tadm_penalty ++ tadm_marginal) !
     }
     val weights =
       localfh.openr(params_filename).map { w => w.toDouble }.toArray
