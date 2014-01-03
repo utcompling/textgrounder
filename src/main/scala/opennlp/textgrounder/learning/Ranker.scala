@@ -514,15 +514,14 @@ trait PointwiseClassifyingRerankerTrainer[
   protected def get_rerank_training_data(training_data: Iterable[ExtInst]
   ): Iterable[QueryTrainingData] = {
     val numitems = training_data.size
-    errprint("Total number of training documents: %s.", numitems)
     // If number of docs is not an even multiple of number of splits,
     // round the split size up -- we want the last split a bit smaller
     // rather than an extra split with only a couple of items.
     val splitsize = (numitems + number_of_splits - 1) / number_of_splits
-    errprint("Number of splits for training reranker: %s.", number_of_splits)
-    errprint("Size of each split: %s documents.", splitsize)
+    errprint(s"#training docs = $numitems ($number_of_splits splits, $splitsize docs/split)")
     (0 until number_of_splits) flatMap { rerank_split_num =>
-      errprint("Generating data for split %s" format rerank_split_num)
+      errprint(
+        s"======== Generating data for split $rerank_split_num ========")
       val split_training_data = training_data.grouped(splitsize).zipWithIndex
       val (rerank_splits, initrank_splits) = split_training_data partition {
         case (data, num) => num == rerank_split_num

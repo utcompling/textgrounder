@@ -68,8 +68,8 @@ and the logarithms of these two values.""")
       help = """Sort the entries by the given field, from lowest to highest.
 Allowed are %choices. Default %default.""")
 
-  var verbose =
-    ap.flag("verbose",
+  var output_counts =
+    ap.flag("output-counts",
       help = """Output word counts and such as we compute the entropy.""")
 }
 
@@ -104,7 +104,7 @@ class ComputeEntropyDriver extends
     }.reduce[Map[Gram,Int]](combine_maps _)
 
     // Maybe print word and cell counts.
-    if (params.verbose) {
+    if (params.output_counts) {
       for ((word, count) <- words_counts)
         errprint("Gram: %s (%s) = %s / %s", word, Unigram.to_string(word),
           count, words_cellcounts(word))

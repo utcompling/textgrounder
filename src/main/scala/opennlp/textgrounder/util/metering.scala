@@ -38,9 +38,11 @@ protected class MeteringPackage {
   protected var first_time: Double = _
   protected var last_time: Double = _
 
-  class Timer(action: String) {
+  class Timer(action: String, verbose: Boolean = false,
+      secs_between_output: Double = 15) {
     def start() {
-      errprint("--------------------------------------------------------")
+      if (verbose)
+        errprint("--------------------------------------------------------")
       first_time = curtimesecs
       last_time = first_time
       errprint("Beginning %s at %s.", action, humandate_full(first_time))
@@ -57,16 +59,28 @@ protected class MeteringPackage {
 
     def finish() {
       val curtime = curtimesecs
-      errprint("Finished %s at %s.", action, humandate_full(curtime))
-      // Don't include timestamp since we already output it.
-      print_elapsed_time(curtime)
-      output_resource_usage(omit_time = true)
+      if (verbose || curtime - first_time >= secs_between_output) {
+        errprint("Finished %s at %s.", action, humandate_full(curtime))
+        // Don't include timestamp since we already output it.
+        print_elapsed_time(curtime)
+      }
+      if (verbose)
+        output_resource_usage(omit_time = true)
     }
   }
 
-  def time_action[T](action: String)(fn: => T) = {
+  /**
+   * Time an action, displaying the elapsed time.
+   *
+   * @param action String describing action.
+   * @param verbose If true, display more detailed messages, including
+   *    amount of memory used at end, etc. Otherwise, be minimal.
+   * @param fn Action, expressed as a body of code, similar to the
+   *   body of a while statement.
+   */
+  def time_action[T](action: String, verbose: Boolean = false)(fn: => T) = {
     {
-      val timer = new Timer(action)
+      val timer = new Timer(action, verbose = verbose)
       timer.start()
       val retval = fn
       timer.finish()
@@ -96,6 +110,8 @@ protected class MeteringPackage {
    *    is a %s in the text, the item name will be substituted, else appended.
    * @param item_name Generic name of the items being processed; used for
    *    status messages.
+   * @param verbose If true, display more detailed messages, including
+   *    items/sec, amount of memory used at end, etc. Otherwise, be minimal.
    * @param secs_between_output Number of elapsed seconds between successive
    *    periodic status messages.
    * @param maxtime Maximum amount of time allowed for execution, in seconds.
@@ -107,6 +123,7 @@ protected class MeteringPackage {
    *    (the default), no maximum. This works similarly to `maxtime`.
    */
   class Meter(verb: String, item_name: String,
+      verbose: Boolean = false,
       secs_between_output: Double = 15, maxtime: Double = 0.0,
       maxitems: Int = 0) {
     val plural_item_name = pluralize(item_name)
@@ -126,7 +143,9 @@ protected class MeteringPackage {
         total_elapsed_secs / items_processed)
     }
 
-    class MeterTimer(action: String) extends Timer(action) {
+    class MeterTimer(action: String) extends Timer(
+      action, verbose = verbose, secs_between_output = secs_between_output
+    ) {
       override def print_elapsed_time(curtime: Double) {
         // Already printed timestamp.
         print_elapsed_time_and_rate(curtime, include_timestamp = false)
@@ -168,8 +187,9 @@ protected class MeteringPackage {
                attime,
                format_minutes_seconds(tes, include_hours = false),
                format_minutes_seconds(get_program_time_usage))
-      errprint("%s %s processed, %s items/sec, %s sec/item",
-        items_processed, item_unit, format_double(ips), format_double(spi))
+      if (verbose)
+        errprint("%s %s processed, %s items/sec, %s sec/item",
+          items_processed, item_unit, format_double(ips), format_double(spi))
     }
 
     /**

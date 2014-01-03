@@ -381,7 +381,8 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *   used to update the weights when a mistake is made. */
   def iterate(error_threshold: Double, max_iterations: Int)(
       fun: Int => (Int, Int, Double)) = {
-    val task = new Meter("running", "classifier training iteration")
+    val task = new Meter("running", "classifier training iteration",
+      verbose = true)
     task.start()
     var iter = 0
     var total_adjustment = 0.0

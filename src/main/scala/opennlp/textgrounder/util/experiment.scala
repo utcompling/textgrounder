@@ -85,13 +85,14 @@ package experiment {
     }
 
     def show_progress(verb: String, item_name: String,
+      verbose: Boolean = false,
       secs_between_output: Double = 15, maxtime: Double = 0.0,
       maxitems: Int = 0
     ): Meter =
       // Call `driver.heartbeat` every time an item is processed or we
       // otherwise do something, to let Hadoop know that we're actually
       // making progress.
-      new Meter(verb, item_name, secs_between_output, maxtime,
+      new Meter(verb, item_name, verbose, secs_between_output, maxtime,
           maxitems) {
         override def start() = {
           // This is kind of overkill, but shouldn't hurt.

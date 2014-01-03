@@ -770,7 +770,8 @@ abstract class GridDocFactory[Co : TextSerializer](
       suffix: String = "", note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val rawdocs =
-      GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix)
+      GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix,
+        with_messages = driver.params.verbose)
     raw_documents_to_document_statuses(rawdocs, note_globally, finish_globally)
   }
 
@@ -936,12 +937,15 @@ object GridDocFactory {
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying a particular corpus if many exist in
    *   the same dir (e.g. "-dev")
+   * @param with_messages If true, display messages about files being loaded.
    * @return Iterator over document statuses.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = ""): Iterator[DocStatus[Row]] = {
+      suffix: String = "", with_messages: Boolean = false
+  ): Iterator[DocStatus[Row]] = {
     val (schema, files) =
-      TextDB.get_textdb_files(filehand, dir, suffix_re = suffix)
+      TextDB.get_textdb_files(filehand, dir, suffix_re = suffix,
+        with_messages = with_messages)
     files.flatMap { file =>
       filehand.openr(file).zipWithIndex.map {
         case (line, idx) =>

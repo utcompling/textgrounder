@@ -83,6 +83,10 @@ object GridLocateConstants {
 trait GridLocateBasicParameters {
   this: GridLocateParameters =>
 
+  var verbose =
+    ap.flag("verbose", "v",
+      help = """Output more information about what's going on.""")
+
   var language =
     ap.option[String]("language", "lang",
        default = "eng",
@@ -1043,6 +1047,16 @@ trait GridLocateParameters extends ArgParserParameters with
 trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   override type TParam <: GridLocateParameters
 
+  // NOTE: `verbose` is ignored in favor of params.verbose; present only
+  // because we can't create a show_progress without it, would have to
+  // rename.
+  override def show_progress(verb: String, item_name: String,
+      verbose: Boolean = false, secs_between_output: Double = 15,
+      maxtime: Double = 0.0, maxitems: Int = 0
+    ) = super.show_progress(verb, item_name, verbose = params.verbose,
+      secs_between_output = secs_between_output, maxtime = maxtime,
+      maxitems = maxitems)
+
   def deserialize_coord(coord: String): Co
 
   /**
@@ -1082,7 +1096,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       }
     }
     val filename = compute_stopwords_filename(stopwords_filename)
-    errprint("Reading stopwords from %s...", filename)
+    if (params.verbose)
+      errprint("Reading stopwords from %s...", filename)
     filehand.openr(filename).toSet
   }
 
@@ -1235,7 +1250,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         maxitems = params.num_training_docs)
     val dociter = params.input.toIterator.flatMapMetered(task) { dir =>
         GridDocFactory.read_raw_documents_from_textdb(get_file_handler,
-          dir, "-training")
+          dir, "-training", with_messages = params.verbose)
     }
     for (doc <- dociter) yield {
       val sleep_at = debugval("sleep-at-docs")
@@ -1267,7 +1282,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     val (weights, mww) =
       if (params.weights_file != null) {
         val word_weights = mutable.Map[Gram,Double]()
-        errprint("Reading word weights...")
+        if (params.verbose)
+          errprint("Reading word weights...")
         for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
           val word = row.gets("word")
           val weight = row.get[Double]("weight")
@@ -1293,7 +1309,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             params.missing_word_weight / avg
           else
             1.0
-        errprint("Reading word weights... done.")
+        if (params.verbose)
+          errprint("Reading word weights... done.")
         (scaled_word_weights, missing_word_weight)
       } else
         (mutable.Map[Gram,Double](), 0.0)
@@ -1317,14 +1334,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     grid.finish()
 
     if (params.salience_file != null) {
-      errprint("Reading salient points...")
+      if (params.verbose)
+        errprint("Reading salient points...")
       for (row <- TextDB.read_textdb(get_file_handler, params.salience_file)) {
         val name = row.gets("name")
         val coord = deserialize_coord(row.gets("coord"))
         val salience = row.get[Double]("salience")
         grid.add_salient_point(coord, name, salience)
       }
-      errprint("Reading salient points... done.")
+      if (params.verbose)
+        errprint("Reading salient points... done.")
     }
 
     if (params.output_training_cell_lang_models) {
@@ -1415,8 +1434,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   protected def create_pointwise_classifier_trainer = {
     val vec_factory = ArrayVector
     def create_weights(weights: VectorAggregate) = {
-      errprint("Creating %s weight vector: length %s",
-        params.rerank_initial_weights, weights.length)
+      if (params.verbose)
+        errprint("Creating %s weight vector: length %s",
+          params.rerank_initial_weights, weights.length)
       params.rerank_initial_weights match {
         case "zero" => ()
         case "random" => {
@@ -1574,7 +1594,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             data: Iterable[QueryTrainingData]
           ): Iterable[(GridRankerInst[Co], LabelIndex)] = {
 
-            val task = new Meter("converting QTD's to", "RTI'")
+            val task = show_progress("converting QTD's to", "RTI'")
 
             def create_candidate_featvec(query: GridDoc[Co],
                 candidate: GridCell[Co], initial_score: Double,

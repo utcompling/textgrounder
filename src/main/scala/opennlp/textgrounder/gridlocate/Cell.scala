@@ -414,7 +414,8 @@ abstract class Grid[Co](
     docs foreach { doc => add_document_to_grid(doc) }
 
     // Compute overall backoff statistics.
-    errprint("Finishing global backoff stats...")
+    if (docfact.driver.params.verbose)
+      errprint("Finishing global backoff stats...")
     docfact.lang_model_factory.finish_global_backoff_stats()
     docfact.finish_document_loading()
   }
@@ -452,9 +453,12 @@ abstract class Grid[Co](
     driver.note_result("training-documents-per-non-empty-cell",
       training_docs_per_non_empty_cell,
       "Training documents per non-emtpy cell")
-    errprint("%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
-      total_num_cells, num_non_empty_cells, pct_non_empty,
-      pretty_double(training_docs_per_non_empty_cell))
+    if (docfact.driver.params.verbose) {
+      errprint(
+        "%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
+        total_num_cells, num_non_empty_cells, pct_non_empty,
+        pretty_double(training_docs_per_non_empty_cell))
+    }
     driver.heartbeat
   }
 }
