@@ -25,6 +25,7 @@ import collection.mutable
 import util.error.warning
 import util.experiment._
 import util.print.errprint
+import util.text.pretty_double
 import util.textdb.{Encoder, Row}
 
 import langmodel.LangModelFactory
@@ -437,20 +438,23 @@ abstract class Grid[Co](
         cell.num_docs
     }
 
-    driver.note_print_result("number-of-non-empty-cells", num_non_empty_cells,
+    driver.note_result("number-of-non-empty-cells", num_non_empty_cells,
       "Number of non-empty cells")
-    driver.note_print_result("total-number-of-cells", total_num_cells,
+    driver.note_result("total-number-of-cells", total_num_cells,
       "Total number of cells")
-    driver.note_print_result("percent-non-empty-cells",
-      "%g" format (num_non_empty_cells.toDouble / total_num_cells),
-      "Percent non-empty cells"
-    )
+    val pct_non_empty = num_non_empty_cells.toDouble / total_num_cells * 100
+    driver.note_result("percent-non-empty-cells", pct_non_empty,
+      "Percent non-empty cells")
     val training_docs_with_coordinates =
       docfact.num_training_documents_with_coordinates_by_split("training").value
-    driver.note_print_result("training-documents-per-non-empty-cell",
-      "%g" format (training_docs_with_coordinates.toDouble /
-        num_non_empty_cells),
-      "Training documents per non-empty cell")
+    val training_docs_per_non_empty_cell =
+      training_docs_with_coordinates.toDouble / num_non_empty_cells
+    driver.note_result("training-documents-per-non-empty-cell",
+      training_docs_per_non_empty_cell,
+      "Training documents per non-emtpy cell")
+    errprint("%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
+      total_num_cells, num_non_empty_cells, pct_non_empty,
+      pretty_double(training_docs_per_non_empty_cell))
     driver.heartbeat
   }
 }

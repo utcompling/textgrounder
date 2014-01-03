@@ -468,16 +468,18 @@ class MultiRegularGrid(
            j <- minimum_longind to maximum_longind)
          yield RegularCellIndex(i, j)
 
-    driver.show_progress("generating non-empty", "Earth-tiling cell").
-      foreach(indices) { index =>
-        total_num_cells += 1
-        find_cell_for_cell_index(index, create = false,
-          record_created_cell = false).foreach { cell =>
-            cell.finish()
-            if (debug("cell"))
-              errprint("--> (%s,%s): %s", index.latind, index.longind, cell)
-          }
-      }
+    // This doesn't take much time so turn it off.
+    // driver.show_progress("generating non-empty", "Earth-tiling cell").
+    //  foreach(indices)
+    indices.foreach { index =>
+      total_num_cells += 1
+      find_cell_for_cell_index(index, create = false,
+        record_created_cell = false).foreach { cell =>
+          cell.finish()
+          if (debug("cell"))
+            errprint("--> (%s,%s): %s", index.latind, index.longind, cell)
+        }
+    }
   }
 
   def iter_nonempty_cells = {
