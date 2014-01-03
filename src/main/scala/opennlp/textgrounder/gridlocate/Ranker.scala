@@ -26,6 +26,7 @@ import util.print.errprint
 import util.debug._
 
 import langmodel._
+import learning._
 
 /*
 
@@ -34,6 +35,69 @@ location of a document in a grid -- i.e. returning a ranking of the
 suitability of the cells of the grid for a given document.
 
 */
+
+/**
+ * A ranker for ranking cells in a grid as possible matches for a given
+ * document (aka "grid-locating a document").
+ *
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param grid Grid containing the cells over which this ranker operates
+ */
+abstract class GridRanker[Co](
+  val ranker_name: String,
+  val grid: Grid[Co]
+) extends Ranker[GridDoc[Co], GridCell[Co]] {
+}
+
+/**
+ * A grid ranker that does not use reranking.
+ *
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param grid Grid containing the cells over which this ranker operates
+ */
+abstract class SimpleGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co]
+) extends GridRanker[Co](ranker_name, grid) {
+  /**
+   * For a given language model (describing a test document), return
+   * an Iterable of tuples, each listing a particular cell on the Earth
+   * and a score of some sort.  The cells given in `include` must be
+   * included in the list.  Higher scores are better.  The results should
+   * be in sorted order, with better cells earlier.
+   */
+  def return_ranked_cells(lang_model: LangModel,
+      include: Iterable[GridCell[Co]]):
+    Iterable[(GridCell[Co], Double)]
+
+  def imp_evaluate(item: GridDoc[Co], include: Iterable[GridCell[Co]]) =
+    return_ranked_cells(item.grid_lm, include)
+}
+
+/**
+ * Object encapsulating a GridLocate data instance to be used by the
+ * classifier that underlies the ranker. This corresponds to a document
+ * in the training corpus and serves as the main part of an RTI (rerank
+ * training instance, see `PointwiseClassifyingRerankerTrainer`).
+ */
+case class GridRankerInst[Co](
+  doc: GridDoc[Co],
+  candidates: IndexedSeq[GridCell[Co]],
+  agg: AggregateFeatureVector
+) extends DataInstance {
+  final def feature_vector = agg
+  def pretty_print_labeled(prefix: String, correct: LabelIndex) {
+    errprint(s"For instance $prefix with query doc $doc:")
+    for (((cand, fv), index) <- (candidates.view zip agg.fv).zipWithIndex) {
+      errprint(s"  $prefix-${index + 1}: %s: $cand: $fv",
+        if (index == correct) "CORRECT" else "WRONG")
+    }
+  }
+}
 
 /**
  * Class that implements a very simple baseline ranker -- pick a random

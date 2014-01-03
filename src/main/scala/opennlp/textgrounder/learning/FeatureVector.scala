@@ -28,11 +28,11 @@ package learning
 import collection.mutable
 import io.Source
 
-import util.collection._
+import util.collection.{doublemap, intmap, GroupByIterator}
+import util.debug.{debug, debugval}
 import util.error.internal_error
 import util.memoizer._
-import util.print._
-import util.debug._
+import util.print.{errprint, errfmt}
 
 /** Classification of the different types of values used for features.
  * Currently this is only for features that will be rescaled to make

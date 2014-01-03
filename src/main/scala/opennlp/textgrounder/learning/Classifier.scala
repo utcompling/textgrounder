@@ -25,16 +25,12 @@ package learning
  * @author Ben Wing
  */
 
-import collection.mutable
-import io.Source
-
+import util.debug.{debug, debugval}
 import util.error.warning
 import util.math.argmax
 import util.metering._
-import util.print._
+import util.print.errprint
 import util.text.format_double
-
-import util.debug._
 
 object ClassifierConstants {
   val weights_to_print = 100
