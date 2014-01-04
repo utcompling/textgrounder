@@ -104,6 +104,14 @@ doing geolocation is split up into various classes:
    RankedSphereGridEvaluator and MeanShiftSphereGridEvaluator. 
 */
 
+/**
+ * Constants used in various places esp. debugging code.
+ */
+object GeolocateConstants {
+  val default_gridranksize = 11
+  def gridranksize = debugint("gridranksize", default_gridranksize)
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                           Evaluation strategies                         //
 /////////////////////////////////////////////////////////////////////////////

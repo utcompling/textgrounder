@@ -245,8 +245,8 @@ class RankedSphereDocEvalResult(
 
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
-      (debuglist("gridrank") contains doctag.drop(1))) {
-      val grsize = debugval("gridranksize").toInt
+        (debuglist("gridrank") contains doctag.drop(1))) {
+      val grsize = debugint("gridranksize", GeolocateConstants.gridranksize)
       wrapped.correct_cell match {
         case multireg: MultiRegularCell =>
           multireg.grid.

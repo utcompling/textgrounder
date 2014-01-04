@@ -25,7 +25,7 @@ package learning
  * @author Ben Wing
  */
 
-import util.debug.{debug, debugval}
+import util.debug.{debug, debugint}
 import util.error.warning
 import util.math.argmax
 import util.metering._
@@ -33,7 +33,9 @@ import util.print.errprint
 import util.text.format_double
 
 object ClassifierConstants {
-  val weights_to_print = 100
+  private val default_weights_to_print = 100
+
+  def weights_to_print = debugint("weights-to-print", default_weights_to_print)
 }
 
 /**
@@ -253,13 +255,8 @@ object LinearClassifier {
   def debug_print_weights(weights: VectorAggregate,
       format_feature: FeatIndex => String,
       maybe_stats: Option[FeatureStats] = None) {
-    val weights_to_print_str = debugval("weights-to-print")
-    val weights_to_print =
-      if (weights_to_print_str == "")
-        ClassifierConstants.weights_to_print
-      else
-        weights_to_print_str.toInt
-    debug_print_weights(weights, format_feature, maybe_stats, weights_to_print)
+    debug_print_weights(weights, format_feature, maybe_stats,
+      ClassifierConstants.weights_to_print)
   }
 }
 
