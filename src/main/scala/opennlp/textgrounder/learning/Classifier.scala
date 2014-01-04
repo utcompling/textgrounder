@@ -25,7 +25,7 @@ package learning
  * @author Ben Wing
  */
 
-import util.debug.{debug, debugint}
+import util.debug.{debug, debugint, debugdouble}
 import util.error.warning
 import util.math.argmax
 import util.metering._
@@ -34,8 +34,10 @@ import util.text.format_double
 
 object ClassifierConstants {
   private val default_weights_to_print = 100
+  private val default_min_sig = 50.0
 
   def weights_to_print = debugint("weights-to-print", default_weights_to_print)
+  def min_sig = debugdouble("min-sig", default_min_sig)
 }
 
 /**
@@ -123,6 +125,45 @@ case class TrainingData[DI <: DataInstance](
     for (((inst, correct), index) <- data.view.zipWithIndex) {
       val prefix = s"#${index + 1}"
       inst.pretty_print_labeled(prefix, correct)
+    }
+  }
+
+  /**
+   * Compute statistics for determining for how relevant a feature is
+   * for discriminating the correct label against the others. Computes
+   * two factors, a "correlation factor" and a "significance" factor.
+   * The correlation factor compares, among the cases where the feature's
+   * value is not the same between the correct label and an incorrect label,
+   * the extent to which the the feature's value is greater for the correct
+   * label. Values of 1 and 0 indicate perfect correlation, with positive
+   * and negative correlation respectively, while a value of 0.5 indicates
+   * no correlation. The significance factor measures the extent to which
+   * the feature's value is different between the correct label and an
+   * incorrect label. A significance factor near 1 means the feature is
+   * almost always relevant for comparing two labels while a factor near 0
+   * means the feature usually has the same value for both labels (typically
+   * it is absent on both, or equivalently has the value 0), and has no
+   * power to separate the two.
+   *
+   * Averaging is actually done an an instance-by-instance basis, rather
+   * than a label-by-label (feature-vector-by-feature-vector) basis. If
+   * all instances have the same number of labels there will be no
+   * difference, but otherwise instances with fewer labels will not be
+   * counted less in aggregate, as they would be if averaging were
+   * done on a label-by-label basis.
+   */
+  def compute_feature_discrimination = {
+    val stats = new FeatureDiscriminationStats
+    for ((inst, label) <- data) {
+      val agg = AggregateFeatureVector.check_aggregate(inst)
+      stats.accumulate(agg, label)
+    }
+
+    stats.greater_than_other.map { case (feat, fracsum) =>
+      val greaterfrac = fracsum // / stats.num_agg
+      val lessfrac = stats.less_than_other(feat) // / stats.num_agg
+      val neqfrac = greaterfrac + lessfrac
+      (feat, greaterfrac / neqfrac, neqfrac)
     }
   }
 }
@@ -441,21 +482,44 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   def apply(training_data: TrainingData[DI]) = {
     if (debug("training-data"))
       training_data.pretty_print()
+
+    if (debug("feature-relevance")) {
+      val feat_disc = training_data.compute_feature_discrimination
+
+      def print_feats(feats: IndexedSeq[(FeatIndex, Double, Double)]) {
+        val format_feature =
+          training_data.data.head._1.feature_vector.format_feature _
+        for (((f, corr, sig), index) <- feats.zipWithIndex) {
+          errprint(
+            s"#${index + 1}: ${format_feature(f)} ($f) = $corr (sig $sig)")
+        }
+      }
+
+      val min_sig = ClassifierConstants.min_sig
+      val feat_corr =
+        feat_disc.toIndexedSeq.sortBy(-_._2).filter(_._3 >= min_sig)
+      val num_stats = ClassifierConstants.weights_to_print
+      errprint("Most positively correlated features (with sig >= $min_sig):")
+      print_feats(feat_corr.take(num_stats))
+      errprint("Most negatively correlated features (with sig >= $min_sig):")
+      print_feats(feat_corr.takeRight(num_stats).reverse)
+    }
+
     val (weights, _) = get_weights(training_data)
 
-    val cfier = create_classifier(weights)
     if (debug("weights")) {
       val stats = new FeatureStats
       for ((inst, label) <- training_data.data) {
         val agg = AggregateFeatureVector.check_aggregate(inst)
         stats.accumulate(agg, do_sum = true)
       }
-      val format_feature_fn =
+      val format_feature =
         training_data.data.head._1.feature_vector.format_feature _
-      LinearClassifier.debug_print_weights(cfier.weights, format_feature_fn,
+      LinearClassifier.debug_print_weights(weights, format_feature,
         Some(stats))
     }
-    cfier
+
+    create_classifier(weights)
   }
 }
 
@@ -463,6 +527,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
  * Mix-in for training a classifier that supports the possibility of multiple
  * correct labels for a given training instance.
  *
+
  * @tparam DI Type of data instance used in training the classifier.
  */
 trait MultiCorrectLabelClassifierTrainer[DI <: DataInstance]

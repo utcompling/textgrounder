@@ -768,3 +768,55 @@ class FeatureStats {
     }
   }
 }
+
+/**
+ * For each aggregate, we compute the fraction of times a given feature
+ * in the correct label's feature vector is greater than, less than or
+ * equal to the value in the other feature vectors in the aggregate, and
+ * average over all aggregates. These three fraction will add up to 1
+ * for a given aggregate, and the averages will likewise add up to 1.
+ * Note that for any feature seen anywhere in the aggregate we process
+ * all feature vectors in the aggregate, treating unseen features as 0.
+ * However, for features seen nowhere in the aggregate, they won't be
+ * recorded, and hence we need to treat them as cases of all 100%
+ * "equal to". In practice, because the averages add up to 1, we don't
+ * need to keep track of the "equal to" fractions separately but instead
+ * compute them from the other two; the sums of those two fractions
+ * won't be affected by cases where a feature isn't seen in an aggregate.
+ *
+ * FIXME: Should we instead do this comparing the correct label to the
+ * second-best rather than all the others?
+ */
+class FeatureDiscriminationStats {
+  // Count of number of aggregates seen
+  var num_agg = 0
+  // Sum of fractions of fv's other than the correct one where the
+  // feature's value in the correct one is less than the value in the
+  // others. See above.
+  val less_than_other = doublemap[FeatIndex]()
+  // Same for "greater than".
+  val greater_than_other = doublemap[FeatIndex]()
+
+  /**
+   * Find the features that have different values from one component
+   * feature vector to another. Return a set of such features.
+   */
+  def accumulate(agg: AggregateFeatureVector, corrlab: LabelIndex) {
+    num_agg += 1
+
+    for (feat <- agg.find_all_features) {
+      val corrval = agg(feat, corrlab)
+      var num_lto = 0
+      var num_gto = 0
+      for (lab <- 0 until agg.depth; if lab != corrlab) {
+        val othval = agg(feat, lab)
+        if (corrval < othval)
+          num_lto += 1
+        else if (corrval > othval)
+          num_gto += 1
+      }
+      less_than_other(feat) += num_lto.toDouble / (agg.depth - 1)
+      greater_than_other(feat) += num_gto.toDouble / (agg.depth - 1)
+    }
+  }
+}
