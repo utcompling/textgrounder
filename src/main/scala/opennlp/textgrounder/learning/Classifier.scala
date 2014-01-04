@@ -451,7 +451,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
       val stats = new FeatureStats
       for ((inst, label) <- training_data.data) {
         val agg = AggregateFeatureVector.check_aggregate(inst)
-        agg.accumulate_stats(stats, do_sum = true)
+        stats.accumulate(agg, do_sum = true)
       }
       val format_feature_fn =
         training_data.data.head._1.feature_vector.format_feature _

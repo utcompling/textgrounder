@@ -854,21 +854,6 @@ object AggregateFeatureVector {
   }
 }
 
-class FeatureStats {
-  // Count of features
-  val count = intmap[Int]()
-  // Count of feature vectors
-  var num_fv = 0
-  // Min value of features
-  val min = doublemap[Int]()
-  // Max value of features
-  val max = doublemap[Int]()
-  // Sum of features
-  val sum = doublemap[Int]()
-  // Sum of absolute value of features
-  val abssum = doublemap[Int]()
-}
-
 /**
  * An aggregate feature vector that stores a separate individual feature
  * vector for each of a set of labels.
@@ -885,7 +870,7 @@ case class AggregateFeatureVector(
 
   def stored_entries = fv.map(_.stored_entries).sum
 
-  def apply(i: Int, label: LabelIndex) = fv(label)(i, label)
+  def apply(i: FeatIndex, label: LabelIndex) = fv(label)(i, label)
 
   /** Return the squared magnitude of the feature vector for class `label`,
     * i.e. dot product of feature vector with itself */
@@ -945,36 +930,8 @@ case class AggregateFeatureVector(
   }
 
   /**
-   * Find the features that have different values from one component
-   * feature vector to another. Return a set of such features.
-   */
-  def accumulate_stats(stats: FeatureStats, do_minmax: Boolean = false,
-      do_sum: Boolean = false, do_abssum: Boolean = false) {
-    stats.num_fv += depth
-
-    // We do this in a purely iterative fashion to create as little
-    // garbage as possible, because we may be working with very large
-    // arrays. See find_diff_features.
-    for (vec <- fetch_sparse_featvecs; i <- 0 until vec.keys.size) {
-      val k = vec.keys(i)
-      val v = vec.values(i)
-      stats.count(k) += 1
-      if (do_minmax) {
-        if (!(stats.min contains k) || v < stats.min(k))
-          stats.min(k) = v
-        if (!(stats.max contains k) || v > stats.max(k))
-          stats.max(k) = v
-      }
-      if (do_sum)
-        stats.sum(k) += v
-      if (do_abssum)
-        stats.abssum(k) += v.abs
-    }
-  }
-
-  /**
-   * Find the features that have different values from one component
-   * feature vector to another. Return a set of such features.
+   * Find the features that do not have the same value for every component
+   * feature vector. Return a set of such features.
    */
   def find_diff_features = {
     // OK, we do this in a purely iterative fashion to create as little
@@ -998,7 +955,7 @@ case class AggregateFeatureVector(
 
     val stats = new FeatureStats
 
-    accumulate_stats(stats, do_minmax = true)
+    stats.accumulate(this, do_minmax = true)
 
     (
       for ((k, count) <- stats.count;
@@ -1057,7 +1014,7 @@ case class AggregateFeatureVector(
     // difficult as we currently can't expand a sparse feature vector,
     // only change the value of an existing feature.
     val stats = new FeatureStats
-    accumulate_stats(stats, do_sum = true)
+    stats.accumulate(this, do_sum = true)
 
     // Compute the mean of all seen instances of a feature.
     // Unseen features are ignored rather than counted as 0's.
@@ -1067,7 +1024,7 @@ case class AggregateFeatureVector(
     // Compute the sum of squared differences from the mean of all seen
     // instances of a feature.
     // Unseen features are ignored rather than counted as 0's.
-    val sumsqmap = doublemap[Int]()
+    val sumsqmap = doublemap[FeatIndex]()
     for (vec <- sparsevecs; i <- 0 until vec.keys.size) {
       val k = vec.keys(i)
       val v = vec.values(i)
@@ -1107,6 +1064,49 @@ case class AggregateFeatureVector(
             to_feat_value(vec.values(i)/stddev)
         }
       }
+    }
+  }
+}
+
+class FeatureStats {
+  // Count of features
+  val count = intmap[FeatIndex]()
+  // Count of feature vectors
+  var num_fv = 0
+  // Min value of features
+  val min = doublemap[FeatIndex]()
+  // Max value of features
+  val max = doublemap[FeatIndex]()
+  // Sum of features
+  val sum = doublemap[FeatIndex]()
+  // Sum of absolute value of features
+  val abssum = doublemap[FeatIndex]()
+
+  /**
+   * Find the features that have different values from one component
+   * feature vector to another. Return a set of such features.
+   */
+  def accumulate(agg: AggregateFeatureVector, do_minmax: Boolean = false,
+      do_sum: Boolean = false, do_abssum: Boolean = false) {
+    num_fv += agg.depth
+
+    // We do this in a purely iterative fashion to create as little
+    // garbage as possible, because we may be working with very large
+    // arrays. See find_diff_features.
+    for (vec <- agg.fetch_sparse_featvecs; i <- 0 until vec.keys.size) {
+      val k = vec.keys(i)
+      val v = vec.values(i)
+      count(k) += 1
+      if (do_minmax) {
+        if (!(min contains k) || v < min(k))
+          min(k) = v
+        if (!(max contains k) || v > max(k))
+          max(k) = v
+      }
+      if (do_sum)
+        sum(k) += v
+      if (do_abssum)
+        abssum(k) += v.abs
     }
   }
 }
