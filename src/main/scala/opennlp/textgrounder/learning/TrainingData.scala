@@ -21,6 +21,10 @@ package learning
 
 import java.io.PrintStream
 
+import util.io.localfh
+import util.metering._
+import util.print.errprint
+
 /**
  * Training data for a classifier or similar.
  *
@@ -161,6 +165,40 @@ case class TrainingData[DI <: DataInstance](
         }
     })
   }
+
+  def export_to_file(filename: String, include_length: Boolean = false,
+    memoized_features: Boolean = false, no_values: Boolean = false) {
+    val file = localfh.openw(filename)
+    errprint("Writing training data to file: %s", filename)
+    val task = new Meter("writing", "rerank training instance")
+    data.foreachMetered(task) { case (inst, correct_label) =>
+      val agg = AggregateFeatureVector.check_aggregate(inst)
+      TrainingData.export_aggregate_to_file(file, agg, correct_label,
+        include_length = include_length, memoized_features = memoized_features,
+        no_values = no_values)
+    }
+    file.close()
+  }
+  def export_for_tadm = {
+    val frame = "frame" // Name of variable to use for data, etc.
+
+    // This is easier than in the other direction.
+
+    val head = data.head._1.feature_vector
+    val F = head.feature_mapper.number_of_indices
+    val headers =
+      for (i <- 0 until F if !(removed_features contains i))
+        yield head.feature_mapper.to_string(i)
+    (headers, data.view.zipWithIndex.flatMap {
+      case ((inst, correct_label), index) =>
+        inst.feature_vector match {
+          case agg: AggregateFeatureVector =>
+            TrainingData.export_aggregate_for_mlogit(agg, correct_label,
+              index, removed_features)
+          case _ => ???
+        }
+    })
+  }
 }
 
 object TrainingData {
@@ -215,21 +253,23 @@ object TrainingData {
     }
   }
 
-  def export_aggregate_for_tadm(file: PrintStream,
+  def export_aggregate_to_file(file: PrintStream,
       inst: AggregateFeatureVector, correct_label: LabelIndex,
-      raw_features: Boolean = false, no_values: Boolean = false) = {
+      include_length: Boolean = false, memoized_features: Boolean = false,
+      no_values: Boolean = false) = {
     val fvs = inst.fetch_sparse_featvecs
     file.println(fvs.size)
     for ((fv, label) <- fvs.zipWithIndex) {
-      file.print(if (label == correct_label) "1 " else "0 ")
+      file.print(if (label == correct_label) "1" else "0")
       val nfeats = fv.keys.size
-      file.print(nfeats)
+      if (include_length)
+        file.print(" " + nfeats)
       for (i <- 0 until nfeats) {
         val k = fv.keys(i)
         val v = fv.values(i)
         assert(!v.isNaN && !v.isInfinity,
           s"For feature ${fv.format_feature(k)}($k), disallowed value $v")
-        if (raw_features)
+        if (!memoized_features)
           file.print(" " + fv.format_feature(k))
         else
           file.print(" " + k)

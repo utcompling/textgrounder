@@ -22,6 +22,7 @@ package opennlp.textgrounder
 package gridlocate
 
 import scala.util.control.Breaks._
+import scala.util.{Either, Left, Right}
 import scala.collection.mutable
 
 import learning.{Ranker, Reranker}
@@ -422,17 +423,10 @@ abstract class CorpusEvaluator(
   }
         
   /**
-   * Return `(skip, reason)` where `skip` is true if document would be skipped,
-   * false if processed and evaluated; and `reason` is the reason for
-   * skipping.
-   */
-  def would_skip_document(doc: TEvalDoc) = (false, "")
-
-  /**
    * Evaluate a document.  Return an object describing the results of the
-   * evaluation.
+   * evaluation, or the reason for skipping the document.
    */
-  def evaluate_document(doc: TEvalDoc): TEvalRes
+  def evaluate_document(doc: TEvalDoc): Either[String, TEvalRes]
 
   /**
    * Output results so far.  If 'isfinal', this is the last call, so
@@ -467,17 +461,14 @@ abstract class CorpusEvaluator(
         statnum += 1
         stat.map_result { case (row, doc) =>
           val doctag = "#%s" format statnum
-          val (skip, reason) = would_skip_document(doc)
+          val (skip, reason) = would_skip_by_parameters()
           if (skip)
             (None, "skipped", reason, doctag)
-          else {
-            val (skip, reason) = would_skip_by_parameters()
-            if (skip)
-              (None, "skipped", reason, doctag)
-            else {
-              val res = evaluate_document(doc)
+          else evaluate_document(doc) match {
+            case Left(skipped_reason) =>
+              (None, "skipped", skipped_reason, doctag)
+            case Right(res) =>
               (Some(res), "processed", "", doctag)
-            }
           }
         }
       }
@@ -628,7 +619,7 @@ abstract class GridEvaluator[Co](
    * @param correct_cell Cell in the cell grid which contains the document.
    */
   def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]
-  ): DocEvalResult[Co]
+  ): Either[String, DocEvalResult[Co]]
 
   override def process_document_statuses(
     docstats: Iterator[DocStatus[TEvalRes]]
@@ -643,13 +634,13 @@ abstract class GridEvaluator[Co](
    * evaluation happens when the document status is processed, in
    * GridDocCounterTrackerFactory.
    *
-   * Return an object describing the results of the evaluation.
+   * Return an object describing the results of the evaluation, or a
+   * message indicating why the object was skipped (return value of type
+   * Either).
    *
    * @param document Document to evaluate.
    */
   def evaluate_document(document: GridDoc[Co]) = {
-    val (skip, reason) = would_skip_document(document)
-    assert(!skip)
     assert(document.grid_lm.finished)
     assert(document.rerank_lm.finished)
     val maybe_correct_cell =
@@ -663,9 +654,11 @@ abstract class GridEvaluator[Co](
         document, naitr)
     }
     val result = imp_evaluate_document(document, correct_cell)
-    evalstats.record_result(result)
-    if (result.num_docs_in_correct_cell == 0) {
-      evalstats.increment_counter("documents.no_training_documents_in_cell")
+    result.right.map { res =>
+      evalstats.record_result(res)
+      if (res.num_docs_in_correct_cell == 0) {
+        evalstats.increment_counter("documents.no_training_documents_in_cell")
+      }
     }
     result
   }
@@ -700,15 +693,20 @@ class RankedGridEvaluator[Co](
         val correct_rank = get_correct_rank(reranking, correct_cell)
         val initial_correct_rank =
           get_correct_rank(initial_ranking, correct_cell)
-        new FullRerankedDocEvalResult[Co](document, reranking, correct_rank,
-          initial_ranking, initial_correct_rank)
+        if (debug("skip-non-rerankable") && initial_correct_rank >
+            reranker.top_n)
+          Left("correct cell not within rerankable subset " +
+            s"(top ${reranker.top_n})")
+        else
+          Right(new FullRerankedDocEvalResult[Co](document, reranking,
+            correct_rank, initial_ranking, initial_correct_rank))
       }
       case _ => {
         val (pred_cells, correct_rank) =
           return_ranked_cells(document, correct_cell)
 
-        new FullRankedDocEvalResult[Co](document, pred_cells,
-          correct_rank)
+        Right(new FullRankedDocEvalResult[Co](document, pred_cells,
+          correct_rank))
       }
     }
   }
@@ -1053,7 +1051,7 @@ abstract class CoordGridEvaluator[Co](
 
   def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
     val pred_coord = find_best_point(document, correct_cell)
-    new CoordDocEvalResult[Co](document, ranker.grid, pred_coord)
+    Right(new CoordDocEvalResult[Co](document, ranker.grid, pred_coord))
   }
 }
 

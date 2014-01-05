@@ -19,7 +19,8 @@
 package opennlp.textgrounder
 package learning
 
-import util.debug.debug
+import util.debug._
+import util.io.localfh
 import util.math.standardize
 import util.metering._
 import util.print.errprint
@@ -144,6 +145,18 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
   val top_n: Int,
   rerank_classifier: ScoringClassifier
 ) extends Reranker[Query, Candidate] {
+  // FIXME! This is really ugly.
+  val write_test_data_file = {
+    val outfile = debugval("write-rerank-test-data")
+    if (outfile != "") {
+      errprint(s"Writing rerank test data to file: $outfile")
+      val file = localfh.openw(outfile)
+      scala.sys.addShutdownHook(file.close)
+      Some(file)
+    } else
+      None
+  }
+
   /**
    * Create a candidate feature vector to feed to the classifier during
    * evaluation, given a query item, a potential candidate from the
@@ -159,12 +172,24 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
    */
   def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
+    // For each candidate, compute a feature vector.
     val cand_featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
-    val query_featvec =
-      new AggregateFeatureVector(cand_featvecs.toArray)
-    val new_scores0 = rerank_classifier.score(query_featvec).toIndexedSeq
+    // Combine into an aggregate feature vector.
+    val agg = new AggregateFeatureVector(cand_featvecs.toArray)
+    if (write_test_data_file != None) {
+      val maybe_label = scored_candidates.view.zipWithIndex.find {
+        case ((cand, score), index) => cand == correct
+      }
+      if (maybe_label != None) {
+        val (_, the_label) = maybe_label.get
+        TrainingData.export_aggregate_to_file(write_test_data_file.get,
+          agg, the_label)
+      }
+    }
+    // Rescore component vectors using classifier.
+    val new_scores0 = rerank_classifier.score(agg).toIndexedSeq
     val new_scores =
       if (debug("negate-scores"))
         new_scores0.map(-_)
@@ -507,12 +532,16 @@ trait PointwiseClassifyingRerankerTrainer[
    * Train a rerank classifier, based on external training data.
    */
   protected def train_rerank_classifier(
-    training_data: Iterable[ExtInst]
+    ext_training_data: Iterable[ExtInst]
   ) = {
-    val rerank_training_data = get_rerank_training_data(training_data)
-    val rerank_instances =
-      query_training_data_to_rerank_training_instances(rerank_training_data)
-    create_rerank_classifier(TrainingData(rerank_instances))
+    val query_training_data = get_rerank_training_data(ext_training_data)
+    val rerank_training_instances =
+      query_training_data_to_rerank_training_instances(query_training_data)
+    val cooked_training_data = TrainingData(rerank_training_instances)
+    val training_data_file = debugval("write-rerank-training-data")
+    if (training_data_file != "")
+      cooked_training_data.export_to_file(training_data_file)
+    create_rerank_classifier(cooked_training_data)
   }
 
   /**

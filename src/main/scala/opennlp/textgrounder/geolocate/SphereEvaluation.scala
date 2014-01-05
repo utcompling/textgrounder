@@ -228,9 +228,11 @@ class RankedSphereGridEvaluator(
   override def imp_evaluate_document(document: GridDoc[SphereCoord],
       correct_cell: GridCell[SphereCoord]) = {
     val result = super.imp_evaluate_document(document, correct_cell)
-    new RankedSphereDocEvalResult(
-      result.asInstanceOf[FullRankedDocEvalResult[SphereCoord]]
-    )
+    result.right.map { res =>
+      new RankedSphereDocEvalResult(
+        res.asInstanceOf[FullRankedDocEvalResult[SphereCoord]]
+      )
+    }
   }
 }
 

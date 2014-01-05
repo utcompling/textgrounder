@@ -22,10 +22,8 @@ package learning.tadm
 import scala.sys.process._
 
 import learning._
-import util.debug._
 import util.io.localfh
 import util.metering._
-import util.print.errprint
 
 /**
  * This implements an interface onto the TADM classifier and ranker.
@@ -57,6 +55,30 @@ import util.print.errprint
  * Ridge regularization, simply makes the weights smaller with greater
  * penalty but doesn't set them to 0. Thus, Lasso finds a sparse solution,
  * somewhat like what SVM's do.
+ *
+ * Write out the training data to a file in the format desired by TADM.
+ *
+ * TADM-Python assumes the following format for data in the SimpleRanker
+ * format:
+ *
+ * -- Each data instance consists of a number of lines: first a line
+ *    containing only a number giving the number of candidates, followed
+ *    by one line per candidate.
+ * -- Each line consists of label followed by the features for the candidate,
+ *    separated by spaces. Only binary features can be specified this way.
+ * -- The correct candidate is the one that has the label "1".
+ *
+ * TADM itself wants an events-in file in the following format:
+ *
+ * -- Each data instance consists of a number of lines: first a line
+ *    containing only a number giving the number of candidates, followed
+ *    by one line per candidate.
+ * -- Each line consists of a "frequency of observation" followed by the
+ *    number of feature-value pairs followed by a feature, then a value,
+ *    repeated for the total number of pairs. All items are separated by
+ *    spaces. The features should be integers, numbered starting at 0.
+ * -- The correct candidate should have a frequency of 1, and the other
+ *    candidates should have a frequency of 0.
  */
 
 /**
@@ -71,46 +93,6 @@ class TADMRankingTrainer[DI <: DataInstance](
   val uniform_marginal: Boolean = false
 ) extends SingleWeightMultiLabelLinearClassifierTrainer[DI] {
   /**
-   * Write out the training data to a file in the format desired by TADM.
-   *
-   * TADM-Python assumes the following format for data in the SimpleRanker
-   * format:
-   *
-   * -- Each data instance consists of a number of lines: first a line
-   *    containing only a number giving the number of candidates, followed
-   *    by one line per candidate.
-   * -- Each line consists of label followed by the features for the candidate,
-   *    separated by spaces. Only binary features can be specified this way.
-   * -- The correct candidate is the one that has the label "1".
-   *
-   * TADM itself wants an events-in file in the following format:
-   *
-   * -- Each data instance consists of a number of lines: first a line
-   *    containing only a number giving the number of candidates, followed
-   *    by one line per candidate.
-   * -- Each line consists of a "frequency of observation" followed by the
-   *    number of feature-value pairs followed by a feature, then a value,
-   *    repeated for the total number of pairs. All items are separated by
-   *    spaces. The features should be integers, numbered starting at 0.
-   * -- The correct candidate should have a frequency of 1, and the other
-   *    candidates should have a frequency of 0.
-   */
-  def training_data_to_file(training_data: TrainingData[DI],
-      filename: String) {
-    val insts = training_data.data
-    val removed_features = training_data.removed_features
-
-    val file = localfh.openw(filename)
-    errprint("Writing TADM events to file: %s", filename)
-    val task = new Meter("writing", "rerank training instance")
-    insts.foreachMetered(task) { case (inst, correct_label) =>
-      val agg = AggregateFeatureVector.check_aggregate(inst)
-      TrainingData.export_aggregate_for_tadm(file, agg, correct_label)
-    }
-    file.close()
-  }
-
-  /**
    * Write out the set of instances to a TADM events file and run TADM,
    * returning the weights.
    */
@@ -119,7 +101,8 @@ class TADMRankingTrainer[DI <: DataInstance](
       java.io.File.createTempFile("textgrounder.tadm.events", null).toString
     val params_filename =
       java.io.File.createTempFile("textgrounder.tadm.params", null).toString
-    training_data_to_file(training_data, events_filename)
+    training_data.export_to_file(events_filename, include_length = true,
+      memoized_features = true)
     val tadm_cmd_line_start =
       Seq("tadm", "-monitor", "-method", method, "-events_in",
         events_filename, "-params_out", params_filename, "-max_it",
