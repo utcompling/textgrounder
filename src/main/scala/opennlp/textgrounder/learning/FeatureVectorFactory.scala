@@ -263,7 +263,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    *   this individual. There should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_labeled_instance(lines: Iterable[Array[String]],
+  def import_dense_labeled_instance(lines: Iterable[Array[String]],
       columns: Iterable[(String, FeatureClass)],
       indiv_colind: Int, label_colind: Int, choice_colind: Int,
       is_training: Boolean) = {
@@ -340,7 +340,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
    *   should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_labeled_instances(lines_iter: Iterator[String],
+  def import_dense_labeled_instances(lines_iter: Iterator[String],
       split_re: String,
       indiv_column: Int, label_column: Int, choice_column: Int,
       is_training: Boolean) = {
@@ -353,10 +353,10 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val grouped_instances = new GroupByIterator(lines.toIterator,
       { line: Array[String] => line(indiv_column).toInt })
     val retval = (for ((_, inst) <- grouped_instances) yield {
-      import_labeled_instance(inst.toIterable, column_types,
+      import_dense_labeled_instance(inst.toIterable, column_types,
         indiv_column, label_column, choice_column,
         is_training)
-    }).toIterable
+    }).toIndexedSeq
 
     if (debug("export-instances")) {
       val (headers, datarows) =
@@ -367,5 +367,77 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     }
 
     retval
+  }
+
+  /**
+   * Return a pair of `(aggregate, label)` where `aggregate` is an
+   * aggregate feature vector derived from the given input source.
+   * The input source should have the following format, similar to
+   * the TADM event-file format:
+   *
+   * -- Each data instance consists of a number of lines: first a line
+   *    containing only a number giving the number of candidates, followed
+   *    by one line per candidate.
+   * -- Each candidate line consists of a "frequency of observation"
+   *    followed by alternating features and corresponding values.
+   *    All items are separated by spaces.
+   * -- The correct candidate should have a frequency of 1, and the other
+   *    candidates should have a frequency of 0.
+   *
+   * The difference from the TADM event-file format is that the latter
+   * requires that features are given in memoized form (numeric indices
+   * starting from 0) and that the second item in a line is the number of
+   * feature-value pairs (whereas in this format it is computed from the
+   * number of items in the line).
+   *
+   * @param lines Source lines.
+   * @param split_re Regexp to split items in a line.
+   * @param is_binary Whether the features are binary-only (no value given)
+   *   or potentially numeric (value given).
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def import_sparse_labeled_instance(lines: Iterator[String],
+      split_re: String, is_binary: Boolean, is_training: Boolean) = {
+
+    val nvecs = lines.next.toInt
+    var correct_label = -1
+    val fvs = for (i <- 0 until nvecs) yield {
+      val fields = lines.next.split(split_re)
+      val freq = fields(0)
+      if (freq == "1") {
+        require(correct_label == -1, "Saw two correct labels in same instance")
+        correct_label = i
+      }
+      val feats =
+        if (is_binary)
+          (for (feat <- fields.drop(1)) yield (FeatBinary, feat, 1.0)).toSeq
+        else
+          (for (Array(feat, value) <- fields.drop(1).grouped(2))
+            yield (FeatRaw, feat, value.toDouble)).toSeq
+      make_feature_vector(feats, is_training)
+    }
+
+    // Synthesize labels as necessary
+    for (i <- 0 until nvecs) {
+      label_mapper.to_index(s"#${i + 1}")
+    }
+
+    // Aggregate feature vectors, return aggregate with label
+    val agg = new AggregateFeatureVector(fvs.toArray)
+    if (debug("features")) {
+      errprint("Label: %s(%s)", correct_label,
+        label_mapper.to_string(correct_label))
+      errprint("Feature vector: %s", agg.pretty_format(""))
+    }
+    (agg, correct_label)
+  }
+
+  def import_sparse_labeled_instances(lines: Iterator[String],
+      split_re: String, is_binary: Boolean, is_training: Boolean) = {
+    val aggs = mutable.Buffer[(AggregateFeatureVector, LabelIndex)]()
+    while (lines.hasNext)
+      aggs += import_sparse_labeled_instance(lines, split_re, is_binary,
+        is_training)
+    aggs.toIndexedSeq
   }
 }

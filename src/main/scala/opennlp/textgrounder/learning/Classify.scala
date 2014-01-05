@@ -19,6 +19,7 @@ package opennlp.textgrounder
 package learning
 
 import util.argparser._
+import util.debug._
 import util.experiment._
 import util.io
 import util.print._
@@ -28,7 +29,6 @@ import perceptron._
 import mlogit._
 import tadm._
 
-import util.debug._
 
 /**
  * General class retrieving command-line arguments or storing programmatic
@@ -77,6 +77,14 @@ function). Default %default.""")
 instance there are different features for each possible label. This
 requires a different format for the training file.""")
 
+  var input_format =
+    ap.option[String]("input-format",
+      choices = Seq("dense", "sparse"),
+      default = "sparse",
+      help = """If true, features are label-specific, i.e. for a given
+instance there are different features for each possible label. This
+requires a different format for the training file.""")
+
   var split_re =
     ap.option[String]("split-re", "sre", "sr",
       default = """[\s,]+""",
@@ -87,14 +95,15 @@ split on whitespace or commas.""")
     ap.option[Int]("label-column", "lc",
       default = -1,
       help = """Column specifying the label of the instance. Numeric,
-zero-based. If negative, count from the end.""")
+zero-based. If negative, count from the end. Default %default.""")
 
   var instance_index_column =
     ap.option[Int]("instance-index-column", "iic",
       default = 0,
       help = """Column specifying the index of the instance in question,
 when doing label-specific classification. Numeric, zero-based. If negative,
-count from the end. The indices themselves should be numeric.""")
+count from the end. The indices themselves should be numeric.
+Default %default.""")
 
   var choice_column =
     ap.option[Int]("choice-column", "lyc",
@@ -103,7 +112,8 @@ count from the end. The indices themselves should be numeric.""")
 training set, whether the label on this line is the correct label for
 this instance. There should be exactly one per set of lines. Numeric,
 zero-based. If negative, count from the end. The values themselves should
-be "yes", "no", "true" or "false", optionally upper-cased.""")
+be "yes", "no", "true" or "false", optionally upper-cased.
+Default %default.""")
 
   var output =
     ap.option[String]("o", "out",
@@ -211,22 +221,22 @@ object Classify extends ExperimentApp("Classify") {
       if (params.label_specific) {
         // Read in the data instances and create feature vectors
         val factory = new SparseAggregateInstanceFactory
-        val training_instances =
-          factory.import_labeled_instances(trainSource,
-            params.split_re,
-            params.instance_index_column,
-            params.label_column,
-            params.choice_column,
-            is_training = true).
-            toIndexedSeq
-        val test_instances =
-          factory.import_labeled_instances(predictSource,
-            params.split_re,
-            params.instance_index_column,
-            params.label_column,
-            params.choice_column,
-            is_training = false).
-            toIndexedSeq
+        def read_data(source: Iterator[String], is_training: Boolean) = {
+          if (params.input_format == "dense")
+            factory.import_dense_labeled_instances(source,
+              params.split_re,
+              params.instance_index_column,
+              params.label_column,
+              params.choice_column,
+              is_training = is_training)
+          else
+            factory.import_sparse_labeled_instances(source,
+              params.split_re,
+              is_binary = false,
+              is_training = is_training)
+        }
+        val training_instances = read_data(trainSource, is_training = true)
+        val test_instances = read_data(predictSource, is_training = false)
         val numlabs = factory.label_mapper.number_of_indices
         if (numlabs < 2) {
           error("Found %s different labels, when at least 2 are needed." format
