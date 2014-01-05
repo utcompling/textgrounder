@@ -55,7 +55,8 @@ trait Reranker[Query, Candidate]
    * Rerank the given candidates, based on an initial ranking.
    */
   protected def rerank_candidates(item: Query,
-    initial_ranking: Iterable[(Candidate, Double)]): Iterable[(Candidate, Double)]
+    initial_ranking: Iterable[(Candidate, Double)], correct: Candidate
+  ): Iterable[(Candidate, Double)]
 
   def evaluate_with_initial_ranking(item: Query, correct: Candidate,
       include_correct: Boolean) = {
@@ -73,7 +74,7 @@ trait Reranker[Query, Candidate]
       cands zip standardize(scores)
     } else to_rerank
     // Rerank the candidates.
-    val reranked = rerank_candidates(item, rescaled_to_rerank)
+    val reranked = rerank_candidates(item, rescaled_to_rerank, correct)
     // Adjust the scores of the reranked candidates to be above all
     // the others.
     val min_rerank = reranked.map(_._2).min
@@ -102,7 +103,7 @@ trait RandomReranker[Query, Candidate] extends Reranker[Query, Candidate] {
    * for each candidate.
    */
   protected def rerank_candidates(item: Query,
-      scored_candidates: Iterable[(Candidate, Double)]) = {
+      scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
     (new Random()).shuffle(scored_candidates)
   }
 }
@@ -148,7 +149,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
    * for each candidate.
    */
   protected def rerank_candidates(item: Query,
-      scored_candidates: Iterable[(Candidate, Double)]) = {
+      scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
     val cand_featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
