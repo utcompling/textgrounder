@@ -19,13 +19,13 @@
 package opennlp.textgrounder
 package learning.tadm
 
+import scala.sys.process._
+
 import learning._
 import util.debug._
 import util.io.localfh
 import util.metering._
 import util.print.errprint
-
-import scala.sys.process._
 
 /**
  * This implements an interface onto the TADM classifier and ranker.
@@ -104,23 +104,8 @@ class TADMRankingTrainer[DI <: DataInstance](
     errprint("Writing TADM events to file: %s", filename)
     val task = new Meter("writing", "rerank training instance")
     insts.foreachMetered(task) { case (inst, correct_label) =>
-      val fvs =
-        AggregateFeatureVector.check_aggregate(inst).fetch_sparse_featvecs
-      file.println(fvs.size)
-      for ((fv, label) <- fvs.zipWithIndex) {
-        file.print(if (label == correct_label) "1 " else "0 ")
-        val nfeats = fv.keys.size
-        file.print(nfeats)
-        for (i <- 0 until nfeats) {
-          val k = fv.keys(i)
-          val v = fv.values(i)
-          assert(!v.isNaN && !v.isInfinity,
-            s"For feature ${fv.format_feature(k)}($k), disallowed value $v")
-          file.print(" " + k)
-          file.print(" " + v)
-        }
-        file.println("")
-      }
+      val agg = AggregateFeatureVector.check_aggregate(inst)
+      TrainingData.export_aggregate_for_tadm(file, agg, correct_label)
     }
     file.close()
   }

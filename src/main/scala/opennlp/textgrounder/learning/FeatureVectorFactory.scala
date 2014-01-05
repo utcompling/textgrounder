@@ -360,8 +360,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     if (debug("export-instances")) {
       val (headers, datarows) =
-        AggregateFeatureVector.export_training_data(
-          TrainingData(retval, Set[FeatIndex]()))
+        TrainingData(retval, Set[FeatIndex]()).export_for_mlogit
       errprint("Headers: %s", headers mkString " ")
       errprint("Data rows:")
       errprint(datarows.map(_.toString) mkString "\n")
