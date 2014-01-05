@@ -49,12 +49,14 @@ trait Reranker[Query, Candidate]
     extends Ranker[Query, Candidate]
     with RerankerLike[Query, Candidate] {
   /** Ranker for generating initial ranking. */
-  protected def initial_ranker: Ranker[Query, Candidate]
+  def initial_ranker: Ranker[Query, Candidate]
 
   /**
    * Rerank the given candidates, based on an initial ranking.
+   * FIXME: Should be `protected` but can't due to use of composition in
+   * `gridlocate` (`GridReranker`).
    */
-  protected def rerank_candidates(item: Query,
+  def rerank_candidates(item: Query,
     initial_ranking: Iterable[(Candidate, Double)], correct: Candidate
   ): Iterable[(Candidate, Double)]
 
@@ -97,12 +99,15 @@ trait Reranker[Query, Candidate]
 /**
  * A reranker that picks randomly among the candidates to rerank.
  */
-trait RandomReranker[Query, Candidate] extends Reranker[Query, Candidate] {
+class RandomReranker[Query, Candidate](
+  val initial_ranker: Ranker[Query, Candidate],
+  val top_n: Int
+) extends Reranker[Query, Candidate] {
   /**
    * Rerank a set of top candidates, given the query and the initial score
    * for each candidate.
    */
-  protected def rerank_candidates(item: Query,
+  def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
     (new Random()).shuffle(scored_candidates)
   }
@@ -129,12 +134,16 @@ trait RandomReranker[Query, Candidate] extends Reranker[Query, Candidate] {
  *
  * @tparam Query type of a query
  * @tparam Candidate type of a possible candidate
+ *
+ * @param initial_ranker Ranker used to generate initial ranking.
+ * @param top_n Number of top candidates from initial ranker to rerank.
+ * @param rerank_classifier Scoring classifier for use in reranking.
  */
-trait PointwiseClassifyingReranker[Query, Candidate]
-    extends Reranker[Query, Candidate] {
-  /** Scoring classifier for use in reranking. */
-  protected def rerank_classifier: ScoringClassifier
-
+abstract class PointwiseClassifyingReranker[Query, Candidate](
+  val initial_ranker: Ranker[Query, Candidate],
+  val top_n: Int,
+  rerank_classifier: ScoringClassifier
+) extends Reranker[Query, Candidate] {
   /**
    * Create a candidate feature vector to feed to the classifier during
    * evaluation, given a query item, a potential candidate from the
@@ -148,7 +157,7 @@ trait PointwiseClassifyingReranker[Query, Candidate]
    * Rerank a set of top candidates, given the query and the initial score
    * for each candidate.
    */
-  protected def rerank_candidates(item: Query,
+  def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
     val cand_featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
@@ -511,13 +520,11 @@ trait PointwiseClassifyingRerankerTrainer[
    * initial ranker.
    */
   protected def create_reranker(
-    _rerank_classifier: ScoringClassifier,
-    _initial_ranker: Ranker[Query, Candidate]
-  ) = {
-    new PointwiseClassifyingReranker[Query, Candidate] {
-      protected val rerank_classifier = _rerank_classifier
-      protected val initial_ranker = _initial_ranker
-      val top_n = self.top_n
+    rerank_classifier: ScoringClassifier,
+    initial_ranker: Ranker[Query, Candidate]
+  ): Reranker[Query, Candidate] = {
+    new PointwiseClassifyingReranker[Query, Candidate](
+        initial_ranker, self.top_n, rerank_classifier) {
       protected def create_candidate_eval_featvec(query: Query,
           candidate: Candidate, initial_score: Double, initial_rank: Int) = {
         self.create_candidate_eval_featvec(query, candidate,

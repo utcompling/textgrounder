@@ -1541,10 +1541,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     def basic_ranker =
       create_ranker_from_documents(read_raw_training_documents)
     if (params.reranker == "none") basic_ranker
-    else if (params.reranker == "random")
-      new RandomGridReranker[Co](params.reranker, basic_ranker) {
-        val top_n = params.rerank_top_n
-      }
+    else if (params.reranker == "random") {
+      val reranker = new RandomReranker(basic_ranker, params.rerank_top_n)
+      new GridReranker[Co](reranker, params.reranker)
+    }
     else {
       /* Factory object for generating candidate feature vectors
        * to be ranked. There is one such feature vector per cell to be

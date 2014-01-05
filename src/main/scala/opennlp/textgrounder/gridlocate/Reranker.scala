@@ -22,17 +22,24 @@ case object BinningNo extends BinningStatus
  *
  * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
  *   a year, etc.), which tends to determine the grid structure.
+ * @param wrapped Underlying reranker
  * @param ranker_name Name of the ranker, for output purposes
- * @param initial_ranker Ranker used to compute initial ranking; the top items
- *   are then reranked.
  */
-abstract class GridReranker[Co](
-  ranker_name: String,
-  _initial_ranker: GridRanker[Co]
-) extends GridRanker(ranker_name + "/" + _initial_ranker.ranker_name,
-  _initial_ranker.grid
+class GridReranker[Co](
+  wrapped: Reranker[GridDoc[Co], GridCell[Co]],
+  ranker_name: String
+) extends GridRanker(ranker_name + "/" +
+    wrapped.initial_ranker.asInstanceOf[GridRanker[Co]].ranker_name,
+  wrapped.initial_ranker.asInstanceOf[GridRanker[Co]].grid
 ) with Reranker[GridDoc[Co], GridCell[Co]] {
-  val initial_ranker = _initial_ranker
+
+  val top_n = wrapped.top_n
+  def initial_ranker = wrapped.initial_ranker
+
+  def rerank_candidates(item: GridDoc[Co],
+      initial_ranking: Iterable[(GridCell[Co], Double)],
+      correct: GridCell[Co]) =
+    wrapped.rerank_candidates(item, initial_ranking, correct)
 }
 
 /**
@@ -638,30 +645,6 @@ class NgramMatchingCandidateFeatVecFactory[Co](
 }
 
 /**
- * A grid reranker, i.e. a pointwise reranker for doing reranking in a
- * GridLocate context, based on a grid ranker (for ranking cells in a grid
- * as possible matches for a given document).
- * See `PointwiseClassifyingReranker`.
- */
-abstract class RandomGridReranker[Co](ranker_name: String,
-  _initial_ranker: GridRanker[Co]
-) extends GridReranker[Co](ranker_name, _initial_ranker)
-    with RandomReranker[GridDoc[Co], GridCell[Co]] {
-}
-
-/**
- * A grid reranker, i.e. a pointwise reranker for doing reranking in a
- * GridLocate context, based on a grid ranker (for ranking cells in a grid
- * as possible matches for a given document).
- * See `PointwiseClassifyingReranker`.
- */
-abstract class PointwiseGridReranker[Co](ranker_name: String,
-  _initial_ranker: GridRanker[Co]
-) extends GridReranker[Co](ranker_name, _initial_ranker)
-    with PointwiseClassifyingReranker[GridDoc[Co], GridCell[Co]] {
-}
-
-/**
  * A grid reranker using a linear classifier.  See `PointwiseGridReranker`.
  *
  * @param trainer Factory object for training a linear classifier used for
@@ -710,23 +693,15 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
     _rerank_classifier: ScoringClassifier,
     _initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
   ) = {
-    val grid_ir = _initial_ranker.asInstanceOf[GridRanker[Co]]
-    new PointwiseGridReranker[Co](ranker_name, grid_ir) {
-      protected val rerank_classifier = _rerank_classifier
-      val top_n = self.top_n
-      protected def create_candidate_eval_featvec(query: GridDoc[Co],
-          candidate: GridCell[Co], initial_score: Double, initial_rank: Int
-      ) = self.create_candidate_eval_featvec(query, candidate,
-          initial_score, initial_rank)
-    }
+    val reranker = super.create_reranker(_rerank_classifier, _initial_ranker)
+    new GridReranker(reranker, ranker_name)
   }
 
   /**
    * Train a reranker, based on external training data.
    */
   override def apply(training_data: Iterable[DocStatus[Row]]) =
-    super.apply(training_data).
-      asInstanceOf[PointwiseGridReranker[Co]]
+    super.apply(training_data).asInstanceOf[GridReranker[Co]]
 
   override def format_query_item(item: GridDoc[Co]) = {
     "%s, lm=%s" format (item, item.rerank_lm.debug_string)
