@@ -162,7 +162,7 @@ abstract class PointwiseScoreGridRanker[Co](
       include_correct: Boolean) = {
     for (cell <- grid.iter_nonempty_cells_including(correct, include_correct))
         yield {
-      if (debug("lots")) {
+      if (debug("ranking")) {
         errprint(
           "Nonempty cell at indices %s = location %s, num_documents = %s",
           cell.format_indices, cell.format_location,
@@ -197,7 +197,7 @@ abstract class PointwiseScoreGridRanker[Co](
 
     /* If doing things parallel, this code applies for debugging
        (serial has the debugging code embedded into it). */
-    if (parallel && debug("lots")) {
+    if (parallel && debug("ranking")) {
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
           cell.format_indices, cell.format_location,

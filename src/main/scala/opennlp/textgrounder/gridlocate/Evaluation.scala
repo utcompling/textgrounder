@@ -657,7 +657,7 @@ abstract class GridEvaluator[Co](
         create_non_recorded = true)
     assert(maybe_correct_cell != None)
     val correct_cell = maybe_correct_cell.get
-    if (debug("lots") || debug("commontop")) {
+    if (debug("ranking") || debug("commontop")) {
       val naitr = correct_cell.num_docs
       errprint("Evaluating document %s with %s documents in correct cell",
         document, naitr)

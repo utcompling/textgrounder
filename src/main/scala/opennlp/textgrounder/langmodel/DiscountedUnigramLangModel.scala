@@ -65,11 +65,11 @@ abstract class DiscountedUnigramLangModelFactory(
       document_freq(word) += 1
     }
     num_documents += 1
-    if (debug("lots")) {
-      val ulm = lm.asInstanceOf[DiscountedUnigramLangModel]
-      errprint("""For lang model, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
-        ulm.num_tokens, ulm.unseen_mass, ulm.overall_unseen_mass)
-    }
+    //if (debug("lang-model")) {
+    //  val ulm = lm.asInstanceOf[DiscountedUnigramLangModel]
+    //  errprint("""For lang model, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
+    //    ulm.num_tokens, ulm.unseen_mass, ulm.overall_unseen_mass)
+    //}
   }
 
   // The total probability mass to be assigned to words not seen at all in
@@ -204,9 +204,9 @@ abstract class DiscountedUnigramLangModel(
       "Zero normalization factor for lm %s" format this)
     //if (LangModelConstants.use_sorted_list)
     //  counts = new SortedList(counts)
-    if (debug("discount-factor") || debug("discountfactor"))
-      errprint("For lang model %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
-        format (this, normalization_factor, num_tokens, unseen_mass))
+    //if (debug("discount-factor") || debug("discountfactor"))
+    //  errprint("For lang model %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
+    //    format (this, normalization_factor, num_tokens, unseen_mass))
   }
 
   def fast_kl_divergence(other: LangModel, partial: Boolean = true,
@@ -290,7 +290,7 @@ abstract class DiscountedUnigramLangModel(
   protected def imp_gram_prob(word: Gram) = {
     if (factory.interpolate) {
       val wordcount = if (contains(word)) get_gram(word) else 0.0
-      // if (debug("some")) {
+      // if (debug("lang-model")) {
       //   errprint("Found counts for document %s, num word types = %s",
       //            doc, wordcounts(0).length)
       //   errprint("Unknown prob = %s, overall_unseen_mass = %s",
@@ -299,9 +299,9 @@ abstract class DiscountedUnigramLangModel(
       val owprob = factory.overall_word_probs.getOrElse(word, 0.0)
       val mle_wordprob = wordcount.toDouble/normalization_factor
       val wordprob = mle_wordprob*(1.0 - unseen_mass) + owprob*unseen_mass
-      if (debug("lots"))
-        errprint("Word %s, seen in document, wordprob = %s",
-                 gram_to_string(word), wordprob)
+      //if (debug("lang-model"))
+      //  errprint("Word %s, seen in document, wordprob = %s",
+      //           gram_to_string(word), wordprob)
       // DO NOT simplify following expr, or it will fail on NaN
       if (! (wordprob >= 0)) {
         errprint("wordcount = %s, owprob = %s", wordcount, owprob)
@@ -324,9 +324,9 @@ abstract class DiscountedUnigramLangModel(
               */
               /* The new way: Just return 0 */
               val wordprob = 0.0
-              if (debug("lots"))
-                errprint("Word %s, never seen at all, wordprob = %s",
-                         gram_to_string(word), wordprob)
+              //if (debug("lang-model"))
+              //  errprint("Word %s, never seen at all, wordprob = %s",
+              //           gram_to_string(word), wordprob)
               wordprob
             }
             case Some(owprob) => {
@@ -336,9 +336,9 @@ abstract class DiscountedUnigramLangModel(
                 errprint("Bad values section #2; unseen_mass = %s, owprob = %s, overall_unseen_mass = %s",
                   unseen_mass, owprob, overall_unseen_mass)
               }
-              if (debug("lots"))
-                errprint("Word %s, seen but not in document, wordprob = %s",
-                         gram_to_string(word), wordprob)
+              //if (debug("lang-model"))
+              //  errprint("Word %s, seen but not in document, wordprob = %s",
+              //           gram_to_string(word), wordprob)
 
               wordprob
             }
@@ -356,9 +356,9 @@ abstract class DiscountedUnigramLangModel(
             errprint("Bad values section #3; wordcount = %s, normalization_factor = %s, unseen_mass = %s",
               wordcount, normalization_factor, unseen_mass)
           }
-          if (debug("lots"))
-            errprint("Word %s, seen in document, wordprob = %s",
-                     gram_to_string(word), wordprob)
+          //if (debug("lang-model"))
+          //  errprint("Word %s, seen in document, wordprob = %s",
+          //           gram_to_string(word), wordprob)
           wordprob
         }
       // Info on word and probability printed in wrapper gram_prob()
