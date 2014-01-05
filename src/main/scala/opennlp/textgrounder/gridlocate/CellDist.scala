@@ -43,13 +43,13 @@ class CellDist[Co](
     cellprobs ++= probs
   }
 
-  def get_ranked_cells(include: Iterable[GridCell[Co]]) = {
+  def get_ranked_cells(correct: GridCell[Co], include_correct: Boolean) = {
     val probs =
-      if (include.size == 0)
+      if (!include_correct)
         cellprobs
       else
         // Elements on right override those on left
-        include.map((_, 0.0)).toMap ++ cellprobs.toMap
+        Map(correct -> 0.0) ++ cellprobs.toMap
     // sort by second element of tuple, in reverse order
     probs.toIndexedSeq sortWith (_._2 > _._2)
   }

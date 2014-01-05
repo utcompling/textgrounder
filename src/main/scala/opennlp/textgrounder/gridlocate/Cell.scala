@@ -377,14 +377,25 @@ abstract class Grid[Co](
    * Iterate over all non-empty cells, making sure to include the given cells
    *  even if empty.
    */
-  def iter_nonempty_cells_including(include: Iterable[GridCell[Co]]) = {
+  def iter_nonempty_cells_including(include: Iterable[GridCell[Co]]
+  ) = {
     val cells = iter_nonempty_cells
     if (include.size == 0)
       cells
-    else {
+   else {
       val not_included = include.filter(cell => cells.find(_ == cell) == None)
       cells ++ not_included
     }
+  }
+
+  /**
+   * Iterate over all non-empty cells, making sure to include the given cell
+   *  even if empty, if `doinc` is true.
+   */
+  def iter_nonempty_cells_including(maybeinc: GridCell[Co], doinc: Boolean
+  ): Iterable[GridCell[Co]] = {
+    val include = if (doinc) Seq(maybeinc) else Seq()
+    iter_nonempty_cells_including(include)
   }
 
   /**

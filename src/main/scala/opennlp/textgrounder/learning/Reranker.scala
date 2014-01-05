@@ -57,10 +57,11 @@ trait Reranker[Query, Candidate]
   protected def rerank_candidates(item: Query,
     initial_ranking: Iterable[(Candidate, Double)]): Iterable[(Candidate, Double)]
 
-  def evaluate_with_initial_ranking(item: Query,
-      include: Iterable[Candidate]) = {
+  def evaluate_with_initial_ranking(item: Query, correct: Candidate,
+      include_correct: Boolean) = {
     // Do initial ranking.
-    val initial_ranking = initial_ranker.evaluate(item, include)
+    val initial_ranking = initial_ranker.evaluate(item, correct,
+      include_correct)
     // Split into candidates to rerank and others.
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
     val rescaled_to_rerank = if (!debug("no-rescale")) {
@@ -84,9 +85,10 @@ trait Reranker[Query, Candidate]
     (initial_ranking, reranking)
   }
 
-  override def imp_evaluate(item: Query, include: Iterable[Candidate]) = {
+  override def imp_evaluate(item: Query, correct: Candidate,
+      include_correct: Boolean) = {
     val (initial_ranking, reranking) =
-      evaluate_with_initial_ranking(item, include)
+      evaluate_with_initial_ranking(item, correct, include_correct)
     reranking
   }
 }
@@ -410,7 +412,7 @@ trait PointwiseClassifyingRerankerTrainer[
     query: Query, correct: Candidate, initial_ranker: Ranker[Query, Candidate]
   ): QueryTrainingData = {
     val initial_candidates =
-      initial_ranker.evaluate(query, Iterable(correct))
+      initial_ranker.evaluate(query, correct, include_correct = true)
     val top_candidates = initial_candidates.take(top_n)
     val cand_scores =
       if (top_candidates.find(_._1 == correct) != None)

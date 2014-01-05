@@ -599,11 +599,11 @@ abstract class GridEvaluator[Co](
     if (driver.params.oracle_results)
       (Iterable((correct_cell, 0.0)), 1)
     else {
-      val include = Iterable[GridCell[Co]]()
       ranker match {
         case reranker: Reranker[GridDoc[Co], GridCell[Co]] if debug("reranker") => {
           val (initial_ranking, reranking) =
-            reranker.evaluate_with_initial_ranking(document, include)
+            reranker.evaluate_with_initial_ranking(document, correct_cell,
+              include_correct = false)
           errprint("Correct cell initial rank: %s",
             get_correct_rank(initial_ranking, correct_cell))
           val correct_rank = get_correct_rank(reranking, correct_cell)
@@ -611,7 +611,8 @@ abstract class GridEvaluator[Co](
           (reranking, correct_rank)
         }
         case _ => {
-          val cells = ranker.evaluate(document, include)
+          val cells = ranker.evaluate(document, correct_cell,
+            include_correct = false)
           (cells, get_correct_rank(cells, correct_cell))
         }
       }
@@ -694,15 +695,17 @@ class RankedGridEvaluator[Co](
     ranker match {
       case reranker: Reranker[GridDoc[Co], GridCell[Co]] => {
         val (initial_ranking, reranking) =
-          reranker.evaluate_with_initial_ranking(document,
-            Iterable[GridCell[Co]]())
+          reranker.evaluate_with_initial_ranking(document, correct_cell,
+            include_correct = false)
         val correct_rank = get_correct_rank(reranking, correct_cell)
-        val initial_correct_rank = get_correct_rank(initial_ranking, correct_cell)
+        val initial_correct_rank =
+          get_correct_rank(initial_ranking, correct_cell)
         new FullRerankedDocEvalResult[Co](document, reranking, correct_rank,
           initial_ranking, initial_correct_rank)
       }
       case _ => {
-        val (pred_cells, correct_rank) = return_ranked_cells(document, correct_cell)
+        val (pred_cells, correct_rank) =
+          return_ranked_cells(document, correct_cell)
 
         new FullRankedDocEvalResult[Co](document, pred_cells,
           correct_rank)

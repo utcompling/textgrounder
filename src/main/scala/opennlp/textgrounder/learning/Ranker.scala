@@ -49,14 +49,19 @@ trait Ranker[Query, Candidate] {
   /**
    * Evaluate a query item, returning a list of ranked candidates from best to
    * worst, with a score for each.  The score must not increase from any
-   * candidate to the next one.  Any candidates mentioned in `include` must be
-   * included in the returned list.
+   * candidate to the next one.
+   *
+   * @param correct Correct candidate, for oracles, etc.
+   * @param include_correct If true, the correct candidate must be included
+   * in the returned list, ranked as if it were just any other candidate.
    */
-  def imp_evaluate(item: Query, include: Iterable[Candidate]):
+  def imp_evaluate(item: Query, correct: Candidate,
+      include_correct: Boolean):
     Iterable[(Candidate, Double)]
 
-  final def evaluate(item: Query, include: Iterable[Candidate]) = {
-    val scored_cands = imp_evaluate(item, include)
+  final def evaluate(item: Query, correct: Candidate,
+      include_correct: Boolean) = {
+    val scored_cands = imp_evaluate(item, correct, include_correct)
     assert(is_reverse_sorted(scored_cands.map(_._2)))
     scored_cands
   }
