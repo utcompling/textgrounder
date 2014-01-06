@@ -30,7 +30,7 @@ import util.error.warning
 import util.math.argmax
 import util.metering._
 import util.print.errprint
-import util.text.format_double
+import util.numeric.format_double
 
 object ClassifierConstants {
   private val default_weights_to_print = 100

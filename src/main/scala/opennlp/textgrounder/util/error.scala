@@ -29,7 +29,6 @@ import scala.collection.mutable
 // various meanings.)
 import java.io.{Console=>_,_}
 
-import text._
 import io._
 import os._
 import print._

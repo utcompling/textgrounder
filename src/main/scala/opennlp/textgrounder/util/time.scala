@@ -21,7 +21,7 @@ package util
 
 import error.internal_error
 import serialize.TextSerializer
-import text.split_with_delim
+import string.split_with_delim
 
 protected class TimePackage {
 

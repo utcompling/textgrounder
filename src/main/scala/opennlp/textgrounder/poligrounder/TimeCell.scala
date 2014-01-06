@@ -25,7 +25,7 @@ import math._
 import collection.mutable
 
 import util.collection._
-import util.text.format_double
+import util.numeric.format_double
 import util.time._
 import util.print.{errout, errprint}
 import util.experiment._

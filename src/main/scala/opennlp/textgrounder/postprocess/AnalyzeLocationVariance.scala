@@ -30,7 +30,7 @@ import util.json._
 import util.math._
 import util.print._
 import util.spherical._
-import util.text.min_format_double
+import util.numeric.min_format_double
 import util.textdb._
 import util.time._
 

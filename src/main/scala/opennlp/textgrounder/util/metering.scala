@@ -25,8 +25,9 @@ import scala.collection.generic.CanBuildFrom
 
 import collection.{InterruptibleIterator, SideEffectIterator}
 import os._
+import numeric.format_double
 import print.errprint
-import text._
+import string.pluralize
 import time._
 
 /////////////////////////////////////////////////////////////////////////////

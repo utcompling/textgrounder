@@ -23,7 +23,7 @@ import util.debug._
 import util.experiment._
 import util.io
 import util.print._
-import util.text.min_format_double
+import util.numeric.min_format_double
 import util.table.table_column_format
 
 import perceptron._

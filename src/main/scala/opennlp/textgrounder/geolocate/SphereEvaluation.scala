@@ -32,7 +32,7 @@ import util.math.{mean, median}
 import util.io.{FileHandler}
 import util.print.errprint
 import util.error.{warning, internal_error}
-import util.text.split_text_into_words
+import util.string.split_text_into_words
 
 import gridlocate._
 import util.debug._

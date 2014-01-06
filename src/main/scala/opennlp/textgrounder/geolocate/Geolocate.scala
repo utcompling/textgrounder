@@ -33,7 +33,7 @@ import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
 import util.os._
 import util.print.{errprint, outprint}
-import util.text.format_double
+import util.numeric.format_double
 import util.textdb.Encoder
 import util.time.format_minutes_seconds
 

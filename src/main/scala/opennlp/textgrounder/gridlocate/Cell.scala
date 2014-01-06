@@ -25,7 +25,7 @@ import collection.mutable
 import util.error.warning
 import util.experiment._
 import util.print.errprint
-import util.text.pretty_double
+import util.numeric.pretty_double
 import util.textdb.{Encoder, Row}
 
 import langmodel.LangModelFactory

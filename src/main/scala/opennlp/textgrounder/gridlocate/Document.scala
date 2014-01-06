@@ -34,7 +34,7 @@ import util.experiment._
 import util.io._
 import util.print._
 import util.serialize.TextSerializer
-import util.text.capfirst
+import util.string.capfirst
 import util.textdb.Row
 
 import langmodel.{LangModel,LangModelFactory,LangModelCreationException}

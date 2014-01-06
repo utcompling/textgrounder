@@ -55,7 +55,7 @@ import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
 import util.print._
 import util.spherical.SphereCoord
-import util.text.pretty_long
+import util.numeric.pretty_long
 import util.time._
 
 class ParseTweetsParams(ap: ArgParser) extends
