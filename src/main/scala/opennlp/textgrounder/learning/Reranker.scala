@@ -68,7 +68,7 @@ trait Reranker[Query, Candidate]
       include_correct)
     // Split into candidates to rerank and others.
     val (to_rerank, others) = initial_ranking.splitAt(top_n)
-    val rescaled_to_rerank = if (!debug("no-rescale")) {
+    val rescaled_to_rerank = if (debug("rescale")) {
       // FIXME! We also rescale the scores afterwards in
       // rescale_featvecs.
       // Rescale the initial scores so they are comparable across
@@ -357,7 +357,7 @@ trait PointwiseClassifyingRerankerTrainer[
         (for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
           create_candidate_featvec(query, cand, score, rank)).toArray
       val agg = new AggregateFeatureVector(featvecs)
-      if (!debug("no-rescale"))
+      if (debug("rescale"))
         agg.rescale_featvecs()
       agg
     }
@@ -478,7 +478,7 @@ trait PointwiseClassifyingRerankerTrainer[
         // candidates away so we have the same number.
         top_candidates.take(top_n - 1) ++
           Iterable(initial_candidates.find(_._1 == correct).get)
-    val rescaled_cand_scores = if (!debug("no-rescale")) {
+    val rescaled_cand_scores = if (debug("rescale")) {
       // Rescale the initial scores so they are comparable across
       // different instances.
       val (cands, scores) = cand_scores.unzip
