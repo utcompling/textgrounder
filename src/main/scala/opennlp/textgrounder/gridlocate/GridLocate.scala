@@ -1570,11 +1570,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             label_mapper.to_index(s"#${i + 1}")
           }
 
-          protected def query_training_data_to_rerank_training_instances(
-            data: Iterable[QueryTrainingData]
+          protected def query_training_data_to_feature_vectors(
+            data: Iterable[QueryTrainingInst]
           ): Iterable[(GridRankerInst[Co], LabelIndex)] = {
 
-            val task = show_progress("converting QTD's to", "RTI'")
+            val task = show_progress("converting QTI's to",
+              "aggregate feature vector")
 
             def create_candidate_featvec(query: GridDoc[Co],
                 candidate: GridCell[Co], initial_score: Double,
@@ -1596,15 +1597,15 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               // FIXME: Not yet by default. This seems to use lots more memory
               // and sometimes produces different results than without it,
               // presumably indicative of a race condition.
-              if (debug("parallel-qtd-to-rti")
-                  /*params.no_parallel || debug("no-parallel-qtd-to-rti")*/) data
+              if (debug("parallel-qti-to-rti")
+                  /*params.no_parallel || debug("no-parallel-qti-to-rti")*/) data
               else data.par
 
-            maybepar_data.mapMetered(task) { qtd =>
-              val agg_fv = qtd.aggregate_featvec(create_candidate_featvec)
-              val label = qtd.label
-              val candidates = qtd.cand_scores.map(_._1).toIndexedSeq
-              (GridRankerInst(qtd.query, candidates, agg_fv), label)
+            maybepar_data.mapMetered(task) { qti =>
+              val agg_fv = qti.aggregate_featvec(create_candidate_featvec)
+              val label = qti.label
+              val candidates = qti.cand_scores.map(_._1).toIndexedSeq
+              (GridRankerInst(qti.query, candidates, agg_fv), label)
             }.seq
           }
 
