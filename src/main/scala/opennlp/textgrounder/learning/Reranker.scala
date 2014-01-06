@@ -495,17 +495,17 @@ trait PointwiseClassifyingRerankerTrainer[
    * training instances. See `QueryTrainingInst`.
    */
   protected def get_query_training_data_for_split(
-      splitnum: Int, data: Iterator[ExtInst],
+      splitnum: Int, data: Iterable[ExtInst],
       initial_ranker: Ranker[Query, Candidate]
     ): Iterator[QueryTrainingInst] = {
     val query_candidate_pairs =
-      external_instances_to_query_candidate_pairs(data, initial_ranker)
+      external_instances_to_query_candidate_pairs(data.iterator, initial_ranker)
     val task = new Meter("generating",
-      "split-#%s rerank training instance" format splitnum)
+      s"split-#${splitnum + 1} rerank training instance")
     if (debug("rerank-training")) {
       query_candidate_pairs.zipWithIndex.mapMetered(task) {
         case ((query, correct), index) => {
-          val prefix = "#%s: " format (index + 1)
+          val prefix = s"#${index + 1}: "
           val query_training_data =
             get_query_training_instance(query, correct, initial_ranker)
           query_training_data.debug_out(prefix)
@@ -536,16 +536,26 @@ trait PointwiseClassifyingRerankerTrainer[
     errprint(s"#training docs = $numitems ($number_of_splits splits, $splitsize docs/split)")
     (0 until number_of_splits) flatMap { rerank_split_num =>
       errprint(
-        s"======== Generating data for split $rerank_split_num ========")
+        s"======== Generating data for split ${rerank_split_num + 1} ========")
       val split_training_data = training_data.grouped(splitsize).zipWithIndex
       val (rerank_splits, initrank_splits) = split_training_data partition {
         case (data, num) => num == rerank_split_num
       }
-      val rerank_data = rerank_splits.flatMap(_._1)
+      val rerank_data = rerank_splits.flatMap(_._1).toIndexedSeq
       val initrank_data = initrank_splits.flatMap(_._1).toIndexedSeq
       val split_initial_ranker = create_initial_ranker(initrank_data)
-      get_query_training_data_for_split(rerank_split_num, rerank_data,
-        split_initial_ranker).toIndexedSeq
+      val split_qtd = get_query_training_data_for_split(rerank_split_num,
+        rerank_data, split_initial_ranker).toIndexedSeq
+      // Skipping will happen e.g. in GridLocate when there are no
+      // training documents in the external instance's cell -- remember
+      // that the training documents in question exclude the slice containing
+      // the external instance.
+      //
+      // FIXME! Is this necessary and if so do we want to skip other
+      // external documents with very few training documents in the cell?
+      errprint(s"Split #${rerank_split_num + 1}: size = ${split_qtd.size}" +
+        s" (${rerank_data.size - split_qtd.size} skipped)")
+      split_qtd
     }
   }
 
