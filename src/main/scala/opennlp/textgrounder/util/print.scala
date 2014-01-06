@@ -33,11 +33,11 @@ import text._
 import io._
 import os._
 
-protected class PrintPackage {
+////////////////////////////////////////////////////////////////////////////
+//                            Text output functions                       //
+////////////////////////////////////////////////////////////////////////////
 
-  ////////////////////////////////////////////////////////////////////////////
-  //                            Text output functions                       //
-  ////////////////////////////////////////////////////////////////////////////
+protected class PrintPackage {
 
   // This stuff sucks.  Need to create new Print streams to get the expected
   // UTF-8 output, since the existing System.out/System.err streams don't do it!
@@ -165,93 +165,11 @@ protected class PrintPackage {
   def outout(format: String, args: Any*) {
     uniout(format_outtext(format, args: _*))
   }
+}
 
   ////////////////////////////////////////////////////////////////////////////
   //                              Table Output                              //
   ////////////////////////////////////////////////////////////////////////////
-
-  /**
-   * Given a list of tuples, output the list, one line per tuple.
-   *
-   * @param outfile If specified, send output to this stream instead of
-   *   stdout.
-   * @param indent If specified, indent all rows by this string (usually
-   *   some number of spaces).
-   * @param maxrows If specified, output at most this many rows.
-   */
-  def output_tuple_list[T,U](
-      items: Seq[(T,U)], outfile: PrintStream = System.out,
-      indent: String = "", maxrows: Int = -1) {
-    var its = items
-    if (maxrows >= 0)
-      its = its.slice(0, maxrows)
-    for ((key, value) <- its)
-      outfile.println("%s%s = %s" format (indent, key, value))
-  }
-
-  /**
-   * Given a list of tuples, where the second element of the tuple is a
-   * number and the first a key, output the list, sorted on the numbers from
-   * bigger to smaller.  Within a given number, normally sort the items
-   * alphabetically.
-   *
-   * @param keep_secondary_order If true, the original order of items is
-   *   left instead of sorting secondarily.
-   * @param outfile If specified, send output to this stream instead of
-   *   stdout.
-   * @param indent If specified, indent all rows by this string (usually
-   *   some number of spaces).
-   * @param maxrows If specified, output at most this many rows.
-   */
-  def output_reverse_sorted_list[T <% Ordered[T],U <% Ordered[U]](
-      items: Seq[(T,U)], keep_secondary_order: Boolean = false,
-      outfile: PrintStream = System.out, indent: String = "",
-      maxrows: Int = -1) {
-    var its = items
-    if (!keep_secondary_order)
-      its = its sortBy (_._1)
-    its = its sortWith (_._2 > _._2)
-    output_tuple_list(its, outfile, indent, maxrows)
-  }
-  
-  /**
-   * Given a table with values that are numbers, output the table, sorted on
-   * the numbers from bigger to smaller.  Within a given number, normally
-   * sort the items alphabetically.
-   *
-   * @param keep_secondary_order If true, the original order of items is
-   *   left instead of sorting secondarily.
-   * @param outfile If specified, send output to this stream instead of
-   *   stdout.
-   * @param indent If specified, indent all rows by this string (usually
-   *   some number of spaces).
-   * @param maxrows If specified, output at most this many rows.
-   */
-  def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-      table: scala.collection.Map[T,U], keep_secondary_order: Boolean = false,
-      outfile: PrintStream = System.out, indent: String = "",
-      maxrows: Int = -1) {
-    output_reverse_sorted_list(table toList, keep_secondary_order,
-      outfile, indent, maxrows)
-  }
-
-  /**
-   * Output a table, sorted by its key.
-   *
-   * @param outfile If specified, send output to this stream instead of
-   *   stdout.
-   * @param indent If specified, indent all rows by this string (usually
-   *   some number of spaces).
-   * @param maxrows If specified, output at most this many rows.
-   */
-  def output_key_sorted_table[T <% Ordered[T],U](
-      table: scala.collection.Map[T,U],
-      outfile: PrintStream = System.out, indent: String = "",
-      maxrows: Int = -1) {
-    output_tuple_list(table.toSeq.sortBy (_._1), outfile, indent,
-      maxrows)
-  }
-}
 
 package object print extends PrintPackage { }
 

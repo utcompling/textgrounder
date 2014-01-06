@@ -32,6 +32,7 @@ import util.io._
 import util.metering._
 import util.os.output_resource_usage
 import util.print._
+import util.table.{output_key_sorted_table, output_reverse_sorted_table}
 import util.text.pretty_long
 import util.textdb._
 import util.Twokenize
