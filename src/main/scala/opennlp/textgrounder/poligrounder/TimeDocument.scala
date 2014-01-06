@@ -46,6 +46,7 @@ class TimeDoc(
   def distance_to_coord(coord2: TimeCoord) = {
     (coord_as_double(coord2) - coord_as_double(coord)).abs
   }
+  def format_coord(coord2: TimeCoord) = coord2.format
   def output_distance(dist: Double) = "%s seconds" format dist
 }
 

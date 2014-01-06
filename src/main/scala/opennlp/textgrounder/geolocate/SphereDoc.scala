@@ -37,6 +37,7 @@ abstract class RealSphereDoc(
   def has_coord = coord != null
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
+  def format_coord(coord2: SphereCoord) = coord2.format
   def output_distance(dist: Double) = km_and_miles(dist)
 }
 

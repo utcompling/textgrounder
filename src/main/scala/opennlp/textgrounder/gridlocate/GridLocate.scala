@@ -440,6 +440,10 @@ the fields.""")
     ap.flag("print-results", "show-results",
       help = """Show individual results for each test document.""")
 
+  var print_knn_results =
+    ap.flag("print-knn-results", "show-knn-results",
+      help = """Show kNN-related results for each test document.""")
+
   var results_by_range =
     ap.flag("results-by-range",
       help = """Show results by range (of error distances and number of
@@ -449,7 +453,8 @@ and setting so many counters breaks some Hadoop installations.""")
   var num_nearest_neighbors =
     ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
       must = be_>(0),
-      help = """Number of nearest neighbors (k in kNN); default is %default.""")
+      help = """Number of nearest neighbors (k in kNN), if
+`--print-knn-results`; default is %default.""")
 
   var num_top_cells_to_output =
     ap.option[Int]("num-top-cells-to-output", "num-top-cells", default = 5,

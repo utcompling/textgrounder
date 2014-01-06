@@ -1082,6 +1082,8 @@ abstract class GridDoc[Co : TextSerializer](
 
   def distance_to_coord(coord2: Co): Double
 
+  def format_coord(coord2: Co): String
+
   /**
    * Output a distance with attached units
    */

@@ -38,6 +38,9 @@ package object table {
    */
   def table_column_format(lines: Iterable[Iterable[String]],
       maxcolsize: Int = 40) = {
+    val ncols = lines.head.size
+    // Make sure all lines have same number of columns
+    lines foreach { line => assert(line.size == ncols) }
     val maxsize = lines.transpose.map { line =>
       line.map { _.length}.max min maxcolsize
     }

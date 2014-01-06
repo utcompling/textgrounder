@@ -25,16 +25,19 @@ import scala.util.control.Breaks._
 import scala.util.{Either, Left, Right}
 import scala.collection.mutable
 
-import learning.{Ranker, Reranker}
+import util.debug._
 import util.collection._
+import util.error.{warning, internal_error}
 import util.experiment._
 import util.io.FileHandler
 import util.math._
+import util.numeric._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.errprint
-import util.error.{warning, internal_error}
+import util.table.table_column_format
 import util.textdb.Row
-import util.debug._
+
+import learning.{Ranker, Reranker}
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //
@@ -179,6 +182,14 @@ class DocEvalResult[Co](
    */
   val pred_truedist = document.distance_to_coord(pred_coord)
 
+  protected def print_document(doctag: String) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document language model: %s", doctag, document.grid_lm)
+    errprint("%s:  %s types, %f tokens",
+      doctag, document.grid_lm.num_types,
+      document.grid_lm.num_tokens)
+  }
+
   /**
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
@@ -188,18 +199,15 @@ class DocEvalResult[Co](
    *   the document and its evaluation results.
    */
   def print_result(doctag: String, driver: GridLocateDriver[Co]) {
-    errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document language model: %s", doctag, document.grid_lm)
-    errprint("%s:  %s types, %f tokens",
-      doctag, document.grid_lm.num_types,
-      document.grid_lm.num_tokens)
-
+    print_document(doctag)
     errprint("%s:  Distance %s to correct cell central point at %s",
-      doctag, document.output_distance(correct_truedist), correct_central_point)
+      doctag, document.output_distance(correct_truedist),
+      document.format_coord(correct_central_point))
     errprint("%s:  Distance %s to predicted cell central point at %s",
-      doctag, document.output_distance(pred_truedist), pred_coord)
+      doctag, document.output_distance(pred_truedist),
+      document.format_coord(pred_coord))
 
-    errprint("%s:  correct cell: %s", doctag, correct_cell)
+    errprint(s"$doctag:  correct cell: $correct_cell")
   }
 
   def to_row = Seq(
@@ -698,15 +706,16 @@ class RankedGridEvaluator[Co](
           Left("correct cell not within rerankable subset " +
             s"(top ${reranker.top_n})")
         else
-          Right(new FullRerankedDocEvalResult[Co](document, reranking,
-            correct_rank, initial_ranking, initial_correct_rank))
+          Right(new FullRerankedDocEvalResult[Co](document,
+            reranking.toIndexedSeq, correct_rank,
+            initial_ranking.toIndexedSeq, initial_correct_rank))
       }
       case _ => {
         val (pred_cells, correct_rank) =
           return_ranked_cells(document, correct_cell)
 
-        Right(new FullRankedDocEvalResult[Co](document, pred_cells,
-          correct_rank))
+        Right(new FullRankedDocEvalResult[Co](document,
+            pred_cells.toIndexedSeq, correct_rank))
       }
     }
   }
@@ -745,7 +754,7 @@ class RankedDocEvalResult[Co](
 
   override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
     super.print_result(doctag, driver)
-    errprint("%s:  correct cell at rank: %s", doctag, correct_rank)
+    errprint(s"$doctag:  correct cell at rank: $correct_rank")
   }
 
   override def to_row = super.to_row ++ Seq(
@@ -797,54 +806,119 @@ class RerankedDocEvalResult[Co](
  */
 class FullRankedDocEvalResult[Co](
   document: GridDoc[Co],
-  val pred_cells: Iterable[(GridCell[Co], Double)],
+  val pred_cells: IndexedSeq[(GridCell[Co], Double)],
   correct_rank: Int
 ) extends RankedDocEvalResult[Co](
   document, pred_cells.head._1, correct_rank
 ) {
-  override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
+  protected def print_all_scores(doctag: String, driver: GridLocateDriver[Co]) {
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
         errprint("%s: %6s: Cell at %s: score = %g", doctag, index + 1,
           cell.format_indices, score)
       }
     }
-    super.print_result(doctag, driver)
+  }
+
+  /**
+   * Print out a table of the top cells, as well as the correct cell, marked
+   * with a *.
+   *
+   * @param cells Sequence of ranked scored cells.
+   * @param doctag Document tag, prefixed to all lines
+   * @param driver Driver object, to retrieve parameter values
+   * @param corr_rank Rank of correct cell
+   * @param rank_header Header of column specifying the rank
+   * @param If given, another set of cell rankings to be given in another
+   *   column
+   * @param If given, header of column of other cell rankings
+   */
+  protected def print_top_cell_table(cells: IndexedSeq[(GridCell[Co], Double)],
+      doctag: String, driver: GridLocateDriver[Co],
+      corr_rank: Int, rank_header: String,
+      other_rank: Map[GridCell[Co], Int] = Map(),
+      other_rank_header: String = "") {
     val num_cells_to_output =
       if (driver.params.num_top_cells_to_output >= 0)
-         math.min(driver.params.num_top_cells_to_output, pred_cells.size)
-      else pred_cells.size
-    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex) {
-      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
-        doctag, i + 1, -score, cell)
+         math.min(driver.params.num_top_cells_to_output, cells.size)
+      else cells.size
+    val topranks = (1 to num_cells_to_output).toSeq
+    val ranks = if (corr_rank <= num_cells_to_output) topranks
+      else topranks ++ Seq(corr_rank)
+    val other_rank_heading =
+      if (other_rank_header != "") Seq(other_rank_header) else Seq()
+    val predicted_headings = Seq(rank_header) ++ other_rank_heading ++ Seq(
+      "score", "dist(km)", "central-pt", "#doc",
+      //"#type", "#token",
+      "sal.")
+    val predicted_cell_data =
+      (for (rank <- ranks) yield {
+        val (cell, score, rankstr) =
+          if (rank <= cells.size) {
+            val (c, s) = cells(rank - 1)
+            (c, min_format_double(s), s"$rank")
+          } else {
+            // This may be a faked cell, when the correct cell is empty
+            assert(rank == corr_rank, s"Expected $corr_rank but saw $rank")
+            (correct_cell, "--", "--")
+          }
+        val index = (if (rank == corr_rank) "*" else "") + rankstr
+        val other_rank_column = if (other_rank.isEmpty) Seq()
+          else if (other_rank contains cell) Seq(s"${other_rank(cell)}")
+          else Seq("--")
+        Seq(index) ++ other_rank_column ++ Seq(score,
+          min_format_double(pred_truedist_for_cell(cell)),
+          document.format_coord(cell.get_central_point),
+          pretty_long(cell.num_docs),
+          //pretty_long(cell.grid_lm.num_types),
+          //pretty_double(cell.grid_lm.num_tokens),
+          pretty_double(cell.salience))
+      }).toSeq
+    val fmt = table_column_format(predicted_headings +: predicted_cell_data)
+
+    errprint(s"$doctag: " + fmt.format(predicted_headings: _*))
+    errprint(s"$doctag: " + ("-" * 70))
+    predicted_cell_data.map { line =>
+      errprint(s"$doctag: " + fmt.format(line: _*))
     }
+  }
 
-    val num_nearest_neighbors = driver.params.num_nearest_neighbors
-    val kNN = pred_cells.take(num_nearest_neighbors).map {
-      case (cell, score) => cell }
-    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
-      case ((cell, score), i) => (cell, i + 1) }.toMap
-    val closest_half_with_dists =
-      kNN.map(n => (n, document.distance_to_coord(n.get_central_point))).
-        toIndexedSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+  protected def print_predicted_cell_table(doctag: String,
+      driver: GridLocateDriver[Co]) {
+    errprint(s"$doctag: Top predicted cells by ranker:")
+    print_top_cell_table(pred_cells, doctag, driver, correct_rank, "rank")
+  }
 
-    closest_half_with_dists.foreach {
-      case (cell, dist) =>
-        errprint("%s:  #%s close neighbor: %s; error distance: %s",
-          doctag, kNNranks(cell), cell.get_central_point,
-          document.output_distance(dist))
+  protected def print_knn_result(doctag: String, driver: GridLocateDriver[Co]) {
+    if (driver.params.print_knn_results) {
+      val num_nearest_neighbors = driver.params.num_nearest_neighbors
+      val kNN = pred_cells.take(num_nearest_neighbors).map {
+        case (cell, score) => cell }
+      val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
+        case ((cell, score), i) => (cell, i + 1) }.toMap
+      val closest_half_with_dists =
+        kNN.map(n => (n, pred_truedist_for_cell(n))).
+          toIndexedSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+
+      closest_half_with_dists.foreach {
+        case (cell, dist) =>
+          errprint("%s:  #%s close neighbor: %s; error distance: %s",
+            doctag, kNNranks(cell), cell.get_central_point,
+            document.output_distance(dist))
+      }
+
+      val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
+      errprint("%s:  Average distance from correct cell center to %s closest cells' centers from %s best matches: %s",
+        doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
+        document.output_distance(avg_dist_of_neighbors))
+
+      if (avg_dist_of_neighbors < pred_truedist)
+        driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
     }
+  }
 
-    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
-    errprint("%s:  Average distance from correct cell center to %s closest cells' centers from %s best matches: %s",
-      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
-      document.output_distance(avg_dist_of_neighbors))
-
-    if (avg_dist_of_neighbors < pred_truedist)
-      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
-
+  protected def print_relcontribgrams(doctag: String,
+      driver: GridLocateDriver[Co]) {
     if (debug("relcontribgrams")) {
       def output_relcontribgrams(celltag: String, cell: GridCell[Co],
           othertag: String, others: Iterable[GridCell[Co]]) {
@@ -873,6 +947,14 @@ class FullRankedDocEvalResult[Co](
     }
   }
 
+  override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
+    print_all_scores(doctag, driver)
+    print_document(doctag)
+    print_predicted_cell_table(doctag, driver)
+    print_knn_result(doctag, driver)
+    print_relcontribgrams(doctag, driver)
+  }
+
   override def get_public_result =
     new RankedDocEvalResult(document, pred_cells.head._1, correct_rank)
 }
@@ -891,31 +973,32 @@ class FullRankedDocEvalResult[Co](
  */
 class FullRerankedDocEvalResult[Co](
   document: GridDoc[Co],
-  pred_cells: Iterable[(GridCell[Co], Double)],
+  pred_cells: IndexedSeq[(GridCell[Co], Double)],
   correct_rank: Int,
-  initial_pred_cells: Iterable[(GridCell[Co], Double)],
+  initial_pred_cells: IndexedSeq[(GridCell[Co], Double)],
   initial_correct_rank: Int
 ) extends FullRankedDocEvalResult[Co](
   document, pred_cells, correct_rank
 ) {
-  override def print_result(doctag: String, driver: GridLocateDriver[Co]) {
-    super.print_result(doctag, driver)
-    val num_cells_to_output = 5
-    for (((cell, score), i) <-
-        initial_pred_cells.take(num_cells_to_output).zipWithIndex) {
-      errprint("%s:  Initial predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
-        doctag, i + 1, -score, cell)
-    }
+  override protected def print_predicted_cell_table(doctag: String,
+      driver: GridLocateDriver[Co]) {
+    val initial_rank = initial_pred_cells.view.zipWithIndex.map {
+      case ((cell, score), index) => cell -> (index + 1)
+    }.toMap
+    val rerank = pred_cells.view.zipWithIndex.map {
+      case ((cell, score), index) => cell -> (index + 1)
+    }.toMap
+    errprint(s"$doctag: Top predicted cells by reranker:")
+    print_top_cell_table(pred_cells, doctag, driver, correct_rank, "rerank",
+      initial_rank, "init-rank")
+    errprint(s"$doctag: Top predicted cells by initial ranker:")
+    print_top_cell_table(initial_pred_cells, doctag, driver,
+      initial_correct_rank, "init-rank", rerank, "rerank")
 
     val initial_pred_cell = initial_pred_cells.head._1
     val initial_pred_coord = initial_pred_cell.get_central_point
     val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
 
-    errprint("%s:  Distance %s to initial predicted cell center at %s",
-      doctag, document.output_distance(initial_pred_truedist),
-      initial_pred_coord)
     errprint("%s:  Error distance change by reranking = %s - %s = %s",
       doctag, document.output_distance(pred_truedist),
       document.output_distance(initial_pred_truedist),

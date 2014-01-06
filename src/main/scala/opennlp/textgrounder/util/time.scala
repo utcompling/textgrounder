@@ -228,6 +228,7 @@ protected class TimePackage {
 
   case class TimeCoord(millis: Long) {
     override def toString = "%s (%s)" format (millis, format_time(millis))
+    def format = format_time(millis)
   }
 
   implicit object TimeCoord extends TextSerializer[TimeCoord] {
