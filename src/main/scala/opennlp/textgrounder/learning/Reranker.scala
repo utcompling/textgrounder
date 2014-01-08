@@ -19,6 +19,7 @@
 package opennlp.textgrounder
 package learning
 
+import util.collection._
 import util.debug._
 import util.io.localfh
 import util.math.standardize
@@ -38,11 +39,11 @@ trait RerankerLike[Query, Candidate] {
 
   // Maybe rescale the initial scores so they are comparable across
   // different instances.
-  def rescale_scores(cands_scores: Iterable[(Candidate, Double)]) = {
+  def rescale_scores(cand_scores: Iterable[(Candidate, Double)]) = {
     if (!debug("rescale-scores"))
-      cands_scores
+      cand_scores
     else {
-      val (cands, scores) = cands_scores.unzip
+      val (cands, scores) = cand_scores.unzip
       val maxscore = scores.max
       // Shift the scores so the maximum is at 0 and the scores measure
       // only difference from maximum.
@@ -50,6 +51,12 @@ trait RerankerLike[Query, Candidate] {
       // FIXME: Do we want to rescale to have the same std dev?
       cands zip shifted_scores
     }
+  }
+
+  def find_label[T](cands: Iterable[(Candidate, T)], candidate: Candidate) = {
+    cands.view.zipWithIndex.find {
+      case ((cand, _), index) => cand == candidate
+    }.map { _._2 }
   }
 }
 
@@ -182,19 +189,15 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
   def rerank_candidates(item: Query,
       scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
     // For each candidate, compute a feature vector.
-    val cand_featvecs =
+    val featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
     // Combine into an aggregate feature vector.
-    val agg = new AggregateFeatureVector(cand_featvecs.toArray)
+    val agg = new AggregateFeatureVector(featvecs.toArray)
     if (write_test_data_file != None) {
-      val maybe_label = scored_candidates.view.zipWithIndex.find {
-        case ((cand, score), index) => cand == correct
-      }
-      if (maybe_label != None) {
-        val (_, the_label) = maybe_label.get
+      find_label(scored_candidates, correct).map { label =>
         TrainingData.export_aggregate_to_file(write_test_data_file.get,
-          agg, the_label)
+          agg, label)
       }
     }
     // Rescore component vectors using classifier.
@@ -205,7 +208,52 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
       else
         new_scores0
     val candidates = scored_candidates.map(_._1).toIndexedSeq
-    candidates zip new_scores sortWith (_._2 > _._2)
+    val new_scored = candidates zip new_scores sortWith (_._2 > _._2)
+    if (debug("rerank-problems")) {
+      val old_head = scored_candidates.head._1
+      val new_head = new_scored.head._1
+      if (old_head == correct && new_head != correct) {
+        errprint("For %s, correct candidate %s was ranked #1 but now incorrect candidate %s is #1", item, correct, new_head)
+        /* I want to print out the features that most contribute to
+         * the score for the two of them. Given the two feature vectors,
+         * and the weight vector, multiply the features by their weights
+         * and sort. */
+        val agg_fvs = agg.fetch_sparse_featvecs
+        val old_head_label = find_label(scored_candidates, old_head).get
+        val old_head_featvec = agg_fvs(old_head_label)
+        val new_head_label = find_label(scored_candidates, new_head).get
+        val new_head_featvec = agg_fvs(new_head_label)
+        val linclass = rerank_classifier.asInstanceOf[LinearClassifier]
+        val agg_weights = linclass.weights
+        def get_significant_feats(fv: CompressedSparseFeatureVectorType,
+            label: LabelIndex) = {
+          val weights = agg_weights(label)
+          (for (i <- 0 until fv.keys.length) yield {
+            val key = fv.keys(i)
+            (key, fv.values(i).toDouble, weights(key))
+          }).sortBy { x => -(x._2*x._3).abs }
+        }
+        val old_sig_feats = get_significant_feats(old_head_featvec,
+          old_head_label)
+        val new_sig_feats = get_significant_feats(new_head_featvec,
+          new_head_label)
+        def print_significant_feats(
+            sig_feats: Iterable[(FeatIndex, Double, Double)]
+        ) {
+          val num_items = ClassifierConstants.weights_to_print
+          for (((feat, value, weight), index) <-
+               sig_feats.view.zipWithIndex.take(num_items)) {
+            errprint("#%s: %s (%s) = %s*%s = %s", index + 1,
+              agg.format_feature(feat), feat, weight, value, weight*value)
+          }
+        }
+        errprint("For old, correct #1, %s:", old_head)
+        print_significant_feats(old_sig_feats.diffBy(new_sig_feats) { _._1 })
+        errprint("For new, no longer correct #1, %s:", new_head)
+        print_significant_feats(new_sig_feats.diffBy(old_sig_feats) { _._1 })
+      }
+    }
+    new_scored
   }
 }
 
@@ -339,13 +387,10 @@ trait PointwiseClassifyingRerankerTrainer[
      * should always be in candidate list.
      */
     def label: LabelIndex = {
-      val maybe_label = cand_scores.zipWithIndex.find {
-        case ((cand, featvec), index) => cand == correct
-      }
+      val maybe_label = find_label(cand_scores, correct)
       assert(maybe_label != None,
         "Correct candidate should be in candidate list")
-      val (_, the_label) = maybe_label.get
-      the_label
+      maybe_label.get
     }
 
     /**
