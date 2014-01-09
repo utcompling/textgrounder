@@ -390,11 +390,16 @@ Default '%default'.""")
        metavar = "FILE",
        help = """File containing a set of salient coordinates for identifying
 grid cells, in textdb format. These coordinates can be e.g. cities from a
-gazetteer with their population used as the salience value. For each grid
-cell, the most salient item in the cell will be noted, and when a particular
-grid cell is identified in diagnostic output (e.g. in `--print-results`), the
-salient item will be displayed along with the cell's coordinates to make it
-easier to identify the nature of the cell in question.
+gazetteer with their population used as the salience value. The salience
+values are considered to be additional cell-level salience values and will
+be added to the total salience of a cell in addition to the salience of each
+document (which is specified in the document file or files). The salience
+values are used in the 'salience' method for computing the prior Naive Bayes
+probability of a cell, in the 'salience' baseline ranker, and for diagnostic
+purposes when printing out a cell, e.g. in '--print-results'. In the latter
+case, the single-most salient item in the cell, whether document or salient
+coordinate, is printed out; this makes it possible, e.g., to determine
+where approximately a given cell is located by its largest city.
 
 The value can be any of the following: Either the data or schema file of
 the database; the common prefix of the two; or the directory containing
@@ -1319,8 +1324,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       throw new GridLocateAbruptExit
       // System.exit(0)
     }
-    grid.finish()
 
+    grid.finish_adding_documents()
     if (params.salience_file != null) {
       if (params.verbose)
         errprint("Reading salient points...")
@@ -1333,6 +1338,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       if (params.verbose)
         errprint("Reading salient points... done.")
     }
+    grid.finish()
 
     if (params.output_training_cell_lang_models) {
       for (cell <- grid.iter_nonempty_cells) {

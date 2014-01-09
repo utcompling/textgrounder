@@ -56,10 +56,11 @@ abstract class GridCell[Co](
   /** Number of documents used to create language model. */
   var num_docs = 0
   /** Combined salience score (computed by adding individual
-    * scores of documents). */
+    * scores of documents and cell-level salience points specified using
+    * '--salience-file'). */
   var salience = 0.0
-  var most_salient_document: String = ""
-  var most_salient_doc_salience = 0.0
+  var most_salient_point: String = ""
+  var most_salient_point_salience = 0.0
 
   /**
    * True if the object is empty.  This means no documents have been
@@ -135,9 +136,9 @@ abstract class GridCell[Co](
   override def toString = {
     val unfinished = if (finished) "" else ", unfinished"
     val contains =
-      if (most_salient_document != "")
+      if (most_salient_point != "")
         ", most-salient-doc %s(%s salience)" format (
-          most_salient_document, most_salient_doc_salience)
+          most_salient_point, most_salient_point_salience)
       else ""
 
     "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
@@ -166,8 +167,8 @@ abstract class GridCell[Co](
       rerank_lm.num_tokens,
     "salience" -> salience,
     "most-salient-document" ->
-      Encoder.string(most_salient_document),
-    "most-salient-document-salience" -> most_salient_doc_salience
+      Encoder.string(most_salient_point),
+    "most-salient-document-salience" -> most_salient_point_salience
   )
 
   /************************* Building up the cell *************************/
@@ -217,7 +218,6 @@ abstract class GridCell[Co](
 
     /* Add salience of document to cell. */
     doc.salience.foreach { sal =>
-      salience += sal
       add_salient_point(doc.title, sal)
     }
 
@@ -234,10 +234,11 @@ abstract class GridCell[Co](
    * This allows a cell to be identified by e.g. the most populous city
    * in the cell, even if there are no documents corresponding to a city.
    */
-  def add_salient_point(name: String, salience: Double) {
-    if (salience > most_salient_doc_salience) {
-      most_salient_doc_salience = salience
-      most_salient_document = name
+  def add_salient_point(name: String, sal: Double) {
+    salience += sal
+    if (sal > most_salient_point_salience) {
+      most_salient_point_salience = sal
+      most_salient_point = name
     }
   }
 
@@ -442,17 +443,24 @@ abstract class Grid[Co](
   }
 
   /**
-   * This function is called externally to initialize the cells.  It is a
-   * wrapper around `initialize_cells()`, which is not meant to be called
-   * externally.  Normally this does not need to be overridden.
+   * This function is called externally to initialize the cells when all
+   * documents have been added.  It is a wrapper around `initialize_cells()`,
+   * which is not meant to be called externally.  Normally this does not
+   * need to be overridden.
+   */
+  def finish_adding_documents() {
+    assert(!all_cells_computed)
+    initialize_cells()
+    all_cells_computed = true
+    driver.heartbeat
+  }
+
+  /**
+   * This function is called externally at the very end of modifications
+   * the grid, after cell-level salient points have been added.
    */
   def finish() {
-    assert(!all_cells_computed)
-
-    initialize_cells()
-
-    all_cells_computed = true
-
+    assert(all_cells_computed)
     total_prior_weighting = iter_nonempty_cells.map { _.prior_weighting }.sum
 
     driver.note_result("number-of-non-empty-cells", num_non_empty_cells,
@@ -475,6 +483,5 @@ abstract class Grid[Co](
         total_num_cells, num_non_empty_cells, pct_non_empty,
         pretty_double(training_docs_per_non_empty_cell))
     }
-    driver.heartbeat
   }
 }

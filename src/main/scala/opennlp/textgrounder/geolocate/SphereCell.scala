@@ -90,7 +90,7 @@ abstract class PolygonalCell(
         "%s,%s,%s" format (
           coord.long, coord.lat, fracprob * params.kml_max_height)
         )).mkString("\n") + "\n"
-    val name = most_salient_document
+    val name = most_salient_point
 
     // Placemark indicating name
     val name_placemark = generate_kml_name_placemark(name)

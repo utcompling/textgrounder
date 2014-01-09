@@ -61,6 +61,12 @@ class CombinedModelGrid(
     assert(false)
   }
 
+  override def finish_adding_documents() {
+    for (model <- models) {
+      model.finish_adding_documents()
+    }
+  }
+
   override def finish() {
     for (model <- models) {
       model.finish()
