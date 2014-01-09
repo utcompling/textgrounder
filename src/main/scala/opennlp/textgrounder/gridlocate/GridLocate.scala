@@ -272,7 +272,7 @@ will be ignored. A value of 0 means don't filter any n-grams.  See
 also `--raw-text-max-ngram`, which controls the maximum length of n-grams
 generated from a raw document.""")
   var raw_text_max_ngram =
-    ap.option[Int]("raw-text-max-ngram", "rdmn", metavar = "NUM",
+    ap.option[Int]("raw-text-max-ngram", "rtmn", metavar = "NUM",
       default = 3,
       must = be_>=(0),
       help = """Maximum length of n-grams to generate when generating
@@ -321,17 +321,18 @@ Naive Bayes ranking. Possibilities are 'uniform', 'salience', 'log-salience',
   var stopwords_file =
     ap.option[String]("stopwords-file",
       metavar = "FILE",
-      help = """File containing list of stopwords.  If not specified,
-a default list of English stopwords (stored in the TextGrounder distribution)
-is used.""")
+      help = """File containing list of stopwords.  These words will be
+ignored when creating a language model. Format is one word per line.
+If not specified, a default list of English stopwords (stored in the
+TextGrounder distribution) is used.""")
 
   var whitelist_file =
     ap.option[String]("whitelist-file",
        metavar = "FILE",
-       help = """File containing a whitelist of words. If specified, ONLY
-words on the list will be read from any corpora; other words will be ignored.
-If not specified, all words (except those on the stopword list) will be
-read.""")
+       help = """File containing a whitelist of words. If specified, only
+words in the list will be used when creating a language model from a corpus;
+all others will be ignored. Format is one word per line. When specifying a
+whitelist, the stopwords in '--stopwords-file' will still be ignored.""")
 
   var weights_file =
     ap.option[String]("weights-file",
