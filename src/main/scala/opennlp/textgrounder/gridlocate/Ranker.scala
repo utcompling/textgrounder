@@ -346,11 +346,9 @@ class AverageCellProbabilityGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def create_cell_dist_factory(lru_cache_size: Int) =
-    new CellDistFactory[Co](lru_cache_size)
+  def create_cell_dist_factory = new CellDistFactory[Co]
 
-  val cdist_factory =
-    create_cell_dist_factory(grid.driver.params.lru_cache_size)
+  val cdist_factory = create_cell_dist_factory
 
   def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
       include_correct: Boolean) = {

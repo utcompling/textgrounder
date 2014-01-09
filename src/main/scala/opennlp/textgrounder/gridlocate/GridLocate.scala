@@ -74,6 +74,11 @@ object GridLocateConstants {
   val top_n_for_oracle_dists =
     Seq(1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100)
   val max_rank_for_exact_incorrect = 10
+
+  // Number of entries in the LRU cache.  Used only when
+  // --ranker=average-cell-probability.
+  val default_lru_cache_size = 400
+  def lru_cache_size = debugint("lru-cache-size", default_lru_cache_size)
 }
 
 /**
@@ -304,14 +309,6 @@ from the toponym.""")
       must = be_>=(0.0),
       help = """Relative weight to assign to the baseline (prior
 probability) when doing weighted Naive Bayes.  Default %default.""")
-
-  //// Options used when doing ACP geolocation
-  var lru_cache_size =
-    ap.option[Int]("lru-cache-size", "lru", metavar = "SIZE",
-      default = 400,
-      must = be_>(0),
-      help = """Number of entries in the LRU cache.  Default %default.
-Used only when --ranker=average-cell-probability.""")
 
   var stopwords_file =
     ap.option[String]("stopwords-file",

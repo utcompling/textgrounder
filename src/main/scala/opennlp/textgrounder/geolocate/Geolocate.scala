@@ -125,8 +125,7 @@ class CellDistMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
-  val cdist_factory =
-    new CellDistFactory[SphereCoord](sphere_grid.driver.params.lru_cache_size)
+  val cdist_factory = new CellDistFactory[SphereCoord]
 
   def return_ranked_cells(_lang_model: LangModel, correct: SphereCell,
       include_correct: Boolean) = {

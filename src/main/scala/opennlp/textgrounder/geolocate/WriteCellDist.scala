@@ -77,7 +77,7 @@ class WriteCellDistDriver extends
 
   def run() {
     val grid = initialize_grid
-    val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
+    val cdist_factory = new CellDistFactory[SphereCoord]
     for (word <- params.split_words) {
       val celldist = cdist_factory.get_cell_dist(grid, Unigram.to_index(word))
       if (!celldist.normalized) {

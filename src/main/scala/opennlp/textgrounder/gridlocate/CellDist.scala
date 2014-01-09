@@ -123,15 +123,9 @@ class GramCellDist[Co](
  * The call to `get_cell_dist` on this class either locates a cached
  * distribution or creates a new one, using `create_gram_cell_dist`,
  * which creates the actual `GramCellDist` class.
- *
- * @param lru_cache_size Size of the cache used to avoid creating a new
- *   GramCellDist for a given gram when one is already available for that
- *   gram.
  */
 
-class CellDistFactory[Co](
-  val lru_cache_size: Int
-) {
+class CellDistFactory[Co] {
   def create_gram_cell_dist(
     grid: Grid[Co], gram: Gram
   ) = new GramCellDist[Co](grid, gram)
@@ -144,7 +138,7 @@ class CellDistFactory[Co](
    */
   def get_cell_dist(grid: Grid[Co], gram: Gram) = {
     if (cached_dists == null)
-      cached_dists = new LRUCache(maxsize = lru_cache_size)
+      cached_dists = new LRUCache(maxsize = GridLocateConstants.lru_cache_size)
     cached_dists.get(gram) match {
       case Some(dist) => dist
       case None => {
