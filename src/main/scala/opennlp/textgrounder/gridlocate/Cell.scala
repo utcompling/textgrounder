@@ -21,6 +21,7 @@ package opennlp.textgrounder
 package gridlocate
 
 import collection.mutable
+import scala.math.log
 
 import util.error.warning
 import util.experiment._
@@ -74,6 +75,15 @@ abstract class GridCell[Co](
    * Return true if we have finished creating and populating the cell.
    */
   def finished = lang_model.finished
+
+  def prior_weighting = grid.driver.params.naive_bayes_prior match {
+    case "uniform" => 1
+    // We want the weighting to always be non-zero
+    case "num-docs" => num_docs + 1
+    case "salience" => salience + 1
+    case "log-num-docs" => log(1 + num_docs) + 1
+    case "log-salience" => log(1 + salience) + 1
+  }
 
   /***************************** Central point *****************************/
 
@@ -366,8 +376,8 @@ abstract class Grid[Co](
 
   /*********************** Not meant to be overridden *********************/
 
-  /* Sum of `num_docs` for each cell. */
-  var total_num_docs = 0
+  /* Sum of prior weighting for each cell. */
+  var total_prior_weighting = 0.0
   /* Set once finish() is called. */
   var all_cells_computed = false
   /* Number of non-empty cells. */
@@ -443,12 +453,7 @@ abstract class Grid[Co](
 
     all_cells_computed = true
 
-    total_num_docs = 0
-
-    iter_nonempty_cells foreach { cell =>
-      total_num_docs +=
-        cell.num_docs
-    }
+    total_prior_weighting = iter_nonempty_cells.map { _.prior_weighting }.sum
 
     driver.note_result("number-of-non-empty-cells", num_non_empty_cells,
       "Number of non-empty cells")

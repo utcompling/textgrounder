@@ -302,13 +302,22 @@ and assigning the remainder to the words.  If 'distance-weighted' (NOT
 currently implemented), similar to 'equal-words' but don't weight each word
 the same as each other word; instead, weight the words according to distance
 from the toponym.""")
-  var naive_bayes_baseline_weight =
-    ap.option[Double]("naive-bayes-baseline-weight", "nbbw",
+  var naive_bayes_prior_weight =
+    ap.option[Double]("naive-bayes-prior-weight", "nbpw",
       metavar = "WEIGHT",
       default = 0.5,
       must = be_>=(0.0),
-      help = """Relative weight to assign to the baseline (prior
-probability) when doing weighted Naive Bayes.  Default %default.""")
+      help = """Relative weight to assign to the prior probability when
+doing weighted Naive Bayes ranking.  Default %default.""")
+  var naive_bayes_prior =
+    ap.option[String]("naive-bayes-prior", "nbp",
+      metavar = "STRATEGY",
+      default = "uniform",
+      choices = Seq("uniform", "salience", "log-salience", "num-docs",
+        "log-num-docs"),
+      help = """Strategy for computing the prior probability when doing
+Naive Bayes ranking. Possibilities are 'uniform', 'salience', 'log-salience',
+'num-docs', 'log-num-docs'. Default %default.""")
 
   var stopwords_file =
     ap.option[String]("stopwords-file",
@@ -498,7 +507,7 @@ process all.""")
 trait GridLocateRankParameters {
   this: GridLocateParameters =>
 
-  protected def ranker_default = "naive-bayes-no-baseline"
+  protected def ranker_default = "naive-bayes"
   protected def ranker_choices = Seq(
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
         Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
@@ -511,8 +520,7 @@ trait GridLocateRankParameters {
         Seq("smoothed-cosine-similarity", "smoothed-cossim"),
         Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
             "smoothed-part-cossim"),
-        Seq("naive-bayes-with-baseline", "nb-base"),
-        Seq("naive-bayes-no-baseline", "nb-nobase"),
+        Seq("naive-bayes", "nb"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("salience", "internal-link"),
         Seq("random"),
@@ -527,15 +535,13 @@ abbreviated KL divergence measure that only considers the words seen in the
 document; empirically, this appears to work just as well as the full KL
 divergence.
 
-'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
-Bayes algorithm to match a test document against a training document (e.g.
-by assuming that the words of the test document are independent of each
-other, if we are using a unigram language model).  The variants with
-the "baseline" incorporate a prior probability into the calculations, while
-the non-baseline variants don't.  The baseline is currently derived from the
-number of documents in a cell.  See also 'naive-bayes-weighting' and
-'naive-bayes-baseline-weight' for options controlling how the different
-words are weighted against each other and how the baseline and word
+'naive-bayes uses the Naive Bayes algorithm to match a test document against
+a training document (e.g. by assuming that the words of the test document
+are independent of each other, if we are using a unigram language model).
+The strategy for computing prior probability is specified using
+'--naive-bayes-prior'. See also 'naive-bayes-weighting' and
+'naive-bayes-prior-weight' for options controlling how the different
+words are weighted against each other and how the prior and word
 probabilities are weighted.
 
 'average-cell-probability' (or 'celldist') involves computing, for each word,
@@ -1359,10 +1365,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MostPopularGridRanker[Co](ranker_name, grid, salience = true)
       case "num-documents" =>
         new MostPopularGridRanker[Co](ranker_name, grid, salience = false)
-      case "naive-bayes-no-baseline" =>
-        new NaiveBayesGridRanker[Co](ranker_name, grid, use_baseline = false)
-      case "naive-bayes-with-baseline" =>
-        new NaiveBayesGridRanker[Co](ranker_name, grid, use_baseline = true)
+      case "naive-bayes" =>
+        new NaiveBayesGridRanker[Co](ranker_name, grid)
       case "cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = false)

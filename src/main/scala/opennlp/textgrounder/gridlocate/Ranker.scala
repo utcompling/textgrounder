@@ -315,29 +315,23 @@ class CosineSimilarityGridRanker[Co](
 /** Use a Naive Bayes ranker for comparing document and cell. */
 class NaiveBayesGridRanker[Co](
   ranker_name: String,
-  grid: Grid[Co],
-  use_baseline: Boolean = true
+  grid: Grid[Co]
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val params = grid.driver.params
     // Determine respective weightings
-    val (word_weight, baseline_weight) = (
-      if (use_baseline) {
-        if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
-        else {
-          val bw = params.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / lang_model.num_tokens, bw)
-        }
-      } else (1.0, 0.0))
+    val (word_weight, prior_weight) = (
+      if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
+      else {
+        val bw = params.naive_bayes_prior_weight.toDouble
+        ((1.0 - bw) / lang_model.num_tokens, bw)
+      })
 
-    val gram_logprob =
-      cell.grid_lm.model_logprob(lang_model)
-    val baseline_logprob =
-      log(cell.num_docs.toDouble /
-          grid.total_num_docs)
+    val gram_logprob = cell.grid_lm.model_logprob(lang_model)
+    val prior_logprob = log(cell.prior_weighting / grid.total_prior_weighting)
     val logprob = (word_weight * gram_logprob +
-      baseline_weight * baseline_logprob)
+      prior_weight * prior_logprob)
     logprob
   }
 }
