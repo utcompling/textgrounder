@@ -321,17 +321,14 @@ class NaiveBayesGridRanker[Co](
   def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
     val params = grid.driver.params
     // Determine respective weightings
-    val (word_weight, prior_weight) = (
-      if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
-      else {
-        val bw = params.naive_bayes_prior_weight.toDouble
-        ((1.0 - bw) / lang_model.num_tokens, bw)
-      })
+    val (word_weight, prior_weight) = {
+      val bw = params.naive_bayes_prior_weight
+      (1.0 - bw, bw)
+    }
 
     val gram_logprob = cell.grid_lm.model_logprob(lang_model)
     val prior_logprob = log(cell.prior_weighting / grid.total_prior_weighting)
-    val logprob = (word_weight * gram_logprob +
-      prior_weight * prior_logprob)
+    val logprob = (word_weight * gram_logprob + prior_weight * prior_logprob)
     logprob
   }
 }

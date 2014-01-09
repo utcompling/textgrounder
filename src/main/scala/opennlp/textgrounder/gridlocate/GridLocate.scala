@@ -289,26 +289,25 @@ away.""")
 downweight words that occur in many documents).""")
 
   //// Options used when doing Naive Bayes geolocation
-  var naive_bayes_weighting =
-    ap.option[String]("naive-bayes-weighting", "nbw", metavar = "STRATEGY",
-      default = "equal",
-      choices = Seq("equal", "equal-words", "distance-weighted"),
-      help = """Strategy for weighting the different probabilities
-that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
-prior probability (baseline) and all word probabilities the same.  If
-'equal-words', weight all the words the same but collectively weight all words
-against the baseline, giving the baseline weight according to --baseline-weight
-and assigning the remainder to the words.  If 'distance-weighted' (NOT
-currently implemented), similar to 'equal-words' but don't weight each word
-the same as each other word; instead, weight the words according to distance
-from the toponym.""")
+//FIXME: No longer clear what the idea of the following was.
+//  var naive_bayes_word_weighting =
+//    ap.option[String]("naive-bayes-word-weighting", "nbw",
+//      metavar = "STRATEGY",
+//      default = "fixed",
+//      choices = Seq("fixed", "distance-weighted"),
+//      help = """Strategy for weighting the different probabilities
+//that go into Naive Bayes.  If 'fixed', use fixed weights for the prior
+//probability and likelihood, according to '--naive-bayes-prior-weight'.
+//If 'distance-weighted' weight each word according to distance from the
+//toponym (????).""")
   var naive_bayes_prior_weight =
     ap.option[Double]("naive-bayes-prior-weight", "nbpw",
       metavar = "WEIGHT",
       default = 0.5,
-      must = be_>=(0.0),
-      help = """Relative weight to assign to the prior probability when
-doing weighted Naive Bayes ranking.  Default %default.""")
+      must = be_and(be_>=(0.0), be_<=(1.0)),
+      help = """Relative weight to assign to the prior probability (vs.
+the likelihood) when doing Naive Bayes ranking.  Default 0.5, which does
+standard unweighted Naive Bayes.""")
   var naive_bayes_prior =
     ap.option[String]("naive-bayes-prior", "nbp",
       metavar = "STRATEGY",
@@ -544,10 +543,8 @@ divergence.
 a training document (e.g. by assuming that the words of the test document
 are independent of each other, if we are using a unigram language model).
 The strategy for computing prior probability is specified using
-'--naive-bayes-prior'. See also 'naive-bayes-weighting' and
-'naive-bayes-prior-weight' for options controlling how the different
-words are weighted against each other and how the prior and word
-probabilities are weighted.
+'--naive-bayes-prior'. See also '--naive-bayes-prior-weight' for controlling
+how the prior probability and likelihood (word probabilities) are weighted.
 
 'average-cell-probability' (or 'celldist') involves computing, for each word,
 a probability distribution over cells using the language model of each cell,
