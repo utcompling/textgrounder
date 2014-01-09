@@ -93,11 +93,9 @@ class SphereDocEvalStats(
  * those within particular ranges of one or more quantities of interest.
  */
 class GroupedSphereDocEvalStats(
-  driver_stats: ExperimentDriverStats,
   grid: SphereGrid,
   create_stats: (ExperimentDriverStats, String) => DocEvalStats[SphereCoord]
-) extends GroupedDocEvalStats[SphereCoord](
-  driver_stats, grid,
+) extends GroupedDocEvalStats[SphereCoord](grid,
   (driver: ExperimentDriverStats, prefix: String) => {
     val wrapped = create_stats(driver, prefix)
     new SphereDocEvalStats(driver, wrapped)
@@ -220,10 +218,9 @@ class GroupedSphereDocEvalStats(
  */
 class RankedSphereGridEvaluator(
   ranker: GridRanker[SphereCoord],
-  driver: GeolocateDriver,
   evalstats: DocEvalStats[SphereCoord]
 ) extends RankedGridEvaluator[SphereCoord](
-  ranker, driver, evalstats
+  ranker, evalstats
 ) {
   override def imp_evaluate_document(document: GridDoc[SphereCoord],
       correct_cell: GridCell[SphereCoord]) = {
@@ -241,9 +238,8 @@ class RankedSphereDocEvalResult(
 ) extends FullRankedDocEvalResult[SphereCoord](
   wrapped.document, wrapped.pred_cells, wrapped.correct_rank
 ) {
-  override def print_result(doctag: String,
-      driver: GridLocateDriver[SphereCoord]) {
-    wrapped.print_result(doctag, driver)
+  override def print_result(doctag: String) {
+    wrapped.print_result(doctag)
 
     assert(doctag(0) == '#')
     if (debug("gridrank") ||

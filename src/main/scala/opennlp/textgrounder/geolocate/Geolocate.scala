@@ -534,17 +534,16 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
 
     val evalstats =
       if (params.results_by_range)
-        new GroupedSphereDocEvalStats(this, ranker.grid,
+        new GroupedSphereDocEvalStats(ranker.grid,
           create_stats = create_stats)
       else
         new SphereDocEvalStats(this, create_stats(this, ""))
 
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereGridEvaluator(ranker, this, evalstats)
+        new RankedSphereGridEvaluator(ranker, evalstats)
       case "mean-shift" =>
-        new MeanShiftGridEvaluator[SphereCoord](ranker, this,
-          evalstats,
+        new MeanShiftGridEvaluator[SphereCoord](ranker, evalstats,
           params.k_best,
           new SphereMeanShift(params.mean_shift_window,
             params.mean_shift_max_stddev, params.mean_shift_max_iterations)

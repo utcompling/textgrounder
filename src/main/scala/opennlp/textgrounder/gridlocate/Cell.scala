@@ -98,7 +98,7 @@ abstract class GridCell[Co](
    * or some other measure of central tendency (e.g. the centroid).
    */
   def get_central_point = {
-    if (grid.docfact.driver.params.center_method == "center")
+    if (grid.driver.params.center_method == "center")
       get_true_center
     else
       get_centroid
@@ -425,7 +425,7 @@ abstract class Grid[Co](
     docs foreach { doc => add_document_to_grid(doc) }
 
     // Compute overall backoff statistics.
-    if (docfact.driver.params.verbose)
+    if (driver.params.verbose)
       errprint("Finishing global backoff stats...")
     docfact.lang_model_factory.finish_global_backoff_stats()
     docfact.finish_document_loading()
@@ -464,7 +464,7 @@ abstract class Grid[Co](
     driver.note_result("training-documents-per-non-empty-cell",
       training_docs_per_non_empty_cell,
       "Training documents per non-emtpy cell")
-    if (docfact.driver.params.verbose) {
+    if (driver.params.verbose) {
       errprint(
         "%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
         total_num_cells, num_non_empty_cells, pct_non_empty,
