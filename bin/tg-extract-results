@@ -8,27 +8,49 @@
 # run.
 
 sort=
-avgsort=
+averagesort=
 meansort=
 mediansort=
-accsort=
+accuracysort=
 numevalsort=
 numtrainsort=
-namesort=
+filesort=
 runtimesort=
 verbose=
 debug=
+omit_average=
+omit_mean=
+omit_median=
+omit_accuracy=
+omit_numeval=
+omit_numtrain=
+omit_file=
+omit_rss=
+omit_runtime=
+
 while true; do
   case "$1" in
     --no-sort ) sort=no; shift ;;
-    --sort | --sort-average | --sort-avg ) sort=yes ; avgsort=yes; shift ;;
+    --sort | --sort-average | --sort-avg ) sort=yes ; averagesort=yes; shift ;;
     --sort-mean ) sort=yes ; meansort=yes; shift ;;
     --sort-median ) sort=yes ; mediansort=yes; shift ;;
-    --sort-accuracy | --sort-acc ) sort=yes ; accsort=yes; shift ;;
+    --sort-accuracy | --sort-acc ) sort=yes ; accuracysort=yes; shift ;;
     --sort-numeval ) sort=yes ; numevalsort=yes; shift ;;
     --sort-numtrain ) sort=yes ; numtrainsort=yes; shift ;;
-    --sort-file | --sort-name ) sort=yes ; namesort=yes; shift ;;
+    --sort-file | --sort-name ) sort=yes ; filesort=yes; shift ;;
     --sort-runtime ) sort=yes ; runtimesort=yes; shift ;;
+    #Unimplemented because it's tricky to sort the way we output it; need
+    #to sort on raw number and then convert to human-readable
+    #--sort-rss ) sort=yes ; rsssort=yes; shift ;;
+    --omit-average | --omit-avg ) omit_average=yes; shift ;;
+    --omit-mean ) omit_mean=yes; shift ;;
+    --omit-median ) omit_median=yes; shift ;;
+    --omit-accuracy | --omit-acc ) omit_accuracy=yes; shift ;;
+    --omit-numeval ) omit_numeval=yes; shift ;;
+    --omit-numtrain ) omit_numtrain=yes; shift ;;
+    --omit-file | --omit-name ) omit_file=yes; shift ;;
+    --omit-runtime ) omit_runtime=yes; shift ;;
+    --omit-rss ) omit_rss=yes; shift ;;
     --verbose ) verbose=yes ; shift ;;
     --debug ) debug=yes ; shift ;;
     -- ) shift ; break ;;
@@ -39,11 +61,77 @@ done
 
 if [ -z "$sort" ]; then
   sort=yes
-  avgsort=yes
+  averagesort=yes
+fi
+
+curcol=1
+numevalcol=$curcol
+if [ -z "$omit_numeval" ]; then
+  let curcol=$curcol+1
+fi
+numtraincol=$curcol
+if [ -z "$omit_numtrain" ]; then
+  let curcol=$curcol+1
+fi
+accuracycol=$curcol
+if [ -z "$omit_accuracy" ]; then
+  let curcol=$curcol+1
+fi
+meancol=$curcol
+if [ -z "$omit_mean" ]; then
+  let curcol=$curcol+1
+fi
+mediancol=$curcol
+if [ -z "$omit_median" ]; then
+  let curcol=$curcol+1
+fi
+averagecol=$curcol
+if [ -z "$omit_average" ]; then
+  let curcol=$curcol+1
+fi
+runtimecol=$curcol
+if [ -z "$omit_runtime" ]; then
+  let curcol=$curcol+1
+fi
+rsscol=$curcol
+if [ -z "$omit_rss" ]; then
+  let curcol=$curcol+1
+fi
+filecol=$curcol
+if [ -z "$omit_file" ]; then
+  let curcol=$curcol+1
 fi
 
 if [ "$verbose" != yes ]; then
-  echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime    RSS    File"
+  #echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime    RSS    File"
+  if [ -z "$omit_numeval" ]; then
+    echo -n "  #Eval "
+  fi
+  if [ -z "$omit_numtrain" ]; then
+    echo -n "  #Train "
+  fi
+  if [ -z "$omit_accuracy" ]; then
+    echo -n " %Acc. "
+  fi
+  if [ -z "$omit_mean" ]; then
+    echo -n "  Mean  "
+  fi
+  if [ -z "$omit_median" ]; then
+    echo -n " Median "
+  fi
+  if [ -z "$omit_average" ]; then
+    echo -n "Average  "
+  fi
+  if [ -z "$omit_runtime" ]; then
+    echo -n " Runtime "
+  fi
+  if [ -z "$omit_rss" ]; then
+    echo -n "   RSS    "
+  fi
+  if [ -z "$omit_file" ]; then
+    echo -n "File"
+  fi
+  echo ""
 fi
 
 function output() {
@@ -147,27 +235,55 @@ for x in ${1+"$@"}; do
       echo "$args   Avg-mean-median true error distance = $avg km"
     fi
   elif [ "$skip" = no ]; then
-    echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
+    #echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
+    if [ -z "$omit_numeval" ]; then
+      echo -n "$numeval "
+    fi
+    if [ -z "$omit_numtrain" ]; then
+      echo -n "$numtrain "
+    fi
+    if [ -z "$omit_accuracy" ]; then
+      echo -n "$acc "
+    fi
+    if [ -z "$omit_mean" ]; then
+      echo -n "$mean "
+    fi
+    if [ -z "$omit_median" ]; then
+      echo -n "$median "
+    fi
+    if [ -z "$omit_average" ]; then
+      echo -n "$avg "
+    fi
+    if [ -z "$omit_runtime" ]; then
+      echo -n "$runtime "
+    fi
+    if [ -z "$omit_rss" ]; then
+      echo -n "$rss "
+    fi
+    if [ -z "$omit_file" ]; then
+      echo -n "$args"
+    fi
+    echo ""
   fi
 done
 }
 
-if [ "$namesort" = yes ]; then
-  output ${1+"$@"} | sort -k 9
+if [ "$filesort" = yes ]; then
+  output ${1+"$@"} | sort -k $filecol
 elif [ "$runtimesort" = yes ]; then
-  output ${1+"$@"} | sort -nr -k 8
-elif [ "$avgsort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 6
+  output ${1+"$@"} | sort -nr -k $runtimecol
+elif [ "$averagesort" = yes ]; then
+  output ${1+"$@"} | sort -n -k $averagecol
 elif [ "$meansort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 4
+  output ${1+"$@"} | sort -n -k $meancol
 elif [ "$mediansort" = yes ]; then
-  output ${1+"$@"} | sort -n -k 5
-elif [ "$accsort" = yes ]; then
-  output ${1+"$@"} | sort -nr -k 3
+  output ${1+"$@"} | sort -n -k $mediancol
+elif [ "$accuracysort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k $accuracycol
 elif [ "$numevalsort" = yes ]; then
-  output ${1+"$@"} | sort -nr -k 1
+  output ${1+"$@"} | sort -nr -k $numevalcol
 elif [ "$numtrainsort" = yes ]; then
-  output ${1+"$@"} | sort -nr -k 2
+  output ${1+"$@"} | sort -nr -k $numtraincol
 else
   output ${1+"$@"}
 fi
