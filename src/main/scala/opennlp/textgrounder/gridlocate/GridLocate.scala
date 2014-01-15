@@ -515,16 +515,20 @@ trait GridLocateRankParameters {
   protected def ranker_default = "naive-bayes"
   protected def ranker_choices = Seq(
         Seq("full-kl-divergence", "full-kldiv", "full-kl"),
-        Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
+        Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl",
+            "kl-divergence", "kldiv", "kl"),
         Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
             "symmetric-full-kl", "sym-full-kl"),
         Seq("symmetric-partial-kl-divergence",
             "symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
-        Seq("cosine-similarity", "cossim"),
-        Seq("partial-cosine-similarity", "partial-cossim", "part-cossim"),
-        Seq("smoothed-cosine-similarity", "smoothed-cossim"),
+        Seq("partial-cosine-similarity", "partial-cossim", "part-cossim",
+            "cosine-similarity", "cossim"),
+        Seq("full-cosine-similarity", "full-cossim"),
         Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
-            "smoothed-part-cossim"),
+            "smoothed-part-cossim",
+            "smoothed-cosine-similarity", "smoothed-cossim"),
+        Seq("smoothed-full-cosine-similarity", "smoothed-full-cossim"),
+        Seq("sum-frequency"),
         Seq("naive-bayes", "nb"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("salience", "internal-link"),
@@ -535,12 +539,35 @@ trait GridLocateRankParameters {
 """'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
 divergence between the document and cell is smallest.
 
-'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
-abbreviated KL divergence measure that only considers the words seen in the
-document; empirically, this appears to work just as well as the full KL
-divergence.
+'partial-kl-divergence' (or 'partial-kldiv', or simply 'kl-divergence' or
+'kldiv') is similar but uses an abbreviated KL divergence measure that only
+considers the words seen in the document; empirically, this appears to work
+just as well as the full KL divergence.
 
-'naive-bayes uses the Naive Bayes algorithm to match a test document against
+'partial-cosine-similarity' (or 'partial-cossim', or simply 'cosine-similarity'
+or 'cossim') does a cosine-similarity calculation between the document and
+cell, treating their distributions as vectors. As with 'partial-kl-divergence',
+this considers only the words seen in the document. This is most useful with
+'--tf-idf', which transforms the probabilities using the TF-IDF algorithm.
+
+'full-cosine-similarity' (or 'full-cossim') is similar but it considers words
+in both document and cell.
+
+'smoothed-partial-cosine-similarity' (or 'smoothed-partial-cossim', or simply
+'smoothed-cosine-similarity' or 'smoothed-cossim') does a cosine-similarity
+calculation using smoothed probabilities; the plain cosine-similarity
+ranker uses unsmoothed probabilities.
+
+'smoothed-full-cosine-similarity' (or 'smoothed-full-cossim') is similar to
+'smoothed-partial-cosine-similarity', but considers words in both document
+and cell (words in the cell but not the document will have non-zero
+probability in the document in this case because of smoothing).
+
+'sum-frequency' just adds up the unsmoothed probability calculations for
+each word in the document. This is most useful in conjunction with '--tf-idf',
+which transforms the probabilities using the TF-IDF algorithm.
+
+'naive-bayes' uses the Naive Bayes algorithm to match a test document against
 a training document (e.g. by assuming that the words of the test document
 are independent of each other, if we are using a unigram language model).
 The strategy for computing prior probability is specified using
@@ -1371,30 +1398,32 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MostPopularGridRanker[Co](ranker_name, grid, salience = false)
       case "naive-bayes" =>
         new NaiveBayesGridRanker[Co](ranker_name, grid)
-      case "cosine-similarity" =>
-        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
-          partial = false)
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = true)
-      case "smoothed-cosine-similarity" =>
-        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = true,
+      case "full-cosine-similarity" =>
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = false)
       case "smoothed-partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = true,
           partial = true)
-      case "full-kl-divergence" =>
-        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = false,
+      case "smoothed-full-cosine-similarity" =>
+        new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = true,
           partial = false)
       case "partial-kl-divergence" =>
         new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = false,
           partial = true)
-      case "symmetric-full-kl-divergence" =>
-        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = true,
+      case "full-kl-divergence" =>
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = false,
           partial = false)
       case "symmetric-partial-kl-divergence" =>
         new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = true,
           partial = true)
+      case "symmetric-full-kl-divergence" =>
+        new KLDivergenceGridRanker[Co](ranker_name, grid, symmetric = true,
+          partial = false)
+      case "sum-frequency" =>
+        new SumFrequencyGridRanker[Co](ranker_name, grid)
       case "average-cell-probability" =>
         new AverageCellProbabilityGridRanker[Co](ranker_name, grid)
     }

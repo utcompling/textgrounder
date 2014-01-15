@@ -195,11 +195,11 @@ object FastDiscountedUnigramLangModel {
   // The older implementation that uses smoothed probabilities.
   
   /**
-   A fast implementation of cosine similarity that uses Cython declarations
-  and inlines lookups as much as possible.  It's always "partial" in that it
-  ignores words neither in P nor Q, despite the fact that they have non-zero
-  probability due to smoothing.  But with parameter "partial" to true we
-  proceed as with KL-divergence and ignore words not in P.
+   * A fast implementation of cosine similarity that inlines lookups as
+   * much as possible.  It's always "partial" in that it ignores words
+   * neither in P nor Q, despite the fact that they have non-zero
+   * probability due to smoothing.  But with parameter "partial" to true we
+   * proceed as with KL-divergence and ignore words not in P.
    */
   def fast_smoothed_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = true): Double = {
@@ -274,11 +274,9 @@ object FastDiscountedUnigramLangModel {
   // The newer implementation that uses unsmoothed probabilities.
   
   /**
-   A fast implementation of cosine similarity that uses Cython declarations
-  and inlines lookups as much as possible.  It's always "partial" in that it
-  ignores words neither in P nor Q, despite the fact that they have non-zero
-  probability due to smoothing.  But with parameter "partial" to true we
-  proceed as with KL-divergence and ignore words not in P.
+   * A fast implementation of cosine similarity that inlines lookups as
+   * much as possible. With parameter "partial" to true we
+   * proceed as with KL-divergence and ignore words not in P.
    */
   def fast_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = true) = {

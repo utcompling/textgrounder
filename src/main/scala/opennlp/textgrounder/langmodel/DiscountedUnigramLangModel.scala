@@ -195,9 +195,26 @@ abstract class DiscountedUnigramLangModel(
         (for (ind <- iter_keys)
           yield factory.overall_word_probs(ind)) sum)
     if (factory.tf_idf) {
-      for ((word, count) <- iter_grams_for_modify)
-        set_gram(word,
-          count*log(factory.num_documents/factory.document_freq(word)))
+      for ((word, count) <- iter_grams_for_modify) {
+        /* The classic formula doesn't have the +1 in it. But if we do this
+         * transformation on a test-set doc with a word unseen in the training
+         * set, the document freq will be 0 and the inside factor will be
+         * infinity. This may make the IDF less than 0; we check for this. */
+        var idf = log(factory.num_documents/(factory.document_freq(word) + 1))
+        /* IDF may be <= 0 for the reason given above; without the +1 it might
+         * still be 0. This can mess up our counts, so hack it to a small
+         * positive number.
+         *
+         * FIXME: We really don't want to be directly modifying the counts like
+         * this, but instead have a transformation function that's applied
+         * appropriately in certain circumstances (e.g. during cosine similarity
+         * or sum-frequency). The sum-frequency is probably messed up by this
+         * since it may mess up the denominator of the TF part.
+         */
+        if (idf <= 0)
+          idf = 0.0001
+        set_gram(word, count*idf)
+      }
     }
     normalization_factor = num_tokens
     assert(normalization_factor > 0,

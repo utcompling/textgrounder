@@ -614,6 +614,24 @@ abstract class LangModel(val factory: LangModelFactory) {
     smoothed: Boolean = false): Double
 
   /**
+   * A fast implementation of the sum of unsmoothed probabilities of the
+   * words in a document. Used mostly with '--tf-idf' or similar.
+   */
+  def sum_frequency(other: LangModel) = {
+    assert(finished)
+    val qfact = 1.0/other.num_tokens
+    val qmodel = other.model
+    var sum = 0.0
+    for ((word, count) <- iter_grams) {
+      val q = count * qmodel.get_gram(word) * qfact
+      assert(!q.isNaN, s"Saw NaN: count = $count, gram_count = ${qmodel.get_gram(word)}, qfact = $qfact")
+      sum += q
+    }
+
+    sum
+  }
+
+  /**
    * For a document described by its language model, return the
    * log probability log p(langmodel|other langmodel).
    *

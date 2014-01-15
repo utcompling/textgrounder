@@ -285,8 +285,6 @@ class KLDivergenceGridRanker[Co](
 /**
  * Class that implements a ranker for document geolocation by computing
  * the cosine similarity between the language models of document and cell.
- * FIXME: We really should transform the language model counts by TF/IDF
- * before doing this.
  *
  * @param smoothed If true, use the smoothed language models. (By default,
  * use unsmoothed language models.)
@@ -309,6 +307,21 @@ class CosineSimilarityGridRanker[Co](
     // Just in case of round-off problems
     assert(cossim <= 1.002)
     cossim
+  }
+}
+
+/**
+ * Class that implements a ranker for document geolocation that sums the
+ * unsmoothed probability (or frequency) values for the words in the
+ * document. Generally only useful when '--tf-idf' or similar is invoked.
+ */
+class SumFrequencyGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co]
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+
+  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
+    lang_model.sum_frequency(cell.grid_lm)
   }
 }
 
