@@ -209,7 +209,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
 
     // Return instance
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_string(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_raw(label))
       errprint("Featvec: %s", featvec.pretty_format(""))
     }
     (featvec, label)
@@ -317,7 +317,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // Aggregate feature vectors, return aggregate with label
     val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_string(label))
+      errprint("Label: %s(%s)", label, label_mapper.to_raw(label))
       errprint("Feature vector: %s", agg.pretty_format(""))
     }
     (agg, label)
@@ -426,7 +426,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", correct_label,
-        label_mapper.to_string(correct_label))
+        label_mapper.to_raw(correct_label))
       errprint("Feature vector: %s", agg.pretty_format(""))
     }
     (agg, correct_label)

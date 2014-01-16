@@ -540,7 +540,7 @@ abstract class NgramByNgramCandidateFeatVecFactory[Co](
       // separator in it, but that's unlikely and doesn't really matter
       // anyway.
       yield (fvtype,
-        "%s$%s" format (Ngram.to_string(ngram) mkString "|", suff), value)
+        "%s$%s" format (Ngram.to_raw(ngram) mkString "|", suff), value)
   }
 }
 

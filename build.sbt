@@ -19,6 +19,8 @@ autoAPIMappings := true
 
 (sourceGenerators in Compile) <+= (sourceManaged in Compile) map GenFeatureVector.gen
 
+(sourceGenerators in Compile) <+= (sourceManaged in Compile) map GenMemoizer.gen
+
 resolvers ++= Seq(
   "OpenNLP Maven Repository" at "http://opennlp.sourceforge.net/maven2",
   "repo.codahale.com" at "http://repo.codahale.com"

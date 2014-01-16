@@ -147,15 +147,15 @@ trait FeatureVector extends DataInstance {
   def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex)
 
   /** Display the feature at the given index as a string. */
-  def format_feature(index: FeatIndex) = feature_mapper.to_string(index)
+  def format_feature(index: FeatIndex) = feature_mapper.to_raw(index)
 
   /** Display the label at the given index as a string. */
-  def format_label(index: FeatIndex) = label_mapper.to_string(index)
+  def format_label(index: FeatIndex) = label_mapper.to_raw(index)
 
   def pretty_format(prefix: String): String
 
   def pretty_print_labeled(prefix: String, correct: LabelIndex) {
-    errprint("$prefix: Label: %s(%s)", correct, label_mapper.to_string(correct))
+    errprint("$prefix: Label: %s(%s)", correct, label_mapper.to_raw(correct))
     errprint("$prefix: Featvec: %s", pretty_format(prefix))
   }
 }
@@ -436,7 +436,7 @@ case class AggregateFeatureVector(
   def pretty_format(prefix: String) = {
     (for (d <- 0 until depth) yield
       "Featvec at depth %s(%s): %s" format (
-        d, label_mapper.to_string(d),
+        d, label_mapper.to_raw(d),
         fv(d).pretty_format(prefix))).mkString("\n")
   }
 

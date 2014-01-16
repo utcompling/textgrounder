@@ -154,7 +154,7 @@ case class TrainingData[DI <: DataInstance](
     val F = head.feature_mapper.number_of_indices
     val headers =
       for (i <- 0 until F if !(removed_features contains i))
-        yield head.feature_mapper.to_string(i)
+        yield head.feature_mapper.to_raw(i)
     (headers, data.view.zipWithIndex.flatMap {
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
@@ -188,7 +188,7 @@ case class TrainingData[DI <: DataInstance](
     val F = head.feature_mapper.number_of_indices
     val headers =
       for (i <- 0 until F if !(removed_features contains i))
-        yield head.feature_mapper.to_string(i)
+        yield head.feature_mapper.to_raw(i)
     (headers, data.view.zipWithIndex.flatMap {
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
@@ -243,7 +243,7 @@ object TrainingData {
     // This is easier than in the other direction.
     for ((fv, label) <- inst.fv.view.zipWithIndex) yield {
       val indiv = index + 1
-      val labelstr = inst.label_mapper.to_string(label)
+      val labelstr = inst.label_mapper.to_raw(label)
       val choice = label == correct_label
       assert(fv.length == inst.feature_mapper.vector_length)
       val nums =

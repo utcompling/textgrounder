@@ -106,7 +106,7 @@ class ComputeEntropyDriver extends
     // Maybe print word and cell counts.
     if (params.output_counts) {
       for ((word, count) <- words_counts)
-        errprint("Gram: %s (%s) = %s / %s", word, Unigram.to_string(word),
+        errprint("Gram: %s (%s) = %s / %s", word, Unigram.to_raw(word),
           count, words_cellcounts(word))
     }
     errprint("Computing set of words seen ... done.")
@@ -173,7 +173,7 @@ class ComputeEntropyDriver extends
           normed_log_wordcount, normed_log_cellcount,
           normed_wordcount, normed_cellcount
         ) => Seq(
-        "word" -> Unigram.to_string(word),
+        "word" -> Unigram.to_raw(word),
         "wordcount" -> wordcount,
         "cellcount" -> cellcount,
         "entropy" -> entropy

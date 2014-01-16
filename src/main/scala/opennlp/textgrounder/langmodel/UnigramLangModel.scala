@@ -132,7 +132,7 @@ abstract class UnigramLangModel(
   val pmodel = new UnigramStorage()
   val model = pmodel
 
-  def gram_to_string(gram: Gram) = Unigram.to_string(gram)
+  def gram_to_string(gram: Gram) = Unigram.to_raw(gram)
 
   /**
    * This is a basic unigram implementation of the computation of the

@@ -71,7 +71,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   val model = new NGramModel()
 
   protected def get_sl_ngram(ngram: Gram) =
-    new StringList(Ngram.to_string(ngram).toSeq: _*)
+    new StringList(Ngram.to_raw(ngram).toSeq: _*)
 
   /**************************** Abstract functions ***********************/
 
@@ -266,7 +266,7 @@ abstract class NgramLangModel(
   ) extends LangModel(factory) with FastSlowKLDivergence {
   val model = new OpenNLPNgramStorer
 
-  def gram_to_string(gram: Gram) = Ngram.to_string(gram) mkString " "
+  def gram_to_string(gram: Gram) = Ngram.to_raw(gram) mkString " "
 
   /**
    * This is a basic unigram implementation of the computation of the
@@ -393,7 +393,7 @@ class DefaultNgramLangModelBuilder(
       // way rather than directly calling lm.add_gram() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
-      add_ngram_with_count(lm, Ngram.to_string(ngram), count)
+      add_ngram_with_count(lm, Ngram.to_raw(ngram), count)
   }
 
   /**
@@ -435,7 +435,7 @@ class DefaultNgramLangModelBuilder(
     if (minimum_word_count > 1) {
       for ((ngram, count) <- lm.iter_grams_for_modify if count < minimum_word_count) {
         lm.remove_gram(ngram)
-        val siz = Ngram.to_string(ngram).size
+        val siz = Ngram.to_raw(ngram).size
         val oov = oov_hash.getOrElse(siz, {
           val newoov =
             Ngram.to_index((1 to siz).map(_ => "-OOV-").toArray)

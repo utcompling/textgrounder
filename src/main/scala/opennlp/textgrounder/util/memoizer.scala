@@ -59,6 +59,8 @@ import print.errprint
 object ScalaHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = intmap[Int]()
   def create_int_double_map = doublemap[Int]()
+  def create_int_long_map = longmap[Int]()
+  def create_long_int_map = intmap[Long]()
   def create_int_object_map[T] = mutable.Map[Int,T]()
   def create_object_int_map[T] = intmap[T]()
 }
@@ -70,6 +72,8 @@ object ScalaHashTableFactory /* extends HashTableFactory */ {
 object TroveHashTableFactory /* extends HashTableFactory */ {
   def create_int_int_map = trovescala.IntIntMap()
   def create_int_double_map = trovescala.IntDoubleMap()
+  def create_int_long_map = trovescala.IntLongMap()
+  def create_long_int_map = trovescala.LongIntMap()
   def create_int_object_map[T] = trovescala.IntObjectMap[T]()
   def create_object_int_map[T] = trovescala.ObjectIntMap[T]()
 }
@@ -95,71 +99,6 @@ trait Memoizer[T,U] {
    * Map a value out of its memoized form.
    */
   def to_string(value: U): T
-}
-
-/**
- * Standard memoizer for mapping values to Ints. Specialization of
- * `Memoizer` for Ints, without boxing or unboxing. Uses
- * TroveHashTableFactory for efficiency. Lowest index returned is always
- * 0, so that indices can be directly used in an array.
- */
-trait ToIntMemoizer[T] {
-  // Use Trove for fast, efficient hash tables.
-  val hashfact = TroveHashTableFactory
-  // Alternatively, just use the normal Scala hash tables.
-  // val hashfact = ScalaHashTableFactory
-
-  /* The raw indices used in the hash table aren't the same as the
-   * external indices because TroveHashTableFactory by default uses 0
-   * to indicate that an item wasn't found in an x->int map. So we
-   * add 1 to the external index to get the raw index.
-   *
-   * FIXME: Can we set the not-found item differently, e.g. -1?
-   * (Yes but only at object-creation time, and we need to modify
-   * trove-scala to allow it to be set, and figure out how to retrieve
-   * the DEFAULT_CAPACITY and DEFAULT_LOAD_FACTOR values from Trove,
-   * because they must be specified if we are to set the not-found item.)
-   */
-  type RawIndex = Int
-  // Don't set minimum_index to 0. I think this causes problems because
-  // TroveHashTableFactory by default returns 0 when an item isn't found
-  // in an x->int map.
-  // Smallest index returned.
-  protected val minimum_raw_index: RawIndex = 1
-  protected var next_raw_index: RawIndex = minimum_raw_index
-  def number_of_indices = next_raw_index - minimum_raw_index
-  def maximum_index = number_of_indices - 1
-
-  // For replacing items with ints.  This should save space on 64-bit
-  // machines (object pointers are 8 bytes, ints are 4 bytes) and might
-  // also speed lookup.
-  protected val value_id_map = hashfact.create_object_int_map[T]
-
-  // Map in the opposite direction.
-  protected val id_value_map = hashfact.create_int_object_map[T]
-
-  def to_index_if(value: T) = synchronized {
-    value_id_map.get(value).map(_ - minimum_raw_index)
-  }
-
-  def to_index(value: T) = synchronized {
-    val lookup = to_index_if(value)
-    // println("Saw value=%s, index=%s" format (value, lookup))
-    lookup match {
-      case Some(index) => index
-      case None => {
-        val newind = next_raw_index
-        next_raw_index += 1
-        value_id_map(value) = newind
-        id_value_map(newind) = value
-        newind - minimum_raw_index
-      }
-    }
-  }
-
-  def to_string(index: Int) = synchronized {
-    id_value_map(index + minimum_raw_index)
-  }
 }
 
 // Doesn't currently work because overriding this way leads to error
@@ -189,11 +128,11 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
           index
         }
       }
-    assert(super.to_string(retval) == value)
+    assert(super.to_raw(retval) == value)
     retval
   }
 
-  override def to_string(value: Int) = {
+  override def to_raw(value: Int) = {
     if (!(id_value_map contains value)) {
       errprint("Can't find ID %s in id_value_map", value)
       errprint("Word map:")
@@ -203,7 +142,7 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
       assert(false, "Exiting due to bad code in unmemoize")
       null
     } else {
-      val string = super.to_string(value)
+      val string = super.to_raw(value)
 
       // if (debug("memoize"))
         errprint("Unmemoizing existing ID %s to string %s", value, string)
