@@ -28,9 +28,15 @@ import gridlocate.{GridCell,Grid}
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class KMLSphereCell(
+abstract class RealSphereCell(
   grid: SphereGrid
 ) extends SphereCell(grid) {
+  def format_coord(coord: SphereCoord) = coord.format
+}
+
+abstract class KMLSphereCell(
+  grid: SphereGrid
+) extends RealSphereCell(grid) {
   /**
    * Generate KML for a single cell.
    */

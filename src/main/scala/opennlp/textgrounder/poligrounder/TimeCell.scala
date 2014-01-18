@@ -62,6 +62,8 @@ class TimeCell(
 
   def format_indices =
     "%s/%s" format (format_time(from), format_interval(to - from))
+
+  def format_coord(coord: TimeCoord) = coord.format
 }
 
 /**

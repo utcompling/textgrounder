@@ -130,6 +130,11 @@ abstract class GridCell[Co](
   def format_indices: String
 
   /**
+   * Format a coordinate into a string.
+   */
+  def format_coord(coord: Co): String
+
+  /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
    */
