@@ -19,7 +19,8 @@
 package opennlp.textgrounder
 package gridlocate
 
-import math.{log,exp}
+import scala.collection.mutable
+import scala.math.{log,exp}
 
 import util.debug._
 import util.print._
@@ -57,6 +58,23 @@ trait CandidateFeatVecFactory[Co] extends (
   val featvec_factory: SparseFeatureVectorFactory
   /** Whether to create binned, non-binned or both types of features. */
   val binning_status: BinningStatus
+
+  // Convert cells to label indices without regenerating strings constantly.
+  val cell_to_index = mutable.Map[GridCell[Co], LabelIndex]()
+
+  /** Convert a cell to an index. Cached for speed and to avoid excessive
+    * memory generation of strings. */
+  def lookup_cell(cell: GridCell[Co]) = {
+    cell_to_index.get(cell) match {
+      case Some(index) => index
+      case None => {
+        val center = cell.format_coord(cell.get_true_center)
+        val label = featvec_factory.mapper.label_to_index(center)
+        cell_to_index += cell -> label
+        label
+      }
+    }
+  }
 
   /**
    * Return an Iterable of feature-value pairs for a document-cell pair,
@@ -166,10 +184,10 @@ trait CandidateFeatVecFactory[Co] extends (
     val feats = get_features(doc, cell, score, initial_rank)
     feats.foreach { case (fvtype, feat, value) =>
       assert(!disallowed_value(value),
-        "feature %s (%s) has disallowed value %s"
-          format (feat, fvtype, value))
+        "feature %s (%s) for cell %s has disallowed value %s"
+          format (feat, fvtype, cell.format_location, value))
     }
-    featvec_factory.make_feature_vector(feats, is_training)
+    featvec_factory.make_feature_vector(feats, lookup_cell(cell), is_training)
   }
 }
 

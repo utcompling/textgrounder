@@ -78,6 +78,11 @@ function). Default %default.""")
 instance there are different features for each possible label. This
 requires a different format for the training file.""")
 
+  var ranker =
+    ap.flag("ranker",
+      help = """If true, this is a ranker rather than a classifier. This
+controls how features are generated and requires '--label-specific'.""")
+
   var input_format =
     ap.option[String]("input-format",
       choices = Seq("dense", "sparse"),
@@ -218,10 +223,15 @@ object Classify extends ExperimentApp("Classify") {
         io.localfh.openw(params.output)
     }
 
+    if (params.ranker) {
+      require(params.label_specific,
+        "'--label-specific' must be given if '--ranker' is given")
+    }
     val (classifier, test_instances, factory) =
       if (params.label_specific) {
         // Read in the data instances and create feature vectors
-        val factory = new SparseAggregateInstanceFactory
+        val factory =
+          new SparseAggregateInstanceFactory(attach_label = !params.ranker)
         def read_data(source: Iterator[String], is_training: Boolean) = {
           if (params.input_format == "dense")
             factory.import_dense_labeled_instances(source,
@@ -238,7 +248,7 @@ object Classify extends ExperimentApp("Classify") {
         }
         val training_instances = read_data(trainSource, is_training = true)
         val test_instances = read_data(predictSource, is_training = false)
-        val numlabs = factory.label_mapper.number_of_indices
+        val numlabs = factory.mapper.number_of_labels
         if (numlabs < 2) {
           error("Found %s different labels, when at least 2 are needed." format
             numlabs)
@@ -282,7 +292,7 @@ object Classify extends ExperimentApp("Classify") {
         (classifier, test_instances, factory)
       } else {
         // Read in the data instances and create feature vectors
-        val factory = new SparseSimpleInstanceFactory
+        val factory = new SparseSimpleInstanceFactory(attach_label = true)
         val training_instances =
           factory.import_labeled_instances(trainSource,
             params.split_re,
@@ -295,7 +305,7 @@ object Classify extends ExperimentApp("Classify") {
             params.label_column,
             is_training = false).
             toIndexedSeq
-        val numlabs = factory.label_mapper.number_of_indices
+        val numlabs = factory.mapper.number_of_labels
         if (numlabs < 2) {
           error("Found %s different labels, when at least 2 are needed." format
             numlabs)
@@ -353,7 +363,7 @@ object Classify extends ExperimentApp("Classify") {
     // Run classifier on each instance to get the predictions, and output
     // them in reverse sorted order, tab separated
     val pred_column_headings = Seq("Corr?", "Conf", "Truelab") ++
-      (1 to factory.label_mapper.number_of_indices).toSeq.flatMap { num =>
+      (1 to factory.mapper.number_of_labels).toSeq.flatMap { num =>
         Seq(s"Pred$num", s"Score$num") }
 
     val results_insts_lines =
@@ -365,11 +375,11 @@ object Classify extends ExperimentApp("Classify") {
         // Map to labels
         val scorelabs = scores.flatMap {
           case (lab, pred) => Seq(
-            factory.label_mapper.to_raw(lab), min_format_double(pred))
+            factory.mapper.label_to_string(lab), min_format_double(pred))
         }
         val corrstr = if (correct) "CORRECT" else "WRONG"
         val confstr = min_format_double(conf)
-        val truelabstr = factory.label_mapper.to_raw(truelab)
+        val truelabstr = factory.mapper.label_to_string(truelab)
         val line = Seq(corrstr, confstr, truelabstr) ++ scorelabs
         (correct, (inst, line))
       }

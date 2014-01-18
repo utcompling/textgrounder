@@ -1530,7 +1530,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @see CandidateFeatVecFactory
    */
   protected def create_candidate_featvec_factory = {
-    val featvec_factory = new SparseFeatureVectorFactory
+    val featvec_factory = new SparseFeatureVectorFactory(attach_label = false)
     val binning_status = params.rerank_binning match {
       case "also" => BinningAlso
       case "only" => BinningOnly
@@ -1602,11 +1602,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val top_n = params.rerank_top_n
           val number_of_splits = params.rerank_num_training_splits
 
-          val label_mapper =
-            candidate_featvec_factory.featvec_factory.label_mapper
-          assert(label_mapper.number_of_indices == 0)
+          val mapper =
+            candidate_featvec_factory.featvec_factory.mapper
+          assert(mapper.number_of_labels == 0)
           for (i <- 0 until params.rerank_top_n) {
-            label_mapper.to_index(s"#${i + 1}")
+            mapper.label_to_index(s"#${i + 1}")
           }
 
           protected def query_training_data_to_feature_vectors(

@@ -34,13 +34,15 @@ import util.print.{errprint, errfmt}
 /**
  * A factory object for creating sparse feature vectors for classification.
  * Sparse feature vectors store only the features with non-zero values.
- * The features are indexed by entities of type T, which are internally
- * mapped to integers, using the mapping stored in `feature_mapper`.
+ * The features are strings, which are internally mapped to integers
+ * (of alias type FeatIndex), using the mapping stored in `mapper`.
  */
-class SparseFeatureVectorFactory { self =>
-  val mappers = new FeatureLabelMapper
-  def feature_mapper = mappers.feature_mapper
-  def label_mapper = mappers.label_mapper
+class SparseFeatureVectorFactory(attach_label: Boolean) { self =>
+  val mapper =
+    if (attach_label)
+      new LabelAttachedFeatureLabelMapper
+    else
+      new SimpleFeatureLabelMapper
 
   val vector_impl = debugval("featvec") match {
     case f@("DoubleCompressed" | "FloatCompressed" | "IntCompressed" |
@@ -67,48 +69,49 @@ class SparseFeatureVectorFactory { self =>
    */
   def make_feature_vector(
       feature_values: Iterable[(FeatureValue, String, Double)],
-      is_training: Boolean) = {
+      label: LabelIndex, is_training: Boolean) = {
     val memoized_features =
       // DON'T include an intercept term. Not helpful since it's non-
       // label-specific.
       if (is_training)
         feature_values.map {
           case (ty, name, value) =>
-            (feature_mapper.note_feature(ty, name), value)
+            (mapper.note_feature(ty, name, label), value)
         }
        else
         for { (_, name, value) <- feature_values;
-               index = feature_mapper.to_index_if(name);
+               index = mapper.feature_to_index_if(name, label);
                if index != None }
           yield (index.get, value)
     vector_impl match {
       case "TupleArray" =>
-        new TupleArraySparseFeatureVector(memoized_features.toBuffer, mappers)
+        new TupleArraySparseFeatureVector(memoized_features.toBuffer, mapper)
       case "Map" =>
-        new MapSparseFeatureVector(memoized_features.toMap, mappers)
+        new MapSparseFeatureVector(memoized_features.toMap, mapper)
       case _ => {
         val (keys, values) =
           memoized_features.toIndexedSeq.sortWith(_._1 < _._1).unzip
         vector_impl match {
           case "DoubleCompressed" =>
             new DoubleCompressedSparseFeatureVector(keys.toArray,
-              values.toArray, mappers)
+              values.toArray, mapper)
           case "FloatCompressed" =>
             new FloatCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toFloat).toArray, mappers)
+              values.map(_.toFloat).toArray, mapper)
           case "IntCompressed" =>
             new IntCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toInt).toArray, mappers)
+              values.map(_.toInt).toArray, mapper)
           case "ShortCompressed" =>
             new ShortCompressedSparseFeatureVector(keys.toArray,
-              values.map(_.toShort).toArray, mappers)
+              values.map(_.toShort).toArray, mapper)
         }
       }
     }
   }
 }
 
-class SparseInstanceFactory extends SparseFeatureVectorFactory {
+class SparseInstanceFactory(attach_label: Boolean) extends
+    SparseFeatureVectorFactory(attach_label) {
   // Format a series of lines for debug display.
   def format_lines(lines: TraversableOnce[Array[String]]) = {
     lines.map(line => errfmt(line mkString "\t")).mkString("\n")
@@ -153,7 +156,7 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
 
   def raw_linefeats_to_featvec(
       raw_linefeats: Iterable[(String, (String, FeatureClass))],
-      is_training: Boolean
+      label: LabelIndex, is_training: Boolean
   ) = {
     // Generate appropriate features based on column values, names, types.
     val linefeats = raw_linefeats.map { case (value, (colname, coltype)) =>
@@ -165,7 +168,7 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
     }
 
     // Create feature vector
-    make_feature_vector(linefeats, is_training)
+    make_feature_vector(linefeats, label, is_training)
   }
 }
 
@@ -176,7 +179,8 @@ class SparseInstanceFactory extends SparseFeatureVectorFactory {
  * set of features, which may be nominal or numeric. Nominal values
  * have no ordering or other numerical significance.
  */
-class SparseSimpleInstanceFactory extends SparseInstanceFactory {
+class SparseSimpleInstanceFactory(attach_label: Boolean) extends
+    SparseInstanceFactory(attach_label) {
   /**
    * Return a pair of `(aggregate, label)` where `aggregate` is an
    * aggregate feature vector derived from the given lines.
@@ -197,7 +201,7 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
     require(line.size == columns.size, "Expected %s columns but saw %s: %s"
       format (columns.size, line.size, line mkString "\t"))
 
-    val label = label_mapper.to_index(line(label_column))
+    val label = mapper.label_to_index(line(label_column))
 
     // Filter out the columns we don't use, pair each with its column spec.
     val raw_linefeats = line.zip(columns).zipWithIndex.filter {
@@ -205,11 +209,11 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
     }.map(_._1)
 
     // Generate feature vector based on column values, names, types.
-    val featvec = raw_linefeats_to_featvec(raw_linefeats, is_training)
+    val featvec = raw_linefeats_to_featvec(raw_linefeats, label, is_training)
 
     // Return instance
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_raw(label))
+      errprint("Label: %s(%s)", label, mapper.label_to_string(label))
       errprint("Featvec: %s", featvec.pretty_format(""))
     }
     (featvec, label)
@@ -244,7 +248,8 @@ class SparseSimpleInstanceFactory extends SparseInstanceFactory {
  * set of features, which may be nominal or numeric. Nominal values
  * have no ordering or other numerical significance.
  */
-class SparseAggregateInstanceFactory extends SparseInstanceFactory {
+class SparseAggregateInstanceFactory(attach_label: Boolean) extends
+    SparseInstanceFactory(attach_label) {
   /**
    * Return a pair of `(aggregate, label)` where `aggregate` is an
    * aggregate feature vector derived from the given lines.
@@ -278,7 +283,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
 
     // Retrieve the label, make sure there's exactly 1
     val choice = lines.map { line =>
-      (label_mapper.to_index(line(label_colind)), line(choice_colind))
+      (mapper.label_to_index(line(label_colind)), line(choice_colind))
     }
     val label_lines = choice.filter {
       Seq("yes", "true") contains _._2.toLowerCase
@@ -291,9 +296,9 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // Make sure all possible labels seen.
     val labels_seen = choice.map(_._1)
     val num_labels_seen = labels_seen.toSet.size
-    require(num_labels_seen == label_mapper.number_of_indices,
+    require(num_labels_seen == mapper.number_of_labels,
       "Not all labels found: Expected %s labels but saw %s: %s" format (
-        label_mapper.number_of_indices, num_labels_seen,
+        mapper.number_of_labels, num_labels_seen,
         labels_seen.toSeq.sorted))
 
     // Extract the feature vectors
@@ -304,9 +309,10 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
           index != indiv_colind && index != label_colind &&
           index != choice_colind
       }.map(_._1)
+      val label = mapper.label_to_index(line(label_colind))
 
       // Generate feature vector based on column values, names, types.
-      raw_linefeats_to_featvec(raw_linefeats, is_training)
+      raw_linefeats_to_featvec(raw_linefeats, label, is_training)
     }
 
     // Order by increasing label so that all aggregates have the labels in
@@ -317,7 +323,7 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
     // Aggregate feature vectors, return aggregate with label
     val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
-      errprint("Label: %s(%s)", label, label_mapper.to_raw(label))
+      errprint("Label: %s(%s)", label, mapper.label_to_string(label))
       errprint("Feature vector: %s", agg.pretty_format(""))
     }
     (agg, label)
@@ -414,19 +420,19 @@ class SparseAggregateInstanceFactory extends SparseInstanceFactory {
         else
           (for (Array(feat, value) <- fields.drop(1).grouped(2))
             yield (FeatRaw, feat, value.toDouble)).toSeq
-      make_feature_vector(feats, is_training)
+      make_feature_vector(feats, i, is_training)
     }
 
     // Synthesize labels as necessary
     for (i <- 0 until nvecs) {
-      label_mapper.to_index(s"#${i + 1}")
+      mapper.label_to_index(s"#${i + 1}")
     }
 
     // Aggregate feature vectors, return aggregate with label
     val agg = new AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", correct_label,
-        label_mapper.to_raw(correct_label))
+        mapper.label_to_string(correct_label))
       errprint("Feature vector: %s", agg.pretty_format(""))
     }
     (agg, correct_label)

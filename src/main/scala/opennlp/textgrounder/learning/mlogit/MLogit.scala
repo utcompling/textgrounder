@@ -167,7 +167,7 @@ class MLogitConditionalLogitTrainer[DI <: DataInstance](
         headers.size))
     // Retrieve total number of features = proper size of weight vector
     val head = training_data.data.head._1.feature_vector
-    val F = head.feature_mapper.number_of_indices
+    val F = head.mapper.feature_vector_length
     assert(weights.size + removed_features.size == F,
       "Weights size %s + #removed-features %s should = #features %s" format (
         weights.size, removed_features.size, F))

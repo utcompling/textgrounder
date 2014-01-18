@@ -59,26 +59,118 @@ sealed abstract class FeatureClass
 case object NominalFeature extends FeatureClass
 case object NumericFeature extends FeatureClass
 
-class FeatureMapper extends ToIntMemoizer[String] {
-  def vector_length = number_of_indices
+/**
+ * Mapping of features and labels into integers. In the context of a
+ * classifier, "features" need to be distinguished into "feature properties"
+ * and "combined features". The former, sometimes termed a "contextual
+ * predicate" in the context of binary features, is a semantic concept
+ * describing a property that may be found of data instances or combinations
+ * of instances and labels, while the latter describes the combination of
+ * a feature property and a given label. For instance, in the context of
+ * GridLocate where instances are documents and labels are cells, the
+ * binary feature property "london" has the value of 1 for a document
+ * containing the word "london" regardless of the cell it is paired with,
+ * and the corresponding combined feature "london@53.5,2.5" having a value
+ * of 1 means that the document when paired with the cell centered at
+ * 53.5,2.5 has the value of 1. The same document will have a distinct
+ * combined feature "london@37.5,-120.0" when combined with a different cell.
+ * In this case the identity of the label (i.e. cell) isn't needed to
+ * compute the feature value but in some cases it is, e.g. the matching
+ * feature "london$matching-unigram-binary" indicating that the word
+ * "london" occurred in both document and cell. Regardless, the
+ * separation of feature properties into distinct combined features is
+ * necessary so that different weights are computed in TADM.
+ *
+ * For a ranker, combined features do not include the identity of the
+ * cell, and thus all combined features with the same feature property
+ * will be treated as the same feature, and only a single weight will be
+ * assigned. This is correct in the context of a ranker, where the labels
+ * can be thought of as numbers 1 through N, which are not meaningfully
+ * distinguishable in the way that different labels of a classifier are.
+ *
+ * To combine a feature property and a label, we don't actually create
+ * a string like "london@53.5,2.5"; instead, we map the feature property's
+ * name to an integer, and map the label to an integer, and combine them
+ * in a Long, which is then memoized to an Int. This is done to save
+ * memory.
+ */
+abstract class FeatureLabelMapper {
+  protected val label_mapper = new ToIntMemoizer[String]
+  protected val property_mapper = new ToIntMemoizer[String]
+  def feature_to_index(feature: String, label: LabelIndex): FeatIndex
+  def feature_to_index_if(feature: String, label: LabelIndex): Option[FeatIndex]
+  def feature_to_string(index: FeatIndex): String
+  def feature_vector_length: Int
+
   val features_to_rescale = mutable.BitSet()
-  def note_feature(feattype: FeatureValue, feature: String) = {
-    val index = to_index(feature)
+  protected def add_feature_property(feattype: FeatureValue, prop: String) = {
+    val index = property_mapper.to_index(prop)
     feattype match {
       case FeatRescale => features_to_rescale += index
       case _ => ()
     }
     index
   }
+
+  def note_feature(feattype: FeatureValue, feature: String, label: LabelIndex
+  ): FeatIndex
+
+  def label_to_index(label: String): LabelIndex =
+    label_mapper.to_index(label)
+  def label_to_index_if(label: String): Option[LabelIndex] =
+    label_mapper.to_index_if(label)
+  def label_to_string(index: LabelIndex): String =
+    label_mapper.to_raw(index)
+  def number_of_labels: Int = label_mapper.number_of_indices
 }
 
-class LabelMapper extends ToIntMemoizer[String] {
+class SimpleFeatureLabelMapper extends FeatureLabelMapper {
+  def feature_to_index(feature: String, label: LabelIndex) =
+    property_mapper.to_index(feature)
+  def feature_to_index_if(feature: String, label: LabelIndex) =
+    property_mapper.to_index_if(feature)
+  def feature_to_string(index: FeatIndex) = property_mapper.to_raw(index)
+  def feature_vector_length = property_mapper.number_of_indices
+
+  def note_feature(feattype: FeatureValue, feature: String, label: LabelIndex
+  ) = add_feature_property(feattype, feature)
 }
 
-case class FeatureLabelMapper(
-  feature_mapper: FeatureMapper = new FeatureMapper,
-  label_mapper: LabelMapper = new LabelMapper
-)
+class LabelAttachedFeatureLabelMapper extends FeatureLabelMapper {
+  val combined_mapper = new LongToIntMemoizer
+
+  private def combined_to_long(prop_index: FeatIndex, label: LabelIndex) = {
+    // If label could be negative, we need to and it with 0xFFFFFFFFL to
+    // convert it to an unsigned value, but that should never happen.
+    assert(label >= 0)
+    (prop_index.toLong << 32) + label
+  }
+
+  def feature_to_index(feature: String, label: LabelIndex) = {
+    val prop_index = property_mapper.to_index(feature)
+    combined_mapper.to_index(combined_to_long(prop_index, label))
+  }
+  def feature_to_index_if(feature: String, label: LabelIndex) = {
+    // Only map to Some(...) if both feature property and combined feature
+    // already exist.
+    property_mapper.to_index_if(feature).flatMap { prop_index =>
+      combined_mapper.to_index_if(combined_to_long(prop_index, label))
+    }
+  }
+  def feature_to_string(index: FeatIndex) = {
+    val longval = combined_mapper.to_raw(index)
+    val prop_index = (longval >> 32).toInt
+    val label_index = (longval & 0xFFFFFFFF).toInt
+    property_mapper.to_raw(prop_index) + "@" + label_mapper.to_raw(label_index)
+  }
+  def feature_vector_length = combined_mapper.number_of_indices
+
+  def note_feature(feattype: FeatureValue, feature: String, label: LabelIndex
+  ) = {
+    val prop_index = add_feature_property(feattype, feature)
+    combined_mapper.to_index(combined_to_long(prop_index, label))
+  }
+}
 
 /**
  * A vector of real-valued features.  In general, features are indexed
@@ -91,17 +183,13 @@ case class FeatureLabelMapper(
 trait FeatureVector extends DataInstance {
   final def feature_vector = this
 
-  def mappers: FeatureLabelMapper
-
-  final def feature_mapper = mappers.feature_mapper
-
-  final def label_mapper = mappers.label_mapper
+  def mapper: FeatureLabelMapper
 
   /** Return the length of the feature vector.  This is the number of weights
     * that need to be created -- not necessarily the actual number of items
     * stored in the vector (which will be different especially in the case
     * of sparse vectors). */
-  def length: Int = feature_mapper.vector_length
+  def length: Int = mapper.feature_vector_length
 
   /** Return number of labels for which label-specific information is stored.
     * For a simple feature vector that ignores the label, this will be 1.
@@ -147,15 +235,15 @@ trait FeatureVector extends DataInstance {
   def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex)
 
   /** Display the feature at the given index as a string. */
-  def format_feature(index: FeatIndex) = feature_mapper.to_raw(index)
+  def format_feature(index: FeatIndex) = mapper.feature_to_string(index)
 
   /** Display the label at the given index as a string. */
-  def format_label(index: FeatIndex) = label_mapper.to_raw(index)
+  def format_label(index: FeatIndex) = mapper.label_to_string(index)
 
   def pretty_format(prefix: String): String
 
   def pretty_print_labeled(prefix: String, correct: LabelIndex) {
-    errprint("$prefix: Label: %s(%s)", correct, label_mapper.to_raw(correct))
+    errprint("$prefix: Label: %s(%s)", correct, mapper.label_to_string(correct))
     errprint("$prefix: Featvec: %s", pretty_format(prefix))
   }
 }
@@ -163,9 +251,9 @@ trait FeatureVector extends DataInstance {
 object FeatureVector {
   /** Check that all feature vectors have the same mappers. */
   def check_same_mappers(fvs: Iterable[FeatureVector]) {
-    val mappers = fvs.head.mappers
+    val mapper = fvs.head.mapper
     for (fv <- fvs) {
-      assert(fv.mappers == mappers)
+      assert(fv.mapper == mapper)
     }
   }
 }
@@ -227,7 +315,7 @@ trait BasicFeatureVectorImpl extends FeatureVector {
  */
 case class ArrayFeatureVector(
   values: SimpleVector,
-  mappers: FeatureLabelMapper
+  mapper: FeatureLabelMapper
 ) extends BasicFeatureVectorImpl with SimpleFeatureVector {
   assert(values.length == length)
 
@@ -365,7 +453,7 @@ abstract class SimpleSparseFeatureVector(
  */
 class MapSparseFeatureVector(
   feature_values: collection.Map[FeatIndex, Double],
-  val mappers: FeatureLabelMapper
+  val mapper: FeatureLabelMapper
 ) extends SimpleSparseFeatureVector(feature_values) {
   def apply(index: FeatIndex) = feature_values.getOrElse(index, 0.0)
 
@@ -374,7 +462,7 @@ class MapSparseFeatureVector(
 
 class TupleArraySparseFeatureVector(
   feature_values: mutable.Buffer[(FeatIndex, Double)],
-  val mappers: FeatureLabelMapper
+  val mapper: FeatureLabelMapper
 ) extends SimpleSparseFeatureVector(feature_values) {
   // Use an O(n) algorithm to look up a value at a given index.  Luckily,
   // this operation isn't performed very often (if at all).  We could
@@ -396,7 +484,7 @@ case class AggregateFeatureVector(
 ) extends FeatureVector {
   FeatureVector.check_same_mappers(fv)
 
-  def mappers = fv.head.mappers
+  def mapper = fv.head.mapper
 
   def depth = fv.length
   def max_label = depth - 1
@@ -436,7 +524,7 @@ case class AggregateFeatureVector(
   def pretty_format(prefix: String) = {
     (for (d <- 0 until depth) yield
       "Featvec at depth %s(%s): %s" format (
-        d, label_mapper.to_raw(d),
+        d, mapper.label_to_string(d),
         fv(d).pretty_format(prefix))).mkString("\n")
   }
 
@@ -574,7 +662,7 @@ case class AggregateFeatureVector(
     // Now rescale the features that need to be.
     for (vec <- sparsevecs; i <- 0 until vec.keys.size) {
       val key = vec.keys(i)
-      if (feature_mapper.features_to_rescale contains key) {
+      if (mapper.features_to_rescale contains key) {
         val stddev = stddevmap(key)
         // Must skip 0, NaN and infinity! Comparison between anything and
         // NaN will be false and won't pass the > 0 check.

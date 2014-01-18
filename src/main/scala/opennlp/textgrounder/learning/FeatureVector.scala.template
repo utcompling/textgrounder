@@ -43,7 +43,7 @@ import util.memoizer._
  */
 class makespec(CompressedSparseFeatureVector) private[learning] (
   var keys: Array[FeatIndex], var values: Array[VECTY],
-  val mappers: FeatureLabelMapper
+  val mapper: FeatureLabelMapper
 ) extends SparseFeatureVector {
   assert(keys.length == values.length,
     s"keys.length ${keys.length} should = values.length ${values.length}")
@@ -95,7 +95,7 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
 }
 
 class makespec(BasicCompressedSparseFeatureVector) private[learning] (
-  keys: Array[FeatIndex], values: Array[VECTY], mappers: FeatureLabelMapper
-) extends makespec(CompressedSparseFeatureVector)(keys, values, mappers) {
+  keys: Array[FeatIndex], values: Array[VECTY], mapper: FeatureLabelMapper
+) extends makespec(CompressedSparseFeatureVector)(keys, values, mapper) {
   override val include_displayed_feature = false
 }

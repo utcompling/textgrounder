@@ -41,8 +41,8 @@ case class TrainingData[DI <: DataInstance](
     // (necessary to ensure we end up outputting the correct length of
     // vector).
     val N = data.size
-    val L = head.label_mapper.number_of_indices
-    val F = head.feature_mapper.number_of_indices
+    val L = head.mapper.number_of_labels
+    val F = head.mapper.feature_vector_length
     for (((inst, label), index) <- data.view.zipWithIndex) {
       val fv = inst.feature_vector
       // Equivalent to assert but adds the instance index and the fv itself
@@ -53,8 +53,7 @@ case class TrainingData[DI <: DataInstance](
         "has depth %s instead of %s" format (fv.depth, fv.depth))
       check(fv.length == head.length,
         "has length %s instead of %s" format (fv.length, head.length))
-      check(fv.feature_mapper == head.feature_mapper, "wrong feature mapper")
-      check(fv.label_mapper == head.label_mapper, "wrong label mapper")
+      check(fv.mapper == head.mapper, "wrong mapper")
       check(F == fv.length,
         "feature mapper has length %s instead of %s" format (F, fv.length))
       check(L == fv.depth,
@@ -151,10 +150,10 @@ case class TrainingData[DI <: DataInstance](
     // This is easier than in the other direction.
 
     val head = data.head._1.feature_vector
-    val F = head.feature_mapper.number_of_indices
+    val F = head.mapper.feature_vector_length
     val headers =
       for (i <- 0 until F if !(removed_features contains i))
-        yield head.feature_mapper.to_raw(i)
+        yield head.mapper.feature_to_string(i)
     (headers, data.view.zipWithIndex.flatMap {
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
@@ -185,10 +184,10 @@ case class TrainingData[DI <: DataInstance](
     // This is easier than in the other direction.
 
     val head = data.head._1.feature_vector
-    val F = head.feature_mapper.number_of_indices
+    val F = head.mapper.feature_vector_length
     val headers =
       for (i <- 0 until F if !(removed_features contains i))
-        yield head.feature_mapper.to_raw(i)
+        yield head.mapper.feature_to_string(i)
     (headers, data.view.zipWithIndex.flatMap {
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
@@ -243,9 +242,9 @@ object TrainingData {
     // This is easier than in the other direction.
     for ((fv, label) <- inst.fv.view.zipWithIndex) yield {
       val indiv = index + 1
-      val labelstr = inst.label_mapper.to_raw(label)
+      val labelstr = inst.mapper.label_to_string(label)
       val choice = label == correct_label
-      assert(fv.length == inst.feature_mapper.vector_length)
+      assert(fv.length == inst.mapper.feature_vector_length)
       val nums =
         for (i <- 0 until fv.length if !(removed_features contains i)) yield
           fv(i, label)

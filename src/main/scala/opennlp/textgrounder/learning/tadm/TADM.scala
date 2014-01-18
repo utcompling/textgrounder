@@ -123,7 +123,7 @@ class TADMRankingTrainer[DI <: DataInstance](
     // weight vector smaller than required and need to pad with zeros.
     // Retrieve total number of features
     val head = training_data.data.head._1.feature_vector
-    val F = head.feature_mapper.number_of_indices
+    val F = head.mapper.feature_vector_length
     val expanded_weights =
       if (weights.size < F) {
         // Make sure all missing features were actually removed.
