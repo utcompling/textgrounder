@@ -71,7 +71,7 @@ import gridlocate._
        sorted and grouped at the end of the map stage on the map node,
        *before* being sent over the network; the overall "shuffle" then
        simply involves merging.
-   
+
    (4.5) To reduce the amount of data sent over the network, a combiner can
          be defined, which runs on the map node after sorting but before
          sending the data over.  This is optional, and if it exists, does
@@ -87,7 +87,7 @@ import gridlocate._
          a subset, the median could be any value in the subset; hence the
          entire subset must be sent along, and cannot in general be
          "combined" in any way.)
-         
+
    (6) A set of reducers are created, and the resulting grouped items are
        partitioned based on their keys, with each reducer receiving one
        sorted partition, i.e. a list of all the items whose keys were
@@ -165,7 +165,7 @@ import gridlocate._
 /************************************************************************/
 /*                  General Hadoop code for Geolocate app               */
 /************************************************************************/
-   
+
 trait HadoopGeolocateTextDBMixin extends HadoopTextDBMixin {
   type TDriver <: HadoopGeolocateDriver
   val driver: TDriver

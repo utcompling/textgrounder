@@ -70,7 +70,7 @@ trait FastSlowKLDivergence {
    * between this lang model and another lang model, including possible
    * debug information.  Useful for checking against the other, faster
    * implementation in `fast_kl_divergence`.
-   * 
+   *
    * @param other The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
    *   that exist in our lang model; otherwise we also have to take into
@@ -81,7 +81,7 @@ trait FastSlowKLDivergence {
    *   the words (or n-grams, or whatever) in both lang models (or, for a
    *   partial KL-divergence, the words in our lang model) and the amount
    *   of total KL-divergence they compute, useful for debugging.
-   *   
+   *
    * @return A tuple of (divergence, word_contribs) where the first
    *   value is the actual KL-divergence and the second is the map
    *   of word contributions as described above; will be null if
@@ -483,7 +483,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    * populated.)
    *
    * @see #finish_after_global
-   * 
+   *
    */
   def finish_before_global() {
     assert(!finished)
@@ -568,7 +568,7 @@ abstract class LangModel(val factory: LangModelFactory) {
   /**
    * Compute the KL-divergence between this lang model and another
    * lang model.
-   * 
+   *
    * @param other The other lang model to compute against.
    * @param partial If true, only compute the contribution involving words
    *   that exist in our lang model; otherwise we also have to take
@@ -578,7 +578,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    * @param cache Cached information about this lang model, used to
    *   speed up computations.  Never needs to be supplied; null can always
    *   be given, to cause a new cache to be created.
-   *   
+   *
    * @return The KL-divergence value.
    */
   def kl_divergence(other: LangModel, partial: Boolean = true,
@@ -593,7 +593,7 @@ abstract class LangModel(val factory: LangModelFactory) {
   /**
    * Compute the symmetric KL-divergence between two lang models by averaging
    * the respective one-way KL-divergences in each direction.
-   * 
+   *
    * @param partial Same as in `kl_divergence`.
    */
   def symmetric_kldiv(other: LangModel, partial: Boolean = true,
@@ -667,7 +667,7 @@ abstract class LangModel(val factory: LangModelFactory) {
     }
     prob
   }
-  
+
   /**
    * Return the log-probability of a word, taking into account the
    * possibility that the probability is zero (in which case the
@@ -738,7 +738,7 @@ abstract class LangModel(val factory: LangModelFactory) {
     val grams =
       for ((gram, count) <- iter_grams.toSeq.sortWith(_._2 > _._2).
             view(0, num_actual_grams_to_print))
-      yield "%s=%s" format (gram_to_string(gram), count) 
+      yield "%s=%s" format (gram_to_string(gram), count)
     val gramstr = (grams mkString " ") + (if (need_dots) " ..." else "")
     "%s(%s types, %s tokens%s%s, %s)" format (
         class_name, num_types, num_tokens, innerToString,

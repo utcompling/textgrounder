@@ -22,7 +22,7 @@ package langmodel
 /**
  * This class implements Dirichlet discounting, where the discount factor
  * depends on the size of the document.
- */ 
+ */
 class DirichletUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,

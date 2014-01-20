@@ -75,7 +75,7 @@ import util.debug._
  * sign and magnitude of the scores themselves have no significance.  The only
  * thing that matters is the difference between two scores, which indicates
  * a relative confidence that one label is better than the other.
- * 
+ *
  * In the multi-label case, there are two variants for handling the weights:
  * Either we use a single weight vector for all labels or maintain a separate
  * weight vector for each label.  The former case is most appropriate when
@@ -393,7 +393,7 @@ trait PassiveAggressivePerceptronTrainer {
        the square magnitude, and hence when this magnitude is 0, the
        update vector is also a zero vector and no change to the weights
        should occur.
-       
+
        This occurs in the single-weight case when different labels
        have the same feature vector associated with them.  In the
        multiple-weight case, all labels of a given instance normally

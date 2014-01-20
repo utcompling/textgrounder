@@ -375,7 +375,7 @@ object ConvertCophir
       outlines.filter { case (modid, row) => modid >= 90 }.
                map    { case (modid, row) => row }
     val test_srcdir = opts.output + "-test"
-   
+
     // output data files
     persist((
       TextOutput.toTextFile(training, opts.output),

@@ -367,7 +367,7 @@ class GroupedDocEvalStats[Co](
     output_resource_usage()
   }
 
-  def output_results_by_range() { 
+  def output_results_by_range() {
     errprint("")
     for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
       errprint("")
@@ -428,7 +428,7 @@ abstract class CorpusEvaluator[Co](
       (false, "")
     }
   }
-        
+
   /**
    * Evaluate a document.  Return an object describing the results of the
    * evaluation, or the reason for skipping the document.

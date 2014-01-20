@@ -72,7 +72,7 @@ protected class PrintPackage {
   def set_errout_prefix(prefix: String) {
     errout_prefix = prefix
   }
- 
+
   var need_prefix = true
 
   var errout_stream: PrintStream = System.err

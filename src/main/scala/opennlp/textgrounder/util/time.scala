@@ -157,7 +157,7 @@ protected class TimePackage {
             case "h" => 60*60
             case "d" => 60*60*24
             case "w" => 60*60*24*7
-            case "" => 
+            case "" =>
               return (None, "Missing units in component '%s' in time offset '%s'; should be e.g. '25s' or '10h30m'"
                 format (valstr + units, str))
             case _ =>
@@ -183,7 +183,7 @@ protected class TimePackage {
    * August 2, 2010, 18:05:02 Pacific Standard Time, ending exactly
    * 2 hours 3 minutes later).  Negative offsets are allowed, to indicate
    * an interval backwards from a reference point.
-   * 
+   *
    * @return Tuple of `(Some((start, end)),"")` if able to parse, else
    * return None along with an error message.
    */

@@ -67,7 +67,7 @@ import org.clapper.argot._
        automatically and printed out nicely, and then the program exits
        with return code 1.  You can turn this off if you want to handle
        exceptions yourself.
-  
+
   In general, to parse arguments, you first create an object of type
   ArgParser (call it `ap`), and then add options to it by calling
   functions, typically:
@@ -110,7 +110,7 @@ import org.clapper.argot._
 
   2) A class, e.g. ProgParams, is created to hold the values returned from
      the command line.  This class typically looks like this:
-     
+
      class ProgParams(ap: ArgParser) {
        var outfile = ap.option[String]("outfile", "o", ...)
        var verbose = ap.flag("verbose", "v", ...)
@@ -226,7 +226,7 @@ package object argparser {
   reliable, I tried wrapping the return value in some other object, with
   bidirectional implicit conversions to/from the wrapped value, something
   like this:
-      
+
   class ArgWrap[T](vall: T) extends ArgAny[T] {
     def value = vall
     def specified = true
@@ -949,7 +949,7 @@ package argparser {
      * @param arg The name of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
-     *   
+     *
      * @return The value, of type T.
      */
     def get[T](arg: String) = get_arg(arg).asInstanceOf[ArgAny[T]].value
@@ -961,7 +961,7 @@ package argparser {
      * @param value The new value of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
-     *   
+     *
      * @return The value, of type T.
      */
     def set[T](arg: String, value: T) {
@@ -974,7 +974,7 @@ package argparser {
      * @param arg The name of the argument.
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
-     *   
+     *
      * @return The value, of type T.
      */
     def defaultValue[T](arg: String) =
@@ -1248,7 +1248,7 @@ package argparser {
      * @param name8
      * @param name9
      *    Up to nine aliases for the option; see above.
-     * 
+     *
      * @param default Default value, if option not specified; if not given,
      *    it will end up as 0, 0.0 or false for value types, null for
      *    reference types.
@@ -1377,7 +1377,7 @@ package argparser {
      * @param name8
      * @param name9
      *    Up to nine aliases for the option; same as for `option[T]()`.
-     * 
+     *
      * @param help Help string for the option, shown in the usage string.
      */
     def flag(name1: String, name2: String = null, name3: String = null,
@@ -1605,7 +1605,7 @@ package argparser {
 
       if (argmap.size == 0)
         throw new ArgParserCodingError("No arguments initialized.  If you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
-      
+
       // Call the underlying Argot parsing function and wrap Argot usage
       // errors in our own ArgParserUsageException.
       def call_parse() {

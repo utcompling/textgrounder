@@ -317,7 +317,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param destdir Directory to contain results.
    * @param prefix Prefix to use for files in directory.
    * @param suffix Suffix to use for files in directory.
-   */ 
+   */
   def move_output_files(filehand: FileHandler, srcdir: String, destdir: String,
       prefix: String, suffix: String = "") {
     errprint("Moving/renaming output files ...")
@@ -340,7 +340,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
    * @param dir Directory containing persisted files.
    * @param prefix Prefix to use for files in directory.
    * @param suffix Suffix to use for files in directory.
-   */ 
+   */
   def rename_output_files(filehand: FileHandler, dir: String,
       prefix: String, suffix: String = "") =
     move_output_files(filehand, dir, dir, prefix, suffix)

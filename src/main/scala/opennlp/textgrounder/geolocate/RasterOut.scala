@@ -13,15 +13,15 @@ import java.io._
 class RasterOutParameters(
   parser: ArgParser
 ) extends GeolocateParameters(parser) {
-  
-//File to write ascii raster to 
+
+//File to write ascii raster to
   var raster_output =
     ap.option[String]("ro", "raster_out",
       metavar = "SRTING",
       default = "none",
       help = """Name of raster out file""")
 //Word to create raster for
-  var word_raster = 
+  var word_raster =
       ap.option[String]("word_raster", "wordraster",
       metavar = "STRING",
       default = "",
@@ -40,7 +40,7 @@ class RasterDriver extends
    */
 
   // def CalcMoransWord(word:String, wordFreqsRef:File, GridReference:File){
-  //   
+  //
   // }
 
   def run() {
@@ -59,7 +59,7 @@ class RasterDriver extends
     val word_raster = params.word_raster
     //val word_raster = "mama"
     //val raster_output = "/Users/grant/devel/tg-experiments/RasterOutTest.txt"
-    
+
     val wordMoransMap = Map[Int, Double]()
     val cellsInfo = Map[String, List[String]]()
 
@@ -186,9 +186,9 @@ class RasterDriver extends
       bw.write("\n")
     }
 
-    
+
     bw.close()
-  
+
   }
   def cellProb(latind:Int, longind:Int, grid:MultiRegularGrid, word:Int) = {
     //Check below line for possible problem

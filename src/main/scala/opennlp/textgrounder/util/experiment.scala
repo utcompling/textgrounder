@@ -681,7 +681,7 @@ package experiment {
 
   trait ArgParserExperimentDriver extends ExperimentDriver {
     override type TParam <: ArgParserParameters
-    
+
     override def param_error(string: String)  = {
       params.parser.error(string)
     }
@@ -726,7 +726,7 @@ package experiment {
   abstract class ExperimentDriverApp(appname: String) extends
       ExperimentApp(appname) {
     type TDriver <: ArgParserExperimentDriver
-    
+
     val driver = create_driver
     type TParam = driver.TParam
 

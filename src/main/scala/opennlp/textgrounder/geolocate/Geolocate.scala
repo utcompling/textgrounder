@@ -101,7 +101,7 @@ doing geolocation is split up into various classes:
    e.g. KLDivergenceGridRanker or NaiveBayesGridRanker. The driver method
    `setup_for_run` creates the necessary ranker objects.
 -- Evaluation is performed using different GridEvaluator objects, e.g.
-   RankedSphereGridEvaluator and MeanShiftSphereGridEvaluator. 
+   RankedSphereGridEvaluator and MeanShiftSphereGridEvaluator.
 */
 
 /**
@@ -479,7 +479,7 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     def create_multi_regular_grid = {
       new MultiRegularGrid(params.degrees_per_cell,
         cod,
-        params.width_of_multi_cell, sphere_docfact)      
+        params.width_of_multi_cell, sphere_docfact)
     }
     def create_kd_tree_grid = {
       KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
@@ -743,7 +743,7 @@ object GeolocateDocumentTag extends
     }
 
     /////// How to handle params.
-    
+
     /**
      * The order in the list is the order in which the params are output.
      * Any params not given here are put after all listed params, in the

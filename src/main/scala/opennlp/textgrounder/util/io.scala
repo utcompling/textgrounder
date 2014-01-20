@@ -51,7 +51,7 @@ package io {
   //////////////////////////////////////////////////////////////////////////////
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
-  
+
   case class FileFormatException(
     message: String,
     cause: Option[Throwable] = None
@@ -217,7 +217,7 @@ package io {
       (new FileIterator(stream, encoding=encoding, chomp=chomp, close=close,
          errors=errors), comtype, realname)
     }
-    
+
     /**
      * Open a filename with the given encoding (by default, UTF-8) and
      * optional decompression (by default, based on the filename), and
@@ -258,7 +258,7 @@ package io {
         errors=errors, bufsize=bufsize)
       iterator
     }
-    
+
     /**
      * Wrap an InputStream with optional decompression.  It is strongly
      * recommended that the InputStream be buffered.
@@ -585,18 +585,18 @@ package object io {
   // For example, if all values are equal, it will cycle successively through
   // the different split files; if the values are [1, 1.5, 1], the output
   // will be [1, 2, 3, 2, 1, 2, 3, ...]; etc.
-  
+
   def next_split_set(split_fractions: Seq[Double]): Iterable[Int] = {
-  
+
     val num_splits = split_fractions.length
     val cumulative_articles = mutable.Seq.fill(num_splits)(0.0)
-  
+
     // Normalize so that the smallest value is 1.
-  
+
     val minval = split_fractions min
     val normalized_split_fractions =
       (for (value <- split_fractions) yield value.toDouble/minval)
-  
+
     // The algorithm used is as follows.  We cycle through the output sets in
     // order; each time we return a set, we increment the corresponding
     // cumulative count, but before returning a set, we check to see if the
@@ -606,7 +606,7 @@ package object io {
     // value.  This way, if the fraction value is not a whole number, then
     // any fractional quantity (e.g. 0.6 for a value of 7.6) is left over,
     // any will ensure that the total ratios still work out appropriately.
- 
+
     def fuckme_no_yield(): Stream[Int] = {
       var yieldme = mutable.Buffer[Int]()
       for (j <- 0 until num_splits) {
@@ -645,7 +645,7 @@ package object io {
     var numread = 0
     /* SCALABUG: The following compiles but will give incorrect results because
        the result of an assignment is Unit! (You do get a warning but ...)
-     
+
      while ((numread = br.read(cbuf, 0, cbuf.length)) != -1)
        output.appendAll(cbuf, 0, numread)
 

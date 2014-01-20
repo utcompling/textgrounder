@@ -209,7 +209,7 @@ object Classify extends ExperimentApp("Classify") {
     val trainSource = io.localfh.openr(params.trainSource)
     val predictSource = io.localfh.openr(params.predictSource)
 
-    // If the output file is given via the option, create and write to that 
+    // If the output file is given via the option, create and write to that
     // file; otherwise, use stdout.
     val output = {
       if (params.output == null)

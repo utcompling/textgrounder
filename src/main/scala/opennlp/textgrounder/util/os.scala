@@ -52,7 +52,7 @@ package object os {
   private var initialized = false
   private def check_initialized() {
     if (!initialized)
-      throw new IllegalStateException("""You must call initialize_osutil() 
+      throw new IllegalStateException("""You must call initialize_osutil()
 at the beginning of your program, in order to use get_program_time_usage""")
   }
   /**
@@ -68,14 +68,14 @@ at the beginning of your program, in order to use get_program_time_usage""")
     initialized = true
   }
   val beginning_prog_time = curtimesecs
-  
+
   def get_program_time_usage = {
     check_initialized()
     curtimesecs - beginning_prog_time
   }
 
   /**
-   * Return memory usage as a 
+   * Return memory usage as a
    */
   def get_program_memory_usage(virtual: Boolean = false,
       method: String = "auto"): (String, Long) = {
@@ -95,14 +95,14 @@ at the beginning of your program, in order to use get_program_time_usage""")
       }
     }
   }
-  
+
   def get_program_memory_usage_java() = {
     System.gc()
     System.gc()
     val rt = Runtime.getRuntime
     rt.totalMemory - rt.freeMemory
   }
-  
+
   def get_program_memory_usage_rusage() = {
     // val res = resource.getrusage(resource.RUSAGE_SELF)
     // // FIXME!  This is "maximum resident set size".  There are other more useful
@@ -111,7 +111,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
     // res.ru_maxrss
     -1L
   }
-  
+
   def wrap_call[Ret](fn: => Ret, errval: Ret) = {
     try {
       fn
@@ -135,7 +135,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
       return 1024*line.trim.toLong
     return -1L
   }
- 
+
   // Get memory usage by running 'proc'; this works on Linux and doesn't
   // require spawning a subprocess, which can crash when your program is
   // very large.
@@ -156,7 +156,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
       }
     return -1L
   }
-  
+
   def format_bytes(bytes: Long) = {
     if (bytes >= 1000000000)
       "%.2f GB" format (bytes / 1000000000.0)

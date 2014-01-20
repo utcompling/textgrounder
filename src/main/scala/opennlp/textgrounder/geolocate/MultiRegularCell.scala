@@ -35,7 +35,7 @@ import gridlocate.DocStatus
 //                         A regularly spaced grid                         //
 /////////////////////////////////////////////////////////////////////////////
 
-/* 
+/*
   We divide the earth's surface into "tiling cells", all of which are the
   same square size, running on latitude/longitude lines, and which have a
   constant number of degrees on a size, set using the value of the command-
@@ -87,7 +87,7 @@ object RegularCellIndex {
      here?  And why is this not required in the almost identical construction
      in SphereCoord?  I get this error (not here, but where the object is
      created):
-     
+
      [error] /Users/benwing/devel/textgrounder/src/main/scala/opennlp/textgrounder/geolocate/MultiRegularCell.scala:273: overloaded method apply needs result type
      [error]     RegularCellIndex(latind, longind)
      [error]     ^
@@ -186,7 +186,7 @@ class MultiRegularCell(
  * a grid composed of overlapping conglomerations of tiles; this could be
  * useful e.g. for KD trees or other representations where we might want to
  * compare with cells at multiple levels of granularity.
- * 
+ *
  * @param degrees_per_cell Size of each cell in degrees.  Determined by the
  *   --degrees-per-cell option, unless --miles-per-cell is set, in which
  *   case it takes priority.
@@ -281,7 +281,7 @@ class MultiRegularGrid(
   /**
    * Convert a fractional cell index to the corresponding coordinate.  Useful
    * for indices not referring to the corner of a cell.
-   * 
+   *
    * @see #cell_index_to_coord
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
@@ -300,7 +300,7 @@ class MultiRegularGrid(
       method: String = "coerce-warn") =
     fractional_cell_index_to_coord(index.toFractional, method)
 
-  /** 
+  /**
    * Add 'offset' to both latind and longind of 'index' and then convert to a
    * coordinate.  Coerce the coordinate to be within bounds.
    */
@@ -494,7 +494,7 @@ class MultiRegularGrid(
    * Output a "ranking grid" of information so that a nice 3-D graph
    * can be created showing the ranks of cells surrounding the true
    * cell, out to a certain distance.
-   * 
+   *
    * @param pred_cells List of predicted cells, along with their scores.
    * @param correct_cell Correct cell.
    * @param grsize Total size of the ranking grid. (For example, a total size

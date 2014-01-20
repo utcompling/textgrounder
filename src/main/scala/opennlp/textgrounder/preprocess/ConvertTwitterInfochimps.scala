@@ -45,7 +45,7 @@ Steps for converting Infochimps to our format:
 2) Each line looks like this:
 
 
-100000018081132545      20110807002716  25430513        GTheHardWay                                     Niggas Lost in the Sauce ..smh better slow yo roll and tell them hoes to get a job nigga #MRIloveRatsIcanchange&amp;amp;saveherassNIGGA &lt;a href=&quot;http://twitter.com/download/android&quot; rel=&quot;nofollow&quot;&gt;Twitter for Android&lt;/a&gt;    en      42.330165       -83.045913                                      
+100000018081132545      20110807002716  25430513        GTheHardWay                                     Niggas Lost in the Sauce ..smh better slow yo roll and tell them hoes to get a job nigga #MRIloveRatsIcanchange&amp;amp;saveherassNIGGA &lt;a href=&quot;http://twitter.com/download/android&quot; rel=&quot;nofollow&quot;&gt;Twitter for Android&lt;/a&gt;    en      42.330165       -83.045913
 The fields are:
 
 1) Tweet ID
@@ -524,7 +524,7 @@ class TwitterInfochimpsStatsFileProcessor(
 class ConvertTwitterInfochimpsDriver extends
     ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = ConvertTwitterInfochimpsParameters
-  
+
   override def run() {
     val filehand = get_file_handler
     if (params.output_min_stats)

@@ -40,7 +40,7 @@ protected class ErrorPackage {
   def warning(format: String, args: Any*) {
     errprint("Warning: " + format, args: _*)
   }
-  
+
   private object WarningsSeen {
     val warnings_seen = mutable.Set[String]()
   }
@@ -56,7 +56,7 @@ protected class ErrorPackage {
       errprint(warnstr)
     }
   }
-  
+
   /**
     Output a value, for debugging through print statements.
     Basically same as just caling errprint() or println() or whatever,
@@ -67,7 +67,7 @@ protected class ErrorPackage {
   def debprint(format: String, args: Any*) {
     errprint("Debug: " + format, args: _*)
   }
-  
+
   /**
    * Return the stack trace of an exception as a string.
    */

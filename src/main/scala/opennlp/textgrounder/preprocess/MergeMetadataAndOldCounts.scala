@@ -144,7 +144,7 @@ class MMCUnigramLangModelHandler(
   writer.output_schema_file(filehand, output_dir + "/" + output_file_prefix)
   val outstream = writer.open_data_file(filehand,
     output_dir + "/" + output_file_prefix, compression = "bzip2")
- 
+
   def handle_document(title: String, keys: Array[String], values: Array[Int],
       num_words: Int) = {
     errprint("Handling document: %s", title)
@@ -172,9 +172,9 @@ class MMCUnigramLangModelHandler(
 class MMCDriver extends ArgParserExperimentDriver {
   type TParam = MMCParameters
   type TRunRes = Unit
-  
+
   val filehand = new LocalFileHandler
-  
+
   def usage() {
     sys.error("""Usage: MergeMetadataAndOldCounts [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
 

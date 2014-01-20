@@ -112,7 +112,7 @@ abstract class DiscountedUnigramLangModel(
       the unsmoothed (maximum-likelihood) estimated language model of the
       document.  This can be document-specific and is one of the two basic
       differences between the smoothing methods investigated here:
-      
+
       1. Jelinek-Mercer uses a constant value.
       2. Dirichlet uses a value that is related to document length, getting
          smaller as document length increases.
@@ -130,8 +130,8 @@ abstract class DiscountedUnigramLangModel(
       In other words:
 
       1. With interpolation, we compute the probability as
-      
-          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS) + 
+
+          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS) +
             UNSEEN_MASS * overall_word_probs[W]
 
          For unseen words, only the second term is non-zero.
@@ -255,7 +255,7 @@ abstract class DiscountedUnigramLangModel(
     inner_kl_divergence_34(other.asInstanceOf[TThis],
       overall_probs_diff_words)
   }
-      
+
   /**
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
@@ -271,7 +271,7 @@ abstract class DiscountedUnigramLangModel(
     //           (log(other.unseen_mass) - log(other.overall_unseen_mass))
     // factor2 = self.unseen_mass / self.overall_unseen_mass * factor1
     // kldiv = factor2 * (sum(words seen globally but not in either lm)
-    //                    of overall_word_probs[word]) 
+    //                    of overall_word_probs[word])
     //
     // The final sum
     //   = 1 - sum(words in self) overall_word_probs[word]

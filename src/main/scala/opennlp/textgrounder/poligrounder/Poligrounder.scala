@@ -161,10 +161,10 @@ class PoligrounderParameters(val parser: ArgParser = null) extends
 //    default = "combined",
 //    choices = Seq("combined", "ideo-users"),
 //    help = """How to compare language models.  Possible values are
-//    
+//
 //    'combined': For a given time period, combine all users into a single
 //    language model.
-//    
+//
 //    'ideo-users': Retrieve the ideology of the users and use that to
 //    separate the users into liberal and conservative, and compare those
 //    separately.""")

@@ -51,7 +51,7 @@ protected class CollectionPackage {
   ////////////////////////////////////////////////////////////////////////////
   //                               Default maps                             //
   ////////////////////////////////////////////////////////////////////////////
-  
+
   abstract class DefaultHashMap[T,U] extends mutable.HashMap[T,U] {
     def getNoSet(key: T): U
   }
@@ -77,7 +77,7 @@ protected class CollectionPackage {
         this(key) = buf
       buf
     }
-        
+
     /**
      * Retrieve the value of 'key'.  If the value isn't found, the
      * default value (from 'defaultval') will be returned, but the
@@ -107,7 +107,7 @@ protected class CollectionPackage {
       val buf = create_default(key)
       buf
     }
-        
+
     def getNoSet(key: T) = this(key)
   }
 
@@ -125,30 +125,30 @@ protected class CollectionPackage {
    *   will also add it to the buffers for other keys, which is not what
    *   we want. (Note, when mutable objects are used as values, you need to
    *   set the `setkey` parameter to true.)
-   * 
+   *
    * @param setkey indicates whether we set the key to the default upon
    *   access.  This is necessary when the value is something mutable, but
    *   probably a bad idea otherwise, since looking up a nonexistent value
    *   in the table will cause a later contains() call to return true on the
    *   value.
-   * 
+   *
    * For example:
-    
+
     val foo = defaultmap[String,Int](0, setkey = false)
     foo("bar")              -> 0
     foo contains "bar"      -> false
-   
+
     val foo = defaultmap[String,Int](0, setkey = true)
     foo("bar")              -> 0
     foo contains "bar"      -> true         (Probably not what we want)
-                   
-   
+
+
     val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = false)
     foo("myfoods") += "spam"
     foo("myfoods") += "eggs"
     foo("myfoods") += "milk"
     foo("myfoods")             -> ArrayBuffer(milk)                (OOOOOPS)
-   
+
     val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = true)
     foo("myfoods") += "spam"
     foo("myfoods") += "eggs"
@@ -215,7 +215,7 @@ protected class CollectionPackage {
    * contents of the collection will be modified.  On the other hand, in
    * the case of the above maps, the result of 'map(key)' will be
    * different.)
-   * 
+   *
    * @see #setmap[T,U]
    * @see #mapmap[T,U,V]
    */
@@ -227,7 +227,7 @@ protected class CollectionPackage {
    * `map(key) += item` will add the item to the Set stored as the
    * value of the key rather than changing the value itself, similar
    * to how `bufmap` works.
-   * 
+   *
    * @see #bufmap[T,U]
    * @see #mapmap[T,U,V]
    */
@@ -239,7 +239,7 @@ protected class CollectionPackage {
    * `map(key)(key2) = value2` will add the mapping `key2 -> value2`
    * to the Map stored as the value of the key rather than changing
    * the value itself, similar to how `bufmap` works.
-   *   
+   *
    * @see #bufmap[T,U]
    * @see #setmap[T,U]
    */
@@ -262,7 +262,7 @@ protected class CollectionPackage {
    */
    def primmapmap[T,U,V](default: V = null.asInstanceOf[V]) =
     collection_defaultmap[T,mutable.Map[U,V]](primmap[U,V](default))
-  
+
   def intmapmap[T,U](default: Int = 0) =
     collection_defaultmap[T,mutable.Map[U,Int]](intmap[U](default))
   def longmapmap[T,U](default: Long = 0L) =
@@ -293,7 +293,7 @@ protected class CollectionPackage {
   /////////////////////////////////////////////////////////////////////////////
   //                              Dynamic arrays                             //
   /////////////////////////////////////////////////////////////////////////////
-  
+
   /**
    A simple class like ArrayBuilder but which gets you direct access
    to the underlying array and lets you easily reset things, so that you
@@ -325,11 +325,11 @@ protected class CollectionPackage {
       length = 0
     }
   }
-    
+
   /////////////////////////////////////////////////////////////////////////////
   //                                Sorted lists                             //
   /////////////////////////////////////////////////////////////////////////////
-  
+
   // Return a tuple (keys, values) of lists of items corresponding to a hash
   // table.  Stored in sorted order according to the keys.  Use
   // lookup_sorted_list(key) to find the corresponding value.  The purpose of
@@ -345,48 +345,48 @@ protected class CollectionPackage {
 //      keys[i] = item[0]
 //      values[i] = item[1]
 //    return (keys, values)
-//  
+//
 //  // Given a sorted list in the tuple form (KEYS, VALUES), look up the item KEY.
 //  // If found, return the corresponding value; else return None.
-//  
+//
 //  def lookup_sorted_list(sorted_list, key, default=None):
 //    (keys, values) = sorted_list
 //    i = bisect.bisect_left(keys, key)
 //    if i != len(keys) and keys[i] == key:
 //      return values[i]
 //    return default
-//  
+//
 //  // A class that provides a dictionary-compatible interface to a sorted list
-//  
+//
 //  class SortedList(object, UserDict.DictMixin):
 //    def __init__(self, table):
 //      self.sorted_list = make_sorted_list(table)
-//  
+//
 //    def __len__(self):
 //      return len(self.sorted_list[0])
-//  
+//
 //    def __getitem__(self, key):
 //      retval = lookup_sorted_list(self.sorted_list, key)
 //      if retval is None:
 //        raise KeyError(key)
 //      return retval
-//  
+//
 //    def __contains__(self, key):
 //      return lookup_sorted_list(self.sorted_list, key) is not None
-//  
+//
 //    def __iter__(self):
 //      (keys, values) = self.sorted_list
 //      for x in keys:
 //        yield x
-//  
+//
 //    def keys(self):
 //      return self.sorted_list[0]
-//  
+//
 //    def itervalues(self):
 //      (keys, values) = self.sorted_list
 //      for x in values:
 //        yield x
-//  
+//
 //    def iteritems(self):
 //      (keys, values) = self.sorted_list
 //      for (key, value) in izip(keys, values):
@@ -402,19 +402,19 @@ protected class CollectionPackage {
 //  // in the Queue module.
 //  class PriorityQueue(object):
 //    INVALID = 0                     // mark an entry as deleted
-//  
+//
 //    def __init__(self):
 //      self.pq = []                         // the priority queue list
 //      self.counter = itertools.count(1)    // unique sequence count
 //      self.task_finder = {}                // mapping of tasks to entries
-//  
+//
 //    def add_task(self, priority, task, count=None):
 //      if count is None:
 //        count = self.counter.next()
 //      entry = [priority, count, task]
 //      self.task_finder[task] = entry
 //      heappush(self.pq, entry)
-//  
+//
 //    //Return the top-priority task. If 'return_priority' is false, just
 //    //return the task itself; otherwise, return a tuple (task, priority).
 //    def get_top_priority(self, return_priority=false):
@@ -426,11 +426,11 @@ protected class CollectionPackage {
 //            return (task, priority)
 //          else:
 //            return task
-//  
+//
 //    def delete_task(self, task):
 //      entry = self.task_finder[task]
 //      entry[1] = PriorityQueue.INVALID
-//  
+//
 //    def reprioritize(self, priority, task):
 //      entry = self.task_finder[task]
 //      self.add_task(priority, task, entry[1])
@@ -459,7 +459,7 @@ protected class CollectionPackage {
       }
       else None
     }
- 
+
     override def update(key: T, value: U) {
       if (cache contains key)
         reprioritize(key)
@@ -473,7 +473,7 @@ protected class CollectionPackage {
     }
 
     override def remove(key: T): Option[U] = cache.remove(key)
- 
+
     def iterator: Iterator[(T, U)] = cache.iterator
 
     // All the rest Looks like pure boilerplate!  Why necessary?
@@ -514,7 +514,7 @@ protected class CollectionPackage {
   // "collector") that the user can use to keep track of the keys and values.
   // This way, the user can choose to use a list of values, a set of values, a
   // table of keys and values, etc.
-  
+
   // 'ranges' is a sorted list of numbers, indicating the
   // boundaries of the ranges.  One range includes all keys that are
   // numerically below the first number, one range includes all keys that are
@@ -535,7 +535,7 @@ protected class CollectionPackage {
     val max_value: Numtype
     val items_by_range = mutable.Map[Numtype,Coll]()
     var seen_negative = false
-  
+
     def get_collector(key: Numtype) = {
       // This somewhat scary-looking cast produces 0 for Int and 0.0 for
       // Double.  If you write it as 0.asInstanceOf[Numtype], you get a
@@ -560,7 +560,7 @@ protected class CollectionPackage {
         items_by_range(lower_range) = create(lower_range)
       items_by_range(lower_range)
     }
-  
+
     /**
      Return an iterator over ranges in the table.  Each returned value is
      a tuple (LOWER, UPPER, COLLECTOR), giving the lower and upper bounds
@@ -569,7 +569,7 @@ protected class CollectionPackage {
      'lowest_bound' specified during creation, and the upper bound of the range
      that is higher than any numbers specified during creation in the 'ranges'
      list will be the string "infinity" if such a range is returned.
-  
+
      The optional arguments 'unseen_between' and 'unseen_all' control the
      behavior of this iterator with respect to ranges that have never been seen
      (i.e. no keys in this range have been passed to 'get_collector').  If
@@ -587,7 +587,7 @@ protected class CollectionPackage {
         if (items_by_range contains lower)
           highest_seen = upper
       }
-  
+
       var seen_any = false
       for {(lower, upper) <- iteration_range
            // FIXME SCALABUG: This is a bug in Scala if I have to do this
@@ -620,7 +620,7 @@ protected class CollectionPackage {
     val max_value = java.lang.Double.POSITIVE_INFINITY
   }
 
- 
+
 //  //////////////////////////////////////////////////////////////////////////////
 //  //                          Depth-, breadth-first search                    //
 //  //////////////////////////////////////////////////////////////////////////////
@@ -635,7 +635,7 @@ protected class CollectionPackage {
 //      if matches(node):
 //        yield node
 //      nodelist.extend(reversed(children(node)))
-//  
+//
 //  // General breadth-first search.  'node' is the node to search, the top of a
 //  // tree.  'matches' indicates whether a given node matches.  'children'
 //  // returns a list of child nodes.
@@ -668,7 +668,7 @@ protected class CollectionPackage {
     }
 
     def next = {
-      if (interrupted) 
+      if (interrupted)
         throw new java.util.NoSuchElementException("next on empty iterator")
       else iter.next
     }

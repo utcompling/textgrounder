@@ -217,7 +217,7 @@ object FindPolitical extends
       opts.schema.fieldnames filterNot (_ == "user")
     val user_subschema = new SubSchema(user_subschema_fieldnames,
       opts.schema.fixed_values, opts.schema)
- 
+
     def row_fields =
       Seq("user", "ideology",
         "num-ideo-accounts", "num-ideo-refs", "ideo-refs",

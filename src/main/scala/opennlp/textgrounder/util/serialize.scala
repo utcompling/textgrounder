@@ -147,7 +147,7 @@ object TextSerializer {
    * If the object has the value `null`, write out a blank string.
    * Note that T must be a reference type (i.e. not a primitive
    * type such as Int or Double), so that `null` is a valid value.
-   * 
+   *
    * @see put_x
    * @see put_x
    */

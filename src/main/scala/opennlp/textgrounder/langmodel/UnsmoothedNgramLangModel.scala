@@ -54,7 +54,7 @@ class UnsmoothedNgramLangModel(
   def model_logprob(langmodel: LangModel) = ???
 
   def kl_divergence_34(other: NgramLangModel) = ???
- 
+
   /**
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.

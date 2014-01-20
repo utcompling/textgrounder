@@ -255,7 +255,7 @@ class OpenNLPNgramStorer extends NgramStorage {
  * involve e.g. creating some sort of trie, with a pointer to the appropriate
  * memory location (or index) in the trie serving as the value returned back
  * after memoization.
- * 
+ *
  * @param factory A `LangModelFactory` object used to create this lang model.
  *   The object also stores global properties of various sorts (e.g. for
  *   smothing).
@@ -272,16 +272,16 @@ abstract class NgramLangModel(
    * This is a basic unigram implementation of the computation of the
    * KL-divergence between this lang model and another lang model,
    * including possible debug information.
-   * 
+   *
    * Computing the KL divergence is a bit tricky, especially in the
    * presence of smoothing, which assigns probabilities even to words not
    * seen in either lang model.  We have to take into account:
-   * 
+   *
    * 1. Words in this lang model (may or may not be in the other).
    * 2. Words in the other lang model that are not in this one.
    * 3. Words in neither lang model but seen in the global backoff stats.
    * 4. Words never seen at all.
-   * 
+   *
    * The computation of steps 3 and 4 depends heavily on the particular
    * smoothing algorithm; in the absence of smoothing, these steps
    * contribute nothing to the overall KL-divergence.
@@ -296,7 +296,7 @@ abstract class NgramLangModel(
    * @see #slow_kl_divergence_debug
    */
   def kl_divergence_34(other: NgramLangModel): Double
-  
+
   def get_most_contributing_grams(langmodel: LangModel,
       relative_to: Iterable[LangModel] = Iterable()) = ???
 }
@@ -422,7 +422,7 @@ class DefaultNgramLangModelBuilder(
     // Way too much output to keep enabled
     //errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_ngrams))
     //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
-  } 
+  }
 
   def finish_before_global(lm: LangModel) {
     // A table listing OOV ngrams, e.g. Seq(OOV), Seq(OOV, OOV), etc.
@@ -461,5 +461,5 @@ class DefaultNgramLangModelBuilder(
 
 /**
  * General factory for NgramLangModel lang models.
- */ 
+ */
 abstract class NgramLangModelFactory extends LangModelFactory { }

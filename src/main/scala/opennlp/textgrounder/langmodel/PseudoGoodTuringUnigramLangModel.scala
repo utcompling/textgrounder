@@ -36,7 +36,7 @@ import util.print.errprint
  * theoretical sense (and in particular ensures that we don't assign 99%
  * of the mass or whatever to unseen words, as can happen to add-one smoothing
  * especially for bigrams or trigrams).
- */ 
+ */
 class PseudoGoodTuringUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,

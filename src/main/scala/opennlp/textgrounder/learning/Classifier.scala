@@ -85,7 +85,7 @@ trait DataInstance {
  *    the feature vectors themselves don't vary by label, since either the
  *    weights or features must vary from label to label or the classifier
  *    cannot distinguish one label from another.
- * 
+ *
  * 2. A basic variable-depth classifier.  Each instance has a particular
  *    number of allowable labels, which may vary from instance to instance.
  *    In such a case, since the number of possible labels isn't known in
@@ -162,7 +162,7 @@ object LinearClassifier {
       if (maybestats != None) {
         errprint(s"  Weights at depth $depth by relative contribution: ")
         val stats = maybestats.get
-        val scaled_weights = vec.zipWithIndex.map { case (coeff, feat) => 
+        val scaled_weights = vec.zipWithIndex.map { case (coeff, feat) =>
           val count = stats.count(feat)
           val absavg =
             if (count == 0) 0.0
@@ -282,7 +282,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
       val max_label = weights.max_label min inst.feature_vector.max_label
       require(label >= 0 && label <= max_label,
         "Label %s out of bounds: [%s,%s]" format (label, 0, max_label))
-    } 
+    }
     weights
   }
 
@@ -435,7 +435,7 @@ trait MultiCorrectLabelClassifierTrainer[DI <: DataInstance]
   def no_labels(inst: DI, label: LabelIndex) =
     (0 until label) ++ ((label + 1) until number_of_labels(inst))
 }
- 
+
 /**
  * Class for training a linear classifier with a single weight vector for
  * all labels.  This is used both for binary and multi-label classifiers.

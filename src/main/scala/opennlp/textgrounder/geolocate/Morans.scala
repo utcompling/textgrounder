@@ -25,12 +25,12 @@ import util.textdb.TextDB
 import scala.collection.mutable.Map
 
 import java.io._
- 
+
 class MoransParameters(
   parser: ArgParser
 ) extends GeolocateParameters(parser) {
   var morans_output =
-  //NEED TO REDO COMMENTING ON MORANS, NOT CORRECT 
+  //NEED TO REDO COMMENTING ON MORANS, NOT CORRECT
     ap.option[String]("mo", "morans_output",
       metavar = "String",
       default = "MoransOutput.txt",
@@ -47,7 +47,7 @@ class MoransDriver extends
    */
 
   // def CalcMoransWord(word:String, wordFreqsRef:File, GridReference:File){
-  //   
+  //
   // }
 
   def run() {
@@ -79,7 +79,7 @@ class MoransDriver extends
         val word = key._1
         //println(key._2)
         val mean = wordMap_lookupMap._1(word)
-        
+
         val CAF = cellProb((index.latind + 1), index.longind, grid.asInstanceOf[MultiRegularGrid], word)
         //println("Cell Above Prob " + CAF)
 
@@ -118,14 +118,14 @@ class MoransDriver extends
         //Num_of_Neighbors_with_word (Adjacent neighbors)
         val num_of_neighbors_with_word = (4.0 - CalcNumer(CF, CAF, CBF, CLF, CRF, mean)._2)
 
-        //Normalizing_Factor_Word = (CF - Mean)^2 
+        //Normalizing_Factor_Word = (CF - Mean)^2
         val morans_denom = ((CF - mean)*(CF - mean))
 
         //Check Calculation for "yalll"
         /*if (word == 12955){
           println("#########")
           println("CF: %s, CAF: %s, CBF: %s, CLF: %s, CRF: %s, Mean: %s, Morans_Num: %s, Morans_Denom: %s, Neighbors: %s" format (CF, CAF, CBF, CLF, CRF, mean, morans_numerator, morans_denom, num_of_neighbors_with_word))
-        }*/ 
+        }*/
 
         //Total_Denom_Word = Total_Denom_Word + Normalizing_Factor_Word
         if (wordMoransSum_Denom.contains(word)){
@@ -133,7 +133,7 @@ class MoransDriver extends
         }else{
           wordMoransSum_Denom += (word -> (morans_denom / (wordMap_lookupMap._3(word).toDouble)))
         }
-        
+
 
         //Total_Neighbors_word = Total_Neighbors_word + Num_of_Neighbors_with_word
         if (wordMoransSum_Neighbors.contains(word)){
@@ -151,7 +151,7 @@ class MoransDriver extends
         //Word Global Mean Frequency
 
         val mean = wordMap_lookupMap._1(word)
-        
+
         //println(wordMap_lookupMap._2(word))
 
         val index = cell.asInstanceOf[MultiRegularCell].index
@@ -191,14 +191,14 @@ class MoransDriver extends
         //Num_of_Neighbors_with_word (Adjacent neighbors)
         val num_of_neighbors_with_word = (4.0 - CalcNumer(CF, CAF, CBF, CLF, CRF, mean)._2)
 
-        //Normalizing_Factor_Word = (CF - Mean)^2 
+        //Normalizing_Factor_Word = (CF - Mean)^2
         val morans_denom = ((CF - mean)*(CF - mean))
 
         //Check Calculation for "yalll"
         /*if (word == 12955){
           println("#########")
           println("CF: %s, CAF: %s, CBF: %s, CLF: %s, CRF: %s, Mean: %s, Morans_Num: %s, Morans_Denom: %s, Neighbors: %s" format (CF, CAF, CBF, CLF, CRF, mean, morans_numerator, morans_denom, num_of_neighbors_with_word))
-        }*/ 
+        }*/
 
         //Total_Denom_Word = Total_Denom_Word + Normalizing_Factor_Word
         if (wordMoransSum_Denom.contains(word)){
@@ -206,7 +206,7 @@ class MoransDriver extends
         }else{
           wordMoransSum_Denom += (word -> (morans_denom / (wordMap_lookupMap._3(word).toDouble)))
         }
-        
+
 
         //Total_Neighbors_word = Total_Neighbors_word + Num_of_Neighbors_with_word
         if (wordMoransSum_Neighbors.contains(word)){
@@ -219,7 +219,7 @@ class MoransDriver extends
     }*/
     //val dir = new File()
     //val fw = new FileWriter(dir.getAbsoluteFile())
-    
+
     println("#####Starting to Write Out#######")
     //Write Out Info to file
     val bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(params.morans_output), "UTF-8"))
@@ -227,7 +227,7 @@ class MoransDriver extends
     for (thing <- wordMap_lookupMap._1 ){
       //Currently Morans Coef only gets results for words that have at least 1 neighbor with the word
       wordMoransMap += (thing._1 -> (((wordMoransSum_Numer(thing._1) / wordMoransSum_Neighbors(thing._1))  / (wordMoransSum_Denom(thing._1)))))
-      
+
       /*if (thing._1 == 12955){
         println("WordID: %s, Word: %s, MC: %s" format (thing._1, wordMap_lookupMap._2(thing._1) , wordMoransMap(thing._1)))
         println(wordMoransSum_Numer(thing._1))

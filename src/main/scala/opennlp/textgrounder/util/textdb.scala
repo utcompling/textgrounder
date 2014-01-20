@@ -68,7 +68,7 @@ import serialize.TextSerializer
  *     -- data file #1: "twitter-infochimps-1-dev.data.txt.bz2"
  *     -- data file #2: "twitter-infochimps-2-dev.data.txt.bz2"
  *     etc.
- * 
+ *
  * The most common setup is to have the schema file and any data files
  * placed in the same directory, although it's possible to have them in
  * different directories or to have data files scattered across multiple

@@ -113,7 +113,7 @@ class WikipediaDocSubfactory(
 
   /**
    * Add document to related lists mapping lowercased form, short form, etc.
-   */ 
+   */
   override def record_training_document_in_subfactory(xdoc: SphereDoc) {
     val doc = xdoc.asInstanceOf[WikipediaDoc]
     val name = doc.title

@@ -22,7 +22,7 @@ package langmodel
 /**
  * This class implements Jelinek-Mercer discounting, the simplest type of
  * discounting where we just use a constant discount factor.
- */ 
+ */
 class JelinekMercerUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,

@@ -364,8 +364,8 @@ class FrobTextDB(
       TextDB.get_textdb_files(filehand, dir, suffix_re = params.input_suffix)
     val (_, schpref, _, _) = Schema.split_schema_file(filehand,
       schema.filename, params.input_suffix).get
-    schema_prefix = schpref    
-    
+    schema_prefix = schpref
+
     for (file <- files) {
       val (_, prefix, _, _) = TextDB.split_data_file(
         filehand, file, params.input_suffix).get

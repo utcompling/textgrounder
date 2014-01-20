@@ -58,7 +58,7 @@ package object math {
    */
   def median(seq: IndexedSeq[Double], sorted: Boolean = false) =
     quantile_at(seq, 0.5, sorted)
-  
+
   /**
    *  Return the quantile value at the given fraction. If the quantile
    *  doesn't fall exactly at a point in the array, we interpolate between
@@ -163,4 +163,4 @@ package math {
       shifted
     }
   }
-} 
+}

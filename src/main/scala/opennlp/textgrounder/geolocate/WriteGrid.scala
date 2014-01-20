@@ -22,7 +22,7 @@ package geolocate
 import util.argparser._
 import util.experiment._
 import util.textdb.TextDB
- 
+
 class WriteGridParameters(
   parser: ArgParser
 ) extends GeolocateParameters(parser) {

@@ -109,7 +109,7 @@ class TimeGrid(
   category_of_doc: TimeDoc => String,
   override val docfact: TimeDocFactory
 ) extends Grid[TimeCoord](docfact) {
-  
+
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))
   }.toMap

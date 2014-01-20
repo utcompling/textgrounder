@@ -103,12 +103,12 @@ object FastDiscountedUnigramLangModel {
     // time, though.
     var kldiv = 0.0
     /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
-       
+
        This code needs to scream.  Hence we do extra setup above involving
        arrays, to avoid having a function call through a function
        pointer (through the "obvious" use of forEach()). FIXME: But see
        comment above.
-      
+
        Note that HotSpot is good about inlining function calls.
        Hence we can assume that the calls to apply() below (e.g.
        qcounts(word)) will be inlined.  However, it's *very important*
@@ -175,7 +175,7 @@ object FastDiscountedUnigramLangModel {
         i += 1
       }
     }
-  
+
     if (partial)
       return kldiv
 
@@ -187,13 +187,13 @@ object FastDiscountedUnigramLangModel {
       val q = qcount * qfact
       kldiv += p * (log(p) - log(q))
       overall_probs_diff_words += word_overall_prob
-    }    
+    }
 
     return kldiv + self.inner_kl_divergence_34(other, overall_probs_diff_words)
   }
-  
+
   // The older implementation that uses smoothed probabilities.
-  
+
   /**
    * A fast implementation of cosine similarity that inlines lookups as
    * much as possible.  It's always "partial" in that it ignores words
@@ -242,10 +242,10 @@ object FastDiscountedUnigramLangModel {
       p2sum += p * p
       q2sum += q * q
     }
-  
+
     if (partial)
       return pqsum / (sqrt(p2sum) * sqrt(q2sum))
-  
+
     // 2.
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
@@ -258,21 +258,21 @@ object FastDiscountedUnigramLangModel {
       q2sum += q * q
       //overall_probs_diff_words += word_overall_prob
     }
-  
+
     // FIXME: This would be the remainder of the computation for words
     // neither in P nor Q.  We did a certain amount of math in the case of the
     // KL-divergence to make it possible to do these steps efficiently.
     // Probably similar math could make the steps here efficient as well, but
     // unclear.
-  
+
     //kldiv += self.kl_divergence_34(other, overall_probs_diff_words)
     //return kldiv
-  
+
     return pqsum / (sqrt(p2sum) * sqrt(q2sum))
   }
-  
+
   // The newer implementation that uses unsmoothed probabilities.
-  
+
   /**
    * A fast implementation of cosine similarity that inlines lookups as
    * much as possible. With parameter "partial" to true we
@@ -306,14 +306,14 @@ object FastDiscountedUnigramLangModel {
       p2sum += p * p
       q2sum += q * q
     }
-  
+
     // 2.
     if (!partial)
     for ((word, qcount) <- qmodel.iter_grams if !(pmodel contains word)) {
       val q = qcount * qfact
       q2sum += q * q
     }
-  
+
     if (pqsum == 0.0) 0.0 else pqsum / (sqrt(p2sum) * sqrt(q2sum))
   }
 }

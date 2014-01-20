@@ -122,7 +122,7 @@ class UnigramStorage extends GramStorage {
  *   arrays from DynamicArray objects can be used
  * @param values Array holding values corresponding to each key, possibly
  *   oversize
- * @param num_words Number of actual key/value pairs to be stored 
+ * @param num_words Number of actual key/value pairs to be stored
  *   statistics.
  */
 
@@ -138,16 +138,16 @@ abstract class UnigramLangModel(
    * This is a basic unigram implementation of the computation of the
    * KL-divergence between this lang model and another lang model,
    * including possible debug information.
-   * 
+   *
    * Computing the KL divergence is a bit tricky, especially in the
    * presence of smoothing, which assigns probabilities even to words not
    * seen in either lang model.  We have to take into account:
-   * 
+   *
    * 1. Words in this lang model (may or may not be in the other).
    * 2. Words in the other lang model that are not in this one.
    * 3. Words in neither lang model but seen in the global back-off stats.
    * 4. Words never seen at all.
-   * 
+   *
    * The computation of steps 3 and 4 depends heavily on the particular
    * smoothing algorithm; in the absence of smoothing, these steps
    * contribute nothing to the overall KL-divergence.
@@ -196,7 +196,7 @@ abstract class UnigramLangModel(
    * @see #slow_kl_divergence_debug
    */
   def kl_divergence_34(other: UnigramLangModel): Double
-  
+
   /**
    * Return `log p(thismodel|othermodel)`. This implements a log-linear
    * model, i.e. it is similar to a standard Naive-Bayes model that
@@ -362,7 +362,7 @@ class DefaultUnigramLangModelBuilder(
     // Way too much output to keep enabled
     //errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_words))
     //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
-  } 
+  }
 
   /**
    * Incorporate a set of (key, value) pairs into the language model.
@@ -451,5 +451,5 @@ class FilterUnigramLangModelBuilder(
 
 /**
  * General factory for UnigramLangModel language models.
- */ 
+ */
 trait UnigramLangModelFactory extends LangModelFactory { }

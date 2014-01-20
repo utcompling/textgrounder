@@ -401,7 +401,7 @@ abstract class GridDocFactory[Co : TextSerializer](
   val lang_model_factory: DocLangModelFactory
 ) {
   // Example of using TaskCounterWrapper directly for non-split values.
-  // val num_documents = new driver.TaskCounterWrapper("num_documents") 
+  // val num_documents = new driver.TaskCounterWrapper("num_documents")
 
   /** # of records seen in each split. */
   val num_records_by_split =

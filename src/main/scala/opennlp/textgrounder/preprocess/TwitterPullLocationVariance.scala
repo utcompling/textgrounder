@@ -69,7 +69,7 @@ object TwitterPullLocationVariance extends ScoobiApp {
       val parsed = json.parse(line)
       val author = force_value(parsed \ "user" \ "screen_name")
       val tweet_id = force_value(parsed \ "id_str")
-      val (blat, blng) = 
+      val (blat, blng) =
         try {
           val bounding_box = (parsed \ "place" \ "bounding_box" \ "coordinates" values)
                               .asInstanceOf[List[List[List[Double]]]](0)
@@ -79,12 +79,12 @@ object TwitterPullLocationVariance extends ScoobiApp {
           case npe: NullPointerException => (Double.NaN, Double.NaN)
           case cce: ClassCastException => (Double.NaN, Double.NaN)
         }
-      val (plat, plng) = 
+      val (plat, plng) =
         if ((parsed \ "coordinates" values) == null ||
             (force_value(parsed \ "coordinates" \ "type") != "Point")) {
           (Double.NaN, Double.NaN)
         } else {
-          val latlng: List[Number] = 
+          val latlng: List[Number] =
             (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
           (latlng(1).doubleValue, latlng(0).doubleValue)
         }
@@ -106,7 +106,7 @@ object TwitterPullLocationVariance extends ScoobiApp {
     val (a, (lat, lng)) = r
     !isNaN(lat) && !isNaN(lng)
   }
-  
+
   def cartesian_product[T1, T2](A: Seq[T1], B: Seq[T2]): Iterable[(T1, T2)] = {
     for (a <- A; b <- B) yield (a, b)
   }

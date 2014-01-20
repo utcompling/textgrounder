@@ -54,7 +54,7 @@ package hadoop {
 
     def get_raw_input_stream(filename: String) =
       get_file_system(filename).open(new Path(filename))
-  
+
     def get_raw_output_stream(filename: String, append: Boolean) = {
       val fs = get_file_system(filename)
       val path = new Path(filename)
@@ -300,7 +300,7 @@ package hadoop {
     def get_configuration = get_job_context.getConfiguration
 
     def get_task_id = get_configuration.getInt("mapred.task.partition", -1)
-    
+
     /**
      * Find the Counter object for the given counter.
      */

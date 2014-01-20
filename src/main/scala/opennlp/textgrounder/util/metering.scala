@@ -238,7 +238,7 @@ protected class MeteringPackage {
      * comes from the `doing` parameter to this function and should be a
      * lower-case transitive verb in the -ing form.  The actual value of
      * "items" comes from the `item_name` constructor parameter to this
-     * class. */ 
+     * class. */
     def finish() {
       meter_timer.finish()
     }
@@ -258,7 +258,7 @@ protected class MeteringPackage {
     def iterate[T](iter: Iterator[T]) = {
       val wrapiter = new InterruptibleIterator(iter)
       new SideEffectIterator({ start() }) ++
-      wrapiter.map { x => 
+      wrapiter.map { x =>
         if (item_processed())
           wrapiter.stop()
         x
