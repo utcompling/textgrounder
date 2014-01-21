@@ -26,6 +26,20 @@ import util.textdb.Row
 import learning._
 
 /**
+ * Object encapsulating a GridLocate data instance to be used by the
+ * classifier that underlies the reranker. This corresponds to a document
+ * in the training corpus and serves as the main part of an RTI (rerank
+ * training instance, see `PointwiseClassifyingRerankerTrainer`).
+ */
+case class GridRerankerInst[Co](
+  doc: GridDoc[Co],
+  agg: AggregateFeatureVector,
+  candidates: IndexedSeq[GridCell[Co]]
+) extends GridRankerInst[Co] {
+  def get_cell(index: LabelIndex) = candidates(index)
+}
+
+/**
  * A grid ranker that uses reranking.
  *
  * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
@@ -58,12 +72,12 @@ class GridReranker[Co](
  */
 abstract class LinearClassifierGridRerankerTrainer[Co](
   ranker_name: String,
-  val trainer: SingleWeightLinearClassifierTrainer[GridRankerInst[Co]]
+  val trainer: SingleWeightLinearClassifierTrainer[GridRerankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRankerInst[Co]
+    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRerankerInst[Co]
     ] { self =>
   protected def create_rerank_classifier(
-    training_data: TrainingData[GridRankerInst[Co]]
+    training_data: TrainingData[GridRerankerInst[Co]]
   ) = {
     val data = training_data.data
     errprint("Training linear classifier ...")

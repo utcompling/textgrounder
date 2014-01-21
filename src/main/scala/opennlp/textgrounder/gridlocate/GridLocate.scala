@@ -530,6 +530,7 @@ trait GridLocateRankParameters {
         Seq("smoothed-full-cosine-similarity", "smoothed-full-cossim"),
         Seq("sum-frequency"),
         Seq("naive-bayes", "nb"),
+        Seq("classifier"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("salience", "internal-link"),
         Seq("random"),
@@ -574,6 +575,10 @@ The strategy for computing prior probability is specified using
 '--naive-bayes-prior'. See also '--naive-bayes-prior-weight' for controlling
 how the prior probability and likelihood (word probabilities) are weighted.
 
+'classify' uses a linear classifier, treating each possible cell as a
+separate class. This only works if the number of cells is small (not more
+than a few hundred, probably).
+
 'average-cell-probability' (or 'celldist') involves computing, for each word,
 a probability distribution over cells using the language model of each cell,
 and then combining the distributions over all words in a document, weighted by
@@ -607,24 +612,23 @@ simple algorithms meant for comparison purposes.
 """Default is '%default'.""")
 }
 
-trait GridLocateRerankParameters {
+trait GridLocateFeatureParameters {
   this: GridLocateParameters =>
 
-  var reranker =
-    ap.option[String]("reranker",
-      default = "none",
-      choices = Seq("none", "random", "oracle", "perceptron", "avg-perceptron",
+  var classifier =
+    ap.option[String]("classifier",
+      default = "tadm",
+      choices = Seq("random", "oracle", "perceptron", "avg-perceptron",
         "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
-      help = """Type of strategy to use when reranking.  Possibilities are:
+      help = """Type of classifier to use when '--ranker=classify'.
+Possibilities are:
 
-'none' (no reranking);
+'random' (pick randomly among the cells to rerank);
 
-'random' (pick randomly among the candidates to rerank);
-
-'oracle' (always pick the correct candidate if it's among the candidates);
+'oracle' (always pick the correct cell);
 
 'perceptron' (using a basic-algorithm perceptron, try to maximimize the
-  likelihood of picking the correct candidate in the training set);
+  likelihood of picking the correct cell in the training set);
 
 'avg-perceptron' (similar to 'perceptron' but averages the weights from
   the various rounds of the perceptron computations -- this usually improves
@@ -639,49 +643,56 @@ trait GridLocateRerankParameters {
   error distance as the cost);
 
 'mlogit' (use R's mlogit() function to implement a multinomial conditional
-  logit aka maxent ranking model, a type of generalized linear model);
+  logit aka label-specific maxent model, a type of generalized linear model);
 
-'tadm' (use TADM to implement a maxent ranking model).
+'tadm' (use TADM to implement a label-specific maxent model).
 
 Default is '%default'.
 
-For the perceptron optimizers, see also `--pa-variant`,
+For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
 `--perceptron-rounds`.""")
 
   protected def with_binned(feats: String*) =
     feats flatMap { f => Seq(f, f + "-binned") }
 
-  val rerank_features_simple_gram_choices =
+  val features_simple_gram_choices =
     (Seq("binary") ++ with_binned(
       "doc-count", "cell-count", "doc-prob", "cell-prob")
     ).map { "gram-" + _ }
 
-  val rerank_features_matching_gram_choices =
+  val features_matching_gram_choices =
     (Seq("binary") ++ with_binned(
       "doc-count", "cell-count", "doc-prob", "cell-prob",
       "count-product", "count-quotient", "prob-product", "prob-quotient",
       "kl")
     ).map { "matching-gram-" + _ }
 
-  val rerank_features_all_gram_choices =
-    rerank_features_simple_gram_choices ++
-    rerank_features_matching_gram_choices
+  val features_all_gram_choices =
+    features_simple_gram_choices ++
+    features_matching_gram_choices
 
-  val allowed_rerank_features =
-    Seq("misc", "types-in-common", "model-compare", "rank-score", "trivial") ++
-    rerank_features_all_gram_choices
+  val allowed_features =
+    Seq("misc", "types-in-common", "model-compare", "trivial") ++
+    features_all_gram_choices
 
-  var rerank_features =
-    ap.option[String]("rerank-features",
-      default = "rank-score,misc",
-      help = """Which features to use in the reranker, to characterize the
-similarity between a document and candidate cell (largely based on the
-respective language models). Possibilities are:
+  def get_feature_list(featstring: String, allowed: Iterable[String],
+      arg: String) = {
+    val features = featstring.split("[ ,]")
+    for (feature <- features) {
+      if (!(allowed_features contains feature))
+        ap.usageError(s"Unrecognized feature '$feature' in --$arg")
+    }
+    features.toSeq
+  }
+
+  var classify_features =
+    ap.option[String]("classify-features",
+      default = "misc",
+      help = """Which features to use when using a linear classifier to rank
+the cells for a document. Possibilities are:
 
 'trivial' (no features, for testing purposes);
-
-'rank-score' (use the original rank and ranking score);
 
 'gram-binary' (when a gram -- i.e. word or ngram according to the type of
   language model -- exists in the document, create a feature with the value
@@ -736,39 +747,123 @@ respective language models). Possibilities are:
 
 Multiple feature types can be specified, separated by spaces or commas.
 
-Default %default.
+Default %default.""")
 
-Note that this only is used when --rerank=pointwise and --rerank-classifier
-specifies something other than 'trivial'.""")
+  lazy val classify_feature_list =
+    get_feature_list(classify_features, allowed_features,
+      "classify-features")
 
-  lazy val rerank_feature_list = {
-    val features = rerank_features.split("[ ,]")
-    for (feature <- features) {
-      if (!(allowed_rerank_features contains feature))
-        ap.usageError("Unrecognized feature '%s' in --rerank-features" format
-          feature)
-    }
-    features.toSeq
-  }
-
-  var rerank_binning =
-    ap.option[String]("rerank-binning", "rb", "bin", metavar = "BINNING",
+  var classify_binning =
+    ap.option[String]("classify-binning", "cb", metavar = "BINNING",
       default = "also",
       aliasedChoices = Seq(
         Seq("also", "yes"),
         Seq("only"),
         Seq("no")),
-      help = """Whether to include binned features in addition to or in place of
-numeric features. If 'also' or 'yes', include both binned and numeric features.
-If 'only', include only binned features. If 'no', include only numeric features.
-Binning features involves converting numeric values to one of a limited number
-of choices. Binning of most values is done logarithmically using base 2.
-Binning of some fractional values is done in equal intervals. Default '%default'.
+      help = """Whether to include binned features in addition to or in place
+of numeric features. If 'also' or 'yes', include both binned and numeric
+features. If 'only', include only binned features. If 'no', include only
+numeric features. Binning features involves converting numeric values to one
+of a limited number of choices. Binning of most values is done logarithmically
+using base 2. Binning of some fractional values is done in equal intervals.
+Default '%default'.
 
-NOTE: Currently, this option does not affect any of the word-by-word rerank feature
-types, which have separate '*-binned' equivalents that can be specified directly.
-It does affect 'misc', 'model-compare', 'rank-score' and similar
-non-word-by-word feature types. See '--rerank-features'.""")
+NOTE: Currently, this option does not affect any of the gram-by-gram feature
+types, which have separate '*-binned' equivalents that can be specified
+directly. It does affect 'misc', 'model-compare', 'rank-score' and similar
+non-word-by-word feature types. See '--classify-features'.""")
+
+  var initial_weights =
+    ap.option[String]("initial-weights", "iw",
+      default = "zero",
+      choices = Seq("zero", "rank-score-only", "random"),
+      help = """How to initialize weights during reranking. Possibilities
+are 'zero' (set to all zero), 'rank-score-only' (set to zero except for
+the original ranking score, when reranking), 'random' (set to random).""")
+
+  var random_restart =
+    ap.option[Int]("random-restart", "rr",
+      default = 1,
+      must = be_>(0),
+      help = """How often to recompute the weights. The resulting
+set of weights will be averaged. This only makes sense when
+'--initialize-weights random', and implements random restarting.
+NOT CURRENTLY IMPLEMENTED.""")
+}
+
+trait GridLocateRerankParameters {
+  this: GridLocateParameters with GridLocateFeatureParameters =>
+
+  var reranker =
+    ap.option[String]("reranker",
+      default = "none",
+      choices = Seq("none", "random", "oracle", "perceptron", "avg-perceptron",
+        "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
+      help = """Type of strategy to use when reranking.  Possibilities are:
+
+'none' (no reranking);
+
+'random' (pick randomly among the candidates to rerank);
+
+'oracle' (always pick the correct candidate if it's among the candidates);
+
+'perceptron' (using a basic-algorithm perceptron, try to maximimize the
+  likelihood of picking the correct candidate in the training set);
+
+'avg-perceptron' (similar to 'perceptron' but averages the weights from
+  the various rounds of the perceptron computations -- this usually improves
+  results if the weights oscillate around a certain error rate, rather than
+  steadily improving);
+
+'pa-perceptron' (passive-aggressive perceptron, which usually leads to steady
+  but gradually dropping-off error rate improvements with increased number
+  of rounds);
+
+'cost-perceptron' (cost-sensitive passive-aggressive perceptron, using the
+  error distance as the cost);
+
+'mlogit' (use R's mlogit() function to implement a multinomial conditional
+  logit aka maxent ranking model, a type of generalized linear model);
+
+'tadm' (use TADM to implement a maxent ranking model).
+
+Default is '%default'.
+
+For the perceptron optimizers, see also `--pa-variant`,
+`--perceptron-error-threshold`, `--perceptron-aggressiveness` and
+`--perceptron-rounds`.""")
+
+  var rerank_features =
+    ap.option[String]("rerank-features",
+      default = "rank-score,misc",
+      help = """Which features to use in the reranker, to characterize the
+similarity between a document and candidate cell (largely based on the
+respective language models). Possibilities are 'rank-score' (use the
+original rank and ranking score), plus all the possible feature types of
+'--classify-features'.
+
+Default %default.
+
+Note that this only is used when '--reranker' specifies something other than
+'none', 'random' or 'oracle'.""")
+
+  val allowed_rerank_features =
+    allowed_features ++ Seq("rank-score")
+
+  lazy val rerank_feature_list =
+    get_feature_list(rerank_features, allowed_rerank_features,
+      "rerank-features")
+
+  var rerank_binning =
+    ap.option[String]("rerank-binning", "rb", metavar = "BINNING",
+      default = "also",
+      aliasedChoices = Seq(
+        Seq("also", "yes"),
+        Seq("only"),
+        Seq("no")),
+      help = """Whether to include binned features in addition to or in place
+of numeric features in the reranker. This works identically to
+'--classify-binning'.""")
 
   var rerank_top_n =
     ap.option[Int]("rerank-top-n",
@@ -817,28 +912,12 @@ A value of 'default' means use the same lang model as is specified in
         Seq("default")),
       help = """Whether to do interpolation rather than back-off when
 reranking. See `--interpolate`.""")
-
-  var rerank_initial_weights =
-    ap.option[String]("rerank-initial-weights", "riw",
-      default = "zero",
-      choices = Seq("zero", "rank-score-only", "random"),
-      help = """How to initialize weights during reranking. Possibilities
-are 'zero' (set to all zero), 'rank-score-only' (set to zero except for
-the original ranking score), 'random' (set to random).""")
-
-  var rerank_random_restart =
-    ap.option[Int]("rerank-random-restart", "rrr",
-      default = 1,
-      must = be_>(0),
-      help = """How often to compute the reranking weights. The resulting
-set of weights will be averaged. This only makes sense when
-'--rerank-initialize-weights random', and implements random restarting.""")
 }
 
 trait GridLocateOptimizerParameters {
   this: GridLocateParameters =>
-  var rerank_iterations =
-    ap.option[Int]("rerank-iterations",
+  var iterations =
+    ap.option[Int]("iterations",
       metavar = "INT",
       default = 10000,
       must = be_>(0),
@@ -1021,8 +1100,9 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 trait GridLocateParameters extends ArgParserParameters with
   GridLocateBasicParameters with GridLocateLangModelParameters with
   GridLocateCellParameters with GridLocateEvalParameters with
-  GridLocateRankParameters with GridLocateRerankParameters with
-  GridLocateOptimizerParameters with GridLocateMiscParameters
+  GridLocateRankParameters with GridLocateFeatureParameters with
+  GridLocateRerankParameters with GridLocateOptimizerParameters with
+  GridLocateMiscParameters
 
 /**
  * Driver class for creating cell grids over some coordinate space, with a
@@ -1369,6 +1449,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MostPopularGridRanker[Co](ranker_name, grid, salience = false)
       case "naive-bayes" =>
         new NaiveBayesGridRanker[Co](ranker_name, grid)
+      case "classifier" => create_classifier_ranker(ranker_name, grid)
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = true)
@@ -1421,13 +1502,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * document, between the correct candidate for that document and the
    * top-scoring incorrect ones.
    */
-  protected def create_pointwise_classifier_trainer = {
+  protected def create_pointwise_classifier_trainer[Inst <: GridRankerInst[Co]](
+      classifier: String, rerank: Boolean) = {
     val vec_factory = ArrayVector
     def create_weights(weights: VectorAggregate) = {
       if (params.verbose)
         errprint("Creating %s weight vector: length %s",
-          params.rerank_initial_weights, weights.length)
-      params.rerank_initial_weights match {
+          params.initial_weights, weights.length)
+      params.initial_weights match {
         case "zero" => ()
         case "random" => {
           val r = new scala.util.Random
@@ -1438,54 +1520,54 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       }
       weights
     }
-    params.reranker match {
+    classifier match {
       case "perceptron" | "avg-perceptron" =>
-        new BasicSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
+        new BasicSingleWeightMultiLabelPerceptronTrainer[Inst](
           vec_factory, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.rerank_iterations,
-          averaged = params.reranker == "avg-perceptron") {
+          max_iterations = params.iterations,
+          averaged = classifier == "avg-perceptron") {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
           }
       case "pa-perceptron" =>
-        new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
+        new PassiveAggressiveNoCostSingleWeightMultiLabelPerceptronTrainer[Inst](
           vec_factory, params.pa_variant, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.rerank_iterations) {
+          max_iterations = params.iterations) {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
           }
       case "cost-perceptron" =>
-        new PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTrainer[GridRankerInst[Co]](
+        new PassiveAggressiveCostSensitiveSingleWeightMultiLabelPerceptronTrainer[Inst](
           vec_factory, params.pa_cost_type == "prediction-based",
           params.pa_variant, params.perceptron_aggressiveness,
           decay = params.perceptron_decay,
           error_threshold = params.perceptron_error_threshold,
-          max_iterations = params.rerank_iterations) {
+          max_iterations = params.iterations) {
             override def new_weights(len: Int) =
               create_weights(new_zero_weights(len))
-            def cost(inst: GridRankerInst[Co], correct: LabelIndex,
+            def cost(inst: Inst, correct: LabelIndex,
                 predicted: LabelIndex) = {
               // Is this checking for correctness itself correct?  Is there a
               // problem with always returning a non-zero cost even when we
-              // choose the "correct" cell?  This makes sense in that a candidate
-              // is often the "best available" but not necessarily the
-              // "best possible".
+              // choose the "correct" cell?  This makes sense in that a
+              // candidate is often the "best available" but not necessarily
+              // the "best possible".
               if (correct == predicted) 0.0
               else inst.doc.distance_to_coord(
-                     inst.candidates(predicted).get_central_point)
+                     inst.get_cell(predicted).get_central_point)
             }
         }
       case "mlogit" =>
-        new MLogitConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
+        new MLogitConditionalLogitTrainer[Inst](vec_factory)
 
       case "tadm" =>
-        new TADMTrainer[GridRankerInst[Co]](vec_factory,
+        new TADMTrainer[Inst](vec_factory,
           method = params.tadm_method,
-          max_iterations = params.rerank_iterations,
+          max_iterations = params.iterations,
           gaussian = params.tadm_gaussian,
           lasso = params.tadm_lasso,
           uniform_marginal = params.tadm_uniform_marginal)
@@ -1500,17 +1582,20 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *
    * @see CandidateFeatVecFactory
    */
-  protected def create_candidate_featvec_factory = {
-    val featvec_factory = new SparseFeatureVectorFactory(attach_label = false)
-    val binning_status = params.rerank_binning match {
+  protected def create_candidate_featvec_factory(
+      feature_list: Iterable[String], binning: String,
+      arg: String, attach_label: Boolean) = {
+    val featvec_factory =
+      new SparseFeatureVectorFactory(attach_label = attach_label)
+    val binning_status = binning match {
       case "also" => BinningAlso
       case "only" => BinningOnly
       case "no" => BinningNo
     }
     def create_fact(ty: String): CandidateFeatVecFactory[Co] = {
-      if (params.rerank_features_simple_gram_choices contains ty)
+      if (params.features_simple_gram_choices contains ty)
         new GramCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
-      else if (params.rerank_features_matching_gram_choices contains ty)
+      else if (params.features_matching_gram_choices contains ty)
         new GramMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else ty match {
         case "trivial" =>
@@ -1526,14 +1611,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       }
     }
 
-    val featlist = params.rerank_feature_list
-    if (featlist.size == 0)
-      params.parser.usageError("Can't specify empty --rerank-features")
-    else if (featlist.size == 1)
-      create_fact(featlist.head)
+    if (feature_list.size == 0)
+      params.parser.usageError(s"Can't specify empty --$arg")
+    else if (feature_list.size == 1)
+      create_fact(feature_list.head)
     else {
-      val facts = featlist.map(create_fact)
-      new CombiningCandidateFeatVecFactory[Co](featvec_factory, binning_status, facts)
+      val facts = feature_list.map(create_fact)
+      new CombiningCandidateFeatVecFactory[Co](featvec_factory, binning_status,
+        facts)
     }
   }
 
@@ -1551,128 +1636,213 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val reranker = new RandomReranker(basic_ranker, params.rerank_top_n)
       new GridReranker[Co](reranker, params.reranker)
     }
-    else {
-      /* Factory object for generating candidate feature vectors
-       * to be ranked. There is one such feature vector per cell to be
-       * ranked for a given document; many of the features describe
-       * the compatibility between the document and cell, e.g. of their
-       * language models.
-       */
-      val candidate_featvec_factory = create_candidate_featvec_factory
+    else
+      // FIXME!! We don't use `basic_ranker`. Do we need to create it at all?
+      create_classifier_reranker
+  }
 
-      /* Object for training a reranker. */
-      val reranker_trainer =
-        new LinearClassifierGridRerankerTrainer[Co](
-          params.reranker,
-          create_pointwise_classifier_trainer
-        ) {
-          val top_n = params.rerank_top_n
-          val number_of_splits = params.rerank_num_training_splits
+  /**
+   * Create a reranker that uses a classifier to do its work.
+   */
+  def create_classifier_reranker: GridRanker[Co] = {
+    /* Factory object for generating candidate feature vectors
+     * to be ranked. There is one such feature vector per cell to be
+     * ranked for a given document; many of the features describe
+     * the compatibility between the document and cell, e.g. of their
+     * language models.
+     */
+    val candidate_featvec_factory =
+      create_candidate_featvec_factory(params.rerank_feature_list,
+        params.rerank_binning, "rerank-features", attach_label = false)
 
-          val mapper =
-            candidate_featvec_factory.featvec_factory.mapper
-          assert(mapper.number_of_labels == 0)
-          for (i <- 0 until params.rerank_top_n) {
-            mapper.label_to_index(s"#${i + 1}")
-          }
+    /* Object for training a reranker. */
+    val reranker_trainer =
+      new LinearClassifierGridRerankerTrainer[Co](
+        params.reranker,
+        create_pointwise_classifier_trainer[GridRerankerInst[Co]](
+          params.reranker, rerank = true)
+      ) {
+        val top_n = params.rerank_top_n
+        val number_of_splits = params.rerank_num_training_splits
 
-          protected def query_training_data_to_feature_vectors(
-            data: Iterable[QueryTrainingInst]
-          ): Iterable[(GridRankerInst[Co], LabelIndex)] = {
+        val mapper =
+          candidate_featvec_factory.featvec_factory.mapper
+        assert(mapper.number_of_labels == 0)
+        for (i <- 0 until params.rerank_top_n) {
+          mapper.label_to_index(s"#${i + 1}")
+        }
 
-            val task = show_progress("converting QTI's to",
-              "aggregate feature vector")
+        protected def query_training_data_to_feature_vectors(
+          data: Iterable[QueryTrainingInst]
+        ): Iterable[(GridRerankerInst[Co], LabelIndex)] = {
 
-            def create_candidate_featvec(query: GridDoc[Co],
-                candidate: GridCell[Co], initial_score: Double,
-                initial_rank: Int) = {
-              val featvec =
-                candidate_featvec_factory(query, candidate, initial_score,
-                  initial_rank, is_training = true)
-              if (debug("features")) {
-                val prefix = "#%s-%s" format (task.num_processed + 1,
-                  initial_rank)
-                errprint("%s: Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
-                  prefix, query, candidate, initial_score,
-                  initial_rank, featvec.pretty_format(prefix))
-              }
-              featvec
-            }
+          val task = show_progress("converting QTI's to",
+            "aggregate feature vector")
 
-            val maybepar_data =
-              // FIXME: Not yet by default. This seems to use lots more memory
-              // and sometimes produces different results than without it,
-              // presumably indicative of a race condition.
-              if (debug("parallel-qti-to-rti")
-                  /*params.no_parallel || debug("no-parallel-qti-to-rti")*/) data
-              else data.par
-
-            maybepar_data.mapMetered(task) { qti =>
-              val agg_fv = qti.aggregate_featvec(create_candidate_featvec)
-              val label = qti.label
-              val candidates = qti.cand_scores.map(_._1).toIndexedSeq
-              (GridRankerInst(qti.query, candidates, agg_fv), label)
-            }.seq
-          }
-
-          /* Create the candidate feature vector during evaluation, by
-           * invoking the candidate feature vector factory (see above).
-           * This may need to operate differently than during training,
-           * in particular in that new features cannot be created. Hence,
-           * e.g., when handling a previously unseen word we need to skip
-           * it rather than creating a previously unseen feature. The
-           * reason for this is that creating a new feature would increase
-           * the total size of the feature vectors and weight vector(s),
-           * which we can't do after training has completed. Typically
-           * the difference down to 'to_index()' vs. 'to_index_if()'
-           * when memoizing.
-           */
-          protected def create_candidate_eval_featvec(query: GridDoc[Co],
+          def create_candidate_featvec(query: GridDoc[Co],
               candidate: GridCell[Co], initial_score: Double,
               initial_rank: Int) = {
             val featvec =
               candidate_featvec_factory(query, candidate, initial_score,
-                initial_rank, is_training = false)
-            if (debug("features"))
-              errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
-                query, candidate, initial_score, featvec)
+                initial_rank, is_training = true)
+            if (debug("features")) {
+              val prefix = "#%s-%s" format (task.num_processed + 1,
+                initial_rank)
+              errprint("%s: Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
+                prefix, query, candidate, initial_score,
+                initial_rank, featvec.pretty_format(prefix))
+            }
             featvec
           }
 
-          /* Create the initial ranker from training data. */
-          protected def create_initial_ranker(
-            data: Iterable[DocStatus[Row]]
-          ) = create_ranker_from_documents(_ => data.toIterator)
+          val maybepar_data =
+            // FIXME: Not yet by default. This seems to use lots more memory
+            // and sometimes produces different results than without it,
+            // presumably indicative of a race condition.
+            if (debug("parallel-qti-to-rti")
+                /*params.no_parallel || debug("no-parallel-qti-to-rti")*/) data
+            else data.par
 
-          /* Convert encapsulated raw documents into document-cell pairs.
-           */
-          protected def external_instances_to_query_candidate_pairs(
-            insts: Iterator[DocStatus[Row]],
-            initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
-          ) = {
-            val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
-            val grid = grid_ranker.grid
-            grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
-              // Convert document to (doc, cell) pair.  But if a cell
-              // can't be found (i.e. there were no training docs in the
-              // cell of this "test" doc), skip the entire instance rather
-              // than end up trying to score a fake cell
-              grid.find_best_cell_for_document(doc,
-                create_non_recorded = false) map ((doc, _))
-            }
-          }
+          maybepar_data.mapMetered(task) { qti =>
+            val agg_fv = qti.aggregate_featvec(create_candidate_featvec)
+            val label = qti.label
+            val candidates = qti.cand_scores.map(_._1).toIndexedSeq
+            (GridRerankerInst(qti.query, agg_fv, candidates), label)
+          }.seq
         }
 
-      /* Training data, in the form of an iterable over raw documents (suitably
-       * wrapped in a DocStatus object). */
-      val training_data = new Iterable[DocStatus[Row]] {
-        def iterator =
-          read_raw_training_documents(
-            "reading %s for generating reranker training data")
-      }.view
-      /* Train the reranker. */
-      reranker_trainer(training_data)
-    }
+        /* Create the candidate feature vector during evaluation, by
+         * invoking the candidate feature vector factory (see above).
+         * This may need to operate differently than during training,
+         * in particular in that new features cannot be created. Hence,
+         * e.g., when handling a previously unseen word we need to skip
+         * it rather than creating a previously unseen feature. The
+         * reason for this is that creating a new feature would increase
+         * the total size of the feature vectors and weight vector(s),
+         * which we can't do after training has completed. Typically
+         * the difference down to 'to_index()' vs. 'to_index_if()'
+         * when memoizing.
+         */
+        protected def create_candidate_eval_featvec(query: GridDoc[Co],
+            candidate: GridCell[Co], initial_score: Double,
+            initial_rank: Int) = {
+          val featvec =
+            candidate_featvec_factory(query, candidate, initial_score,
+              initial_rank, is_training = false)
+          if (debug("features"))
+            errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
+              query, candidate, initial_score, featvec)
+          featvec
+        }
+
+        /* Create the initial ranker from training data. */
+        protected def create_initial_ranker(
+          data: Iterable[DocStatus[Row]]
+        ) = create_ranker_from_documents(_ => data.toIterator)
+
+        /* Convert encapsulated raw documents into document-cell pairs.
+         */
+        protected def external_instances_to_query_candidate_pairs(
+          insts: Iterator[DocStatus[Row]],
+          initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
+        ) = {
+          val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
+          val grid = grid_ranker.grid
+          grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
+            // Convert document to (doc, cell) pair.  But if a cell
+            // can't be found (i.e. there were no training docs in the
+            // cell of this "test" doc), skip the entire instance rather
+            // than end up trying to score a fake cell
+            grid.find_best_cell_for_document(doc,
+              create_non_recorded = false) map ((doc, _))
+          }
+        }
+      }
+
+    /* Training data, in the form of an iterable over raw documents (suitably
+     * wrapped in a DocStatus object). */
+    val training_data = new Iterable[DocStatus[Row]] {
+      def iterator =
+        read_raw_training_documents(
+          "reading %s for generating reranker training data")
+    }.view
+    /* Train the reranker. */
+    reranker_trainer(training_data)
+  }
+
+  /**
+   * Create a ranker that uses a classifier to do its work, treating each
+   * cell as a possible class.
+   */
+  def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
+    // Factory object for generating feature vectors for a given document,
+    // when a given candidate cell is considered as the document's label.
+    val featvec_factory =
+      create_candidate_featvec_factory(params.classify_feature_list,
+        params.classify_binning, "classify-features",
+        attach_label = true)
+
+    // Create classifier trainer.
+    val trainer =
+      create_pointwise_classifier_trainer[GridRankingClassifierInst[Co]](
+        params.classifier, rerank = false)
+
+    // Read the raw training documents.
+    val raw_training_docs = read_raw_training_documents(
+       "reading %s for generating classifier training data")
+
+    // Convert raw documents into document-cell pairs, for the correct cell.
+    val docs_cells =
+      grid.docfact.raw_documents_to_documents(raw_training_docs) flatMap {
+        doc =>
+          // Find correct cell. But if the cell is empty (hence non-existent),
+          // skip it. (FIXME: Does this ever happen?)
+          grid.find_best_cell_for_document(doc,
+            create_non_recorded = false) map ((doc, _))
+      }
+
+    val task = show_progress("generating", "doc agg feat vec")
+
+    // Generate training data. For each document, iterate over the
+    // possible cells, generating a feature vector for each cell.
+    val training_instances =
+      docs_cells.mapMetered(task) { case (doc, correct_cell) =>
+        // Maybe do it in parallel.
+        val cells = grid.iter_nonempty_cells
+        val maybepar_cells =
+          // FIXME: Not yet by default.
+          if (!debug("parallel-classifier-training")
+              /*params.no_parallel || debug("no-parallel-classifier-training")*/)
+            cells
+          else cells.par
+
+        // Iterate over cells.
+        val fvs = maybepar_cells.map { cell =>
+          // Create feature vector. We don't have an initial score or
+          // initial ranking, so pass in 0. This is only used by the
+          // 'rank-score' feature-vector factory.
+          val featvec = featvec_factory(doc, cell, 0, 0, is_training = true)
+          // Maybe output feature vector, for debugging purposes.
+          if (debug("features")) {
+            val prefix = "#%s" format (task.num_processed + 1)
+            errprint(s"$prefix: Training: For doc $doc, cell $cell, featvec ${featvec.pretty_format(prefix)}")
+          }
+          featvec
+        }
+
+        // Aggregate feature vectors.
+        val agg_fv = AggregateFeatureVector(fvs.toArray)
+        // Generate data instance.
+        val data_inst = GridRankingClassifierInst(doc, agg_fv, featvec_factory)
+        // Return it, along with correct cell's label.
+        (data_inst, featvec_factory.lookup_cell(correct_cell))
+      }
+
+    // Train classifier.
+    val classifier =
+      trainer(TrainingData(training_instances.toIndexedSeq))
+    new ClassifierGridRanker[Co](ranker_name, grid, classifier,
+      featvec_factory)
   }
 
   /**

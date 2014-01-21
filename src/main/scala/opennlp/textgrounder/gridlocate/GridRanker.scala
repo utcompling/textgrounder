@@ -70,34 +70,53 @@ abstract class SimpleGridRanker[Co](
    * included in the list.  Higher scores are better.  The results should
    * be in sorted order, with better cells earlier.
    */
-  def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean):
     Iterable[(GridCell[Co], Double)]
 
   def imp_evaluate(item: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) =
-    return_ranked_cells(item.grid_lm, correct, include_correct)
+    return_ranked_cells(item, correct, include_correct)
 }
 
 /**
  * Object encapsulating a GridLocate data instance to be used by the
- * classifier that underlies the ranker. This corresponds to a document
- * in the training corpus and serves as the main part of an RTI (rerank
- * training instance, see `PointwiseClassifyingRerankerTrainer`).
+ * classifier that is either used for ranking directly or underlies the
+ * reranker. This corresponds to a document in the training corpus.
+ * This is used in place of just using an aggregate feature vector directly
+ * because the cost perceptron cost function needs to retrieve the document
+ * and correct cell while training in order to compute the distance between
+ * them, which is used to compute the cost.
  */
-case class GridRankerInst[Co](
-  doc: GridDoc[Co],
-  candidates: IndexedSeq[GridCell[Co]],
-  agg: AggregateFeatureVector
-) extends DataInstance {
+abstract class GridRankerInst[Co] extends DataInstance {
+  def doc: GridDoc[Co]
+  def agg: AggregateFeatureVector
   final def feature_vector = agg
+  /**
+   * Return the candidate cell at the given label index.
+   */
+  def get_cell(index: LabelIndex): GridCell[Co]
+
   def pretty_print_labeled(prefix: String, correct: LabelIndex) {
     errprint(s"For instance $prefix with query doc $doc:")
-    for (((cand, fv), index) <- (candidates.view zip agg.fv).zipWithIndex) {
-      errprint(s"  $prefix-${index + 1}: %s: $cand: $fv",
+    for ((fv, index) <- agg.fv.zipWithIndex) {
+      val cell = get_cell(index)
+      errprint(s"  $prefix-${index + 1}: %s: $cell: $fv",
         if (index == correct) "CORRECT" else "WRONG")
     }
   }
+}
+
+/**
+ * Object encapsulating a GridLocate data instance to be used by the
+ * classifier that is used directly for ranking the cells.
+ */
+case class GridRankingClassifierInst[Co](
+  doc: GridDoc[Co],
+  agg: AggregateFeatureVector,
+  featvec_factory: CandidateFeatVecFactory[Co]
+) extends GridRankerInst[Co] {
+  def get_cell(index: LabelIndex) = featvec_factory.index_to_cell(index)
 }
 
 /**
@@ -109,7 +128,7 @@ class RandomGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
     val shuffled = (new Random()).shuffle(cells)
@@ -128,7 +147,7 @@ class MostPopularGridRanker[Co] (
   grid: Grid[Co],
   salience: Boolean
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
     (for (cell <- cells) yield {
@@ -151,14 +170,14 @@ abstract class PointwiseScoreGridRanker[Co](
    * Function to return the score of a document language model against a
    * cell.
    */
-  def score_cell(lang_model: LangModel, cell: GridCell[Co]): Double
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]): Double
 
   /**
    * Compare a language model (for a document, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_serially(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells_serially(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     for (cell <- grid.iter_nonempty_cells_including(correct, include_correct))
         yield {
@@ -168,7 +187,7 @@ abstract class PointwiseScoreGridRanker[Co](
           cell.format_indices, cell.format_location,
           cell.num_docs)
       }
-      (cell, score_cell(lang_model, cell))
+      (cell, score_cell(doc, cell))
     }
   }
 
@@ -177,20 +196,20 @@ abstract class PointwiseScoreGridRanker[Co](
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_parallel(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells_parallel(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
-    cells.par.map(c => (c, score_cell(lang_model, c)))
+    cells.par.map(c => (c, score_cell(doc, c)))
   }
 
-  def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     val parallel = !grid.driver.params.no_parallel
     val cell_buf = {
       if (parallel)
-        return_ranked_cells_parallel(lang_model, correct, include_correct)
+        return_ranked_cells_parallel(doc, correct, include_correct)
       else
-        return_ranked_cells_serially(lang_model, correct, include_correct)
+        return_ranked_cells_serially(doc, correct, include_correct)
     }
 
     val retval = cell_buf.toIndexedSeq sortWith (_._2 > _._2)
@@ -234,7 +253,8 @@ class KLDivergenceGridRanker[Co](
   def call_kl_divergence(self: LangModel, other: LangModel) =
     self.kl_divergence(other, partial = partial, cache = self_kl_cache)
 
-  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val lang_model = doc.grid_lm
     val cell_lang_model = cell.grid_lm
     var kldiv = call_kl_divergence(lang_model, cell_lang_model)
     if (symmetric) {
@@ -246,12 +266,13 @@ class KLDivergenceGridRanker[Co](
     -kldiv
   }
 
-  override def return_ranked_cells(lang_model: LangModel,
+  override def return_ranked_cells(doc: GridDoc[Co],
       correct: GridCell[Co], include_correct: Boolean) = {
+    val lang_model = doc.grid_lm
     // This will be used by `score_cell` above.
     self_kl_cache = lang_model.get_kl_divergence_cache()
 
-    val cells = super.return_ranked_cells(lang_model, correct, include_correct)
+    val cells = super.return_ranked_cells(doc, correct, include_correct)
 
     if (debug("kldiv") && lang_model.isInstanceOf[FastSlowKLDivergence]) {
       val fast_slow_dist = lang_model.asInstanceOf[FastSlowKLDivergence]
@@ -299,9 +320,9 @@ class CosineSimilarityGridRanker[Co](
   partial: Boolean = true
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val cossim =
-      lang_model.cosine_similarity(cell.grid_lm,
+      doc.grid_lm.cosine_similarity(cell.grid_lm,
         partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -320,8 +341,8 @@ class SumFrequencyGridRanker[Co](
   grid: Grid[Co]
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
-    lang_model.sum_frequency(cell.grid_lm)
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    doc.grid_lm.sum_frequency(cell.grid_lm)
   }
 }
 
@@ -331,7 +352,7 @@ class NaiveBayesGridRanker[Co](
   grid: Grid[Co]
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
-  def score_cell(lang_model: LangModel, cell: GridCell[Co]) = {
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val params = grid.driver.params
     // Determine respective weightings
     val (word_weight, prior_weight) = {
@@ -339,10 +360,24 @@ class NaiveBayesGridRanker[Co](
       (1.0 - bw, bw)
     }
 
-    val gram_logprob = cell.grid_lm.model_logprob(lang_model)
+    val gram_logprob = cell.grid_lm.model_logprob(doc.grid_lm)
     val prior_logprob = log(cell.prior_weighting / grid.total_prior_weighting)
     val logprob = (word_weight * gram_logprob + prior_weight * prior_logprob)
     logprob
+  }
+}
+
+/** Use a classifier (normally maxent) for comparing document and cell. */
+class ClassifierGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co],
+  classifier: LinearClassifier,
+  featvec_factory: CandidateFeatVecFactory[Co]
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val fv = featvec_factory(doc, cell, 0, 0, is_training = false)
+    classifier.score_label(fv, featvec_factory.lookup_cell(cell))
   }
 }
 
@@ -354,10 +389,10 @@ class AverageCellProbabilityGridRanker[Co](
 
   val cdist_factory = create_cell_dist_factory
 
-  def return_ranked_cells(lang_model: LangModel, correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
       include_correct: Boolean) = {
     val celldist =
-      cdist_factory.get_cell_dist_for_lang_model(grid, lang_model)
+      cdist_factory.get_cell_dist_for_lang_model(grid, doc.grid_lm)
     celldist.get_ranked_cells(correct, include_correct)
   }
 }

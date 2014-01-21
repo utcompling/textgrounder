@@ -127,9 +127,9 @@ class CellDistMostCommonToponymSphereGridRanker(
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
   val cdist_factory = new CellDistFactory[SphereCoord]
 
-  def return_ranked_cells(_lang_model: LangModel, correct: SphereCell,
+  def return_ranked_cells(doc: SphereDoc, correct: SphereCell,
       include_correct: Boolean) = {
-    val lang_model = Unigram.check_unigram_lang_model(_lang_model)
+    val lang_model = Unigram.check_unigram_lang_model(doc.grid_lm)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     // Look for a toponym, then a proper noun, then any word.
@@ -153,9 +153,9 @@ class SalienceMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
-  def return_ranked_cells(_lang_model: LangModel, correct: SphereCell,
+  def return_ranked_cells(doc: SphereDoc, correct: SphereCell,
       include_correct: Boolean) = {
-    val lang_model = Unigram.check_unigram_lang_model(_lang_model)
+    val lang_model = Unigram.check_unigram_lang_model(doc.grid_lm)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
 
     var maxword = lang_model.find_most_common_gram(
@@ -203,7 +203,7 @@ class SalienceMostCommonToponymSphereGridRanker(
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
       new RandomGridRanker[SphereCoord](ranker_name, sphere_grid).
-        return_ranked_cells(lang_model, correct, include_correct))
+        return_ranked_cells(doc, correct, include_correct))
   }
 }
 

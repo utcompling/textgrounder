@@ -193,7 +193,7 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
     // Combine into an aggregate feature vector.
-    val agg = new AggregateFeatureVector(featvecs.toArray)
+    val agg = AggregateFeatureVector(featvecs.toArray)
     if (write_test_data_file != None) {
       find_label(scored_candidates, correct).map { label =>
         TrainingData.export_aggregate_to_file(write_test_data_file.get,
@@ -397,7 +397,7 @@ trait PointwiseClassifyingRerankerTrainer[
       val featvecs =
         (for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
           create_candidate_featvec(query, cand, score, rank)).toArray
-      val agg = new AggregateFeatureVector(featvecs)
+      val agg = AggregateFeatureVector(featvecs)
       if (debug("rescale-features"))
         agg.rescale_featvecs()
       agg

@@ -61,6 +61,8 @@ trait CandidateFeatVecFactory[Co] extends (
 
   // Convert cells to label indices without regenerating strings constantly.
   val cell_to_index = mutable.Map[GridCell[Co], LabelIndex]()
+  // Convert in the opposite direction.
+  val index_to_cell = mutable.Map[LabelIndex, GridCell[Co]]()
 
   /** Convert a cell to an index. Cached for speed and to avoid excessive
     * memory generation of strings. */
@@ -71,6 +73,7 @@ trait CandidateFeatVecFactory[Co] extends (
         val center = cell.format_coord(cell.get_true_center)
         val label = featvec_factory.mapper.label_to_index(center)
         cell_to_index += cell -> label
+        index_to_cell += label -> cell
         label
       }
     }
