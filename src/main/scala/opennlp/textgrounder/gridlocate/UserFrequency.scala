@@ -51,7 +51,7 @@ class UserFrequencyModel[Co](
     // strips off the upper 32 bits, which get set if the int is negative.
     // These issues don't arise with the int that goes into the higher
     // portion of the long, nor do they arise converting back to ints.
-    term_user_pairs(cell) += (term << 32L) + (user & 0xFFFFFFFFL)
+    term_user_pairs(cell) += (term.toLong << 32L) + (user & 0xFFFFFFFFL)
   }
 
   /**
