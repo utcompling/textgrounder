@@ -719,6 +719,12 @@ abstract class LangModel(val factory: LangModelFactory) {
   def gram_to_string(gram: Gram): String
 
   /**
+   * Convert a gram (of type Gram) to string for use as a feature name;
+   * must not have any spaces in it.
+   */
+  def gram_to_feature(gram: Gram): String
+
+  /**
    * Extra text to add to the `toString` output, for extra class params.
    */
   def innerToString = ""

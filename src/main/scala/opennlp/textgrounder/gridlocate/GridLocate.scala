@@ -652,38 +652,25 @@ For the perceptron optimizers, see also `--pa-variant`,
   protected def with_binned(feats: String*) =
     feats flatMap { f => Seq(f, f + "-binned") }
 
-  val rerank_features_simple_unigram_choices =
-    with_binned("cell-count", "cell-prob").map { "unigram-" + _ }
+  val rerank_features_simple_gram_choices =
+    (Seq("binary") ++ with_binned(
+      "doc-count", "cell-count", "doc-prob", "cell-prob")
+    ).map { "gram-" + _ }
 
-  val rerank_features_matching_unigram_choices =
+  val rerank_features_matching_gram_choices =
     (Seq("binary") ++ with_binned(
       "doc-count", "cell-count", "doc-prob", "cell-prob",
       "count-product", "count-quotient", "prob-product", "prob-quotient",
       "kl")
-    ).map { "matching-unigram-" + _ }
+    ).map { "matching-gram-" + _ }
 
-  val rerank_features_simple_ngram_choices =
-    with_binned("cell-count", "cell-prob").map { "ngram-" + _ }
-
-  val rerank_features_matching_ngram_choices =
-    (Seq("binary") ++ with_binned(
-      "doc-count", "cell-count", "doc-prob", "cell-prob",
-      "count-product", "count-quotient", "prob-product", "prob-quotient",
-      "kl")
-    ).map { "matching-ngram-" + _ }
-
-  val rerank_features_all_unigram_choices =
-    rerank_features_simple_unigram_choices ++
-    rerank_features_matching_unigram_choices
-
-  val rerank_features_all_ngram_choices =
-    rerank_features_simple_ngram_choices ++
-    rerank_features_matching_ngram_choices
+  val rerank_features_all_gram_choices =
+    rerank_features_simple_gram_choices ++
+    rerank_features_matching_gram_choices
 
   val allowed_rerank_features =
     Seq("misc", "types-in-common", "model-compare", "rank-score", "trivial") ++
-    rerank_features_all_unigram_choices ++
-    rerank_features_all_ngram_choices
+    rerank_features_all_gram_choices
 
   var rerank_features =
     ap.option[String]("rerank-features",
@@ -696,45 +683,41 @@ respective language models). Possibilities are:
 
 'rank-score' (use the original rank and ranking score);
 
-'unigram-cell-count' (use the cell word count when a word exists in
-  the document);
+'gram-binary' (when a gram -- i.e. word or ngram according to the type of
+  language model -- exists in the document, create a feature with the value
+  1);
 
-'unigram-cell-prob' (use the cell word probability when a word exists in
-  the document);
+'gram-doc-count' (when a gram exists in the document, create a feature with
+  the document gram count as the value);
 
-'matching-unigram-binary' (use the value 1 when a word exists in both document
-  and cell, 0 otherwise);
+'gram-cell-count' (when a gram exists in the document, create a feature with
+  the cell gram count as the value);
 
-'matching-unigram-doc-count' (use the document word count when a word exists
-  in both document and cell);
+'gram-doc-count' (when a gram exists in the document, create a feature with
+  the document gram probability as the value);
 
-'matching-unigram-doc-prob' (use the document word probability when a word
-  exists in both document and cell);
+'gram-cell-count' (when a gram exists in the document, create a feature with
+  the cell gram probability as the value);
 
-'matching-unigram-cell-count' (use the cell word count when a word exists
-  in both document and cell -- equivalent to 'unigram-cell-count');
+'matching-gram-*' (same as 'gram-*' but create a feature only when the gram --
+  i.e. word or ngram according to the type of language model -- exists in
+  both document and cell);
 
-'matching-unigram-cell-prob' (use the cell word probability when a word exists
-  in both document and cell);
+'matching-gram-count-product' (use the product of the document and cell
+  gram count when a gram exists in both document and cell);
 
-'matching-unigram-count-product' (use the product of the document and cell
-  word count when a word exists in both document and cell);
+'matching-gram-count-quotient' (use the quotient of the cell and document
+  gram count when a gram exists in both document and cell);
 
-'matching-unigram-count-quotient' (use the quotient of the cell and document
-  word count when a word exists in both document and cell);
+'matching-gram-prob-product' (use the product of both the document and cell
+  gram probability when a gram exists in both document and cell);
 
-'matching-unigram-prob-product' (use the product of both the document and cell
-  probability when a word exists in both document and cell);
+'matching-gram-prob-quotient' (use the quotient of the cell and document
+  gram probability when a gram exists in both document and cell);
 
-'matching-unigram-prob-quotient' (use the quotient of the cell and document
-  word probability when a word exists in both document and cell);
-
-'matching-unigram-kl' (when a word exists in both document and cell, use the
+'matching-gram-kl' (when a gram exists in both document and cell, use the
   individual KL-divergence component score between document and cell for the
-  word, else 0);
-
-'ngram-*', 'matching-ngram-*' (similar to the corresponding unigram features
-  but include features for N-grams up to --max-rerank-ngram);
+  gram, else 0);
 
 '*-binned' (for all feature types given above except for the '*-binary'
   types, a "binned" equivalent exists that creates binary features for
@@ -821,20 +804,8 @@ A value of 'default' means use the same lang model as is specified in
   lazy val rerank_lang_model_type = {
     if (reranker == "none")
       grid_lang_model_type
-    else {
-      val is_ngram =
-        (rerank_features_all_ngram_choices.intersect(
-          rerank_feature_list).size != 0)
-      val is_unigram =
-        (rerank_features_all_unigram_choices.intersect(
-          rerank_feature_list).size != 0)
-      if (is_ngram && is_unigram)
-        ap.usageError("Can't have both ngram and unigram features in --rerank-features")
-      else if (is_ngram)
-        "ngram"
-      else
-        "unigram"
-    }
+    else if (rerank_lang_model == (("unsmoothed-ngram", ""))) "ngram"
+    else "unigram"
   }
 
   var rerank_interpolate =
@@ -1537,14 +1508,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "no" => BinningNo
     }
     def create_fact(ty: String): CandidateFeatVecFactory[Co] = {
-      if (params.rerank_features_simple_unigram_choices contains ty)
-        new WordCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
-      else if (params.rerank_features_matching_unigram_choices contains ty)
-        new WordMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
-      else if (params.rerank_features_simple_ngram_choices contains ty)
-        new NgramCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
-      else if (params.rerank_features_matching_ngram_choices contains ty)
-        new NgramMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
+      if (params.rerank_features_simple_gram_choices contains ty)
+        new GramCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
+      else if (params.rerank_features_matching_gram_choices contains ty)
+        new GramMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
       else ty match {
         case "trivial" =>
           new TrivialCandidateFeatVecFactory[Co](featvec_factory, binning_status)

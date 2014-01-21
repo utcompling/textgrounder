@@ -366,289 +366,126 @@ class RankScoreCandidateFeatVecFactory[Co](
 }
 
 /**
- * A factory for generating features for a doc-cell candidate, when the
- * --rerank-lang-model specifies a unigram model.
- */
-abstract class UnigramCandidateFeatVecFactory[Co](
-  val featvec_factory: SparseFeatureVectorFactory,
-  val binning_status: BinningStatus
-) extends CandidateFeatVecFactory[Co] {
-  /**
-   * Return an Iterable of features corresponding to the given doc-cell
-   * (query-candidate) pair, provided that Unigram rerank distributions
-   * are being used.
-   *
-   * @param doc Document of document-cell pair.
-   * @param doclm Unigram rerank language model of document.
-   * @param cell Cell of document-cell pair.
-   * @param celllm Unigram rerank language model of cell.
-   */
-  def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
-    cell: GridCell[Co], celllm: UnigramLangModel
-  ): Iterable[(FeatureValue, String, Double)]
-
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
-    val doclm = Unigram.check_unigram_lang_model(doc.rerank_lm)
-    val celllm =
-      Unigram.check_unigram_lang_model(cell.rerank_lm)
-    get_unigram_features(doc, doclm, cell, celllm)
-  }
-}
-
-/**
  * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each word.
  */
-abstract class WordByWordCandidateFeatVecFactory[Co](
-  featvec_factory: SparseFeatureVectorFactory,
-  binning_status: BinningStatus
-) extends UnigramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
-  /** Optionally return a per-word feature whose count in the document is
-    * `count`, with specified document and cell language models. The
-    * return value is a tuple of suffix describing the particular feature
-    * class being returned, and feature value. The suffix will be appended
-    * to the word itself to form the feature name. */
-  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
-    celllm: UnigramLangModel): Option[(FeatureValue, String, Double)]
-
-  def get_unigram_features(doc: GridDoc[Co], doclm: UnigramLangModel,
-    cell: GridCell[Co], celllm: UnigramLangModel) = {
-    for ((word, count) <- doclm.iter_grams;
-         (fvtype, suff, value) <- get_word_feature(word, count, doclm, celllm))
-      yield (fvtype, "%s$%s" format (doclm.gram_to_string(word), suff), value)
-  }
-}
-
-/**
- * A factory for generating features for a doc-cell candidate consisting of
- * features for each word in the document that don't involve a comparison
- * between the doc and cell's word probabilities.
- *
- * @param feattype How to compute the value assigned to the words:
- *
- * - `unigram-cell-count`: use cell word count
- * - `unigram-cell-prob`: use cell word probability
- * - any of the above with `-binned` added, which bins logarithmically
- */
-class WordCandidateFeatVecFactory[Co](
-  featvec_factory: SparseFeatureVectorFactory,
-  binning_status: BinningStatus,
-  feattype: String
-) extends WordByWordCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
-  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
-      celllm: UnigramLangModel) = {
-    val binned = feattype.endsWith("-binned")
-    val basetype = feattype.replace("-binned", "")
-    val (fvtype, wordval) = basetype match {
-      case "unigram-cell-count" => (FeatCount, celllm.get_gram(word))
-      case "unigram-cell-prob" => (FeatProb, celllm.gram_prob(word))
-    }
-    if (binned)
-      Some(bin_logarithmically(feattype, wordval))
-    else
-      Some((fvtype, feattype, wordval))
-  }
-}
-
-/**
- * A factory for generating features for a doc-cell candidate consisting of
- * features for each word in the document that involve a comparison
- * between the doc and cell's word probabilities.
- *
- * @param feattype How to compute the value assigned to the words that are
- *   shared:
- *
- * - `matching-unigram-binary`: always assign 1
- * - `matching-unigram-doc-count`: use document word count
- * - `matching-unigram-cell-count`: use cell word count
- * - `matching-unigram-doc-prob`: use document word probability
- * - `matching-unigram-cell-prob`: use cell word probability
- * - `matching-unigram-count-product`: use product of document and cell word count
- * - `matching-unigram-count-quotient`: use quotient of cell and document word count
- * - `matching-unigram-prob-product`: use product of document and cell word prob
- * - `matching-unigram-prob-quotient`: use quotient of cell and document word prob
- * - `matching-unigram-kl`: use KL-divergence component for document/cell probs
- * - any of the above with `-binned` added, which bins logarithmically
- */
-class WordMatchingCandidateFeatVecFactory[Co](
-  featvec_factory: SparseFeatureVectorFactory,
-  binning_status: BinningStatus,
-  feattype: String
-) extends WordByWordCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
-  def get_word_feature(word: Gram, doccount: Double, doclm: UnigramLangModel,
-      celllm: UnigramLangModel) = {
-    val cellcount = celllm.get_gram(word)
-    if (cellcount == 0.0)
-      None
-    else {
-      val binned = feattype.endsWith("-binned")
-      val basetype = feattype.replace("-binned", "")
-      val (fvtype, wordval) = basetype match {
-        case "matching-unigram-binary" =>
-          (FeatBinary, 1.0)
-        case "matching-unigram-doc-count" =>
-          (FeatCount, doccount)
-        case "matching-unigram-cell-count" =>
-          (FeatCount, cellcount)
-        case "matching-unigram-count-product" =>
-          (FeatCount, doccount * cellcount)
-        case "matching-unigram-count-quotient" =>
-          (FeatRaw, cellcount / doccount)
-        case _ => {
-          val docprob = doclm.gram_prob(word)
-          val cellprob = celllm.gram_prob(word)
-          basetype match {
-            case "matching-unigram-doc-prob" =>
-              (FeatProb, docprob)
-            case "matching-unigram-cell-prob" =>
-              (FeatProb, cellprob)
-            case "matching-unigram-prob-product" =>
-              (FeatProb, docprob * cellprob)
-            case "matching-unigram-prob-quotient" =>
-              (FeatRescale, cellprob / docprob)
-            case "matching-unigram-kl" =>
-              (FeatRescale, docprob*(log(docprob/cellprob)))
-          }
-        }
-      }
-      if (binned)
-        Some(bin_logarithmically(feattype, wordval))
-      else
-        Some((fvtype, feattype, wordval))
-    }
-  }
-}
-
-/**
- * A factory for generating features for a doc-cell candidate consisting of
- * separate features for each n-gram.
- */
-abstract class NgramByNgramCandidateFeatVecFactory[Co](
+abstract class GramByGramCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  /** Optionally return a per-ngram feature whose count in the document is
-    * `doccount`, with specified document and cell language models. The
+  /** Optionally return a per-gram feature whose count in the document is
+    * `count`, with specified document and cell language models. The
     * return value is a tuple of suffix describing the particular feature
     * class being returned, and feature value. The suffix will be appended
-    * to the ngram itself to form the feature name. */
-  def get_ngram_feature(word: Gram, doccount: Double, doclm: NgramLangModel,
-    celllm: NgramLangModel): Option[(FeatureValue, String, Double)]
+    * to the gram itself to form the feature name. */
+  def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel,
+    celllm: LangModel): Option[(FeatureValue, String, Double)]
 
   def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
       initial_rank: Int) = {
-    val doclm = Ngram.check_ngram_lang_model(doc.rerank_lm)
-    val celllm =
-      Ngram.check_ngram_lang_model(cell.lang_model.rerank_lm)
-    for ((ngram, count) <- doclm.iter_grams;
-         (fvtype, suff, value) <-
-           get_ngram_feature(ngram, count, doclm, celllm))
-      // Generate a feature name by concatenating the words. This may
-      // conceivably lead to clashes if a word actually has the
-      // separator in it, but that's unlikely and doesn't really matter
-      // anyway.
-      yield (fvtype,
-        "%s$%s" format (Ngram.to_raw(ngram) mkString "|", suff), value)
+    val doclm = doc.rerank_lm
+    val celllm = cell.lang_model.rerank_lm
+    for ((gram, count) <- doclm.iter_grams;
+         (fvtype, suff, value) <- get_gram_feature(gram, count, doclm, celllm))
+      yield (fvtype, "%s$%s" format (doclm.gram_to_feature(gram), suff), value)
   }
 }
 
 /**
  * A factory for generating features for a doc-cell candidate consisting of
- * features for each ngram in the document that don't involve a comparison
- * between the doc and cell's ngram probabilities.
+ * features for each gram in the document that don't involve a comparison
+ * between the doc and cell's gram probabilities.
  *
- * @param feattype How to compute the value assigned to the ngrams:
+ * @param feattype How to compute the value assigned to the words:
  *
- * - `ngram-cell-count`: use cell ngram count
- * - `ngram-cell-prob`: use cell ngram probability
- * - any of the above with `-binned` added, which bins logarithmically
+ * - `gram-binary`: always assign 1
+ * - `gram-doc-count`: use document word count
+ * - `gram-cell-count`: use cell word count
+ * - `gram-doc-prob`: use document word probability
+ * - `gram-cell-prob`: use cell word probability
+ * - any of the above except `gram-binary` with `-binned` added, which
+ *   bins logarithmically
  */
-class NgramCandidateFeatVecFactory[Co](
+class GramCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends NgramByNgramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
-  def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
-      celllm: NgramLangModel) = {
+) extends GramByGramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
+  def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel,
+      celllm: LangModel) = {
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
-    val (fvtype, ngramval) = basetype match {
-      case "ngram-cell-count" => (FeatCount, celllm.get_gram(ngram))
-      case "ngram-cell-prob" => (FeatProb, celllm.gram_prob(ngram))
+    val (fvtype, gramval) = basetype match {
+      case "gram-binary" => (FeatBinary, 1.0)
+      case "gram-doc-count" => (FeatCount, doccount)
+      case "gram-cell-count" => (FeatCount, celllm.get_gram(gram))
+      case "gram-doc-prob" => (FeatProb, doclm.gram_prob(gram))
+      case "gram-cell-prob" => (FeatProb, celllm.gram_prob(gram))
     }
     if (binned)
-      Some(bin_logarithmically(feattype, ngramval))
+      Some(bin_logarithmically(feattype, gramval))
     else
-      Some((fvtype, feattype, ngramval))
+      Some((fvtype, feattype, gramval))
   }
 }
 
 /**
  * A factory for generating features for a doc-cell candidate consisting of
- * features for each ngram in the document that involve a comparison
- * between the doc and cell's ngram probabilities.
+ * features for each gram in the document that involve a comparison
+ * between the doc and cell's gram probabilities.
  *
- * @param feattype How to compute the value assigned to the ngrams that are
+ * @param feattype How to compute the value assigned to the grams that are
  *   shared:
  *
- * - `matching-ngram-binary`: always assign 1
- * - `matching-ngram-doc-count`: use document ngram count
- * - `matching-ngram-cell-count`: use cell ngram count
- * - `matching-ngram-doc-prob`: use document ngram probability
- * - `matching-ngram-cell-prob`: use cell ngram probability
- * - `matching-ngram-count-product`: use product of document and cell ngram count
- * - `matching-ngram-count-quotient`: use quotient of cell and document ngram count
- * - `matching-ngram-prob-product`: use product of document and cell ngram prob
- * - `matching-ngram-prob-quotient`: use quotient of cell and document ngram prob
- * - `matching-ngram-kl`: use KL-divergence component for document/cell probs
+ * - `matching-gram-binary`: always assign 1
+ * - `matching-gram-doc-count`: use document gram count
+ * - `matching-gram-cell-count`: use cell gram count
+ * - `matching-gram-doc-prob`: use document gram probability
+ * - `matching-gram-cell-prob`: use cell gram probability
+ * - `matching-gram-count-product`: use product of document and cell gram count
+ * - `matching-gram-count-quotient`: use quotient of cell and document gram count
+ * - `matching-gram-prob-product`: use product of document and cell gram prob
+ * - `matching-gram-prob-quotient`: use quotient of cell and document gram prob
+ * - `matching-gram-kl`: use KL-divergence component for document/cell probs
  * - any of the above with `-binned` added, which bins logarithmically
  */
-class NgramMatchingCandidateFeatVecFactory[Co](
+class GramMatchingCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
   binning_status: BinningStatus,
   feattype: String
-) extends NgramByNgramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
-  def get_ngram_feature(ngram: Gram, doccount: Double, doclm: NgramLangModel,
-      celllm: NgramLangModel) = {
-    val cellcount = celllm.get_gram(ngram)
+) extends GramByGramCandidateFeatVecFactory[Co](featvec_factory, binning_status) {
+  def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel,
+      celllm: LangModel) = {
+    val cellcount = celllm.get_gram(gram)
     if (cellcount == 0.0)
       None
     else {
       val binned = feattype.endsWith("-binned")
       val basetype = feattype.replace("-binned", "")
-      val (fvtype, ngramval) = basetype match {
-        case "matching-ngram-binary" =>
-          (FeatBinary, 1.0)
-        case "matching-ngram-doc-count" =>
-          (FeatCount, doccount)
-        case "matching-ngram-cell-count" =>
-          (FeatCount, cellcount)
-        case "matching-ngram-count-product" =>
-          (FeatCount, doccount * cellcount)
-        case "matching-ngram-count-quotient" =>
-          (FeatRaw, cellcount / doccount)
+      val (fvtype, gramval) = basetype match {
+        case "matching-gram-binary" => (FeatBinary, 1.0)
+        case "matching-gram-doc-count" => (FeatCount, doccount)
+        case "matching-gram-cell-count" => (FeatCount, cellcount)
+        case "matching-gram-count-product" => (FeatCount, doccount * cellcount)
+        case "matching-gram-count-quotient" => (FeatRaw, cellcount / doccount)
         case _ => {
-          val docprob = doclm.gram_prob(ngram)
-          val cellprob = celllm.gram_prob(ngram)
+          val docprob = doclm.gram_prob(gram)
+          val cellprob = celllm.gram_prob(gram)
           basetype match {
-            case "matching-ngram-doc-prob" =>
-              (FeatProb, docprob)
-            case "matching-ngram-cell-prob" =>
-              (FeatProb, cellprob)
-            case "matching-ngram-prob-product" =>
-              (FeatProb, docprob * cellprob)
-            case "matching-ngram-prob-quotient" =>
+            case "matching-gram-doc-prob" => (FeatProb, docprob)
+            case "matching-gram-cell-prob" => (FeatProb, cellprob)
+            case "matching-gram-prob-product" => (FeatProb, docprob * cellprob)
+            case "matching-gram-prob-quotient" =>
               (FeatRescale, cellprob / docprob)
-            case "matching-ngram-kl" =>
+            case "matching-gram-kl" =>
               (FeatRescale, docprob*(log(docprob/cellprob)))
           }
         }
       }
       if (binned)
-        Some(bin_logarithmically(feattype, ngramval))
+        Some(bin_logarithmically(feattype, gramval))
       else
-        Some((fvtype, feattype, ngramval))
+        Some((fvtype, feattype, gramval))
     }
   }
 }

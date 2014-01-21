@@ -268,6 +268,12 @@ abstract class NgramLangModel(
 
   def gram_to_string(gram: Gram) = Ngram.to_raw(gram) mkString " "
 
+  // Generate a feature name by concatenating the words. This may
+  // conceivably lead to clashes if a word actually has the
+  // separator in it, but that's unlikely and doesn't really matter
+  // anyway.
+  def gram_to_feature(gram: Gram) = Ngram.to_raw(gram) mkString "|"
+
   /**
    * This is a basic unigram implementation of the computation of the
    * KL-divergence between this lang model and another lang model,

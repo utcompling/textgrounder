@@ -134,6 +134,8 @@ abstract class UnigramLangModel(
 
   def gram_to_string(gram: Gram) = Unigram.to_raw(gram)
 
+  def gram_to_feature(gram: Gram) = Unigram.to_raw(gram)
+
   /**
    * This is a basic unigram implementation of the computation of the
    * KL-divergence between this lang model and another lang model,
