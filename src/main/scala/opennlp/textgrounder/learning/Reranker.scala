@@ -273,7 +273,9 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
  * -- Query training data in the form of query training instances (QTI's),
  *    directly encapsulating a query, the candidate list scored by the initial
  *    ranker, and correct candidate. This is the raw-form data needed to
- *    generate the feature vectors that are fed to the reranker.
+ *    generate the feature vectors that are fed to the reranker. (Note that
+ *    the correct candidate must be in the candidate list, and will be
+ *    added if necessary. See below.)
  * -- Feature training data is the data actually used to train a reranker.
  *    Each item is a "feature training instance" (FTI, of generic type
  *    `FTI`, which must be a subclass of `DataInstance`), encapsulating an
@@ -303,21 +305,6 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
  * In other words, the same `ExtInst` object might generate different
  * query-candidate pairs depending on which split it falls in and what the
  * nature of the external instances in the remaining splits is.
- *
- *    gener correctinformation necessary to generate a feature training
- *    (QTI), encapsulating information necessary to generate a feature training
- *    instance (FTI), directly usable by a classifier trainer (see above).
- *    The QTI consists of the query itself, the candidate list with associated
- *    scores for each candidate when ranked using the initial ranker, and the
- *    identity of the correct candidate, which must be in the candidate list.
- *    The candidate list in the QTI is determined by taking the top-ranked N
- *    candidates (N = `top_n`) from the ranking produced by the initial
- *    ranker, and augmenting if necessary with the correct candidate.
- *    We take one other candidate away when doing this; although it's not
- *    always necessary (a single-weight classifier in general can handle
- *    a variable number of classes since it treats them all the same),
- *    it's required for some classifiers (e.g. those based on R's mlogit()
- *    function).
  *
  * Training is as follows:
  *
