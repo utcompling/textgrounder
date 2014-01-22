@@ -264,6 +264,12 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'id': Tweet ID
 
+    'type': Either "tweet", "delete" or "limit"
+
+    'offset': In the case of deletion or limit notices, a non-zero offset
+      to ensure that the notices remain in the same relative position when
+      sorting
+
     'min-timestamp': Earliest timestamp
 
     'max-timestamp': Latest timestamp
@@ -329,6 +335,9 @@ Look for any tweets containing the word "clinton" as well as either the words
   var preserve_case = ap.flag("preserve-case",
     help="""Don't lowercase words.  This preserves the difference
     between e.g. the name "Mark" and the word "mark".""")
+  var include_invalid = ap.flag("include-invalid",
+    help="""Don't skip invalid tweets, deletion notices and such. All tweets
+    and tweet notices will be included.""")
   var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
     default = 1,
     must = be_>(0),
@@ -477,6 +486,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    * @param json Raw JSON for tweet; only stored when --output-format=json
    * @param path Path of file that the tweet came from
    * @param index 1-based index of tweet (= line number); 0 if multiple
+   * @param ty Tweet message type: "tweet", "delete" or "limit"
    * @param text Text for tweet or tweets (a Seq in case of multiple tweets)
    * @param user User name (FIXME: or one of them, when going by time; should
    *    do something smarter)
@@ -508,9 +518,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     // on the DList before operating on it, but this function only exists
     // starting in Scoobi 0.7.
     index: TweetCount,
+    // Tweet type ("tweet", "delete")
+    ty: String,
+    var offset: Int,
     text: Iterable[String],
     user: String,
-    id: TweetID,
+    var id: TweetID,
     min_timestamp: Timestamp,
     max_timestamp: Timestamp,
     geo_timestamp: Timestamp,
@@ -527,7 +540,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     urls: Map[String, Int]
     /* NOTE: If you add a field here, you need to update a bunch of places,
        including (of course) wherever a Tweet is created, but also
-       some less obvious places.  In all:
+       some less obvious places. (HOWEVER, there are currently 22 fields,
+       and adding another one will cause problems at least with WireFormat.
+       In such a case some fields need to be moved into a substructure.)
+       
+       In all:
 
        -- the doc string just above
        -- the help string for parameter --output-fields (output_fields)
@@ -564,6 +581,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "id" => elong(id)
           case "path" => string(path)
           case "index" => elong(index)
+          case "type" => string(ty)
+          case "offset" => int(offset)
           case "min-timestamp" => timestamp(min_timestamp)
           case "max-timestamp" => timestamp(max_timestamp)
           case "geo-timestamp" => timestamp(geo_timestamp)
@@ -614,9 +633,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val operation_category = "Tweet"
 
     val small_fields =
-      Seq("user", "id", "path", "index", "min-timestamp", "max-timestamp",
-        "geo-timestamp", "coord", "followers", "following", "lang",
-        "numtweets", "num-positions")
+      Seq("user", "id", "type", "offset", "path", "index", "min-timestamp",
+        "max-timestamp", "geo-timestamp", "coord", "followers", "following",
+        "lang", "numtweets", "num-positions")
 
     val big_fields =
       Seq("positions", "user-mentions", "retweets", "hashtags", "urls",
@@ -648,6 +667,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         index: TweetCount) = {
       var json = ""
       var path = ""
+      var ty = ""
+      var offset = 0
       var text = Seq[String]()
       var user = ""
       var id: TweetID = 0L
@@ -672,6 +693,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         name match {
           case "json"          => json = string(x)
           case "path"          => path = string(x)
+          case "type"          => ty = string(x)
+          case "offset"        => offset = int(x)
           case "text"          => text = string_seq(x)
           case "user"          => user = string(x)
           case "id"            => id = dlong(x)
@@ -735,15 +758,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       if (positions.size == 0 && !lat.isNaN && !long.isNaN)
         positions = Map(geo_timestamp -> SphereCoord(lat, long))
 
-      Tweet(json, path, index, text, user, id, min_timestamp, max_timestamp,
-        geo_timestamp, lat, long, followers, following, lang, numtweets,
-        positions, user_mentions, retweets, hashtags, urls)
+      Tweet(json, path, index, ty, offset, text, user, id, min_timestamp,
+        max_timestamp, geo_timestamp, lat, long, followers, following, lang,
+        numtweets, positions, user_mentions, retweets, hashtags, urls)
     }
 
     def from_raw_text(path: String, text: String, index: TweetCount) = {
-      Tweet("", path, index, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
-        1, Map[Timestamp, SphereCoord](), empty_map, empty_map,
-        empty_map, empty_map)
+      Tweet("", path, index, "tweet", 0, Seq(text), "", 0L, 0L, 0L, 0L,
+        NaN, NaN, 0, 0, "", 1, Map[Timestamp, SphereCoord](),
+        empty_map, empty_map, empty_map, empty_map)
     }
   }
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
@@ -1102,8 +1125,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           "Unable to parse date %s" format args(1))
       }
       val tweet =
-        Tweet("", "", 1, Seq(text), "user", 0, timestamp, timestamp,
-          timestamp, NaN, NaN, 0, 0, "unknown", 1,
+        Tweet("", "", 1, "tweet", 0, Seq(text), "user", 0, timestamp,
+          timestamp, timestamp, NaN, NaN, 0, 0, "unknown", 1,
           Map[Timestamp, SphereCoord](), empty_map, empty_map,
           empty_map, empty_map)
       test(args(0), tweet)
@@ -1119,13 +1142,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     // occurs.
     private class ParseJSonExit extends Exception { }
 
+    var tweet_offset = 0
+
     /**
      * Parse a JSON line into a tweet, using Lift.
      *
      * @return status and tweet.
      */
     def parse_json_lift(path: String, line: String, index: TweetCount
-        ): (String, Tweet) = {
+        ): Tweet = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -1149,7 +1174,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       def parse_problem(e: Exception) = {
         logger.warn("Error parsing line %s: %s\n%s" format (
           lineno, line, stack_trace_as_string(e)))
-        ("error", null)
+        null
       }
 
       /**
@@ -1289,20 +1314,30 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
               collections.
         */
         val parsed = liftweb.json.parse(line)
+        val json = if (opts.output_format == "json") line else ""
         if ((parsed \ "delete" values) != None) {
-          bump_counter("tweet deletion notices skipped")
-          ("delete", null)
+          bump_counter("tweet deletion notices")
+          tweet_offset += 1
+          Tweet(json, path, index, "delete", tweet_offset, Seq(), "",
+            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+            Map[Timestamp, SphereCoord](),
+            empty_map, empty_map, empty_map, empty_map)
         } else if ((parsed \ "limit" values) != None) {
-          bump_counter("tweet limit notices skipped")
-          ("limit", null)
+          bump_counter("tweet limit notices")
+          tweet_offset += 1
+          Tweet(json, path, index, "limit", tweet_offset, Seq(), "",
+            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+            Map[Timestamp, SphereCoord](),
+            empty_map, empty_map, empty_map, empty_map)
         } else {
+          tweet_offset = 0
           val user = force_string(parsed, "user", "screen_name")
           val timestamp = parse_time(force_string(parsed, "created_at"))
           val raw_text = force_string(parsed, "text")
           val text = raw_text.replaceAll("\\s+", " ")
           val followers = force_string(parsed, "user", "followers_count").toInt
           val following = force_string(parsed, "user", "friends_count").toInt
-          val tweet_id = force_string(parsed, "id_str")
+          val tweet_id = force_string(parsed, "id_str").toLong
           val lang = force_string(parsed, "user", "lang")
           val (lat, long) =
             if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
@@ -1401,11 +1436,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           // map
           //  { case (url, count) => (url.replace("\\/", "/"), count) }
 
-          ("success",
-            Tweet(if (opts.output_format == "json") line else "",
-              path, index, Seq(text), user, tweet_id.toLong, timestamp,
-              timestamp, timestamp, lat, long, followers, following, lang, 1,
-              positions, user_mentions, retweets, hashtags, urls))
+          Tweet(json, path, index, "tweet", 0, Seq(text), user, tweet_id,
+            timestamp, timestamp, timestamp, lat, long, followers,
+            following, lang, 1, positions, user_mentions, retweets, hashtags,
+            urls)
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -1420,7 +1454,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           bump_counter("ERROR: NumberFormatException when parsing")
           parse_problem(nfe)
         }
-        case _: ParseJSonExit => ("error", null)
+        case _: ParseJSonExit => null
         case e: Exception => {
           bump_counter("ERROR: %s when parsing" format e.getClass.getName)
           parse_problem(e); throw e
@@ -1442,7 +1476,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * Parse a line (JSON or textdb) into a tweet.  Return `null` if
      * unable to parse.
      */
-    def parse_line(pathline: (String, String)) = {
+    def parse_line_1(pathline: (String, String)): Tweet = {
       val (path, line) = pathline
       bump_counter("total lines")
       lineno += 1
@@ -1455,28 +1489,61 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
       else {
         bump_counter("total tweets parsed")
-        val (status, tweet) = opts.input_format match {
-          case "raw-lines" => ("success",
-            Tweet.from_raw_text(path, line, lineno))
+        val tweet = opts.input_format match {
+          case "raw-lines" =>
+            Tweet.from_raw_text(path, line, lineno)
           case "json" => parse_json_lift(path, line, lineno)
           case "textdb" =>
-            error_wrap(line, ("error", null: Tweet)) { line =>
-              ("success",
-                Tweet.from_row(opts.input_schema, line.split("\t", -1),
-                  lineno))
+            error_wrap(line, null: Tweet) { line =>
+              Tweet.from_row(opts.input_schema, line.split("\t", -1), lineno)
             }
         }
-        if (status == "error") {
+        if (tweet == null) {
           bump_counter("total tweets unsuccessfully parsed")
-        } else if (status == "success") {
-          bump_counter("total tweets successfully parsed")
         } else {
-          bump_counter("total tweet-related notices skipped during parsing")
+          bump_counter("total tweets successfully parsed")
         }
         tweet
       }
     }
 
+    val stored_notices = mutable.Buffer[Tweet]()
+    var last_id: Long = _
+
+    def parse_line(pathline: (String, String)): Seq[Tweet] = {
+      val tweet = parse_line_1(pathline)
+      /* Normally, we assign a delete message the same ID as the previous
+         tweet so it will sort after it. But we can't do that for delete
+         messages at the beginning of a split so instead we cache them
+         until we encounter a tweet, then set the ID to that tweet and
+         use negative offsets to ensure that they sort before that tweet.
+         In the process we handle nulls (errors).
+       */
+      if (tweet == null)
+        Seq()
+      else if (tweet.id == 0) {
+        tweet.id = last_id
+        if (tweet.id == 0) {
+          stored_notices += tweet
+          Seq()
+        } else
+          Seq(tweet)
+      } else {
+        last_id = tweet.id
+        if (stored_notices.size > 0) {
+          var negoffset = -stored_notices.size
+          for (tw <- stored_notices) {
+            tw.id = last_id
+            tw.offset = negoffset
+            negoffset += 1
+          }
+          val retval = stored_notices.toList ++ Seq(tweet)
+          stored_notices.clear()
+          retval
+        } else
+          Seq(tweet)
+      }
+    }
 
     /**
      * Return true if this tweet is "valid" in that it doesn't have any
@@ -1488,10 +1555,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def is_valid_tweet(tw: Tweet): Boolean = {
       val valid =
       // filters out invalid tweets, as well as trivial spam
-        tw.id != 0 && tw.min_timestamp != 0 && tw.max_timestamp != 0 &&
-          tw.user != "" && !(tw.lat == 0.0 && tw.long == 0.0)
-      if (!valid)
-        bump_counter("tweets skipped due to invalid fields")
+        tw.ty == "tweet" && tw.id != 0 && tw.min_timestamp != 0 &&
+          tw.max_timestamp != 0 && tw.user != "" &&
+          !(tw.lat == 0.0 && tw.long == 0.0)
+      if (!valid) {
+        if (tw.ty != "tweet")
+          bump_counter("tweet-related notices skipped")
+        else
+          bump_counter("tweets skipped due to invalid fields")
+      }
       valid
     }
 
@@ -1509,7 +1581,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * the different streams, but there is a lot of duplication that needs to
      * be tossed aside.
      */
-    def tweet_once(id_tweets: (TweetID, Iterable[Tweet])) = {
+    def tweet_once(id_tweets: ((TweetID, Int), Iterable[Tweet])) = {
       val (id, tweets) = id_tweets
       val head = tweets.head
       val skipped = tweets.tail.toSeq.length
@@ -1543,8 +1615,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     // source are combined to deal with the inevitable gaps in coverage
     // resulting from brief Twitter failures or hiccups, periods when
     // one of the scraping machines goes down, etc.
-    def filter_duplicates(values: DList[Tweet]) =
-      values.groupBy(_.id).map(tweet_once)
+    def filter_duplicates(values: DList[Tweet]) = {
+      values.groupBy { tweet => (tweet.id, tweet.offset)
+      }.map(tweet_once)
+    }
 
     def filter_tweets(values: DList[Tweet]) = {
       // It's necessary to filter for duplicates when reading JSON tweets
@@ -1555,11 +1629,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       //
       // Likewise it may be a good idea to filter out JSON tweets with
       // invalid fields in them, but not a good idea otherwise.
+      val valid =
+        if (opts.include_invalid) values
+        else values.filter(is_valid_tweet)
       val deduplicated =
-        if (opts.input_format == "json")
-          filter_duplicates(values.filter(is_valid_tweet))
-        else
-          values
+        if (opts.input_format == "json") filter_duplicates(valid)
+        else values
       deduplicated.filter(x => filter_tweet_by_tweet_filters(x))
     }
 
@@ -1573,8 +1648,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      */
     def apply(lines: DList[(String, String)]) = {
 
-      // Parse JSON into tweet records.  Filter out nulls (unparsable tweets).
-      val values_extracted = lines.map(parse_line).filter(_ != null)
+      // Parse JSON into tweet records.
+      val values_extracted = lines.flatMap(parse_line)
 
       /* Filter duplicates, invalid tweets, tweets not matching any
          tweet-level boolean filters. (User-level boolean filters get
@@ -1633,6 +1708,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val t1 = tw1.tweet
       val t2 = tw2.tweet
       val id = if (t1.id != t2.id) -1L else t1.id
+      val ty = if (t1.ty != t2.ty) "[multiple]" else t1.ty
       val lang = if (t1.lang != t2.lang) "[multiple]" else t1.lang
       val path = if (t1.path != t2.path) "[multiple]" else t1.path
       val (followers, following) =
@@ -1682,9 +1758,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // FIXME maybe want to track the different users
       val tweet =
-        Tweet("", path, 0, text, t1.user, id, min_timestamp, max_timestamp,
-          geo_timestamp, lat, long, followers, following, lang, numtweets,
-          positions, user_mentions, retweets, hashtags, urls)
+        Tweet("", path, 0, ty, 0, text, t1.user, id, min_timestamp,
+          max_timestamp, geo_timestamp, lat, long, followers, following,
+          lang, numtweets, positions, user_mentions, retweets, hashtags, urls)
       Record(tw1.output_key, "", tw1.matches || tw2.matches, tweet)
     }
 
