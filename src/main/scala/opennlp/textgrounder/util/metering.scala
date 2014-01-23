@@ -184,13 +184,17 @@ protected class MeteringPackage {
       val (tes, ips, spi) = tes_ips_spi
       val attime = if (!include_timestamp) "" else
         "At %s: " format humandate_time(curtime)
-      errprint("%sElapsed time: %s (since start: %s)",
-               attime,
-               format_minutes_seconds(tes, include_hours = false),
-               format_minutes_seconds(get_program_time_usage))
-      if (verbose)
+      val since_start = format_minutes_seconds(get_program_time_usage)
+      if (verbose) {
+        errprint("%sElapsed time: %s (since start: %s)",
+                 attime,
+                 format_minutes_seconds(tes, include_hours = false),
+                 since_start)
         errprint("%s %s processed, %s items/sec, %s sec/item",
           items_processed, item_unit, format_double(ips), format_double(spi))
+      } else
+        errprint("%s%s %s processed (since start: %s)",
+          attime, items_processed, item_unit, since_start)
     }
 
     /**

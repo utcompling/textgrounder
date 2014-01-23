@@ -482,11 +482,9 @@ abstract class Grid[Co](
     driver.note_result("training-documents-per-non-empty-cell",
       training_docs_per_non_empty_cell,
       "Training documents per non-emtpy cell")
-    if (driver.params.verbose) {
-      errprint(
-        "%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
-        total_num_cells, num_non_empty_cells, pct_non_empty,
-        pretty_double(training_docs_per_non_empty_cell))
-    }
+    errprint(
+      "%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
+      total_num_cells, num_non_empty_cells, pct_non_empty,
+      pretty_double(training_docs_per_non_empty_cell))
   }
 }
