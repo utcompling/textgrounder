@@ -1064,7 +1064,8 @@ class RankedDocEvalStats[Co](
             minerrors.last min rankres.pred_truedist_for_cell(cell_at_rank)
           minerrors :+ newbest
       }
-    for (rank <- top_n_for_oracle_dists)
+    val num_pred_cells = rankres.pred_cells.size
+    for (rank <- top_n_for_oracle_dists; if rank < num_pred_cells)
       oracle_true_dists_at(rank) :+= min_errors(rank)
     true_dists += res.pred_truedist
     oracle_true_dists += res.correct_truedist
@@ -1087,11 +1088,13 @@ class RankedDocEvalStats[Co](
     super.output_incorrect_results()
      errprint("                                           %10s %10s",
        "mean", "median")
-    for (i <- top_n_for_oracle_dists) {
+    for (i <- top_n_for_oracle_dists;
+         dists_at = oracle_true_dists_at(i);
+         if dists_at.size > 0) {
        errprint("Oracle true error distance at rank <= %-4s %10s %10s",
          "%s:" format i,
-         output_result_with_units(mean(oracle_true_dists_at(i))),
-         output_result_with_units(median(oracle_true_dists_at(i))))
+         output_result_with_units(mean(dists_at)),
+         output_result_with_units(median(dists_at)))
     }
     for (i <- 2 to max_rank_for_exact_incorrect) {
       output_fraction("  Incorrect, with correct at rank %s" format i,
