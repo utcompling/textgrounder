@@ -49,15 +49,19 @@ case class TrainingData[DI <: DataInstance](
       def check(cond: Boolean, msg: => String) {
         assert(cond, "Instance #%s: %s: %s" format (index + 1, msg, fv))
       }
-      check(fv.depth == head.depth,
-        "has depth %s instead of %s" format (fv.depth, fv.depth))
+      // There may legitimately be different instances with different depths
+      // when ranking.
+      //check(fv.depth == head.depth,
+      //  "has depth %s instead of %s" format (fv.depth, head.depth))
       check(fv.length == head.length,
         "has length %s instead of %s" format (fv.length, head.length))
       check(fv.mapper == head.mapper, "wrong mapper")
       check(F == fv.length,
         "feature mapper has length %s instead of %s" format (F, fv.length))
-      check(L == fv.depth,
-        "label mapper has depth %s instead of %s" format (L, fv.depth))
+      // There may legitimately be different instances with different depths
+      // when ranking.
+      //check(L == fv.depth,
+      //  "label mapper has depth %s instead of %s" format (L, fv.depth))
       check(label >= 0 && label < L,
         "label %s out of bounds [0,%s)" format (label, L))
 

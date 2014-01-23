@@ -72,30 +72,31 @@ function). Default %default.""")
       must = be_specified,
       help = """(Labeled) file to make predictions on.""")
 
-  var label_specific =
-    ap.flag("label-specific",
-      help = """If true, features are label-specific, i.e. for a given
-instance there are different features for each possible label. This
-requires a different format for the training file.""")
-
   var ranker =
     ap.flag("ranker",
       help = """If true, this is a ranker rather than a classifier. This
-controls how features are generated and requires '--label-specific'.""")
+controls how features are generated and requires that one of the
+label-specific input formats be given.""")
 
   var input_format =
     ap.option[String]("input-format",
-      choices = Seq("dense", "sparse"),
-      default = "sparse",
+      choices = Seq("simple-dense", "simple-sparse",
+        "mlogit-dense-label-specific", "tadm-sparse-label-specific"),
+      default = "simple-sparse",
       help = """If true, features are label-specific, i.e. for a given
 instance there are different features for each possible label. This
 requires a different format for the training file.""")
 
   var split_re =
     ap.option[String]("split-re", "sre", "sr",
-      default = """[\s,]+""",
+      default = """[\s]+""",
       help = """Regexp for splitting a line into column values. By default,
-split on whitespace or commas.""")
+split on whitespace.""")
+
+  var binary =
+    ap.flag("binary",
+      help = """If true, all features are binary and the value is omitted.
+Only possible with sparse input formats.""")
 
   var label_column =
     ap.option[Int]("label-column", "lc",
@@ -213,6 +214,10 @@ object Classify extends ExperimentApp("Classify") {
   def run_program(args: Array[String]) = {
     val trainSource = io.localfh.openr(params.trainSource)
     val predictSource = io.localfh.openr(params.predictSource)
+    val label_specific = Seq("tadm-sparse-label-specific",
+      "mlogit-dense-label-specific").contains(params.input_format)
+    val sparse = Seq("simple-sparse", "tadm-sparse-label-specific"
+      ).contains(params.input_format)
 
     // If the output file is given via the option, create and write to that
     // file; otherwise, use stdout.
@@ -224,30 +229,30 @@ object Classify extends ExperimentApp("Classify") {
     }
 
     if (params.ranker) {
-      require(params.label_specific,
-        "'--label-specific' must be given if '--ranker' is given")
+      require(label_specific,
+        "Need one of the label-specific input formats if '--ranker' is given")
     }
+    if (params.binary) {
+      require(sparse,
+        "Need a sparse input format if '--binary' is given")
+    }
+    val attach_label = params.method == "tadm" && !params.ranker
     val (classifier, test_instances, factory) =
-      if (params.label_specific) {
+      if (label_specific) {
         // Read in the data instances and create feature vectors
-        val factory =
-          new SparseAggregateInstanceFactory(attach_label = !params.ranker)
-        def read_data(source: Iterator[String], is_training: Boolean) = {
-          if (params.input_format == "dense")
-            factory.import_dense_labeled_instances(source,
-              params.split_re,
-              params.instance_index_column,
-              params.label_column,
-              params.choice_column,
-              is_training = is_training)
-          else
-            factory.import_sparse_labeled_instances(source,
-              params.split_re,
-              is_binary = false,
-              is_training = is_training)
+        val factory = params.input_format match {
+          case "mlogit-dense-label-specific" =>
+            new MLogitDenseLabelSpecificDataInstanceFactory(attach_label,
+              params.split_re, params.instance_index_column,
+              params.label_column, params.choice_column)
+          case "tadm-sparse-label-specific" =>
+            new TADMSparseLabelSpecificDataInstanceFactory(attach_label,
+              params.split_re, is_binary = params.binary)
         }
-        val training_instances = read_data(trainSource, is_training = true)
-        val test_instances = read_data(predictSource, is_training = false)
+        val training_instances =
+          factory.import_instances(trainSource, is_training = true)
+        val test_instances =
+          factory.import_instances(predictSource, is_training = false)
         val numlabs = factory.mapper.number_of_labels
         if (numlabs < 2) {
           error("Found %s different labels, when at least 2 are needed." format
@@ -261,8 +266,8 @@ object Classify extends ExperimentApp("Classify") {
             new MLogitConditionalLogitTrainer[FeatureVector](ArrayVector)
           }
           case "tadm" => {
-            errprint("Using TADM maxent ranker")
-            new TADMRankingTrainer[FeatureVector](ArrayVector,
+            errprint("Using TADM trainer")
+            new TADMTrainer[FeatureVector](ArrayVector,
               max_iterations = params.iterations,
               gaussian = params.gaussian,
               lasso = params.lasso)
@@ -292,31 +297,35 @@ object Classify extends ExperimentApp("Classify") {
         (classifier, test_instances, factory)
       } else {
         // Read in the data instances and create feature vectors
-        val factory = new SparseSimpleInstanceFactory(attach_label = true)
+        val factory = params.input_format match {
+          case "simple-dense" =>
+            new SimpleDenseDataInstanceFactory(attach_label,
+              params.split_re, params.label_column)
+          case "simple-sparse" =>
+            new SimpleSparseDataInstanceFactory(attach_label,
+              params.split_re, is_binary = params.binary)
+        }
         val training_instances =
-          factory.import_labeled_instances(trainSource,
-            params.split_re,
-            params.label_column,
-            is_training = true).
-            toIndexedSeq
+          factory.import_instances(trainSource, is_training = true)
         val test_instances =
-          factory.import_labeled_instances(predictSource,
-            params.split_re,
-            params.label_column,
-            is_training = false).
-            toIndexedSeq
+          factory.import_instances(predictSource, is_training = false)
         val numlabs = factory.mapper.number_of_labels
         if (numlabs < 2) {
           error("Found %s different labels, when at least 2 are needed." format
             numlabs)
         }
 
-        // Train a classifer
+        // Train a classifier
         val trainer = params.method match {
           case "mlogit" =>
             error("Currently `mlogit` only works when --label-specific")
-          case "tadm" =>
-            error("Currently `tadm` only works when --label-specific")
+          case "tadm" => {
+            errprint("Using TADM trainer")
+            new TADMTrainer[FeatureVector](ArrayVector,
+              max_iterations = params.iterations,
+              gaussian = params.gaussian,
+              lasso = params.lasso)
+          }
           case "pa-perceptron" if numlabs > 2 || debug("multilabel") => {
             errprint("Using passive-aggressive multi-label perceptron")
             new PassiveAggressiveNoCostMultiWeightMultiLabelPerceptronTrainer[

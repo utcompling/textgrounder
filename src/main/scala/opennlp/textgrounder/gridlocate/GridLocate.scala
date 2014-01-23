@@ -1512,7 +1512,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MLogitConditionalLogitTrainer[GridRankerInst[Co]](vec_factory)
 
       case "tadm" =>
-        new TADMRankingTrainer[GridRankerInst[Co]](vec_factory,
+        new TADMTrainer[GridRankerInst[Co]](vec_factory,
           method = params.tadm_method,
           max_iterations = params.rerank_iterations,
           gaussian = params.tadm_gaussian,

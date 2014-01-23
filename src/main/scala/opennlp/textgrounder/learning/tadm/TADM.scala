@@ -58,6 +58,13 @@ import util.metering._
  *
  * Write out the training data to a file in the format desired by TADM.
  *
+ * TADM-Python assumes the following format for data in the Simple format
+ * (for classification):
+ *
+ * -- Each data instance consists of a single line, the correct label followed
+ *    by the features for the candidate, separated by spaces. Only binary features
+ *    can be specified this way.
+ *
  * TADM-Python assumes the following format for data in the SimpleRanker
  * format:
  *
@@ -68,7 +75,7 @@ import util.metering._
  *    separated by spaces. Only binary features can be specified this way.
  * -- The correct candidate is the one that has the label "1".
  *
- * TADM itself wants an events-in file in the following format:
+ * TADM itself wants an events-in file in the following format for ranking:
  *
  * -- Each data instance consists of a number of lines: first a line
  *    containing only a number giving the number of candidates, followed
@@ -79,12 +86,32 @@ import util.metering._
  *    spaces. The features should be integers, numbered starting at 0.
  * -- The correct candidate should have a frequency of 1, and the other
  *    candidates should have a frequency of 0.
+ *
+ * For classification, TADM uses the same events-in file format, structured
+ * as follows:
+ *
+ * -- For a given instance, in place of there being one line per candidate,
+ *    there is one line per label, specifying the features that occur for
+ *    the instance in combination with the given label.
+ * -- In the common case where the features of an instance are not
+ *    label-specific, it's necessary to create separately-numbered features
+ *    for use with each separate label. For example, in the "tennis" example,
+ *    the feature "Outlook=Sunny" corresponds to separately-numbered features
+ *    for label "Yes" and label "No". Contrast this with the case of a ranker,
+ *    where the same-numbered feature may occur with several candidates. The
+ *    effect separately numbering the features like this is the equivalent of
+ *    having separate weight vectors for each label.
+ * -- The correct label still has a frequency of 1, and the others 0.
+ *
+ * Because of the above, the difference between classifier and ranker needs to
+ * be handled entirely by the caller. In both cases, AggregateFeatureVectors
+ * are passed in, and the return value is a SingleVectorAggregate.
  */
 
 /**
- * Train a ranking model using TADM.
+ * Train a classifying or ranking model using TADM.
  */
-class TADMRankingTrainer[DI <: DataInstance](
+class TADMTrainer[DI <: DataInstance](
   val vector_factory: SimpleVectorFactory,
   val max_iterations: Int,
   val gaussian: Double,

@@ -110,7 +110,18 @@ class SparseFeatureVectorFactory(attach_label: Boolean) { self =>
   }
 }
 
-class SparseInstanceFactory(attach_label: Boolean) extends
+/**
+ * A factory object for creating training data for a classifier. Subclasses
+ * have additional class parameters specifying different options for the
+ * external format of the data, and the function `import_instances` retrieves
+ * the data instances from the external source.
+ *
+ * @param attach_label Whether we need to make features distinguished according
+ *   to the different possible labels, so we get different weights for
+ *   different labels when the underlying classifier is single-weight
+ *   (as in TADM).
+ */
+abstract class ExternalDataInstanceFactory(attach_label: Boolean) extends
     SparseFeatureVectorFactory(attach_label) {
   // Format a series of lines for debug display.
   def format_lines(lines: TraversableOnce[Array[String]]) = {
@@ -154,6 +165,19 @@ class SparseInstanceFactory(attach_label: Boolean) extends
     (lines, column_types)
   }
 
+  def raw_linefeats_to_features(
+      raw_linefeats: Iterable[(String, (String, FeatureClass))]
+  ) = {
+    // Generate appropriate features based on column values, names, types.
+    raw_linefeats.map { case (value, (colname, coltype)) =>
+      coltype match {
+        case NumericFeature => (FeatRaw, colname, value.toDouble)
+        case NominalFeature =>
+          (FeatBinary, "%s$%s" format (colname, value), 1.0)
+      }
+    }
+  }
+
   def raw_linefeats_to_featvec(
       raw_linefeats: Iterable[(String, (String, FeatureClass))],
       label: LabelIndex, is_training: Boolean
@@ -170,86 +194,192 @@ class SparseInstanceFactory(attach_label: Boolean) extends
     // Create feature vector
     make_feature_vector(linefeats, label, is_training)
   }
+
+  def import_instances(lines: Iterator[String], is_training: Boolean
+    ): IndexedSeq[(FeatureVector, LabelIndex)]
 }
 
+/**
+ * A factory object for creating training data for a classifier from an
+ * external file consisting of one instance per line.
+ *
+ * @param attach_label Whether we need to make features distinguished according
+ *   to the different possible labels, so we get different weights for
+ *   different labels when the underlying classifier is single-weight
+ *   (as in TADM).
+ */
+abstract class SimpleDataInstanceFactory(
+  attach_label: Boolean
+) extends ExternalDataInstanceFactory(attach_label) {
+  /**
+   * Return a sequence of pairs of `(feature_vector, label)` consisting of
+   * a feature vector derived from a given and the corresponding correct
+   * label. The first line should list the column headings.
+   *
+   * @param lines_iter Iterator over lines in the file.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def compute_instances(
+      features_labels: Iterator[(Iterable[(FeatureValue, String, Double)],
+        LabelIndex)],
+      is_training: Boolean) = {
+
+    (for ((featvals, correct_label) <- features_labels) yield {
+
+      val featvec = if (attach_label) {
+        // The aggregate feature vector is derived from the given line and
+        // contains separate feature vectors for each possible label, with
+        // separate label-attached features.
+        val fvs = for (i <- 0 until mapper.number_of_labels) yield
+          make_feature_vector(featvals, i, is_training)
+        AggregateFeatureVector(fvs.toArray)
+      } else {
+        // The label isn't used here.
+        make_feature_vector(featvals, -1, is_training)
+      }
+
+      // Return instance
+      if (debug("features")) {
+        errprint("Label: %s(%s)", correct_label,
+          mapper.label_to_string(correct_label))
+        errprint("Featvec: %s", featvec.pretty_format(""))
+      }
+
+      (featvec, correct_label)
+    }).toIndexedSeq
+  }
+}
 
 /**
- * A factory object for creating sparse aggregate instances for
- * classification or ranking, consisting of a nominal label and a
- * set of features, which may be nominal or numeric. Nominal values
- * have no ordering or other numerical significance.
+ * A factory object for creating training data for a classifier from an
+ * external file consisting of one instance per line, in a dense format
+ * where each feature is a separate column and one of the columns specifies
+ * the correct label. The features in the columns may be nominal or
+ * numeric, and this is figured out automatically. (Nominal values
+ * have no ordering or other numerical significance and are treated as
+ * separate binary-valued features. The label is always treated as nominal.)
+ *
+ * All lines should have the same number of columns. The regexp to split
+ * columns can be specified. The first line is a header, specifying the
+ * names of the columns.
+ *
+ * @param attach_label Whether we need to make features distinguished according
+ *   to the different possible labels, so we get different weights for
+ *   different labels when the underlying classifier is single-weight
+ *   (as in TADM).
+ * @param split_re Regexp to split columns in a line.
+ * @param label_column Column specifying the label; used to fetch
+ *   the label and removed before creating features. A numeric index
+ *   starting at 0; can be negative, in which case it counts from the
+ *   end. Most common values are 0 (first column holds label) and -1
+ *   (last column holds label).
  */
-class SparseSimpleInstanceFactory(attach_label: Boolean) extends
-    SparseInstanceFactory(attach_label) {
+class SimpleDenseDataInstanceFactory(
+  attach_label: Boolean, split_re: String, label_column: Int
+) extends SimpleDataInstanceFactory(attach_label) {
   /**
-   * Return a pair of `(aggregate, label)` where `aggregate` is an
-   * aggregate feature vector derived from the given lines.
+   * Return a pair of `(raw_linefeats, label)` consisting of the raw features
+   * extracted from the given line along with the correct label.
    *
-   * @param line Line specifying feature values.
+   * @param line Line specifying feature values, already split.
    * @param columns Names of columns and corresponding feature type.
    *   There should be the same number of columns as items in each of the
    *   arrays.
-   * @param label_column Column specifying the label; used to fetch
-   *   the label and removed before creating features.
+   * @param label_colind Column specifying the label; always non-negative.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_labeled_instance(line: Array[String],
-      columns: Iterable[(String, FeatureClass)], label_column: Int,
-      is_training: Boolean) = {
-
+  private def get_raw_features(line: Array[String],
+      columns: Iterable[(String, FeatureClass)],
+      label_colind: Int) = {
     // Check the right length for the line
     require(line.size == columns.size, "Expected %s columns but saw %s: %s"
       format (columns.size, line.size, line mkString "\t"))
 
-    val label = mapper.label_to_index(line(label_column))
+    val label = mapper.label_to_index(line(label_colind))
 
     // Filter out the columns we don't use, pair each with its column spec.
     val raw_linefeats = line.zip(columns).zipWithIndex.filter {
-      case (value, index) => index != label_column
+      case (value, index) => index != label_colind
     }.map(_._1)
 
-    // Generate feature vector based on column values, names, types.
-    val featvec = raw_linefeats_to_featvec(raw_linefeats, label, is_training)
-
-    // Return instance
-    if (debug("features")) {
-      errprint("Label: %s(%s)", label, mapper.label_to_string(label))
-      errprint("Featvec: %s", featvec.pretty_format(""))
-    }
-    (featvec, label)
+    (raw_linefeats, label)
   }
 
   /**
-   * Return a sequence of pairs of `(aggregate, label)` where `aggregate`
-   * is an aggregate feature vector derived from the given lines. The
-   * first line should list the column headings.
+   * Return a sequence of pairs of `(feature_vector, label)` consisting of
+   * a feature vector derived from a given and the corresponding correct
+   * label. The first line should list the column headings.
    *
    * @param lines_iter Iterator over lines in the file.
-   * @param split_re Regexp to split columns in a line.
-   * @param label_column Column specifying the label; used to fetch
-   *   the label and removed before creating features.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_labeled_instances(lines_iter: Iterator[String],
-      split_re: String, label_column: Int,
-      is_training: Boolean) = {
-    val (lines, column_types) = get_columns(lines_iter, split_re)
-    val numcols = column_types.size
+  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
+    val (lines, columns) = get_columns(lines_iter, split_re)
+    val numcols = columns.size
     val label_colind = get_index(numcols, label_column)
-    for (inst <- lines) yield {
-      import_labeled_instance(inst, column_types, label_colind, is_training)
+    // If `attach_label`, we need to go through and find all the labels first,
+    // so we can create separate feature vectors for each one.
+    if (attach_label) {
+      for (line <- lines)
+        mapper.label_to_index(line(label_colind))
     }
+
+    val features_labels = lines.map { line =>
+      // Compute raw features based on column values, names, types.
+      val (raw_linefeats, label) = get_raw_features(line, columns, label_colind)
+      (raw_linefeats_to_features(raw_linefeats), label)
+    }
+
+    compute_instances(features_labels.toIterator, is_training)
   }
 }
 
 /**
- * A factory object for creating sparse aggregate instances for
- * classification or ranking, consisting of a nominal label and a
- * set of features, which may be nominal or numeric. Nominal values
- * have no ordering or other numerical significance.
+ * A factory object for creating training data for a classifier from an
+ * external file consisting of label-specific data, where each data instance
+ * has separate feature values for each possible label. For example, the
+ * labels may represent different transportation modes (car, bus, train,
+ * plane) and the data instances are particular trips to be taken by
+ * particular people, where some features (e.g. income and number of people
+ * in the party) are the same for all labels but some features differ from
+ * label to label (e.g. cost of trip, time to take trip, comfort of trip).
+ *
+ * The data is in the dense format used by R's conditional logit package
+ * ('mlogit'). Each data instance consists of a number of lines, with one
+ * line per label, with a fixed number of columns specifying the feature
+ * values for each combination of instance and label. The features in the
+ * columns may be nominal or numeric, and this is figured out automatically.
+ * (Nominal values have no ordering or other numerical significance and are
+ * treated as separate binary-valued features. The label is always treated
+ * as nominal.) There are three extra columns per line that do not specify
+ * feature values:
+ *
+ * -- The 'indiv' column specifies the individual index, i.e. the index of
+ *    the data instance. This should be the same for all lines in a given
+ *    instance and should generally be numeric, starting at 0.
+ * -- The 'label' column specifies the label of the line. This is a nominal
+ *    (non-numeric) value.
+ * -- The 'choice' column indicates whether the label on this line is the
+ *    correct one. It should be either "yes" or "true" if so, "no" or
+ *    "false" otherwise (either upper or lower case).
+ *
+ * All lines should have the same number of columns. The regexp to split
+ * columns can be specified. The first line is a header, specifying the
+ * names of the columns.
+ *
+ * @param split_re Regexp to split columns in a line.
+ * @param indiv_column Column specifying the individual index; removed
+ *   before creating features. This is a zero-based index into the
+ *   list of columns.
+ * @param label_column Column specifying the label; used to fetch
+ *   the label and removed before creating features.
+ * @param choice_column Column specifying "yes" or "no" identifying
+ *   whether the label on this line was chosen by this individual. There
+ *   should be exactly one per set of lines.
  */
-class SparseAggregateInstanceFactory(attach_label: Boolean) extends
-    SparseInstanceFactory(attach_label) {
+class MLogitDenseLabelSpecificDataInstanceFactory(attach_label: Boolean,
+  split_re: String, indiv_column: Int, label_column: Int, choice_column: Int
+) extends ExternalDataInstanceFactory(attach_label) {
   /**
    * Return a pair of `(aggregate, label)` where `aggregate` is an
    * aggregate feature vector derived from the given lines.
@@ -268,7 +398,7 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
    *   this individual. There should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_dense_labeled_instance(lines: Iterable[Array[String]],
+  private def import_instance(lines: Iterable[Array[String]],
       columns: Iterable[(String, FeatureClass)],
       indiv_colind: Int, label_colind: Int, choice_colind: Int,
       is_training: Boolean) = {
@@ -321,7 +451,7 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
     val sorted_fvs = (fvs zip labels_seen).toSeq.sortBy(_._2).map(_._1)
 
     // Aggregate feature vectors, return aggregate with label
-    val agg = new AggregateFeatureVector(fvs.toArray)
+    val agg = AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", label, mapper.label_to_string(label))
       errprint("Feature vector: %s", agg.pretty_format(""))
@@ -335,21 +465,9 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
    * first line should list the column headings.
    *
    * @param lines_iter Iterator over lines in the file.
-   * @param split_re Regexp to split columns in a line.
-   * @param indiv_column Column specifying the individual index; removed
-   *   before creating features. This is a zero-based index into the
-   *   list of columns.
-   * @param label_column Column specifying the label; used to fetch
-   *   the label and removed before creating features.
-   * @param choice_column Column specifying "yes" or "no" identifying
-   *   whether the label on this line was chosen by this individual. There
-   *   should be exactly one per set of lines.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_dense_labeled_instances(lines_iter: Iterator[String],
-      split_re: String,
-      indiv_column: Int, label_column: Int, choice_column: Int,
-      is_training: Boolean) = {
+  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
     val (lines, column_types) = get_columns(lines_iter, split_re)
     val numcols = column_types.size
     val indiv_colind = get_index(numcols, indiv_column)
@@ -359,9 +477,8 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
     val grouped_instances = new GroupByIterator(lines.toIterator,
       { line: Array[String] => line(indiv_column).toInt })
     val retval = (for ((_, inst) <- grouped_instances) yield {
-      import_dense_labeled_instance(inst.toIterable, column_types,
-        indiv_column, label_column, choice_column,
-        is_training)
+      import_instance(inst.toIterable, column_types,
+        indiv_colind, label_colind, choice_colind, is_training)
     }).toIndexedSeq
 
     if (debug("export-instances")) {
@@ -374,27 +491,101 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
 
     retval
   }
+}
 
+/**
+ * A factory object for creating training data for a classifier from an
+ * external file consisting of one instance per line, in a sparse format.
+ * The first item on the line is the label, and the remainder are the
+ * features, either alternating feature names and values, or (when
+ * `is_binary` is specified) just binary feature names, which will be given
+ * a value of 1.
+ *
+ * @param attach_label Whether we need to make features distinguished according
+ *   to the different possible labels, so we get different weights for
+ *   different labels when the underlying classifier is single-weight
+ *   (as in TADM).
+ * @param split_re Regexp to split items in a line.
+ * @param is_binary Whether the features are binary-only (no value given)
+ *   or potentially numeric (value given).
+ */
+class SimpleSparseDataInstanceFactory(
+  attach_label: Boolean,
+  split_re: String,
+  is_binary: Boolean
+) extends SimpleDataInstanceFactory(attach_label) {
+  /**
+   * Return a pair of `(featvals, label)` where `featvals` is the
+   * features/values to be passed to `make_feature_vector`.
+   *
+   * @param fields Source line, split into fields.
+   */
+  private def get_features_labels(fields: Array[String]) = {
+    val label = mapper.label_to_index(fields(0))
+    val feats =
+      if (is_binary)
+        (for (feat <- fields.drop(1)) yield (FeatBinary, feat, 1.0)).toSeq
+      else
+        (for (Array(feat, value) <- fields.drop(1).grouped(2))
+          yield (FeatRaw, feat, value.toDouble)).toSeq
+    (feats, label)
+  }
+
+  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
+    val split_lines = lines_iter.map { _.split(split_re) }.toIterable
+    if (attach_label) {
+      for (fields <- split_lines)
+        mapper.label_to_index(fields(0))
+    }
+    val features_labels = split_lines.map(get_features_labels)
+    compute_instances(features_labels.toIterator, is_training)
+  }
+}
+
+/**
+ * A factory object for creating training data for a classifier from an
+ * external file consisting of label-specific data, where each data instance
+ * has separate feature values for each possible label. See
+ * `DenseLabelSpecificDataInstanceFactory` for a description of an example
+ * of data of this sort.
+ *
+ * This data format is often used for creating rankers, where in place of
+ * semantically distinct labels there are a series of candidates, which are
+ * labeled only by numeric rank. The different ranks are typically considered
+ * semantically equivalent, meaning there aren't separate weights for a
+ * given feature combined with different labels.
+ *
+ * The input source should have the following format, similar to
+ * the TADM event-file format:
+ *
+ * -- Each data instance consists of a number of lines: first a line
+ *    containing only a number giving the number of candidates, followed
+ *    by one line per candidate.
+ * -- Each candidate line consists of a "frequency of observation"
+ *    followed by alternating feature names and corresponding values.
+ *    (Alternatively, if all features are binary, only the feature names
+ *    need to be specified, and all features present will be given the
+ *    value of 1. This is controlled by the `is_binary` argument below.)
+ * -- The correct candidate should have a frequency of 1, and the other
+ *    candidates should have a frequency of 0.
+ * -- Commonly, the items on a line are separated by spaces, but this is
+ *    controllable.
+ *
+ * The differences from the TADM event-file format are that the latter
+ * requires that features are given in memoized form (numeric indices
+ * starting from 0); that the second item in a line is the number of
+ * feature-value pairs (whereas in this format it is computed from the
+ * number of items in the line); that items must be separated by spaces;
+ * and that the binary feature-only format is not allowed.
+ */
+class TADMSparseLabelSpecificDataInstanceFactory(
+  attach_label: Boolean,
+  split_re: String,
+  is_binary: Boolean
+) extends ExternalDataInstanceFactory(attach_label) {
   /**
    * Return a pair of `(aggregate, label)` where `aggregate` is an
    * aggregate feature vector derived from the given input source.
-   * The input source should have the following format, similar to
-   * the TADM event-file format:
-   *
-   * -- Each data instance consists of a number of lines: first a line
-   *    containing only a number giving the number of candidates, followed
-   *    by one line per candidate.
-   * -- Each candidate line consists of a "frequency of observation"
-   *    followed by alternating features and corresponding values.
-   *    All items are separated by spaces.
-   * -- The correct candidate should have a frequency of 1, and the other
-   *    candidates should have a frequency of 0.
-   *
-   * The difference from the TADM event-file format is that the latter
-   * requires that features are given in memoized form (numeric indices
-   * starting from 0) and that the second item in a line is the number of
-   * feature-value pairs (whereas in this format it is computed from the
-   * number of items in the line).
    *
    * @param lines Source lines.
    * @param split_re Regexp to split items in a line.
@@ -402,9 +593,7 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
    *   or potentially numeric (value given).
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_sparse_labeled_instance(lines: Iterator[String],
-      split_re: String, is_binary: Boolean, is_training: Boolean) = {
-
+  private def import_instance(lines: Iterator[String], is_training: Boolean) = {
     val nvecs = lines.next.toInt
     var correct_label = -1
     val fvs = for (i <- 0 until nvecs) yield {
@@ -429,7 +618,7 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
     }
 
     // Aggregate feature vectors, return aggregate with label
-    val agg = new AggregateFeatureVector(fvs.toArray)
+    val agg = AggregateFeatureVector(fvs.toArray)
     if (debug("features")) {
       errprint("Label: %s(%s)", correct_label,
         mapper.label_to_string(correct_label))
@@ -438,12 +627,10 @@ class SparseAggregateInstanceFactory(attach_label: Boolean) extends
     (agg, correct_label)
   }
 
-  def import_sparse_labeled_instances(lines: Iterator[String],
-      split_re: String, is_binary: Boolean, is_training: Boolean) = {
+  def import_instances(lines: Iterator[String], is_training: Boolean) = {
     val aggs = mutable.Buffer[(AggregateFeatureVector, LabelIndex)]()
     while (lines.hasNext)
-      aggs += import_sparse_labeled_instance(lines, split_re, is_binary,
-        is_training)
+      aggs += import_instance(lines, is_training)
     aggs.toIndexedSeq
   }
 }
