@@ -45,12 +45,14 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   var keys: Array[FeatIndex], var values: Array[VECTY],
   val mappers: FeatureLabelMapper
 ) extends SparseFeatureVector {
-  assert(keys.length == values.length)
+  assert(keys.length == values.length,
+    s"keys.length ${keys.length} should = values.length ${values.length}")
 
   def stored_entries = keys.length
 
   def apply(index: FeatIndex) = {
-    assert(index >= 0 && index < length)
+    assert(index >= 0 && index < length,
+      s"index $index should be within [0,$length)")
     val keyind = java.util.Arrays.binarySearch(keys, index)
     if (keyind < 0) 0.0 else values(keyind)
   }
@@ -66,7 +68,8 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   }
 
   def dot_product(weights: SimpleVector, label: LabelIndex) = {
-    assert(length == weights.length)
+    assert(length == weights.length,
+      s"length $length should = weights length ${weights.length}")
     var i = 0
     var res = 0.0
     while (i < keys.length) {
@@ -77,7 +80,8 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   }
 
   def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex) {
-    assert(length == weights.length)
+    assert(length == weights.length,
+      s"length $length should = weights length ${weights.length}")
     var i = 0
     while (i < keys.length) {
       weights(keys(i)) += scale * values(i)
