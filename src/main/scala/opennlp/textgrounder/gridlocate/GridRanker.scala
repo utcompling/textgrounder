@@ -64,9 +64,9 @@ abstract class SimpleGridRanker[Co](
   grid: Grid[Co]
 ) extends GridRanker[Co](ranker_name, grid) {
   /**
-   * For a given language model (describing a test document), return
-   * an Iterable of tuples, each listing a particular cell on the Earth
-   * and a score of some sort.  The cells given in `include` must be
+   * For a given test document, return an Iterable of tuples, each listing
+   * a particular cell on the Earth and a score of some sort.  The correct
+   * cell is as given, and if `include_correct` is specified, must be
    * included in the list.  Higher scores are better.  The results should
    * be in sorted order, with better cells earlier.
    */

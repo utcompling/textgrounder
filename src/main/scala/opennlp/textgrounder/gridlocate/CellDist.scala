@@ -43,6 +43,10 @@ class CellDist[Co](
     cellprobs ++= probs
   }
 
+  /**
+   * Return a ranked list of all the cells. We may need to add the
+   * specified correct cell to the list. See `Ranker.evaluate`.
+   */
   def get_ranked_cells(correct: GridCell[Co], include_correct: Boolean) = {
     val probs =
       if (!include_correct)

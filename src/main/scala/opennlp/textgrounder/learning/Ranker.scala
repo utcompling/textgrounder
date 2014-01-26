@@ -46,6 +46,11 @@ import util.collection.is_reverse_sorted
  * and the document's actual location).
  */
 trait Ranker[Query, Candidate] {
+  /** Implementation of `evaluate`, to be provided by subclasses. */
+  def imp_evaluate(item: Query, correct: Candidate,
+      include_correct: Boolean):
+    Iterable[(Candidate, Double)]
+
   /**
    * Evaluate a query item, returning a list of ranked candidates from best to
    * worst, with a score for each.  The score must not increase from any
@@ -53,12 +58,13 @@ trait Ranker[Query, Candidate] {
    *
    * @param correct Correct candidate, for oracles, etc.
    * @param include_correct If true, the correct candidate must be included
-   * in the returned list, ranked as if it were just any other candidate.
+   *   in the returned list, ranked as if it were just any other candidate.
+   *   FIXME: Why is this necessary? I think the reason the correct candidate
+   *   might not be included is that it might be an empty cell. The place
+   *   where 'include_correct' is set is in the reranker when it generates the
+   *   initial ranking. (FIXME: But we skip training items where the cell is
+   *   empty, in external_instances_to_query_candidate_pairs() ...)
    */
-  def imp_evaluate(item: Query, correct: Candidate,
-      include_correct: Boolean):
-    Iterable[(Candidate, Double)]
-
   final def evaluate(item: Query, correct: Candidate,
       include_correct: Boolean) = {
     val scored_cands = imp_evaluate(item, correct, include_correct)
