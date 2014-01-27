@@ -58,7 +58,6 @@ class MMCParameters(val parser: ArgParser) extends
       help = """File containing the word counts, in old format.""")
   var output_file_prefix =
     parser.option[String]("output-file-prefix",
-      must = be_specified,
       metavar = "FILE",
       help = """Prefix to add to files in the output corpus dir.""")
 }
