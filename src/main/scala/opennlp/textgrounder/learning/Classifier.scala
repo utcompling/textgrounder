@@ -115,6 +115,17 @@ trait ScoringClassifier extends Classifier {
   def score(inst: FeatureVector): IndexedSeq[Double] =
     (0 until number_of_labels(inst)).map(score_label(inst, _)).toIndexedSeq
 
+//  /** Score a given instance and generate probabilities of each possible
+//    * label, assuming a maxent (exponential) transformation of the scores to
+//    * probabilities. Return a sequence of predicted probabilities, of
+//    * the same length as the number of labels present, as with `score`.
+//    */
+//  def maxent_prob(inst: FeatureVector): IndexedSeq[Double] = {
+//    val exp_scores = score(inst).map { math.exp(_) }
+//    val sum = exp_scores.sum
+//    exp_scores.map { _/sum }
+//  }
+
   /** Return a sorted sequence of pairs of `(label, score)`, sorted in
     * descending order.  The first item is the best label, hence the label
     * that will be returned by `classify` (except possibly when there are
