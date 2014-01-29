@@ -496,6 +496,17 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
     }
   }
 
+  protected def create_rough_ranker(args: Array[String]) = {
+    val arg_parser = new ArgParser("RoughRanker")
+    val shadow_fields = new GeolocateRoughRankerParameters(arg_parser)
+    arg_parser.parse(args)
+    val params = catch_parser_errors {
+      new GeolocateRoughRankerParameters(arg_parser)
+    }
+    val driver = new GeolocateRoughRankerDriver
+    driver.run_program(args, params)
+  }
+
   override def create_named_ranker(ranker_name: String,
       grid: Grid[SphereCoord]) = {
     ranker_name match {

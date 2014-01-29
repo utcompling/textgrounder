@@ -316,7 +316,26 @@ standard unweighted Naive Bayes.""")
         "log-num-docs"),
       help = """Strategy for computing the prior probability when doing
 Naive Bayes ranking. Possibilities are 'uniform', 'salience', 'log-salience',
-'num-docs', 'log-num-docs'. Default %default.""")
+'num-docs', and 'log-num-docs'. Default %default.""")
+  var naive_bayes_features =
+    ap.option[String]("naive-bayes-features", "nbf",
+      metavar = "STRATEGY",
+      default = "terms",
+      help = """Which features to use when using Naive Bayes to rank
+the cells for a document. Possibilities are:
+
+'terms' (use the terms of the language model);
+
+'rough-ranker' (run a ranker -- usually at a coarser grid partition -- and
+  use its scores as a feature);
+
+Multiple feature types can be specified, separated by spaces or commas.
+
+Default %default.""")
+
+  lazy val naive_bayes_feature_list =
+    get_feature_list(naive_bayes_features, Seq("terms", "rough-ranker"),
+      "naive-bayes-features")
 
   var stopwords_file =
     ap.option[String]("stopwords-file",
@@ -676,16 +695,6 @@ For the perceptron classifiers, see also `--pa-variant`,
     Seq("misc", "types-in-common", "model-compare", "trivial") ++
     features_all_gram_choices
 
-  def get_feature_list(featstring: String, allowed: Iterable[String],
-      arg: String) = {
-    val features = featstring.split("[ ,]")
-    for (feature <- features) {
-      if (!(allowed_features contains feature))
-        ap.usageError(s"Unrecognized feature '$feature' in --$arg")
-    }
-    features.toSeq
-  }
-
   var classify_features =
     ap.option[String]("classify-features",
       default = "misc",
@@ -789,6 +798,13 @@ the original ranking score, when reranking), 'random' (set to random).""")
 set of weights will be averaged. This only makes sense when
 '--initialize-weights random', and implements random restarting.
 NOT CURRENTLY IMPLEMENTED.""")
+
+  var rough_ranker_args =
+    ap.option[String]("rough-ranker-args",
+      default = "",
+      help = """Arguments to use when running the rough ranker that computes
+a sort of prior value in rough-to-fine ranking, for the fine Naive-Bayes
+ranker. This is for use with '--naive-bayes-features rough-ranker'.""")
 }
 
 trait GridLocateRerankParameters {
@@ -1102,7 +1118,17 @@ trait GridLocateParameters extends ArgParserParameters with
   GridLocateCellParameters with GridLocateEvalParameters with
   GridLocateRankParameters with GridLocateFeatureParameters with
   GridLocateRerankParameters with GridLocateOptimizerParameters with
-  GridLocateMiscParameters
+  GridLocateMiscParameters {
+  def get_feature_list(featstring: String, allowed: Seq[String],
+      arg: String) = {
+    val features = featstring.split("[ ,]")
+    for (feature <- features) {
+      if (!(allowed contains feature))
+        ap.usageError(s"Unrecognized feature '$feature' in --$arg")
+    }
+    features.toSeq
+  }
+}
 
 /**
  * Driver class for creating cell grids over some coordinate space, with a
@@ -1447,8 +1473,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new MostPopularGridRanker[Co](ranker_name, grid, salience = true)
       case "num-documents" =>
         new MostPopularGridRanker[Co](ranker_name, grid, salience = false)
-      case "naive-bayes" =>
-        new NaiveBayesGridRanker[Co](ranker_name, grid)
+      case "naive-bayes" => {
+        val features =
+          create_naive_bayes_features(params.naive_bayes_feature_list)
+        new NaiveBayesGridRanker[Co](ranker_name, grid, features)
+      }
       case "classifier" => create_classifier_ranker(ranker_name, grid)
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
@@ -1478,6 +1507,25 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new SumFrequencyGridRanker[Co](ranker_name, grid)
       case "average-cell-probability" =>
         new AverageCellProbabilityGridRanker[Co](ranker_name, grid)
+    }
+  }
+
+  protected def create_rough_ranker(args: Array[String]
+    ): PointwiseScoreGridRanker[Co]
+
+  /**
+   * Create Naive Bayes feature objects, which generate feature probabilities
+   * for Naive Bayes, similar to candidate feature-vector factories for the
+   * feature-vector-based rankers/classifiers.
+   */
+  protected def create_naive_bayes_features(feature_list: Iterable[String]) = {
+    feature_list map {
+      case "terms" => new NaiveBayesTermsFeature[Co]
+      case "rough-ranker" => {
+        val rough_args = split_command_line(params.rough_ranker_args)
+        val ranker = create_rough_ranker(rough_args)
+        new NaiveBayesRoughRankerFeature[Co](ranker)
+      }
     }
   }
 

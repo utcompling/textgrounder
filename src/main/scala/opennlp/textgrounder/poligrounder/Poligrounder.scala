@@ -199,6 +199,9 @@ class PoligrounderDriver extends
         }, time_docfact)
   }
 
+  // FIXME!
+  def create_rough_ranker(args: Array[String]) = ???
+
   def run() {
     def parse_interval(param: String) = {
       parse_date_interval(param) match {

@@ -346,10 +346,40 @@ class SumFrequencyGridRanker[Co](
   }
 }
 
+trait NaiveBayesFeature[Co]
+{
+  def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]): Double
+}
+
+class NaiveBayesTermsFeature[Co] extends NaiveBayesFeature[Co]
+{
+  def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]) =
+    cell.grid_lm.model_logprob(doc.grid_lm)
+}
+
+class NaiveBayesRoughRankerFeature[Co](
+  rough_ranker: PointwiseScoreGridRanker[Co]
+) extends NaiveBayesFeature[Co]
+{
+  def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val central = cell.get_central_point
+    val rough_cell = rough_ranker.grid.find_best_cell_for_coord(central,
+      create_non_recorded = true).get
+    // We don't need to take the log here. If the score is from Naive Bayes,
+    // we've already taken the log of the probability. If from maxent, we'd
+    // convert it to a probability by exponentiating and renormalizing, and
+    // the normalization factor will be the same for all cells so it shouldn't
+    // affect the ranking and can be ignored. Taking the log would then just
+    // cancel out the exponentiation, so neither needs to be done.
+    rough_ranker.score_cell(doc, rough_cell)
+  }
+}
+
 /** Use a Naive Bayes ranker for comparing document and cell. */
 class NaiveBayesGridRanker[Co](
   ranker_name: String,
-  grid: Grid[Co]
+  grid: Grid[Co],
+  features: Iterable[NaiveBayesFeature[Co]]
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
@@ -360,9 +390,10 @@ class NaiveBayesGridRanker[Co](
       (1.0 - bw, bw)
     }
 
-    val gram_logprob = cell.grid_lm.model_logprob(doc.grid_lm)
+    val features_logprob = features.map(_.get_logprob(doc, cell)).sum
+    // FIXME: Is the normalization necessary?
     val prior_logprob = log(cell.prior_weighting / grid.total_prior_weighting)
-    val logprob = (word_weight * gram_logprob + prior_weight * prior_logprob)
+    val logprob = (word_weight * features_logprob + prior_weight * prior_logprob)
     logprob
   }
 }
