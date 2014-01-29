@@ -31,7 +31,7 @@ import text._
 import textdb.{Encoder, TextDB}
 import time.format_minutes_seconds
 
-package experiment {
+protected class ExperimentPackage {
   /**
    * A general experiment driver class for programmatic access to a program
    * that runs experiments.
@@ -607,7 +607,7 @@ package experiment {
      *
      * @param args Command-line arguments, as specified by user
      * @return Exit code, typically 0 for successful completion,
-     *   positive for errorThis needs to be called explicitly from the
+     *   positive for error.
      */
     def implement_main(args: Array[String]) = {
       initialize_osutil()
@@ -771,4 +771,13 @@ package experiment {
       0
     }
   }
+
+  /** Split a command line into arguments. Respect quotes (FIXME:
+   * not implemented yet). */
+  def split_command_line(cmdline: String) = {
+    // FIXME! Make it respect quotes.
+    cmdline.split("""\s+""")
+  }
 }
+
+package object experiment extends ExperimentPackage { }
