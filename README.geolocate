@@ -59,20 +59,22 @@ Obtaining the Data
 
 If you don't have the data already (you do if you have access to the Comp
 Ling machines), download and unzip the processed Wikipedia/Twitter data
-from http://wing.best.vwh.net/wikigrounder.
+from http://web.corral.tacc.utexas.edu/utcompling/wing-baldridge-2011/.
 
 There are two sets of data to download:
-  * The processed Wikipedia data, in `wikipedia/`.  The files are
-    listed separately here and bzipped, in case you don't want them all.
-    If you're not sure, get them all; or read down below to see which ones
-    you need.
-  * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
+  * The processed Wikipedia data, in `enwiki-20100905/`. You need at least the
+    files ending in '.data.txt.bz2' and '.schema.txt'.
+  * The processed Twitter data, in `twitter-geotext/'. You need at least the
+    subdirectories 'docthresh-*'.
 
-Untar these files somewhere.  It is generally recommended that you create
+Download the data files. It is generally recommended that you create
 a directory and set `TG_GROUPS_DIR` to point to it; then put the Wikipedia
 and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory.
 Alternatively, `TG_CORPUS_DIR` can be used to directly point to where the
-corpora are stored.
+corpora are stored. In both cases, the directory storing the corpora should
+have subdirectories 'enwiki-20100905' and 'twitter-geotext'; underneath the
+former should be the downloaded '*.data.txt.bz2' and '*.schema.txt' files,
+and underneath the latter should be the 'docthresh-*' subdirectories.
 
 (Alternatively, if you are running on a UTexas Comp Ling machine, or a
 machine with a copy of the relevant portions of /groups/corpora and
