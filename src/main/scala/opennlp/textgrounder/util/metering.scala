@@ -192,6 +192,7 @@ protected class MeteringPackage {
                  since_start)
         errprint("%s %s processed, %s items/sec, %s sec/item",
           items_processed, item_unit, format_double(ips), format_double(spi))
+        output_resource_usage(omit_time = true)
       } else
         errprint("%s%s %s processed (since start: %s)",
           attime, items_processed, item_unit, since_start)
