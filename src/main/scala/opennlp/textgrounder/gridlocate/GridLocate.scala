@@ -107,7 +107,7 @@ English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   //// Input files
   var input =
-    ap.multiOption[String]("i", "input", "input-corpus",
+    ap.multiOption[String]("i", "input", "ic", "input-corpus",
       metavar = "FILE",
       help = """Input corpus, a textdb database (a type of flat-file
 database, with separate schema and data files). The value can be any of
@@ -446,7 +446,7 @@ training set, 'dev' or 'devel' for the development set, 'test' for the test
 set). Default '%default'.""")
 
   var eval_file =
-    ap.multiOption[String]("e", "eval-file",
+    ap.multiOption[String]("e", "eval-file", "ef",
       metavar = "FILE",
       help = """File or directory containing files to evaluate on.
 Multiple such files/directories can be given by specifying the option multiple
@@ -457,7 +457,7 @@ document geolocation when --eval-format=internal (the default).""")
 
   //// Eval output options
   var results =
-    ap.option[String]("r", "results",
+    ap.option[String]("results", "res",
       metavar = "FILE",
       help = """If specified, prefix of file to store results into.
 Results are also normally output to stderr for debugging purposes unless
@@ -467,15 +467,15 @@ the former storing the data as tab-separated fields and the latter naming
 the fields.""")
 
   var print_results =
-    ap.flag("print-results", "show-results",
+    ap.flag("print-results", "show-results", "pr", "sr",
       help = """Show individual results for each test document.""")
 
   var print_knn_results =
-    ap.flag("print-knn-results", "show-knn-results",
+    ap.flag("print-knn-results", "show-knn-results", "pkr", "skr",
       help = """Show kNN-related results for each test document.""")
 
   var results_by_range =
-    ap.flag("results-by-range",
+    ap.flag("results-by-range", "rbr",
       help = """Show results by range (of error distances and number of
 documents in correct cell).  Not on by default as counters are used for this,
 and setting so many counters breaks some Hadoop installations.""")
@@ -619,7 +619,7 @@ use number of documents in cell.
 """
 
   var ranker =
-    ap.option[String]("s", "ranker", "strategy",
+    ap.option[String]("s", "ranker", "ra", "strategy",
       default = ranker_default,
       aliasedChoices = ranker_choices,
       help = """Ranking strategy/strategies to use for geolocation.
@@ -635,7 +635,7 @@ trait GridLocateFeatureParameters {
   this: GridLocateParameters =>
 
   var classifier =
-    ap.option[String]("classifier",
+    ap.option[String]("classifier", "cl",
       default = "tadm",
       choices = Seq("random", "oracle", "perceptron", "avg-perceptron",
         "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
@@ -696,7 +696,7 @@ For the perceptron classifiers, see also `--pa-variant`,
     features_all_gram_choices
 
   var classify_features =
-    ap.option[String]("classify-features",
+    ap.option[String]("classify-features", "cf",
       default = "misc",
       help = """Which features to use when using a linear classifier to rank
 the cells for a document. Possibilities are:
@@ -800,7 +800,7 @@ set of weights will be averaged. This only makes sense when
 NOT CURRENTLY IMPLEMENTED.""")
 
   var rough_ranker_args =
-    ap.option[String]("rough-ranker-args",
+    ap.option[String]("rough-ranker-args", "rra",
       default = "",
       help = """Arguments to use when running the rough ranker that computes
 a sort of prior value in rough-to-fine ranking, for the fine Naive-Bayes
@@ -811,7 +811,7 @@ trait GridLocateRerankParameters {
   this: GridLocateParameters with GridLocateFeatureParameters =>
 
   var reranker =
-    ap.option[String]("reranker",
+    ap.option[String]("reranker", "rer",
       default = "none",
       choices = Seq("none", "random", "oracle", "perceptron", "avg-perceptron",
         "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
@@ -850,7 +850,7 @@ For the perceptron optimizers, see also `--pa-variant`,
 `--perceptron-rounds`.""")
 
   var rerank_features =
-    ap.option[String]("rerank-features",
+    ap.option[String]("rerank-features", "rf",
       default = "rank-score,misc",
       help = """Which features to use in the reranker, to characterize the
 similarity between a document and candidate cell (largely based on the
@@ -882,13 +882,13 @@ of numeric features in the reranker. This works identically to
 '--classify-binning'.""")
 
   var rerank_top_n =
-    ap.option[Int]("rerank-top-n",
+    ap.option[Int]("rerank-top-n", "rtn",
       default = 10,
       must = be_>(0),
       help = """Number of top-ranked items to rerank.  Default is %default.""")
 
   var rerank_num_training_splits =
-    ap.option[Int]("rerank-num-training-splits",
+    ap.option[Int]("rerank-num-training-splits", "rnts",
       default = 5,
       must = be_>(0),
       help = """Number of splits to use when training the reranker.
@@ -933,7 +933,7 @@ reranking. See `--interpolate`.""")
 trait GridLocateOptimizerParameters {
   this: GridLocateParameters =>
   var iterations =
-    ap.option[Int]("iterations",
+    ap.option[Int]("iterations", "it",
       metavar = "INT",
       default = 10000,
       must = be_>(0),

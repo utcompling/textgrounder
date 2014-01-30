@@ -68,7 +68,7 @@ process_wikipedia() {
     * ) lang=en ;;
   esac
   set_wp_version "$1"
-  echo --language $lang --input-corpus $TG_CORPUS_URL/wikipedia/$1
+  echo --language $lang --input $TG_CORPUS_URL/wikipedia/$1
 }
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
@@ -81,18 +81,18 @@ output_args() {
     *wiki-* )
       process_wikipedia "$1" ;;
     geotext | twitter-geotext | twitter )
-      echo --input-corpus $TG_CORPUS_URL/twitter-geotext/docthresh-5 ;;
+      echo --input $TG_CORPUS_URL/twitter-geotext/docthresh-5 ;;
     docthresh-* )
-      echo --input-corpus $TG_CORPUS_URL/twitter-geotext/$1 ;;
+      echo --input $TG_CORPUS_URL/twitter-geotext/$1 ;;
     twitter-wiki )
       output_args wikipedia; output_args geotext ;;
     *:* | /* | ./* | ../* )
-      echo --input-corpus $1 ;;
+      echo --input $1 ;;
     * )
       if [ -e "$TG_CORPUS_URL/$1" ]; then
-        echo --input-corpus $TG_CORPUS_URL/$1
+        echo --input $TG_CORPUS_URL/$1
       else
-        echo --input-corpus $1
+        echo --input $1
       fi
       ;;
 
