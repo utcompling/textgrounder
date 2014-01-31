@@ -34,6 +34,9 @@ package memoizer
  * `Memoizer` for Ints, without boxing or unboxing. Uses
  * TroveHashTableFactory for efficiency. Lowest index returned is always
  * 0, so that indices can be directly used in an array.
+ *
+ * NOTE: This is *NOT* thread-safe! See FeatureLabelMapper comments for
+ * further discussion.
  */
 #ifdef OBJECT_MEMOIZE
 #define GENTY T
@@ -96,11 +99,11 @@ class TY_MEMOIZER
   protected val id_value_map = hashfact.create_int_int_map
 #endif
 
-  def to_index_if(value: GENTY) = synchronized {
+  def to_index_if(value: GENTY) = {
     value_id_map.get(value).map(_ - minimum_raw_index)
   }
 
-  def to_index(value: GENTY) = synchronized {
+  def to_index(value: GENTY) = {
     val lookup = to_index_if(value)
     // println("Saw value=%s, index=%s" format (value, lookup))
     lookup match {
@@ -115,7 +118,7 @@ class TY_MEMOIZER
     }
   }
 
-  def to_raw(index: Int) = synchronized {
+  def to_raw(index: Int) = {
     id_value_map(index + minimum_raw_index)
   }
 }

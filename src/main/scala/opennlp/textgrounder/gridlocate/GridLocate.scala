@@ -1743,13 +1743,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             featvec
           }
 
+          val maybepar_data = data
+          // FIXME: This does not yet work because memoization isn't
+          // thread-safe. See the comments for FeatureLabelMapper.
+          /*
           val maybepar_data =
-            // FIXME: Not yet by default. This seems to use lots more memory
-            // and sometimes produces different results than without it,
-            // presumably indicative of a race condition.
-            if (debug("parallel-qti-to-rti")
-                /*params.no_parallel || debug("no-parallel-qti-to-rti")*/) data
+            if (!debug("parallel-classifier-training")
+                //params.no_parallel || debug("no-parallel-classifier-training")
+               )
+              data
             else data.par
+          */
 
           maybepar_data.mapMetered(task) { qti =>
             val agg_fv = qti.aggregate_featvec(create_candidate_featvec)
@@ -1857,12 +1861,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       docs_cells.mapMetered(task) { case (doc, correct_cell) =>
         // Maybe do it in parallel.
         val cells = grid.iter_nonempty_cells
+        val maybepar_cells = cells
+        // FIXME: This does not yet work because memoization isn't
+        // thread-safe. See the comments for FeatureLabelMapper.
+        /*
         val maybepar_cells =
-          // FIXME: Not yet by default.
           if (!debug("parallel-classifier-training")
-              /*params.no_parallel || debug("no-parallel-classifier-training")*/)
+              //params.no_parallel || debug("no-parallel-classifier-training")
+             )
             cells
           else cells.par
+        */
 
         // Iterate over cells.
         val fvs = maybepar_cells.map { cell =>

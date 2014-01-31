@@ -93,6 +93,26 @@ case object NumericFeature extends FeatureClass
  * name to an integer, and map the label to an integer, and combine them
  * in a Long, which is then memoized to an Int. This is done to save
  * memory.
+ *
+ * NOTE: This is *NOT* thread-safe! That means we can't parallelize
+ * feature generation currently. In any case it's not clear it helps.
+ * An experiment involving an attempt to do parallel feature generation
+ * for classification (see commented-out code in create_classifier_ranker())
+ * actually yielded slower times running on roller/learningcurve03
+ * (18 hours vs 15 hours) when classifying at 5 degrees/cell, as well as
+ * extremely incorrect results (mean 1869.60 km, median 1669.41 km,
+ * instead of mean 935.92 km, median 479.24 km). At this point the
+ * functions below were not synchronized but the basic memoizer functions
+ * were. This means that the majority of time was spent in memoization,
+ * and the synchronization clashes combined with the effort to split up
+ * the work of parallelizing a relatively small number of cells (c. 50)
+ * made the time grow. The way to fix this is to use feature hashing
+ * (see the Wikipedia article on this), where the hash code of the
+ * feature string (suitably modded) is directly used as an index. In this
+ * case there is no shared memoization table and hence no problems with
+ * parallelization. With a suitably large number of different hash items,
+ * there will be little or no accuracy degradation and dramatically
+ * increased performance.
  */
 abstract class FeatureLabelMapper {
   protected val label_mapper = new ToIntMemoizer[String]
@@ -124,6 +144,12 @@ abstract class FeatureLabelMapper {
   def number_of_labels: Int = label_mapper.number_of_indices
 }
 
+/**
+ * The non-label-attached version of the feature mapper, which maps
+ * feature properties directly to integers.
+ *
+ * NOTE: This is *NOT* thread-safe! See above.
+ */
 class SimpleFeatureLabelMapper extends FeatureLabelMapper {
   def feature_to_index(feature: String, label: LabelIndex) =
     property_mapper.to_index(feature)
@@ -136,6 +162,12 @@ class SimpleFeatureLabelMapper extends FeatureLabelMapper {
   ) = add_feature_property(feattype, feature)
 }
 
+/**
+ * The label-attached version of the feature mapper, which maps the
+ * combination of feature property and label to an integer.
+ *
+ * NOTE: This is *NOT* thread-safe! See above.
+ */
 class LabelAttachedFeatureLabelMapper extends FeatureLabelMapper {
   val combined_mapper = new LongToIntMemoizer
 
