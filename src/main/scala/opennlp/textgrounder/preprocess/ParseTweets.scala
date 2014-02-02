@@ -480,6 +480,45 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
   }
 
+  abstract class BasicTweet {
+    def json: String
+    def ty: String
+    def offset: Int
+    def offset_=(x: Int)
+    def id: TweetID
+    def id_=(x: TweetID)
+  }
+
+  implicit def BasicTweetFmt = new WireFormat[BasicTweet] {
+    def toWire(x: BasicTweet, out: DataOutput) {
+      x match {
+        case tw: SimpleTweet => {
+          out.writeInt(0)
+          simpleTweetWire.toWire(tw, out)
+        }
+        case tw: Tweet => {
+          out.writeInt(1)
+          tweetWire.toWire(tw, out)
+        }
+      }
+    }
+    def fromWire(in: DataInput): BasicTweet = {
+      val ty = in.readInt
+      if (ty == 0)
+        simpleTweetWire.fromWire(in)
+      else
+        tweetWire.fromWire(in)
+    }
+  }
+
+  case class SimpleTweet(
+    json: String,
+    ty: String,
+    var offset: Int,
+    var id: TweetID,
+    min_timestamp: Timestamp
+  ) extends BasicTweet
+
   /**
    * Data for a tweet or grouping of tweets.
    *
@@ -556,7 +595,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        -- merge_records()
        -- TweetFilterParser.main()
     */
-  ) {
+  ) extends BasicTweet {
     def lookup_mapquest_place: String = {
       errout("Looking up %s,%s in MapQuest... ", lat, long)
       val place = if (!has_latlong) "" else {
@@ -769,6 +808,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         empty_map, empty_map, empty_map, empty_map)
     }
   }
+  implicit val simpleTweetWire =
+    mkCaseWireFormat(SimpleTweet.apply _, SimpleTweet.unapply _)
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 
   /**
@@ -1133,8 +1174,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
   }
 
-  class ParseAndUniquifyTweets(opts: ParseTweetsParams) extends
-    ParseTweetsAction {
+  class ParseAndUniquifyTweets(opts: ParseTweetsParams, simple_tweet: Boolean
+    ) extends ParseTweetsAction {
 
     val operation_category = "Parse"
 
@@ -1150,7 +1191,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * @return status and tweet.
      */
     def parse_json_lift(path: String, line: String, index: TweetCount
-        ): Tweet = {
+      ): BasicTweet = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -1318,128 +1359,138 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         if ((parsed \ "delete" values) != None) {
           bump_counter("tweet deletion notices")
           tweet_offset += 1
-          Tweet(json, path, index, "delete", tweet_offset, Seq(), "",
-            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
-            Map[Timestamp, SphereCoord](),
-            empty_map, empty_map, empty_map, empty_map)
+          if (simple_tweet)
+            SimpleTweet(json, "delete", tweet_offset, 0L, 0L)
+          else
+            Tweet(json, path, index, "delete", tweet_offset, Seq(), "",
+              0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+              Map[Timestamp, SphereCoord](),
+              empty_map, empty_map, empty_map, empty_map)
         } else if ((parsed \ "limit" values) != None) {
           bump_counter("tweet limit notices")
           tweet_offset += 1
-          Tweet(json, path, index, "limit", tweet_offset, Seq(), "",
-            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
-            Map[Timestamp, SphereCoord](),
-            empty_map, empty_map, empty_map, empty_map)
+          if (simple_tweet)
+            SimpleTweet(json, "limit", tweet_offset, 0L, 0L)
+          else
+            Tweet(json, path, index, "limit", tweet_offset, Seq(), "",
+              0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+              Map[Timestamp, SphereCoord](),
+              empty_map, empty_map, empty_map, empty_map)
         } else {
           tweet_offset = 0
-          val user = force_string(parsed, "user", "screen_name")
-          val timestamp = parse_time(force_string(parsed, "created_at"))
-          val raw_text = force_string(parsed, "text")
-          val text = raw_text.replaceAll("\\s+", " ")
-          val followers = force_string(parsed, "user", "followers_count").toInt
-          val following = force_string(parsed, "user", "friends_count").toInt
           val tweet_id = force_string(parsed, "id_str").toLong
-          val lang = force_string(parsed, "user", "lang")
-          val (lat, long) =
-            if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
-              (NaN, NaN)
-            } else {
-              val latlong: List[Number] =
-                (parsed \ "coordinates" \ "coordinates" values).
-                  asInstanceOf[List[Number]]
-              (latlong(1).doubleValue, latlong(0).doubleValue)
-            }
-
-          val positions = if (lat.isNaN || long.isNaN)
-            Map[Timestamp, SphereCoord]()
-          else
-            Map(timestamp -> SphereCoord(lat, long))
-
-          /////////////// HANDLE ENTITIES
-
-          /* Entity types:
-
-           user_mentions: @-mentions in the text; subkeys are
-             screen_name = Username of user
-             name = Display name of user
-             id_str = ID of user, as a string
-             id = ID of user, as a number
-             indices = indices in text of @-mention, including the @
-
-           urls: URLs mentioned in the text; subkeys are
-             url = raw URL (probably a shortened reference to bit.ly etc.)
-             expanded_url = actual URL
-             display_url = display form of URL (without initial http://, cut
-               off after a point with \u2026 (Unicode ...)
-             indices = indices in text of raw URL
-             (NOTE: all URL's in the JSON text have /'s quoted as \/, and
-              display_url may not be present)
-
-           hashtags: Hashtags mentioned in the text; subkeys are
-             text = text of the hashtag
-             indices = indices in text of hashtag, including the #
-
-           media: Embedded objects
-             type = "photo" for images
-             indices = indices of URL for image
-             url, expanded_url, display_url = similar to URL mentions
-             media_url = photo on p.twimg.com?
-             media_url_https = https:// alias for media_url
-             id_str, id = some sort of tweet ID or similar?
-             sizes = map with keys "small", "medium", "large", "thumb";
-               each has subkeys:
-                 resize = "crop" or "fit"
-                 h = height (as number)
-                 w = width (as number)
-
-             Example of URL's for photo:
-  url = http:\/\/t.co\/AO3mRYaG
-  expanded_url = http:\/\/twitter.com\/alejandraoraa\/status\/215758169589284864\/photo\/1
-  display_url = pic.twitter.com\/AO3mRYaG
-  media_url = http:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
-  media_url_https = https:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
-
-"id_str":"215758169597673472"
-           */
-
-          // Retrieve "user_mentions", which is a list of mentions, each
-          // listing the span of text, the user actually mentioned, etc. --
-          // along with whether the mention is a retweet (by looking for
-          // "RT" before the mention)
-          val user_mentions_raw = retrieve_entities_with_indices(
-            parsed, "user_mentions", "screen_name")
-          val user_mentions_retweets =
-            for { (screen_name, start, end) <- user_mentions_raw
-                  namelen = screen_name.length
-                  retweet = (start >= 3 &&
-                             raw_text.slice(start - 3, start) == "RT ")
-                } yield {
-              // Subtract one because of the initial @ in the index reference
-              if (end - start - 1 != namelen) {
-                bump_counter("wrong length interval for screen name seen")
-                warning(line, "Strange indices [%s,%s] for screen name %s, length %s != %s, text context is '%s'",
-                  start, end, screen_name, end - start - 1, namelen,
-                  raw_text.slice(start, end))
+          val timestamp = parse_time(force_string(parsed, "created_at"))
+          if (simple_tweet)
+            SimpleTweet(json, "tweet", tweet_offset, tweet_id, timestamp)
+          else {
+            val user = force_string(parsed, "user", "screen_name")
+            val raw_text = force_string(parsed, "text")
+            val text = raw_text.replaceAll("\\s+", " ")
+            val followers = force_string(parsed, "user", "followers_count").toInt
+            val following = force_string(parsed, "user", "friends_count").toInt
+            val lang = force_string(parsed, "user", "lang")
+            val (lat, long) =
+              if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
+                (NaN, NaN)
+              } else {
+                val latlong: List[Number] =
+                  (parsed \ "coordinates" \ "coordinates" values).
+                    asInstanceOf[List[Number]]
+                (latlong(1).doubleValue, latlong(0).doubleValue)
               }
-              (screen_name, retweet)
-            }
-          val user_mentions_list =
-            for { (screen_name, retweet) <- user_mentions_retweets }
-              yield screen_name
-          val retweets_list =
-            for { (screen_name, retweet) <- user_mentions_retweets if retweet }
-              yield screen_name
-          val user_mentions = list_to_item_count_map(user_mentions_list)
-          val retweets = list_to_item_count_map(retweets_list)
 
-          val hashtags = retrieve_entities(parsed, "hashtags", "text")
-          val urls = retrieve_entities(parsed, "urls", "expanded_url")
-          // map
-          //  { case (url, count) => (url.replace("\\/", "/"), count) }
+            val positions = if (lat.isNaN || long.isNaN)
+              Map[Timestamp, SphereCoord]()
+            else
+              Map(timestamp -> SphereCoord(lat, long))
 
-          Tweet(json, path, index, "tweet", 0, Seq(text), user, tweet_id,
-            timestamp, timestamp, timestamp, lat, long, followers,
-            following, lang, 1, positions, user_mentions, retweets, hashtags,
-            urls)
+            /////////////// HANDLE ENTITIES
+
+            /* Entity types:
+
+             user_mentions: @-mentions in the text; subkeys are
+               screen_name = Username of user
+               name = Display name of user
+               id_str = ID of user, as a string
+               id = ID of user, as a number
+               indices = indices in text of @-mention, including the @
+
+             urls: URLs mentioned in the text; subkeys are
+               url = raw URL (probably a shortened reference to bit.ly etc.)
+               expanded_url = actual URL
+               display_url = display form of URL (without initial http://, cut
+                 off after a point with \u2026 (Unicode ...)
+               indices = indices in text of raw URL
+               (NOTE: all URL's in the JSON text have /'s quoted as \/, and
+                display_url may not be present)
+
+             hashtags: Hashtags mentioned in the text; subkeys are
+               text = text of the hashtag
+               indices = indices in text of hashtag, including the #
+
+             media: Embedded objects
+               type = "photo" for images
+               indices = indices of URL for image
+               url, expanded_url, display_url = similar to URL mentions
+               media_url = photo on p.twimg.com?
+               media_url_https = https:// alias for media_url
+               id_str, id = some sort of tweet ID or similar?
+               sizes = map with keys "small", "medium", "large", "thumb";
+                 each has subkeys:
+                   resize = "crop" or "fit"
+                   h = height (as number)
+                   w = width (as number)
+
+               Example of URL's for photo:
+    url = http:\/\/t.co\/AO3mRYaG
+    expanded_url = http:\/\/twitter.com\/alejandraoraa\/status\/215758169589284864\/photo\/1
+    display_url = pic.twitter.com\/AO3mRYaG
+    media_url = http:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
+    media_url_https = https:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
+
+  "id_str":"215758169597673472"
+             */
+
+            // Retrieve "user_mentions", which is a list of mentions, each
+            // listing the span of text, the user actually mentioned, etc. --
+            // along with whether the mention is a retweet (by looking for
+            // "RT" before the mention)
+            val user_mentions_raw = retrieve_entities_with_indices(
+              parsed, "user_mentions", "screen_name")
+            val user_mentions_retweets =
+              for { (screen_name, start, end) <- user_mentions_raw
+                    namelen = screen_name.length
+                    retweet = (start >= 3 &&
+                               raw_text.slice(start - 3, start) == "RT ")
+                  } yield {
+                // Subtract one because of the initial @ in the index reference
+                if (end - start - 1 != namelen) {
+                  bump_counter("wrong length interval for screen name seen")
+                  warning(line, "Strange indices [%s,%s] for screen name %s, length %s != %s, text context is '%s'",
+                    start, end, screen_name, end - start - 1, namelen,
+                    raw_text.slice(start, end))
+                }
+                (screen_name, retweet)
+              }
+            val user_mentions_list =
+              for { (screen_name, retweet) <- user_mentions_retweets }
+                yield screen_name
+            val retweets_list =
+              for { (screen_name, retweet) <- user_mentions_retweets if retweet }
+                yield screen_name
+            val user_mentions = list_to_item_count_map(user_mentions_list)
+            val retweets = list_to_item_count_map(retweets_list)
+
+            val hashtags = retrieve_entities(parsed, "hashtags", "text")
+            val urls = retrieve_entities(parsed, "urls", "expanded_url")
+            // map
+            //  { case (url, count) => (url.replace("\\/", "/"), count) }
+
+            Tweet(json, path, index, "tweet", 0, Seq(text), user, tweet_id,
+              timestamp, timestamp, timestamp, lat, long, followers,
+              following, lang, 1, positions, user_mentions, retweets, hashtags,
+              urls)
+          }
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -1453,6 +1504,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         case nfe: NumberFormatException => {
           bump_counter("ERROR: NumberFormatException when parsing")
           parse_problem(nfe)
+        }
+        case iae: IllegalArgumentException => {
+          // Can arise e.g. when invalid coordinate is given.
+          bump_counter("ERROR: IllegalArgumentException when parsing")
+          parse_problem(iae)
         }
         case _: ParseJSonExit => null
         case e: Exception => {
@@ -1476,7 +1532,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * Parse a line (JSON or textdb) into a tweet.  Return `null` if
      * unable to parse.
      */
-    def parse_line_1(pathline: (String, String)): Tweet = {
+    def parse_line_1(pathline: (String, String)): BasicTweet = {
       val (path, line) = pathline
       bump_counter("total lines")
       lineno += 1
@@ -1507,10 +1563,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
     }
 
-    val stored_notices = mutable.Buffer[Tweet]()
+    val stored_notices = mutable.Buffer[BasicTweet]()
     var last_id: Long = _
 
-    def parse_line(pathline: (String, String)): Seq[Tweet] = {
+    def parse_line(pathline: (String, String)): Seq[BasicTweet] = {
       val tweet = parse_line_1(pathline)
       /* Normally, we assign a delete message the same ID as the previous
          tweet so it will sort after it. But we can't do that for delete
@@ -1552,14 +1608,20 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * invalid even though technically such a place could exist. (FIXME,
      * use NaN or something to indicate a missing latitude or longitude).
      */
-    def is_valid_tweet(tw: Tweet): Boolean = {
-      val valid =
-      // filters out invalid tweets, as well as trivial spam
-        tw.ty == "tweet" && tw.id != 0 && tw.min_timestamp != 0 &&
-          tw.max_timestamp != 0 && tw.user != "" &&
-          !(tw.lat == 0.0 && tw.long == 0.0)
+    def is_valid_tweet(tweet: BasicTweet): Boolean = {
+      val valid = tweet match {
+        case tw: Tweet => {
+          // filters out invalid tweets, as well as trivial spam
+          tw.ty == "tweet" && tw.id != 0 && tw.min_timestamp != 0 &&
+            tw.max_timestamp != 0 && tw.user != "" &&
+            !(tw.lat == 0.0 && tw.long == 0.0)
+        }
+        case tw: SimpleTweet => {
+          tw.ty == "tweet" && tw.id != 0 && tw.min_timestamp != 0
+        }
+      }
       if (!valid) {
-        if (tw.ty != "tweet")
+        if (tweet.ty != "tweet")
           bump_counter("tweet-related notices skipped")
         else
           bump_counter("tweets skipped due to invalid fields")
@@ -1581,7 +1643,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * the different streams, but there is a lot of duplication that needs to
      * be tossed aside.
      */
-    def tweet_once(id_tweets: ((TweetID, Int), Iterable[Tweet])) = {
+    def tweet_once(id_tweets: ((TweetID, Int), Iterable[BasicTweet])) = {
       val (id, tweets) = id_tweets
       val head = tweets.head
       val skipped = tweets.tail.toSeq.length
@@ -1599,13 +1661,18 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * Apply any boolean filters given in `--filter-tweets` or
      * `--cfilter-tweets`.
      */
-    def filter_tweet_by_tweet_filters(tweet: Tweet) = {
-      val good =
-        (filter_tweets_ast == null || (filter_tweets_ast matches tweet)) &&
-         (cfilter_tweets_ast == null || (cfilter_tweets_ast matches tweet))
-      if (!good)
-        bump_counter("tweets skipped due to non-matching tweet-level filter")
-      good
+    def filter_tweet_by_tweet_filters(tweet: BasicTweet) = {
+      tweet match {
+        case tw:SimpleTweet => true
+        case tw: Tweet => {
+          val good =
+            (filter_tweets_ast == null || (filter_tweets_ast matches tw)) &&
+             (cfilter_tweets_ast == null || (cfilter_tweets_ast matches tw))
+          if (!good)
+            bump_counter("tweets skipped due to non-matching tweet-level filter")
+          good
+        }
+      }
     }
 
     // Filter out duplicate tweets -- group by tweet ID and then take the
@@ -1615,12 +1682,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     // source are combined to deal with the inevitable gaps in coverage
     // resulting from brief Twitter failures or hiccups, periods when
     // one of the scraping machines goes down, etc.
-    def filter_duplicates(values: DList[Tweet]) = {
+    def filter_duplicates(values: DList[BasicTweet]) = {
       values.groupBy { tweet => (tweet.id, tweet.offset)
       }.map(tweet_once)
     }
 
-    def filter_tweets(values: DList[Tweet]) = {
+    def filter_tweets(values: DList[BasicTweet]) = {
       // It's necessary to filter for duplicates when reading JSON tweets
       // directly (see comment above), but a bad idea when reading other
       // formats because tweet ID's may not be unique (particularly when
@@ -1638,7 +1705,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       deduplicated.filter(x => filter_tweet_by_tweet_filters(x))
     }
 
-    def note_remaining_tweets(tweet: Tweet) = {
+    def note_remaining_tweets(tweet: BasicTweet) = {
       bump_counter("tweets remaining after uniquifying and tweet-level filtering")
       true
     }
@@ -2399,6 +2466,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val (_, tail) = filehand.split_filename(opts.input)
       opts.corpus_name = tail.replace("*", "_")
     }
+
+    val simple_tweet =
+      opts.output_format == "json" && (
+        !opts.has_group_filtering && !opts.has_tweet_filtering)
+
     errprint("ParseTweets: " + (opts.grouping match {
       case "none" => "not grouping output"
       case x => "grouping output by " + grouping_type_english(opts, x)
@@ -2432,15 +2504,17 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     errprint("ParseTweets: Generate tweets ...")
-    val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
+    val basic_tweets1 = new ParseAndUniquifyTweets(opts, simple_tweet)(lines)
 
     /* Maybe group tweets */
-    val tweets = new GroupTweets(opts)(tweets1)
+    val basic_tweets =
+      if (simple_tweet) basic_tweets1
+      else new GroupTweets(opts)(basic_tweets1.map(_.asInstanceOf[Tweet]))
 
     opts.output_format match {
       case "json" => {
         /* We're outputting JSON's directly. */
-        persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
+        persist(TextOutput.toTextFile(basic_tweets.map(_.json), opts.output))
         rename_output_files(filehand, opts.output, opts.corpus_name)
       }
 
@@ -2449,14 +2523,17 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.
         val schema = ptd.create_schema
-        val nicely_formatted = tweets.map { tw =>
-          schema.make_line(tfct.tokenize_count_and_format(tw)) }
+
+        val nicely_formatted = basic_tweets.map { tw =>
+          schema.make_line(tfct.tokenize_count_and_format(
+            tw.asInstanceOf[Tweet])) }
         dlist_output_textdb(schema, nicely_formatted, filehand, opts.output,
           opts.corpus_name)
       }
 
       case "stats" => {
         val get_stats = new GetStats(opts)
+        val tweets = basic_tweets.map(_.asInstanceOf[Tweet])
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize).toSeq.sorted
