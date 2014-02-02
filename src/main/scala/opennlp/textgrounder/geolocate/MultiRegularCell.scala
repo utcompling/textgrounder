@@ -218,7 +218,7 @@ class MultiRegularGrid(
     cell_offset_degrees.long % degrees_per_cell)
   val maximum_index =
     coord_to_tiling_cell_index(SphereCoord(maximum_latitude - 1e-10,
-      maximum_longitude))
+      maximum_longitude - 1e-10))
   val maximum_latind = maximum_index.latind
   val maximum_longind = maximum_index.longind
   val minimum_index =

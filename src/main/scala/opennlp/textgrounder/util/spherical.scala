@@ -69,7 +69,9 @@ protected class SphericalPackage {
   val minimum_latitude = -90.0
   val maximum_latitude = 90.0
   val minimum_longitude = -180.0
-  val maximum_longitude = 180.0 - 1e-10
+  // We consider this value valid in external sources, but internally
+  // we coerce it to -180 degrees.
+  val maximum_longitude = 180.0
 
   // Radius of the earth in km.  Used to compute spherical distance in km,
   // and km per degree of latitude/longitude.
@@ -97,10 +99,15 @@ protected class SphericalPackage {
   //
   //   lat, long: Latitude and longitude of coordinate.
 
-  case class SphereCoord(lat: Double, long: Double) {
+  case class SphereCoord(lat: Double, var long: Double) {
     // Not sure why this code was implemented with coerce_within_bounds,
     // but either always coerce, or check the bounds ...
-    require(SphereCoord.valid(lat, long),
+    // FIXME: This should not be a case class, and instead we should
+    // control access to constructor so we don't have to have the
+    // 'var' in the long.
+    if (long == maximum_longitude)
+      long = minimum_longitude
+    require(SphereCoord.valid_internal(lat, long),
       "Coordinates out of bounds: %s" format toString)
     override def toString = SphereCoord.serialize(this)
     def format = SphereCoord.format_lat_long(lat, long)
@@ -139,13 +146,14 @@ protected class SphericalPackage {
       val (newlat, newlong) =
         method match {
           case "coerce-warn" => {
-            if (!valid(lat, long))
+            if (!valid_external(lat, long))
               warning("Coordinates out of bounds: %s",
                 format_lat_long(lat, long))
             coerce(lat, long)
           }
           case "coerce" => coerce(lat, long)
           case "validate" => (lat, long)
+          case "allow" => (lat, long)
           case _ => {
             require(false,
                     "Invalid method to SphereCoord(): %s" format method)
@@ -155,7 +163,23 @@ protected class SphericalPackage {
       new SphereCoord(newlat, newlong)
     }
 
-    def valid(lat: Double, long: Double) = (
+    /**
+     * Whether the given latitude and longitude are internally valid,
+     * i.e. validly storable as the coordinates of a SphereCoord.
+     */
+    def valid_internal(lat: Double, long: Double) = (
+      lat >= minimum_latitude &&
+      lat <= maximum_latitude &&
+      long >= minimum_longitude &&
+      long < maximum_longitude
+    )
+
+    /**
+     * Whether the given external latitude and longitude are valid.
+     * The only difference is in longitude +180 degrees, which we
+     * accept but map internally to -180 degrees.
+     */
+    def valid_external(lat: Double, long: Double) = (
       lat >= minimum_latitude &&
       lat <= maximum_latitude &&
       long >= minimum_longitude &&
@@ -165,8 +189,10 @@ protected class SphericalPackage {
     def coerce(lat: Double, long: Double) = {
       var newlat = lat
       var newlong = long
+      // Truncate out-of-bounds latitudes, but wrap out-of-bounds
+      // longitudes.
       if (newlat > maximum_latitude) newlat = maximum_latitude
-      while (newlong > maximum_longitude) newlong -= 360.0
+      while (newlong >= maximum_longitude) newlong -= 360.0
       if (newlat < minimum_latitude) newlat = minimum_latitude
       while (newlong < minimum_longitude) newlong += 360.0
       (newlat, newlong)
