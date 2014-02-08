@@ -121,6 +121,9 @@ abstract class FeatureLabelMapper {
   def feature_to_index_if(feature: String, label: LabelIndex): Option[FeatIndex]
   def feature_to_string(index: FeatIndex): String
   def feature_vector_length: Int
+  def feature_property_label_index(index: FeatIndex): (FeatIndex, FeatIndex)
+  def feature_property_to_string(index: FeatIndex) =
+    property_mapper.to_raw(index)
 
   val features_to_rescale = mutable.BitSet()
   protected def add_feature_property(feattype: FeatureValue, prop: String) = {
@@ -157,6 +160,7 @@ class SimpleFeatureLabelMapper extends FeatureLabelMapper {
     property_mapper.to_index_if(feature)
   def feature_to_string(index: FeatIndex) = property_mapper.to_raw(index)
   def feature_vector_length = property_mapper.number_of_indices
+  def feature_property_label_index(index: FeatIndex) = (index, -1)
 
   def note_feature(feattype: FeatureValue, feature: String, label: LabelIndex
   ) = add_feature_property(feattype, feature)
@@ -201,6 +205,13 @@ class LabelAttachedFeatureLabelMapper extends FeatureLabelMapper {
   ) = {
     val prop_index = add_feature_property(feattype, feature)
     combined_mapper.to_index(combined_to_long(prop_index, label))
+  }
+
+  def feature_property_label_index(index: FeatIndex) = {
+    val longval = combined_mapper.to_raw(index)
+    val prop_index = (longval >> 32).toInt
+    val label_index = (longval & 0xFFFFFFFF).toInt
+    (prop_index, label_index)
   }
 }
 
@@ -760,6 +771,10 @@ object AggregateFeatureVector {
   }
 }
 
+/** Compute statistics over features, e.g. how many times they occur,
+  * what their sum and absolute sum is, what their min and max values are.
+  * The accumulate() function counts each combination of doc+cell separately.
+  */
 class FeatureStats {
   // Count of features
   val count = intmap[FeatIndex]()
@@ -775,8 +790,7 @@ class FeatureStats {
   val abssum = doublemap[FeatIndex]()
 
   /**
-   * Find the features that have different values from one component
-   * feature vector to another. Return a set of such features.
+   * Accumulate statistics on features.
    */
   def accumulate(agg: AggregateFeatureVector, do_minmax: Boolean = false,
       do_sum: Boolean = false, do_abssum: Boolean = false) {
@@ -787,6 +801,41 @@ class FeatureStats {
     // arrays. See find_diff_features.
     for (vec <- agg.fetch_sparse_featvecs; i <- 0 until vec.keys.size) {
       val k = vec.keys(i)
+      val v = vec.values(i)
+      count(k) += 1
+      if (do_minmax) {
+        if (!(min contains k) || v < min(k))
+          min(k) = v
+        if (!(max contains k) || v > max(k))
+          max(k) = v
+      }
+      if (do_sum)
+        sum(k) += v
+      if (do_abssum)
+        abssum(k) += v.abs
+    }
+  }
+
+  /**
+   * Accumulate statistics on features, at the document level rather than
+   * the doc+cell level.
+   */
+  def accumulate_doc_level(agg: AggregateFeatureVector,
+      do_minmax: Boolean = false, do_sum: Boolean = false,
+      do_abssum: Boolean = false) {
+    num_fv += 1
+
+    // We do this in a purely iterative fashion to create as little
+    // garbage as possible; see accumuate().
+    //
+    // HACK! We assume that the features aren't really label-specific,
+    // that the difference in label-specificness is only due to the necessity
+    // of attaching labels to features for TADM. So we just look at the
+    // first one.
+    val vec = agg.fetch_sparse_featvecs.head
+    for (i <- 0 until vec.keys.size) {
+      val fk = vec.keys(i)
+      val (k, _) = vec.mapper.feature_property_label_index(fk)
       val v = vec.values(i)
       count(k) += 1
       if (do_minmax) {
