@@ -61,11 +61,11 @@ class SparseFeatureVectorFactory(attach_label: Boolean) { self =>
   })
 
   /**
-   * Generate a feature vector.  If not at training time, we need to be
-   * careful to skip features not seen during training because there won't a
-   * corresponding entry in the weight vector, and the resulting feature would
-   * containing a non-existent index, causing a crash during lookup (e.g.
-   * during the dot-product operation).
+   * Generate a feature vector from direct features.  If not at training time,
+   * we need to be careful to skip features not seen during training because
+   * there won't a corresponding entry in the weight vector, and the
+   * resulting feature would containing a non-existent index, causing a
+   * crash during lookup (e.g. during the dot-product operation).
    */
   def make_feature_vector(
       feature_values: Iterable[(FeatureValue, String, Double)],
@@ -165,7 +165,12 @@ abstract class ExternalDataInstanceFactory(attach_label: Boolean) extends
     (lines, column_types)
   }
 
-  def raw_linefeats_to_features(
+  /**
+   * Compute raw features as read from an input file (based on column
+   * values, names, types) into direct features, i.e. an iterable over
+   * feature types, features and values.
+   */
+  def raw_linefeats_to_direct_features(
       raw_linefeats: Iterable[(String, (String, FeatureClass))]
   ) = {
     // Generate appropriate features based on column values, names, types.
@@ -178,18 +183,15 @@ abstract class ExternalDataInstanceFactory(attach_label: Boolean) extends
     }
   }
 
+  /**
+   * Compute raw features as read from an input file into a feature
+   * vector.
+   */
   def raw_linefeats_to_featvec(
       raw_linefeats: Iterable[(String, (String, FeatureClass))],
       label: LabelIndex, is_training: Boolean
   ) = {
-    // Generate appropriate features based on column values, names, types.
-    val linefeats = raw_linefeats.map { case (value, (colname, coltype)) =>
-      coltype match {
-        case NumericFeature => (FeatRaw, colname, value.toDouble)
-        case NominalFeature =>
-          (FeatBinary, "%s$%s" format (colname, value), 1.0)
-      }
-    }
+    val linefeats = raw_linefeats_to_direct_features(raw_linefeats)
 
     // Create feature vector
     make_feature_vector(linefeats, label, is_training)
@@ -212,11 +214,12 @@ abstract class SimpleDataInstanceFactory(
   attach_label: Boolean
 ) extends ExternalDataInstanceFactory(attach_label) {
   /**
-   * Return a sequence of pairs of `(feature_vector, label)` consisting of
-   * a feature vector derived from a given and the corresponding correct
-   * label. The first line should list the column headings.
+   * Convert an iterator over direct features into training instances,
+   * in the form of a sequence of pairs of `(feature_vector, label)`
+   * consisting of a feature vector and the corresponding correct label.
    *
-   * @param lines_iter Iterator over lines in the file.
+   * @param features_labels Iterator over direct features and
+   *   memoized labels.
    * @param is_training Whether we are currently training or testing a model.
    */
   def compute_instances(
@@ -247,6 +250,28 @@ abstract class SimpleDataInstanceFactory(
 
       (featvec, correct_label)
     }).toIndexedSeq
+  }
+
+  /**
+   * Return an iterator over "direct instances", i.e. pairs of direct
+   * features and memoized labels, where the direct features directly
+   * list the features and corresponding values (plus a feature-type value).
+   */
+  def import_direct_instances(lines_iter: Iterator[String]):
+      Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
+
+  /**
+   * Return a sequence of pairs of `(feature_vector, label)` consisting of
+   * a feature vector derived from a given and the corresponding correct
+   * label. The first line should list the column headings.
+   *
+   * @param lines_iter Iterator over lines in the file.
+   * @param is_training Whether we are currently training or testing a model.
+   */
+  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
+    val direct_instances = import_direct_instances(lines_iter)
+
+    compute_instances(direct_instances, is_training)
   }
 }
 
@@ -313,7 +338,7 @@ class SimpleDenseDataInstanceFactory(
    * @param lines_iter Iterator over lines in the file.
    * @param is_training Whether we are currently training or testing a model.
    */
-  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
+  def import_direct_instances(lines_iter: Iterator[String]) = {
     val (lines, columns) = get_columns(lines_iter, split_re)
     val numcols = columns.size
     val label_colind = get_index(numcols, label_column)
@@ -327,10 +352,9 @@ class SimpleDenseDataInstanceFactory(
     val features_labels = lines.map { line =>
       // Compute raw features based on column values, names, types.
       val (raw_linefeats, label) = get_raw_features(line, columns, label_colind)
-      (raw_linefeats_to_features(raw_linefeats), label)
+      (raw_linefeats_to_direct_features(raw_linefeats), label)
     }
-
-    compute_instances(features_labels.toIterator, is_training)
+    features_labels.toIterator
   }
 }
 
@@ -531,14 +555,14 @@ class SimpleSparseDataInstanceFactory(
     (feats, label)
   }
 
-  def import_instances(lines_iter: Iterator[String], is_training: Boolean) = {
+  def import_direct_instances(lines_iter: Iterator[String]) = {
     val split_lines = lines_iter.map { _.split(split_re) }.toIterable
     if (attach_label) {
       for (fields <- split_lines)
         mapper.label_to_index(fields(0))
     }
     val features_labels = split_lines.map(get_features_labels)
-    compute_instances(features_labels.toIterator, is_training)
+    features_labels.toIterator
   }
 }
 

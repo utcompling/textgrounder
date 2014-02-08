@@ -25,7 +25,7 @@ import util.argparser._
 import util.spherical._
 import util.error.warning
 import util.experiment._
-import util.io.FileHandler
+import util.io.{FileHandler,localfh}
 import util.metering._
 import util.os.output_resource_usage
 import util.print._
@@ -1822,22 +1822,15 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     reranker_trainer(training_data)
   }
 
-  /**
-   * Create a ranker that uses a classifier to do its work, treating each
-   * cell as a possible class.
-   */
-  def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
+  // Get objects needed to create training data of feature vectors.
+  def get_featvec_factory_and_docs_cells(grid: Grid[Co],
+      attach_label: Boolean) = {
     // Factory object for generating feature vectors for a given document,
     // when a given candidate cell is considered as the document's label.
     val featvec_factory =
       create_candidate_featvec_factory(params.classify_feature_list,
         params.classify_binning, "classify-features",
-        attach_label = true)
-
-    // Create classifier trainer.
-    val trainer =
-      create_pointwise_classifier_trainer[GridRankingClassifierInst[Co]](
-        params.classifier, rerank = false)
+        attach_label = attach_label)
 
     // Read the raw training documents.
     val raw_training_docs = read_raw_training_documents(
@@ -1852,11 +1845,23 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           grid.find_best_cell_for_document(doc,
             create_non_recorded = false) map ((doc, _))
       }
+    (featvec_factory, docs_cells)
+  }
+
+  /**
+   * Create a ranker that uses a classifier to do its work, treating each
+   * cell as a possible class.
+   */
+  def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
+    val (featvec_factory, docs_cells) =
+      get_featvec_factory_and_docs_cells(grid, attach_label = true)
 
     val task = show_progress("generating", "doc agg feat vec")
 
     // Generate training data. For each document, iterate over the
     // possible cells, generating a feature vector for each cell.
+    // This actually holds an iterator; nothing gets done until we
+    // convert to an indexed sequence, below.
     val training_instances =
       docs_cells.mapMetered(task) { case (doc, correct_cell) =>
         // Maybe do it in parallel.
@@ -1895,12 +1900,54 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         (data_inst, featvec_factory.lookup_cell(correct_cell))
       }
 
+    // Create classifier trainer.
+    val trainer =
+      create_pointwise_classifier_trainer[GridRankingClassifierInst[Co]](
+        params.classifier, rerank = false)
+
     // Train classifier.
     val classifier =
       trainer(TrainingData(training_instances.toIndexedSeq,
         remove_non_choice_specific_columns = false))
     new ClassifierGridRanker[Co](ranker_name, grid, classifier,
       featvec_factory)
+  }
+
+  /**
+   * Create a ranker that uses a classifier to do its work, treating each
+   * cell as a possible class.
+   */
+  def create_feature_file(grid: Grid[Co], file: String, filetype: String) = {
+    val (featvec_factory, docs_cells) =
+      get_featvec_factory_and_docs_cells(grid, attach_label = false)
+
+    val task = show_progress("processing features in", "document")
+
+    // HACK! We create non-label-specific features for now. Since a cell
+    // must be passed in, we hack by always passing in the first one.
+    val cell = grid.iter_nonempty_cells.head
+
+    val f = localfh.openw(file)
+    docs_cells.foreachMetered(task) { case (doc, correct_cell) =>
+      // Create feature vector. We don't have an initial score or
+      // initial ranking, so pass in 0. This is only used by the
+      // 'rank-score' feature-vector factory.
+      val feats = featvec_factory.get_features(doc, cell, 0, 0)
+      // Maybe output features, for debugging purposes.
+      if (debug("features")) {
+        val prefix = "#%s" format (task.num_processed + 1)
+        feats.foreach { case (fvtype, feat, value) =>
+          errprint(s"  $prefix: $feat ($fvtype) = $value")
+        }
+      }
+      val line = s"${featvec_factory.lookup_cell(correct_cell)} | " +
+        feats.map { case (fvtype, feat, value) =>
+          val goodfeat = feat.replace(":", "_")
+          s"$goodfeat:$value"
+        }.mkString(" ")
+      f.println(line)
+    }
+    f.close()
   }
 
   /**
