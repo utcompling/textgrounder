@@ -25,8 +25,9 @@ package learning
  * @author Ben Wing
  */
 
-import util.debug.{debug, debugint, debugdouble}
+import util.debug._
 import util.error.warning
+import util.io.localfh
 import util.math.argmax
 import util.metering._
 import util.print.errprint
@@ -386,6 +387,10 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     if (debug("training-data"))
       training_data.pretty_print()
 
+    // Print most "relevant" features. See comment under
+    // training_data.compute_feature_discrimination.
+    // FIXME: This is designed for the reranker, with non-label-attached
+    // features.
     if (debug("feature-relevance")) {
       val feat_disc = training_data.compute_feature_discrimination
 
@@ -410,6 +415,9 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
     val (weights, _) = get_weights(training_data)
 
+    // Output highest weights.
+    // FIXME: This is designed for the reranker, with non-label-attached
+    // features.
     if (debug("weights")) {
       val stats = new FeatureStats
       for ((inst, label) <- training_data.data) {
@@ -420,6 +428,43 @@ trait LinearClassifierTrainer[DI <: DataInstance]
         training_data.data.head._1.feature_vector.format_feature _
       LinearClassifier.debug_print_weights(weights, format_feature,
         Some(stats))
+    }
+
+    // Write all weights to a file, along with number of documents the
+    // corresponding feature is in and sum of feature values.
+    // FIXME: This is designed for the rough-to-fine classifier and
+    // assumes TADM-style label-attached weights, with a single long
+    // weight vector that virtually encompasses all the weights for the
+    // different labels (cells). Things need to be changed to handle the
+    // case with non-label-attached weights and multiple weight vectors,
+    // one per label.
+    val weights_filename = debugval("write-weights")
+    if (weights_filename != "") {
+      val weights_file = localfh.openw(weights_filename)
+      val stats = new FeatureStats
+      for ((inst, label) <- training_data.data) {
+        val agg = AggregateFeatureVector.check_aggregate(inst)
+        stats.accumulate_doc_level(agg, do_abssum = true)
+      }
+      assert(weights.depth == 1)
+      val rawvec = weights(0)
+
+      val mapper =
+        training_data.data.head._1.feature_vector.mapper
+      // Go through all the label-attached features. Output the
+      // feature property, label (i.e. cell), weight, #docs containing
+      // feature property, sum of feature property values
+      for (i <- 0 until rawvec.length) {
+        val weight = rawvec(i)
+        val (prop, label) = mapper.feature_property_label_index(i)
+        val propstr = mapper.feature_property_to_string(prop)
+        val labelstr = mapper.label_to_string(label)
+        val propcount = stats.count(prop)
+        val propabssum = stats.abssum(prop)
+        weights_file.println(
+          s"$propstr\t$labelstr\t$weight\t$propcount\t$propabssum")
+      }
+      weights_file.close()
     }
 
     create_classifier(weights)
