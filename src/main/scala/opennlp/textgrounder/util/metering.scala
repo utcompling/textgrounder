@@ -260,6 +260,18 @@ protected class MeteringPackage {
       finish()
     }
 
+    def foreach[T](iter: GenTraversableOnce[T])(f: T => Unit) {
+      start()
+      breakable {
+        iter.foreach {
+          x => f(x)
+          if (item_processed())
+            break
+        }
+      }
+      finish()
+    }
+
     def iterate[T](iter: Iterator[T]) = {
       val wrapiter = new InterruptibleIterator(iter)
       new SideEffectIterator({ start() }) ++
@@ -306,6 +318,9 @@ protected class MeteringPackage {
   }
 
   implicit class MeteredIteratorPimp[T](iter: Iterator[T]) {
+    def foreachMetered(m: Meter)(f: T => Unit) =
+      m.foreach(iter)(f)
+
     def mapMetered[B](m: Meter)(f: (T) => B): Iterator[B] =
       m.iterate(iter.map(f))
 
