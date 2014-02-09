@@ -1897,7 +1897,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     // Train classifier.
     val classifier =
-      trainer(TrainingData(training_instances.toIndexedSeq))
+      trainer(TrainingData(training_instances.toIndexedSeq,
+        remove_non_choice_specific_columns = false))
     new ClassifierGridRanker[Co](ranker_name, grid, classifier,
       featvec_factory)
   }

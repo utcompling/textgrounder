@@ -205,11 +205,12 @@ case class TrainingData[DI <: DataInstance](
 }
 
 object TrainingData {
-  def apply[DI <: DataInstance](data: Iterable[(DI, LabelIndex)]):
-      TrainingData[DI] = {
+  def apply[DI <: DataInstance](data: Iterable[(DI, LabelIndex)],
+      remove_non_choice_specific_columns: Boolean = true
+  ): TrainingData[DI] = {
     assert(data.size > 0)
     data.head._1.feature_vector match {
-      case agg: AggregateFeatureVector =>
+      case agg: AggregateFeatureVector if remove_non_choice_specific_columns =>
         val removed_features =
           AggregateFeatureVector.remove_all_non_choice_specific_columns(data)
         apply(data, removed_features)
