@@ -365,7 +365,8 @@ object Classify extends ExperimentApp("Classify") {
               max_iterations = params.iterations)
           }
         }
-        val classifier = trainer(TrainingData(training_instances))
+        val classifier = trainer(TrainingData(training_instances,
+          remove_non_choice_specific_columns = false))
         (classifier, test_instances, factory)
       }
 
