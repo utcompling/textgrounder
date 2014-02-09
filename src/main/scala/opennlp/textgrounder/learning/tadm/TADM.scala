@@ -135,9 +135,8 @@ class TADMTrainer[DI <: DataInstance](
         events_filename, "-params_out", params_filename, "-max_it",
         s"$max_iterations")
     val tadm_penalty =
-      if (gaussian > 0) Seq("-l2", s"$gaussian")
-      else if (lasso > 0) Seq("-l1", s"$lasso")
-      else Seq()
+      (if (gaussian > 0) Seq("-l2", s"$gaussian") else Seq()) ++
+      (if (lasso > 0) Seq("-l1", s"$lasso") else Seq())
     val tadm_marginal =
       if (uniform_marginal) Seq("-uniform")
       else Seq()
