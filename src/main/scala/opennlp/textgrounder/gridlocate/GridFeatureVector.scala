@@ -51,9 +51,7 @@ case object BinningNo extends BinningStatus
  * feature and weight vectors. This can't happen in evaluation, since the
  * weight vector was already computed during training.)
  */
-trait CandidateFeatVecFactory[Co] extends (
-  (GridDoc[Co], GridCell[Co], Double, Int, Boolean) => FeatureVector
-) {
+trait FeatVecFactory[Co] {
   /** Underlying feature-vector factory for generating features. */
   val featvec_factory: SparseFeatureVectorFactory
   /** Whether to create binned, non-binned or both types of features. */
@@ -79,23 +77,18 @@ trait CandidateFeatVecFactory[Co] extends (
     }
   }
 
-  /**
-   * Return an Iterable of feature-value pairs for a document-cell pair,
-   * usually describing similarities between the document and cell's
-   * language models. Meant to be supplied by subclasses.
-   *
-   * @param doc Document of document-cell pair.
-   * @param cell Cell of document-cell pair.
-   * @param initial_score Initial ranking score for this cell.
-   * @param initial_rank Rank of this cell in the initial ranking (0-based).
-   */
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co],
-      initial_score: Double, initial_rank: Int
-  ): Iterable[(FeatureValue, String, Double)]
-
   val logarithmic_base = 2.0
 
   def disallowed_value(value: Double) = value.isNaN || value.isInfinity
+
+  def check_not_disallowed(feats: Iterable[(FeatureValue, String, Double)]) = {
+    feats.foreach { case (fvtype, feat, value) =>
+      assert(!disallowed_value(value),
+        "feature %s (%s) has disallowed value %s"
+          format (feat, fvtype, value))
+    }
+    feats
+  }
 
   /** Add a feature with the given value, binned logarithmically, i.e.
    * in place of directly including the feature's value we put the value
@@ -172,6 +165,60 @@ trait CandidateFeatVecFactory[Co] extends (
         Seq((fvtype, feat, value), bin)
     }
   }
+}
+
+/**
+ * A factory for generating candidate feature vectors describing the
+ * properties of one of the possible candidates (cells) to be chosen by
+ * a reranker for a given query (i.e. document). In general, the
+ * features describe the compatibility between the query and the candidate,
+ * e.g. between the language models of a document and a cell.
+ *
+ * The factory is in the form of a function that will generate a feature
+ * vector when passed appropriate arguments: a document, a cell, the score
+ * of the cell as produced by the original ranker, the initial ranking of
+ * the cell, and a boolean indicating whether we are generating the
+ * feature vector for use in training a model or in evaluating a model.
+ * (This matters in that we can only create new features, e.g. in handling
+ * unseen words, during training because it will end up lengthening the
+ * feature and weight vectors. This can't happen in evaluation, since the
+ * weight vector was already computed during training.)
+ */
+trait CandidateFeatVecFactory[Co] extends (
+  (GridDoc[Co], GridCell[Co], Double, Int, Boolean) => FeatureVector
+) with FeatVecFactory[Co] {
+  /**
+   * Return an Iterable of feature-value pairs for a document-cell pair,
+   * usually describing similarities between the document and cell's
+   * language models. Meant to be supplied by subclasses.
+   *
+   * FIXME: Would like it to be protected but needs to be accessed by
+   * CombiningCandidateFeatVecFactory.
+   *
+   * @param doc Document of document-cell pair.
+   * @param cell Cell of document-cell pair.
+   * @param initial_score Initial ranking score for this cell.
+   * @param initial_rank Rank of this cell in the initial ranking (0-based).
+   */
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int
+  ): Iterable[(FeatureValue, String, Double)]
+
+  /**
+   * Return an Iterable of feature-value pairs for a document-cell pair,
+   * usually describing similarities between the document and cell's
+   * language models. Meant to be called externally.
+   *
+   * @param doc Document of document-cell pair.
+   * @param cell Cell of document-cell pair.
+   * @param initial_score Initial ranking score for this cell.
+   * @param initial_rank Rank of this cell in the initial ranking (0-based).
+   */
+  def get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
+    val feats = imp_get_features(doc, cell, initial_score, initial_rank)
+    check_not_disallowed(feats)
+  }
 
   /**
    * Generate a feature vector from a query-candidate (document-cell) pair.
@@ -185,12 +232,124 @@ trait CandidateFeatVecFactory[Co] extends (
   def apply(doc: GridDoc[Co], cell: GridCell[Co], score: Double,
       initial_rank: Int, is_training: Boolean) = {
     val feats = get_features(doc, cell, score, initial_rank)
-    feats.foreach { case (fvtype, feat, value) =>
-      assert(!disallowed_value(value),
-        "feature %s (%s) for cell %s has disallowed value %s"
-          format (feat, fvtype, cell.format_location, value))
-    }
     featvec_factory.make_feature_vector(feats, lookup_cell(cell), is_training)
+  }
+}
+
+/**
+ * A factory that combines the features of a set of subsidiary factories.
+ */
+class CombiningCandidateFeatVecFactory[Co](
+  val featvec_factory: SparseFeatureVectorFactory,
+  val binning_status: BinningStatus,
+  val subsidiary_facts: Iterable[CandidateFeatVecFactory[Co]]
+) extends CandidateFeatVecFactory[Co] {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
+    // Concatenate the features of each subsidiary factory.
+//    if (debug("show-combined-features")) {
+//      errprint("Document: %s", doc)
+//      errprint("Cell: %s", cell)
+//    }
+    subsidiary_facts.zipWithIndex flatMap {
+      case (fact, index) => {
+        fact.imp_get_features(doc, cell, initial_score, initial_rank)
+//        val feats =
+//          fact.imp_get_features(doc, cell, initial_score, initial_rank)
+//        if (!debug("show-combined-features") && !debug("tag-combined-features"))
+//          feats
+//        else feats map { case (ty, item, count) =>
+//          val featname =
+//            // Obsolete comment:
+//            // [FIXME! May not be necessary to memoize like this. I don't
+//            // think we need to unmemoize the feature names (except for
+//            // debugging purposes), so it's enough just to OR the index
+//            // onto the top bits of the word, which is already a low
+//            // integer due to memoization (or if we change the memoization
+//            // strategy in a way that generates spread-out integers, we
+//            // can just XOR the index onto the top bits or hash the two
+//            // numbers together; occasional feature clashes aren't a big
+//            // deal).]
+//            if (debug("tag-combined-features"))
+//              "~%s~%s" format (index, item)
+//            else
+//              item
+//          if (debug("show-combined-features")) {
+//            errprint("%s = %s", featname, count)
+//          }
+//          (ty, featname, count)
+//        }
+      }
+    }
+  }
+}
+
+/**
+ * A factory for generating feature vectors describing the
+ * properties of a given document.
+ *
+ * The factory is in the form of a function that will generate a feature
+ * vector when passed appropriate arguments: a document and a boolean
+ * indicating whether we are generating the feature vector for use in
+ * training a model or in evaluating a model. (This matters in that we
+ * can only create new features, e.g. in handling unseen words, during
+ * training because it will end up lengthening the feature and weight
+ * vectors. This can't happen in evaluation, since the weight vector was
+ * already computed during training.)
+ */
+trait DocFeatVecFactory[Co] extends CandidateFeatVecFactory[Co] {
+  /**
+   * Return an Iterable of feature-value pairs for a document.
+   * Meant to be supplied by subclasses.
+   *
+   * @param doc Document to retrieve features of.
+   */
+  def imp_get_features(doc: GridDoc[Co]
+    ): Iterable[(FeatureValue, String, Double)]
+
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int
+  ) = imp_get_features(doc)
+
+  /**
+   * Return an Iterable of feature-value pairs for a document.
+   * Meant to be called externally.
+   *
+   * @param doc Document to retrieve features of.
+   */
+  def get_features(doc: GridDoc[Co]) = {
+    val feats = imp_get_features(doc)
+    check_not_disallowed(feats)
+  }
+
+  /**
+   * Generate a feature vector from a document.
+   *
+   * @param doc Document to retrieve features of.
+   * @param is_training Whether we are training or evaluating a model
+   *   (see above)
+   */
+  def apply(doc: GridDoc[Co], is_training: Boolean) = {
+    val feats = get_features(doc)
+    featvec_factory.make_feature_vector(feats, 0, is_training)
+  }
+}
+
+/**
+ * A factory that combines the features of a set of subsidiary factories.
+ */
+class CombiningDocFeatVecFactory[Co](
+  val featvec_factory: SparseFeatureVectorFactory,
+  val binning_status: BinningStatus,
+  val subsidiary_facts: Iterable[DocFeatVecFactory[Co]]
+) extends DocFeatVecFactory[Co] {
+  def imp_get_features(doc: GridDoc[Co]) = {
+    // Concatenate the features of each subsidiary factory.
+    subsidiary_facts.zipWithIndex flatMap {
+      case (fact, index) => {
+        fact.imp_get_features(doc)
+      }
+    }
   }
 }
 
@@ -202,56 +361,8 @@ class TrivialCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = Iterable()
-}
-
-/**
- * A factory that combines the features of a set of subsidiary factories.
- */
-class CombiningCandidateFeatVecFactory[Co](
-  val featvec_factory: SparseFeatureVectorFactory,
-  val binning_status: BinningStatus,
-  val subsidiary_facts: Iterable[CandidateFeatVecFactory[Co]]
-) extends CandidateFeatVecFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
-    // For each subsidiary factory, retrieve its features, then add the
-    // index of the factory to the feature's name to disambiguate, and
-    // concatenate all features.
-    if (debug("show-combined-features")) {
-      errprint("Document: %s", doc)
-      errprint("Cell: %s", cell)
-    }
-    subsidiary_facts.zipWithIndex flatMap {
-      case (fact, index) => {
-        val feats = fact.get_features(doc, cell, initial_score, initial_rank)
-        if (!debug("show-combined-features") && !debug("tag-combined-features"))
-          feats
-        else feats map { case (ty, item, count) =>
-          val featname =
-            // Obsolete comment:
-            // [FIXME! May not be necessary to memoize like this. I don't
-            // think we need to unmemoize the feature names (except for
-            // debugging purposes), so it's enough just to OR the index
-            // onto the top bits of the word, which is already a low
-            // integer due to memoization (or if we change the memoization
-            // strategy in a way that generates spread-out integers, we
-            // can just XOR the index onto the top bits or hash the two
-            // numbers together; occasional feature clashes aren't a big
-            // deal).]
-            if (debug("tag-combined-features"))
-              "~%s~%s" format (index, item)
-            else
-              item
-          if (debug("show-combined-features")) {
-            errprint("%s = %s", featname, count)
-          }
-          (ty, featname, count)
-        }
-      }
-    }
-  }
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+    initial_score: Double, initial_rank: Int) = Iterable()
 }
 
 /**
@@ -262,8 +373,8 @@ class MiscCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
@@ -312,8 +423,8 @@ class TypesInCommonCandidateFeatVecFactory[Co](
     (doctypes intersect celltypes).size
   }
 
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     ib(FeatCount, "$types-in-common", types_in_common(doclm, celllm))
@@ -329,8 +440,8 @@ class ModelCompareCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
     val doclm = doc.rerank_lm
     val celllm = cell.rerank_lm
     Iterable(
@@ -350,8 +461,8 @@ class RankScoreCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
 ) extends CandidateFeatVecFactory[Co] {
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
     val frobbed_initial_score =
       if (debug("ensure-score-positive")) {
         if (initial_score < 0)
@@ -372,6 +483,61 @@ class RankScoreCandidateFeatVecFactory[Co](
  * A factory for generating features for a doc-cell candidate consisting of
  * separate features for each word.
  */
+abstract class GramByGramDocFeatVecFactory[Co](
+  val featvec_factory: SparseFeatureVectorFactory,
+  val binning_status: BinningStatus
+) extends DocFeatVecFactory[Co] {
+  /** Optionally return a per-gram feature whose count in the document is
+    * `count`, with specified document and cell language models. The
+    * return value is a tuple of suffix describing the particular feature
+    * class being returned, and feature value. The suffix will be appended
+    * to the gram itself to form the feature name. */
+  def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel
+    ): Option[(FeatureValue, String, Double)]
+
+  def imp_get_features(doc: GridDoc[Co]) = {
+    val doclm = doc.rerank_lm
+    for ((gram, count) <- doclm.iter_grams;
+         (fvtype, suff, value) <- get_gram_feature(gram, count, doclm))
+      yield (fvtype, "%s$%s" format (doclm.gram_to_feature(gram), suff), value)
+  }
+}
+
+/**
+ * A factory for generating features for a document consisting of
+ * features for each gram in the document.
+ * @param feattype How to compute the value assigned to the words:
+ *
+ * - `gram-binary`: always assign 1
+ * - `gram-doc-count`: use document word count
+ * - `gram-doc-prob`: use document word probability
+ * - any of the above except `gram-binary` with `-binned` added, which
+ *   bins logarithmically
+ */
+class GramDocFeatVecFactory[Co](
+  featvec_factory: SparseFeatureVectorFactory,
+  binning_status: BinningStatus,
+  feattype: String
+) extends GramByGramDocFeatVecFactory[Co](featvec_factory, binning_status) {
+  def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel) = {
+    val binned = feattype.endsWith("-binned")
+    val basetype = feattype.replace("-binned", "")
+    val (fvtype, gramval) = basetype match {
+      case "gram-binary" => (FeatBinary, 1.0)
+      case "gram-doc-count" => (FeatCount, doccount)
+      case "gram-doc-prob" => (FeatProb, doclm.gram_prob(gram))
+    }
+    if (binned)
+      Some(bin_logarithmically(feattype, gramval))
+    else
+      Some((fvtype, feattype, gramval))
+  }
+}
+
+/**
+ * A factory for generating features for a doc-cell candidate consisting of
+ * separate features for each word.
+ */
 abstract class GramByGramCandidateFeatVecFactory[Co](
   val featvec_factory: SparseFeatureVectorFactory,
   val binning_status: BinningStatus
@@ -384,8 +550,8 @@ abstract class GramByGramCandidateFeatVecFactory[Co](
   def get_gram_feature(gram: Gram, doccount: Double, doclm: LangModel,
     celllm: LangModel): Option[(FeatureValue, String, Double)]
 
-  def get_features(doc: GridDoc[Co], cell: GridCell[Co], initial_score: Double,
-      initial_rank: Int) = {
+  def imp_get_features(doc: GridDoc[Co], cell: GridCell[Co],
+      initial_score: Double, initial_rank: Int) = {
     val doclm = doc.rerank_lm
     val celllm = cell.lang_model.rerank_lm
     for ((gram, count) <- doclm.iter_grams;
@@ -401,13 +567,9 @@ abstract class GramByGramCandidateFeatVecFactory[Co](
  *
  * @param feattype How to compute the value assigned to the words:
  *
- * - `gram-binary`: always assign 1
- * - `gram-doc-count`: use document word count
  * - `gram-cell-count`: use cell word count
- * - `gram-doc-prob`: use document word probability
  * - `gram-cell-prob`: use cell word probability
- * - any of the above except `gram-binary` with `-binned` added, which
- *   bins logarithmically
+ * - any of the above with `-binned` added, which bins logarithmically
  */
 class GramCandidateFeatVecFactory[Co](
   featvec_factory: SparseFeatureVectorFactory,
@@ -419,10 +581,7 @@ class GramCandidateFeatVecFactory[Co](
     val binned = feattype.endsWith("-binned")
     val basetype = feattype.replace("-binned", "")
     val (fvtype, gramval) = basetype match {
-      case "gram-binary" => (FeatBinary, 1.0)
-      case "gram-doc-count" => (FeatCount, doccount)
       case "gram-cell-count" => (FeatCount, celllm.get_gram(gram))
-      case "gram-doc-prob" => (FeatProb, doclm.gram_prob(gram))
       case "gram-cell-prob" => (FeatProb, celllm.gram_prob(gram))
     }
     if (binned)

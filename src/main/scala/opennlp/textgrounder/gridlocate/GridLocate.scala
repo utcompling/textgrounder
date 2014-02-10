@@ -675,10 +675,12 @@ For the perceptron classifiers, see also `--pa-variant`,
   protected def with_binned(feats: String*) =
     feats flatMap { f => Seq(f, f + "-binned") }
 
-  val features_simple_gram_choices =
-    (Seq("binary") ++ with_binned(
-      "doc-count", "cell-count", "doc-prob", "cell-prob")
+  val features_simple_doc_only_gram_choices =
+    (Seq("binary") ++ with_binned("doc-count", "doc-prob")
     ).map { "gram-" + _ }
+
+  val features_simple_doc_cell_gram_choices =
+    with_binned("cell-count", "doc-prob").map { "gram-" + _ }
 
   val features_matching_gram_choices =
     (Seq("binary") ++ with_binned(
@@ -688,7 +690,8 @@ For the perceptron classifiers, see also `--pa-variant`,
     ).map { "matching-gram-" + _ }
 
   val features_all_gram_choices =
-    features_simple_gram_choices ++
+    features_simple_doc_only_gram_choices ++
+    features_simple_doc_cell_gram_choices ++
     features_matching_gram_choices
 
   val allowed_features =
@@ -1630,9 +1633,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *
    * @see CandidateFeatVecFactory
    */
-  protected def create_candidate_featvec_factory(
+  protected def create_combined_featvec_factory(
       feature_list: Iterable[String], binning: String,
-      arg: String, attach_label: Boolean) = {
+      arg: String, attach_label: Boolean,
+      include_doc_only: Boolean, include_doc_cell: Boolean,
+      output_skip_message: Boolean = false) = {
+    require(include_doc_only || include_doc_cell)
     val featvec_factory =
       new SparseFeatureVectorFactory(attach_label = attach_label)
     val binning_status = binning match {
@@ -1640,33 +1646,85 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "only" => BinningOnly
       case "no" => BinningNo
     }
-    def create_fact(ty: String): CandidateFeatVecFactory[Co] = {
-      if (params.features_simple_gram_choices contains ty)
-        new GramCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
+    def create_doc_only_fact(ty: String): Option[DocFeatVecFactory[Co]] = {
+      if (params.features_simple_doc_only_gram_choices.contains(ty))
+        Some(new GramDocFeatVecFactory[Co](featvec_factory,
+          binning_status, ty))
+      else {
+        if (output_skip_message)
+          errprint(s"Skipping label-dependent feature type $ty")
+        None
+      }
+    }
+
+    def create_doc_cell_fact(ty: String
+    ): Option[CandidateFeatVecFactory[Co]] = {
+      if (params.features_simple_doc_cell_gram_choices contains ty)
+        Some(new GramCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status, ty))
       else if (params.features_matching_gram_choices contains ty)
-        new GramMatchingCandidateFeatVecFactory[Co](featvec_factory, binning_status, ty)
+        Some(new GramMatchingCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status, ty))
       else ty match {
         case "trivial" =>
-          new TrivialCandidateFeatVecFactory[Co](featvec_factory, binning_status)
+          Some(new TrivialCandidateFeatVecFactory[Co](featvec_factory,
+            binning_status))
         case "misc" =>
-          new MiscCandidateFeatVecFactory[Co](featvec_factory, binning_status)
+          Some(new MiscCandidateFeatVecFactory[Co](featvec_factory,
+            binning_status))
         case "types-in-common" =>
-          new TypesInCommonCandidateFeatVecFactory[Co](featvec_factory, binning_status)
+          Some(new TypesInCommonCandidateFeatVecFactory[Co](featvec_factory,
+            binning_status))
         case "model-compare" =>
-          new ModelCompareCandidateFeatVecFactory[Co](featvec_factory, binning_status)
+          Some(new ModelCompareCandidateFeatVecFactory[Co](featvec_factory,
+            binning_status))
         case "rank-score" =>
-          new RankScoreCandidateFeatVecFactory[Co](featvec_factory, binning_status)
+          Some(new RankScoreCandidateFeatVecFactory[Co](featvec_factory,
+            binning_status))
+        case _ => {
+          if (output_skip_message)
+            errprint(s"Skipping document-only feature type $ty")
+          None
+        }
       }
     }
 
     if (feature_list.size == 0)
       params.parser.usageError(s"Can't specify empty --$arg")
-    else if (feature_list.size == 1)
-      create_fact(feature_list.head)
-    else {
-      val facts = feature_list.map(create_fact)
+    //else if (feature_list.size == 1)
+    //  create_fact(feature_list.head)
+    else if (!include_doc_cell) {
+      val facts = feature_list.flatMap(create_doc_only_fact)
+      new CombiningDocFeatVecFactory[Co](featvec_factory, binning_status,
+        facts)
+    } else {
+      val doc_only_facts =
+        if (include_doc_only) feature_list.flatMap(create_doc_only_fact)
+        else Iterable()
+      val facts = doc_only_facts ++ feature_list.flatMap(create_doc_cell_fact)
       new CombiningCandidateFeatVecFactory[Co](featvec_factory, binning_status,
         facts)
+    }
+  }
+
+  protected def create_classify_featvec_factory(attach_label: Boolean,
+      include_doc_only: Boolean, include_doc_cell: Boolean,
+      output_skip_message: Boolean = false) = {
+    // Factory object for generating feature vectors for a given document,
+    // when a given candidate cell is considered as the document's label.
+    create_combined_featvec_factory(params.classify_feature_list,
+      params.classify_binning, "classify-features",
+      attach_label = attach_label, include_doc_only = include_doc_only,
+      include_doc_cell = include_doc_cell,
+      output_skip_message = output_skip_message)
+  }
+
+  protected def create_classify_doc_featvec_factory(attach_label: Boolean,
+      output_skip_message: Boolean = false) = {
+    create_classify_featvec_factory(attach_label,
+        include_doc_only = true, include_doc_cell = false,
+        output_skip_message = output_skip_message) match {
+      case e:CombiningDocFeatVecFactory[Co] => e
     }
   }
 
@@ -1700,8 +1758,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
      * language models.
      */
     val candidate_featvec_factory =
-      create_candidate_featvec_factory(params.rerank_feature_list,
-        params.rerank_binning, "rerank-features", attach_label = false)
+      create_combined_featvec_factory(params.rerank_feature_list,
+        params.rerank_binning, "rerank-features", attach_label = false,
+        include_doc_only = true, include_doc_cell = true)
 
     /* Object for training a reranker. */
     val reranker_trainer =
@@ -1822,30 +1881,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     reranker_trainer(training_data)
   }
 
-  // Get objects needed to create training data of feature vectors.
-  def get_featvec_factory_and_docs_cells(grid: Grid[Co],
-      attach_label: Boolean) = {
-    // Factory object for generating feature vectors for a given document,
-    // when a given candidate cell is considered as the document's label.
-    val featvec_factory =
-      create_candidate_featvec_factory(params.classify_feature_list,
-        params.classify_binning, "classify-features",
-        attach_label = attach_label)
-
+  def get_docs_cells(grid: Grid[Co]) = {
     // Read the raw training documents.
     val raw_training_docs = read_raw_training_documents(
        "reading %s for generating classifier training data")
 
     // Convert raw documents into document-cell pairs, for the correct cell.
-    val docs_cells =
-      grid.docfact.raw_documents_to_documents(raw_training_docs) flatMap {
-        doc =>
-          // Find correct cell. But if the cell is empty (hence non-existent),
-          // skip it. (FIXME: Does this ever happen?)
-          grid.find_best_cell_for_document(doc,
-            create_non_recorded = false) map ((doc, _))
-      }
-    (featvec_factory, docs_cells)
+    grid.docfact.raw_documents_to_documents(raw_training_docs) flatMap {
+      doc =>
+        // Find correct cell. But if the cell is empty (hence non-existent),
+        // skip it. (FIXME: Does this ever happen?)
+        grid.find_best_cell_for_document(doc,
+          create_non_recorded = false) map ((doc, _))
+    }
   }
 
   /**
@@ -1853,9 +1901,29 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * cell as a possible class.
    */
   def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
-    val (featvec_factory, docs_cells) =
-      get_featvec_factory_and_docs_cells(grid, attach_label = true)
+    val featvec_factory = create_classify_featvec_factory(attach_label = true,
+      include_doc_only = true, include_doc_cell = true)
+    val docs_cells = get_docs_cells(grid)
 
+    /*
+     * We need to do the following during training:
+     *
+     * 1. Go through all the documents and create feature vectors for the
+     *    doc-only features, using the feature property indices.
+     * 2. Set ND = #doc-only features.
+     * 3. Go through the documents again, zipped with the corresponding
+     *    feature vectors, and loop through the cells. For each cell,
+     *    create a feature vector consisting of the original vector scaled
+     *    up appropriately (with ND*cell-id added to each feature ID) +
+     *    new doc-cell features created using the original two-level
+     *    cell-specific feature memoization technique, with an offset
+     *    ND*#cells added to all features set this way.
+     *
+     * During training time, we do something similar but for each
+     * document separately, since ND isn't changing.
+     *
+     * To do this, perhaps at first only implement doc-only features.
+     */
     val task = show_progress("generating", "doc agg feat vec")
 
     // Generate training data. For each document, iterate over the
@@ -1918,21 +1986,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * cell as a possible class.
    */
   def create_feature_file(grid: Grid[Co], file: String, filetype: String) = {
-    val (featvec_factory, docs_cells) =
-      get_featvec_factory_and_docs_cells(grid, attach_label = false)
+    val featvec_factory =
+      create_classify_doc_featvec_factory(attach_label = false,
+      output_skip_message = true)
+    val docs_cells = get_docs_cells(grid)
 
     val task = show_progress("processing features in", "document")
-
-    // HACK! We create non-label-specific features for now. Since a cell
-    // must be passed in, we hack by always passing in the first one.
-    val cell = grid.iter_nonempty_cells.head
 
     val f = localfh.openw(file)
     docs_cells.foreachMetered(task) { case (doc, correct_cell) =>
       // Create feature vector. We don't have an initial score or
       // initial ranking, so pass in 0. This is only used by the
       // 'rank-score' feature-vector factory.
-      val feats = featvec_factory.get_features(doc, cell, 0, 0)
+      val feats = featvec_factory.get_features(doc)
       // Maybe output features, for debugging purposes.
       if (debug("features")) {
         val prefix = "#%s" format (task.num_processed + 1)
