@@ -36,6 +36,7 @@ import learning._
 import learning.perceptron._
 import learning.mlogit._
 import learning.tadm._
+import learning.vowpalwabbit._
 import langmodel._
 
 /*
@@ -638,7 +639,7 @@ trait GridLocateFeatureParameters {
     ap.option[String]("classifier", "cl",
       default = "tadm",
       choices = Seq("random", "oracle", "perceptron", "avg-perceptron",
-        "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
+        "pa-perceptron", "cost-perceptron", "mlogit", "tadm", "vowpal-wabbit"),
       help = """Type of classifier to use when '--ranker=classify'.
 Possibilities are:
 
@@ -664,7 +665,9 @@ Possibilities are:
 'mlogit' (use R's mlogit() function to implement a multinomial conditional
   logit aka label-specific maxent model, a type of generalized linear model);
 
-'tadm' (use TADM to implement a label-specific maxent model).
+'tadm' (use TADM to implement a label-specific maxent model);
+
+'vowpal-wabbit' (use VowpalWabbit to implement a maxent model).
 
 Default is '%default'.
 
@@ -1005,24 +1008,24 @@ factor each round. For example, the value 0.01 means to decay the factor
 by 1% each round. This should be a small number, and always a number
 between 0 and 1.""")
 
-  var tadm_gaussian =
-    ap.option[Double]("tadm-gaussian",
-      metavar = "VARIANCE",
+  var gaussian_penalty =
+    ap.option[Double]("gaussian-penalty", "gaussian", "l2",
+      metavar = "PENALTY",
       default = 0.0,
       must = be_>=(0),
-      help = """If specified, give TADM a Gaussian (L2) penalty function
-(aka ridge regression, Tikhonov regularization) with the specified variance
-(smaller = more penalty). If zero (the default), don't specify any penalty,
-using the TADM default.""")
+      help = """If specified, impose a Gaussian (L2) penalty function
+(aka ridge regression, Tikhonov regularization) with the specified value
+(smaller = more penalty??). If zero (the default), don't specify any penalty.
+This applies when using TADM and Vowpal Wabbit.""")
 
-  var tadm_lasso =
-    ap.option[Double]("tadm-lasso",
-      metavar = "VARIANCE",
+  var lasso_penalty =
+    ap.option[Double]("lasso-penalty", "lasso", "l1",
+      metavar = "PENALTY",
       default = 0.0,
       must = be_>=(0),
-      help = """If specified, give TADM a Lasso (L1) penalty function with
-the specified variance (smaller = more penalty). If zero (the default),
-don't specify any penalty, using the TADM default.""")
+      help = """If specified, impose a Lasso (L1) penalty function with
+the specified value (smaller = more penalty??). If zero (the default),
+don't specify any penalty. This applies when using TADM and Vowpal Wabbit.""")
 
   var tadm_method =
     ap.option[String]("tadm-method",
@@ -1619,8 +1622,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new TADMTrainer[Inst](vec_factory,
           method = params.tadm_method,
           max_iterations = params.iterations,
-          gaussian = params.tadm_gaussian,
-          lasso = params.tadm_lasso,
+          gaussian = params.gaussian_penalty,
+          lasso = params.lasso_penalty,
           uniform_marginal = params.tadm_uniform_marginal)
     }
   }
@@ -1858,15 +1861,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
         ) = {
           val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
-          val grid = grid_ranker.grid
-          grid.docfact.raw_documents_to_documents(insts) flatMap { doc =>
-            // Convert document to (doc, cell) pair.  But if a cell
-            // can't be found (i.e. there were no training docs in the
-            // cell of this "test" doc), skip the entire instance rather
-            // than end up trying to score a fake cell
-            grid.find_best_cell_for_document(doc,
-              create_non_recorded = false) map ((doc, _))
-          }
+          get_docs_cells_from_raw_documents(grid_ranker.grid, insts)
         }
       }
 
@@ -1886,11 +1881,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     val raw_training_docs = read_raw_training_documents(
        "reading %s for generating classifier training data")
 
+    get_docs_cells_from_raw_documents(grid, raw_training_docs)
+  }
+
+  def get_docs_cells_from_raw_documents(grid: Grid[Co],
+      raw_docs: Iterator[DocStatus[Row]]) = {
     // Convert raw documents into document-cell pairs, for the correct cell.
-    grid.docfact.raw_documents_to_documents(raw_training_docs) flatMap {
+    grid.docfact.raw_documents_to_documents(raw_docs) flatMap {
       doc =>
-        // Find correct cell. But if the cell is empty (hence non-existent),
-        // skip it. (FIXME: Does this ever happen?)
+        // Convert document to (doc, cell) pair.  But if a cell
+        // can't be found (i.e. there were no training docs in the
+        // cell of this "test" doc), skip the entire instance rather
+        // than end up trying to score a fake cell. (FIXME: Does this
+        // ever happen if we're reading training documents? Presumably not?)
         grid.find_best_cell_for_document(doc,
           create_non_recorded = false) map ((doc, _))
     }
@@ -1901,119 +1904,125 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * cell as a possible class.
    */
   def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
-    val featvec_factory = create_classify_featvec_factory(attach_label = true,
-      include_doc_only = true, include_doc_cell = true)
-    val docs_cells = get_docs_cells(grid)
+    if (params.classifier == "vowpal-wabbit")
+      create_vowpal_wabbit_classifier_ranker(ranker_name, grid)
+    else {
+      val featvec_factory = create_classify_featvec_factory(attach_label = true,
+        include_doc_only = true, include_doc_cell = true)
+      val docs_cells = get_docs_cells(grid)
 
-    /*
-     * We need to do the following during training:
-     *
-     * 1. Go through all the documents and create feature vectors for the
-     *    doc-only features, using the feature property indices.
-     * 2. Set ND = #doc-only features.
-     * 3. Go through the documents again, zipped with the corresponding
-     *    feature vectors, and loop through the cells. For each cell,
-     *    create a feature vector consisting of the original vector scaled
-     *    up appropriately (with ND*cell-id added to each feature ID) +
-     *    new doc-cell features created using the original two-level
-     *    cell-specific feature memoization technique, with an offset
-     *    ND*#cells added to all features set this way.
-     *
-     * During training time, we do something similar but for each
-     * document separately, since ND isn't changing.
-     *
-     * To do this, perhaps at first only implement doc-only features.
-     */
-    val task = show_progress("generating", "doc agg feat vec")
+      /*
+       * We need to do the following during training:
+       *
+       * 1. Go through all the documents and create feature vectors for the
+       *    doc-only features, using the feature property indices.
+       * 2. Set ND = #doc-only features.
+       * 3. Go through the documents again, zipped with the corresponding
+       *    feature vectors, and loop through the cells. For each cell,
+       *    create a feature vector consisting of the original vector scaled
+       *    up appropriately (with ND*cell-id added to each feature ID) +
+       *    new doc-cell features created using the original two-level
+       *    cell-specific feature memoization technique, with an offset
+       *    ND*#cells added to all features set this way.
+       *
+       * During training time, we do something similar but for each
+       * document separately, since ND isn't changing.
+       *
+       * To do this, perhaps at first only implement doc-only features.
+       */
+      val task = show_progress("generating", "doc agg feat vec")
 
-    // Generate training data. For each document, iterate over the
-    // possible cells, generating a feature vector for each cell.
-    // This actually holds an iterator; nothing gets done until we
-    // convert to an indexed sequence, below.
-    val training_instances =
-      docs_cells.mapMetered(task) { case (doc, correct_cell) =>
-        // Maybe do it in parallel.
-        val cells = grid.iter_nonempty_cells
-        val maybepar_cells = cells
-        // FIXME: This does not yet work because memoization isn't
-        // thread-safe. See the comments for FeatureLabelMapper.
-        /*
-        val maybepar_cells =
-          if (!debug("parallel-classifier-training")
-              //params.no_parallel || debug("no-parallel-classifier-training")
-             )
-            cells
-          else cells.par
-        */
+      // Generate training data. For each document, iterate over the
+      // possible cells, generating a feature vector for each cell.
+      // This actually holds an iterator; nothing gets done until we
+      // convert to an indexed sequence, below.
+      val training_instances =
+        docs_cells.mapMetered(task) { case (doc, correct_cell) =>
+          // Maybe do it in parallel.
+          val cells = grid.iter_nonempty_cells
+          val maybepar_cells = cells
+          // FIXME: This does not yet work because memoization isn't
+          // thread-safe. See the comments for FeatureLabelMapper.
+          /*
+          val maybepar_cells =
+            if (!debug("parallel-classifier-training")
+                //params.no_parallel || debug("no-parallel-classifier-training")
+               )
+              cells
+            else cells.par
+          */
 
-        // Iterate over cells.
-        val fvs = maybepar_cells.map { cell =>
-          // Create feature vector. We don't have an initial score or
-          // initial ranking, so pass in 0. This is only used by the
-          // 'rank-score' feature-vector factory.
-          val featvec = featvec_factory(doc, cell, 0, 0, is_training = true)
-          // Maybe output feature vector, for debugging purposes.
-          if (debug("features")) {
-            val prefix = "#%s" format (task.num_processed + 1)
-            errprint(s"$prefix: Training: For doc $doc, cell $cell, featvec ${featvec.pretty_format(prefix)}")
+          // Iterate over cells.
+          val fvs = maybepar_cells.map { cell =>
+            // Create feature vector. We don't have an initial score or
+            // initial ranking, so pass in 0. This is only used by the
+            // 'rank-score' feature-vector factory.
+            val featvec = featvec_factory(doc, cell, 0, 0, is_training = true)
+            // Maybe output feature vector, for debugging purposes.
+            if (debug("features")) {
+              val prefix = "#%s" format (task.num_processed + 1)
+              errprint(s"$prefix: Training: For doc $doc, cell $cell, featvec ${featvec.pretty_format(prefix)}")
+            }
+            featvec
           }
-          featvec
+
+          // Aggregate feature vectors.
+          val agg_fv = AggregateFeatureVector(fvs.toArray)
+          // Generate data instance.
+          val data_inst = GridRankingClassifierInst(doc, agg_fv, featvec_factory)
+          // Return it, along with correct cell's label.
+          (data_inst, featvec_factory.lookup_cell(correct_cell))
         }
 
-        // Aggregate feature vectors.
-        val agg_fv = AggregateFeatureVector(fvs.toArray)
-        // Generate data instance.
-        val data_inst = GridRankingClassifierInst(doc, agg_fv, featvec_factory)
-        // Return it, along with correct cell's label.
-        (data_inst, featvec_factory.lookup_cell(correct_cell))
-      }
+      // Create classifier trainer.
+      val trainer =
+        create_pointwise_classifier_trainer[GridRankingClassifierInst[Co]](
+          params.classifier, rerank = false)
 
-    // Create classifier trainer.
-    val trainer =
-      create_pointwise_classifier_trainer[GridRankingClassifierInst[Co]](
-        params.classifier, rerank = false)
-
-    // Train classifier.
-    val classifier =
-      trainer(TrainingData(training_instances.toIndexedSeq,
-        remove_non_choice_specific_columns = false))
-    new ClassifierGridRanker[Co](ranker_name, grid, classifier,
-      featvec_factory)
+      // Train classifier.
+      val classifier =
+        trainer(TrainingData(training_instances.toIndexedSeq,
+          remove_non_choice_specific_columns = false))
+      new ClassifierGridRanker[Co](ranker_name, grid, classifier,
+        featvec_factory)
+    }
   }
 
   /**
-   * Create a ranker that uses a classifier to do its work, treating each
-   * cell as a possible class.
+   * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
+   * treating each cell as a possible class.
    */
-  def create_feature_file(grid: Grid[Co], file: String, filetype: String) = {
+  def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
+      grid: Grid[Co]) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
       output_skip_message = true)
     val docs_cells = get_docs_cells(grid)
 
-    val task = show_progress("processing features in", "document")
+    // val task = show_progress("processing features in", "document")
 
-    val f = localfh.openw(file)
-    docs_cells.foreachMetered(task) { case (doc, correct_cell) =>
-      // Create feature vector. We don't have an initial score or
-      // initial ranking, so pass in 0. This is only used by the
-      // 'rank-score' feature-vector factory.
+    val training_data =
+      docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
       val feats = featvec_factory.get_features(doc)
-      // Maybe output features, for debugging purposes.
-      if (debug("features")) {
-        val prefix = "#%s" format (task.num_processed + 1)
-        feats.foreach { case (fvtype, feat, value) =>
-          errprint(s"  $prefix: $feat ($fvtype) = $value")
-        }
-      }
-      val line = s"${featvec_factory.lookup_cell(correct_cell)} | " +
-        feats.map { case (fvtype, feat, value) =>
-          val goodfeat = feat.replace(":", "_")
-          s"$goodfeat:$value"
-        }.mkString(" ")
-      f.println(line)
+      (feats, featvec_factory.lookup_cell(correct_cell))
     }
-    f.close()
+
+    // Create classifier trainer.
+    val trainer = new VowpalWabbitTrainer(
+      gaussian = params.gaussian_penalty,
+      lasso = params.lasso_penalty)
+
+    // Train classifier.
+    //
+    // Write the feature file before computing the number of labels
+    // because the process of writing the feature file iterates through
+    // the input data and memoizes all the labels; only after that is
+    // the number of labels correct in the featvec factory's mapper.
+    val feats_filename = trainer.write_feature_file(training_data)
+    val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
+    val classifier = trainer(num_labels, feats_filename)
+    new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
+      featvec_factory)
   }
 
   /**

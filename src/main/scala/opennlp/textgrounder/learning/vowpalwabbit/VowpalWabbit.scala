@@ -109,13 +109,15 @@ protected trait VowpalWabbitBase {
    * @param file File to write features to.
    */
   def write_feature_file(
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)],
-    file: String
-  ) {
-    errprint(s"Writing features to $file")
+    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
+  ) = {
+    var feats_filename =
+      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
+    errprint(s"Writing features to $feats_filename")
+
     val task = new Meter("processing features in", "document")
 
-    val f = localfh.openw(file)
+    val f = localfh.openw(feats_filename)
     features.foreachMetered(task) { case (feats, correct) =>
       if (debug("features")) {
         val prefix = "#%s" format (task.num_processed + 1)
@@ -133,6 +135,7 @@ protected trait VowpalWabbitBase {
       f.println(line)
     }
     f.close()
+    feats_filename
   }
 }
 
@@ -150,9 +153,7 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
     // We need three temporary files: One where we write out the features,
     // one used by VW as a cache, and one where VW writes the raw predictions.
     // In addition we need the file holding the written-out model.
-    var feats_filename =
-      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
-    write_feature_file(features, feats_filename)
+    val feats_filename = write_feature_file(features)
     val cache_filename =
       java.io.File.createTempFile("textgrounder.vw.cache.test", null).toString
     val pred_filename =
@@ -183,15 +184,13 @@ class VowpalWabbitTrainer(
   val gaussian: Double,
   val lasso: Double
 ) extends VowpalWabbitBase {
-  def apply(num_classes: Int,
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
-  ) = {
-    // We need three temporary files: One where we write out the features,
+  def apply(num_classes: Int, feats_filename: String) = {
+    // We make the writing happen in a different step because the number of
+    // classes might not be known until we do so.
+    //
+    // We need two temporary files in addition to the feature file:
     // one used by VW as a cache, and one where the model is written to.
     // The last one needs to be preserved for evaluation.
-    var feats_filename =
-      java.io.File.createTempFile("textgrounder.vw.feats.train", null).toString
-    write_feature_file(features, feats_filename)
     val cache_filename =
       java.io.File.createTempFile("textgrounder.vw.cache.train", null).toString
     val model_filename =
@@ -219,8 +218,10 @@ class VowpalWabbitTrainer(
     val vw_penalty =
       (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
       (if (lasso > 0) Seq("--l1", s"$lasso") else Seq())
+    val vw_cmd_line = vw_cmd_line_start ++ vw_penalty
+    errprint("Executing: %s", vw_cmd_line mkString " ")
     time_action("running VowpalWabbit") {
-      (vw_cmd_line_start ++ vw_penalty) !
+      vw_cmd_line !
     }
     new VowpalWabbitClassifier(model_filename)
   }

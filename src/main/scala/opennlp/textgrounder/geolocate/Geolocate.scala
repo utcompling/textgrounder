@@ -590,12 +590,12 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
           case "internal" => {
-            val docstats =
+            val get_docstats = () =>
               params.input.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir, document_textdb_suffix))
             val evalobj = create_cell_evaluator(ranker)
-            evalobj.evaluate_documents(docstats)
+            evalobj.evaluate_documents(get_docstats)
           }
           case "raw-text" => ???
         }

@@ -271,8 +271,11 @@ class DocEvalMapper
       }
     }
 
-    val lines = new HadoopIterator
-    val docstats =
+    // FIXME! This won't work. Can't iterate multiple times over the input
+    // except with multiple map-reduce sessions. Need to scrap this whole
+    // Hadoop code and use Scoobi.
+    val get_docstats = () => {
+      val lines = new HadoopIterator
       lines.map {
         case (filehand, file, line, lineno) =>
           ranker.grid.docfact.line_to_document_status(filehand, file, line,
@@ -282,8 +285,9 @@ class DocEvalMapper
           case (row, doc) => doc.lang_model.finish_after_global() }
         stat
       }
+    }
     val evalobj = driver.create_cell_evaluator(ranker)
-    for (result <- evalobj.evaluate_documents(docstats)) {
+    for (result <- evalobj.evaluate_documents(get_docstats)) {
       context.write(new Text(ranker.ranker_name),
         new DoubleWritable(result.pred_truedist))
     }

@@ -24,9 +24,11 @@ import math._
 
 import util.print.errprint
 import util.debug._
+import util.textdb.Row
 
 import langmodel._
 import learning._
+import learning.vowpalwabbit._
 
 /*
 
@@ -49,6 +51,11 @@ abstract class GridRanker[Co](
   val ranker_name: String,
   val grid: Grid[Co]
 ) extends Ranker[GridDoc[Co], GridCell[Co]] {
+  /** Optional initialization stage passing one or more times over the
+   * data. */
+  def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+  ) { }
 }
 
 /**
@@ -409,6 +416,45 @@ class ClassifierGridRanker[Co](
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val fv = featvec_factory(doc, cell, 0, 0, is_training = false)
     classifier.score_label(fv, featvec_factory.lookup_cell(cell))
+  }
+}
+
+/** Use a Vowpal Wabbit classifier for comparing document and cell. */
+class VowpalWabbitGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co],
+  classifier: VowpalWabbitClassifier,
+  featvec_factory: DocFeatVecFactory[Co]
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+
+  var doc_scores: Map[String, Array[Double]] = _
+
+  override def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+  ) {
+    val docs = grid.docfact.document_statuses_to_documents(get_docstats())
+
+    val title_training_data =
+      docs.map/*Metered(task)*/ { doc =>
+      val feats = featvec_factory.get_features(doc)
+      // It doesn't matter what we give as the correct cell here
+      (doc.title, (feats, 0))
+    }.toIndexedSeq
+
+    val (titles, training_data) = title_training_data.unzip
+    val list_of_scores =
+      classifier(training_data.toIterator).map { label_scores =>
+        val scores = label_scores.sortWith(_._1 < _._1).map(_._2)
+        assert(scores.size ==
+          featvec_factory.featvec_factory.mapper.number_of_labels)
+        scores
+      }
+    doc_scores = (titles zip list_of_scores).toMap
+  }
+
+  def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val scores = doc_scores(doc.title)
+    scores(featvec_factory.lookup_cell(cell))
   }
 }
 
