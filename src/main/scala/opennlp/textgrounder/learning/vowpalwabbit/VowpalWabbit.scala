@@ -182,7 +182,10 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
  */
 class VowpalWabbitTrainer(
   val gaussian: Double,
-  val lasso: Double
+  val lasso: Double,
+  val vw_loss_function: String = "logistic",
+  val vw_multiclass: String = "oaa",
+  val vw_args: String = ""
 ) extends VowpalWabbitBase {
   def apply(num_classes: Int, feats_filename: String) = {
     // We make the writing happen in a different step because the number of
@@ -211,14 +214,14 @@ class VowpalWabbitTrainer(
     //        (do quantile regression, trying to predict the median or some
     //        other quantile, rather than the mean as with least squares).
     // --compressed: Compress the cache file.
-    val vw_cmd_line_start =
+    val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
-          "-f", model_filename, "--oaa", s"$num_classes",
-          "--loss_function", "logistic", "--compressed")
-    val vw_penalty =
-      (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
-      (if (lasso > 0) Seq("--l1", s"$lasso") else Seq())
-    val vw_cmd_line = vw_cmd_line_start ++ vw_penalty
+          "-f", model_filename, "--" + vw_multiclass, s"$num_classes",
+          "--loss_function", vw_loss_function, "--compressed") ++
+        (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
+        (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
+        // Split on an empty string wrongly returns Array("")
+        (if (vw_args == "") Seq() else vw_args.split("""\s+""").toSeq)
     errprint("Executing: %s", vw_cmd_line mkString " ")
     time_action("running VowpalWabbit") {
       vw_cmd_line !

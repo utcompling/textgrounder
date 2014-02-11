@@ -1039,7 +1039,28 @@ don't specify any penalty. This applies when using TADM and Vowpal Wabbit.""")
   var tadm_uniform_marginal =
     ap.flag("tadm-uniform-marginal",
       help = """If specified, use uniform rather than pseudo-likelihood
-marginal calculation.""")
+marginal calculation in TADM.""")
+
+  var vw_loss_function =
+    ap.option[String]("vw-loss-function", "vlf",
+      default = "logistic",
+      choices = Seq("logistic", "hinge", "squared", "quantile"),
+      help = """Loss function for Vowpal Wabbit: One of 'logistic', 'hinge',
+'squared', 'quantile'.""")
+
+  var vw_multiclass =
+    ap.option[String]("vw-multiclass", "vm",
+      default = "oaa",
+      choices = Seq("oaa", "ect"),
+      help = """In Vowpal Wabbit, how to reduce a multiclass problem to a
+set of binary problems: One of 'oaa' (one against all), 'ect' (error-correcting
+tournament).""")
+
+  var vw_args =
+    ap.option[String]("vw-args",
+      default = "",
+      help = """Miscellaneous arguments to pass to Vowpal Wabbit at training
+time.""")
 }
 
 trait GridLocateMiscParameters {
@@ -2010,7 +2031,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // Create classifier trainer.
     val trainer = new VowpalWabbitTrainer(
       gaussian = params.gaussian_penalty,
-      lasso = params.lasso_penalty)
+      lasso = params.lasso_penalty,
+      vw_loss_function = params.vw_loss_function,
+      vw_multiclass = params.vw_multiclass,
+      vw_args = params.vw_args)
 
     // Train classifier.
     val feats_filename = trainer.write_feature_file(training_data)
