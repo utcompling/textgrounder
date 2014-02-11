@@ -453,14 +453,25 @@ abstract class CorpusEvaluator[Co](
   }
 
   /**
-   * Evaluate the documents, or some subset of them.  This may skip
+   * Optional initialization stage requiring one or more passes over the
+   * documents. Meant to be overridden by subclasses.
+   */
+  def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+  ) { }
+
+  /**
+   * Process the documents, or some subset of them.  This may skip
    * some of the documents (e.g. based on the parameter
    * `--every-nth-test-doc`) and may stop early (e.g. based on
    * `--num-test-docs`).
    *
+   * @param get_docstats Iterator over document statuses of raw documents.
+   * @param process Function to process raw documents.
    * @return Iterator over evaluation results.
    */
-  def evaluate_documents(docstats: Iterator[DocStatus[(Row, TEvalDoc)]]) = {
+  def process_documents(docstats: Iterator[DocStatus[(Row, TEvalDoc)]])(
+      process: TEvalDoc => Either[String, TEvalRes]) = {
     var statnum = 0
     val result_stats =
       for (stat <- docstats) yield {
@@ -471,7 +482,7 @@ abstract class CorpusEvaluator[Co](
           val (skip, reason) = would_skip_by_parameters()
           if (skip)
             (None, "skipped", reason, doctag)
-          else evaluate_document(doc) match {
+          else process(doc) match {
             case Left(skipped_reason) =>
               (None, "skipped", skipped_reason, doctag)
             case Right(res) =>
@@ -480,7 +491,30 @@ abstract class CorpusEvaluator[Co](
         }
       }
 
-    task.iterate(process_document_statuses(result_stats)).map { res =>
+    process_document_statuses(result_stats)
+  }
+
+  /**
+   * Evaluate the documents, or some subset of them.  This may skip
+   * some of the documents (e.g. based on the parameter
+   * `--every-nth-test-doc`) and may stop early (e.g. based on
+   * `--num-test-docs`).
+   *
+   * @param get_docstats Function that will return an iterator over
+   *   document statuses of raw documents. This is provided in case it
+   *   is necessary to iterate more than once over the documents.
+   * @return Iterator over evaluation results.
+   */
+  def evaluate_documents(
+    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+  ) = {
+
+    initialize(get_docstats)
+
+    val results =
+      task.iterate(process_documents(get_docstats())(evaluate_document))
+
+    results.map { res =>
       val new_elapsed = task.elapsed_time
       val new_processed = task.num_processed
       // If enough time and documents have gone by, print out results
@@ -613,6 +647,14 @@ abstract class GridEvaluator[Co](
       }
     }
   }
+
+  /**
+   * Optional initialization stage requiring one or more passes over the
+   * documents. Meant to be overridden by subclasses.
+   */
+  override def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+  ) { ranker.initialize(get_docstats) }
 
   /**
    * Actual implementation of code to evaluate a document.  Optionally

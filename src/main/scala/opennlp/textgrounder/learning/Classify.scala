@@ -495,7 +495,9 @@ object Classify extends ExperimentApp("Classify") {
             gaussian = params.gaussian,
             lasso = params.lasso)
 
-          val classifier = trainer(numlabs, training_instances.toIterator)
+          val feats_filename =
+            trainer.write_feature_file(training_instances.toIterator)
+          val classifier = trainer(numlabs, feats_filename)
           (classifier, test_instances, factory)
         }
 
