@@ -356,6 +356,13 @@ class SumFrequencyGridRanker[Co](
 
 trait NaiveBayesFeature[Co]
 {
+  /** Possible initialization step at beginning to do a pass over test data.
+   * Needed for NaiveBayesRoughRankerFeature when the wrapped ranker uses
+   * Vowpal Wabbit. */
+  def initialize(
+      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+  }
+
   def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]): Double
 }
 
@@ -369,6 +376,12 @@ class NaiveBayesRoughRankerFeature[Co](
   rough_ranker: PointwiseScoreGridRanker[Co]
 ) extends NaiveBayesFeature[Co]
 {
+  // Needed for Vowpal Wabbit.
+  override def initialize(
+      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+    rough_ranker.initialize(get_docstats)
+  }
+
   def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val central = cell.get_central_point
     val rough_cell = rough_ranker.grid.find_best_cell_for_coord(central,
@@ -389,6 +402,12 @@ class NaiveBayesGridRanker[Co](
   grid: Grid[Co],
   features: Iterable[NaiveBayesFeature[Co]]
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+
+  override def initialize(
+      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+    for (f <- features)
+      f.initialize(get_docstats)
+  }
 
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val params = grid.driver.params
