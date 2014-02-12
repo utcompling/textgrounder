@@ -1065,6 +1065,14 @@ only for 'cost-vowpal-wabbit').""")
   else if (classifier == "cost-vowpal-wabbit" && vw_multiclass == "ect")
     ap.error("--vw-multiclass ect not possible with --classifier cost-vowpal-wabbit")
 
+  var vw_cost_function =
+    ap.option[String]("vw-cost-function", "vcf",
+      default = "dist",
+      choices = Seq("dist", "sqrt-dist", "log-dist"),
+      help = """How to compute the cost in 'cost-vowpal-wabbit'. Possibilities:
+'dist' (use the error distance directly), 'sqrt-dist' (use the square root
+of the distance), 'log-dist' (use the log of the distance).""")
+
   var vw_args =
     ap.option[String]("vw-args",
       default = "",
@@ -2022,6 +2030,15 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
+  def vowpal_wabbit_cost_function(doc: GridDoc[Co], cell: GridCell[Co]) = {
+    val dist = doc.distance_to_coord(cell.get_central_point)
+    params.vw_cost_function match {
+      case "dist" => dist
+      case "sqrt-dist" => math.sqrt(dist)
+      case "log-dist" => if (dist < 1.0) 0.0 else math.log(dist)
+    }
+  }
+
   /**
    * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
    * treating each cell as a possible class.
@@ -2051,7 +2068,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               // instead of actual error distance.  Doesn't seem to make
               // much difference.
               // if (label == correct_cell) 0.0 else
-              doc.distance_to_coord(cell.get_central_point))
+              vowpal_wabbit_cost_function(doc, cell))
           }
           (feats, cells_costs)
         }
