@@ -772,11 +772,33 @@ protected class ExperimentPackage {
     }
   }
 
-  /** Split a command line into arguments. Respect quotes (FIXME:
-   * not implemented yet). */
+  /** Split a command line into arguments. Respect quotes. Allow \" for a
+   * quote, \\ for a single backslash. */
   def split_command_line(cmdline: String) = {
-    // FIXME! Make it respect quotes.
-    cmdline.split("""\s+""")
+    val words = """("([^"\\]|\.)*"|[^"\s])+""".r.findAllIn(cmdline).toArray
+    for (word <- words) yield {
+      // println("Saw: %s" format word)
+      val wordbuf = mutable.Buffer[Char]()
+      var in_backslash = false
+      for (c <- word) {
+        if (in_backslash) {
+          if (c == '\\' || c == '"')
+            wordbuf += c
+          else {
+            wordbuf += '\\'
+            wordbuf += c
+          }
+          in_backslash = false
+        } else if (c == '\\') {
+          in_backslash = true
+        } else if (c != '"') {
+          wordbuf += c
+        }
+      }
+      if (in_backslash)
+        wordbuf += '\\'
+      wordbuf mkString ""
+    }
   }
 }
 
