@@ -96,98 +96,11 @@ import util.print.errprint
  */
 
 /**
- * Common code to VowpalWabbitTrainer and VowpalWabbitClassifier.
+ * Common code to the various Vowpal Wabbit trainers and classifiers.
  */
 protected trait VowpalWabbitBase {
-  /**
-   * Write out a set of data instances, described by their features,
-   * to a file.
-   *
-   * @param features An iterator over data instances. Each instance is
-   *   a tuple of a memoized label and an iterable over features,
-   *   described by a string and double value.
-   * @param file File to write features to.
-   */
-  def write_feature_file(
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
-  ) = {
-    var feats_filename =
-      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
-    errprint(s"Writing features to $feats_filename")
-
-    val task = new Meter("processing features in", "document")
-
-    val f = localfh.openw(feats_filename)
-    features.foreachMetered(task) { case (feats, correct) =>
-      if (debug("features")) {
-        val prefix = "#%s" format (task.num_processed + 1)
-        feats.foreach { case (_, feat, value) =>
-          errprint(s"  $prefix: $feat = $value")
-        }
-      }
-      // Map 0-based memoized labels to 1-based labels for VW, which
-      // seems to want labels in this format.
-      val line = s"${correct + 1} | " +
-        feats.map { case (_, feat, value) =>
-          val goodfeat = feat.replace(":", "_")
-          s"$goodfeat:$value"
-        }.mkString(" ")
-      f.println(line)
-    }
-    f.close()
-    feats_filename
-  }
-}
-
-/**
- * Classify data instances using VowpalWabbit. When applied to a set of
- * feature vectors, return a set of vectors holding scores, which should
- * be convertible to probabilities by exponentiating and normalizing.
- */
-class VowpalWabbitClassifier private[vowpalwabbit] (
-  val model_filename: String
-) extends VowpalWabbitBase {
-  def apply(
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
-  ) = {
-    // We need three temporary files: One where we write out the features,
-    // one used by VW as a cache, and one where VW writes the raw predictions.
-    // In addition we need the file holding the written-out model.
-    val feats_filename = write_feature_file(features)
-    val cache_filename =
-      java.io.File.createTempFile("textgrounder.vw.cache.test", null).toString
-    val pred_filename =
-      java.io.File.createTempFile("textgrounder.vw.pred", null).toString
-    errprint(s"Writing VW eval cache to $cache_filename")
-    errprint(s"Writing VW raw predictions to $pred_filename")
-    val vw_cmd_line_start =
-      Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
-          "-i", model_filename, "--raw_predictions", pred_filename,
-          "--compressed", "-t")
-    time_action("running VowpalWabbit") {
-      vw_cmd_line_start !
-    }
-    (for (line <- localfh.openr(pred_filename)) yield {
-      val preds_1 = line.split("""\s+""")
-      preds_1.map(_.split(":")).map {
-        // Map 1-based VW labels back to the 0-based memoized labels we use.
-        case Array(label, value) => (label.toInt - 1, value.toDouble)
-      }
-    }).toIndexedSeq
-  }
-}
-/**
- * Train a classifying model using VowpalWabbit. When applied to a set of
- * feature vectors, return a classifier object.
- */
-class VowpalWabbitTrainer(
-  val gaussian: Double,
-  val lasso: Double,
-  val vw_loss_function: String = "logistic",
-  val vw_multiclass: String = "oaa",
-  val vw_args: String = ""
-) extends VowpalWabbitBase {
-  def apply(num_classes: Int, feats_filename: String) = {
+  def train_vw(feats_filename: String, gaussian: Double, lasso: Double,
+      vw_loss_function: String, vw_args: String, extra_args: Seq[String]) = {
     // We make the writing happen in a different step because the number of
     // classes might not be known until we do so.
     //
@@ -216,8 +129,9 @@ class VowpalWabbitTrainer(
     // --compressed: Compress the cache file.
     val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
-          "-f", model_filename, "--" + vw_multiclass, s"$num_classes",
-          "--loss_function", vw_loss_function, "--compressed") ++
+          "-f", model_filename) ++
+        extra_args ++
+        Seq("--loss_function", vw_loss_function, "--compressed") ++
         (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
         (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
         // Split on an empty string wrongly returns Array("")
@@ -227,5 +141,172 @@ class VowpalWabbitTrainer(
       vw_cmd_line !
     }
     new VowpalWabbitClassifier(model_filename)
+  }
+
+  /**
+   * Write out a set of data instances, described by their features,
+   * to a file.
+   *
+   * @param features An iterator over data instances. Each instance is
+   *   a tuple of an iterable over features and a memoized correct label.
+   *   Each feature is described by a feature type (ignored), a
+   *   feature name and a value.
+   * @param file File to write features to.
+   */
+  def write_feature_file(
+    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
+  ) = {
+    var feats_filename =
+      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
+    errprint(s"Writing features to $feats_filename")
+
+    val task = new Meter("processing features in", "document")
+
+    val f = localfh.openw(feats_filename)
+    features.foreachMetered(task) { case (feats, correct) =>
+      if (debug("features")) {
+        val prefix = "#%s" format (task.num_processed + 1)
+        errprint(s"$prefix: Correct = $correct")
+        feats.foreach { case (_, feat, value) =>
+          errprint(s"  $prefix: $feat = $value")
+        }
+      }
+      // Map 0-based memoized labels to 1-based labels for VW, which
+      // seems to want labels in this format.
+      val line = s"${correct + 1} | " +
+        feats.map { case (_, feat, value) =>
+          val goodfeat = feat.replace(":", "_")
+          s"$goodfeat:$value"
+        }.mkString(" ")
+      f.println(line)
+    }
+    f.close()
+    feats_filename
+  }
+
+  /**
+   * Write out a set of cost-sensitive data instances, described by their
+   * features and costs per label, to a file.
+   *
+   * @param features An iterator over data instances. Each instance is
+   *   a tuple of an iterable over features and an iterable over per-label
+   *   costs. Each feature is described by a feature type (ignored), a
+   *   feature name and a value.
+   * @param file File to write features to.
+   */
+  def write_cost_sensitive_feature_file(
+    features: Iterator[(Iterable[(FeatureValue, String, Double)],
+      Iterable[(LabelIndex, Double)])]
+  ) = {
+    var feats_filename =
+      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
+    errprint(s"Writing features to $feats_filename")
+
+    val task = new Meter("processing features in", "document")
+
+    val f = localfh.openw(feats_filename)
+    features.foreachMetered(task) { case (feats, costs) =>
+      if (debug("features")) {
+        val prefix = "#%s" format (task.num_processed + 1)
+        errprint(s"$prefix: ${costs.size} labels, ${feats.size} features")
+        costs.foreach { case (label, cost) =>
+          errprint(s"  $prefix: Label $label: cost $cost")
+        }
+        feats.foreach { case (_, feat, value) =>
+          errprint(s"  $prefix: $feat = $value")
+        }
+      }
+      // Map 0-based memoized labels to 1-based labels for VW, which
+      // seems to want labels in this format.
+      val line =
+        costs.map { case (label, cost) =>
+          s"${label + 1}:$cost"
+        }.mkString(" ") +
+        " | " +
+        feats.map { case (_, feat, value) =>
+          val goodfeat = feat.replace(":", "_")
+          s"$goodfeat:$value"
+        }.mkString(" ")
+      f.println(line)
+    }
+    f.close()
+    feats_filename
+  }
+}
+
+/**
+ * Classify data instances using VowpalWabbit. When applied to a set of
+ * feature vectors, return a set of vectors holding scores, which should
+ * be convertible to probabilities by exponentiating and normalizing.
+ * As when training, you need to write out the features first, then pass
+ * in the feature file name.
+ */
+class VowpalWabbitClassifier private[vowpalwabbit] (
+  val model_filename: String
+) extends VowpalWabbitBase {
+  def apply(feats_filename: String) = {
+    // We need two temporary files: one used by VW as a cache, and one
+    // where VW writes the raw predictions. In addition we need the file
+    // holding the features and the file holding the written-out model.
+    val cache_filename =
+      java.io.File.createTempFile("textgrounder.vw.cache.test", null).toString
+    val pred_filename =
+      java.io.File.createTempFile("textgrounder.vw.pred", null).toString
+    errprint(s"Writing VW eval cache to $cache_filename")
+    errprint(s"Writing VW raw predictions to $pred_filename")
+    val vw_cmd_line_start =
+      Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
+          "-i", model_filename, "--raw_predictions", pred_filename,
+          "--compressed", "-t")
+    time_action("running VowpalWabbit") {
+      vw_cmd_line_start !
+    }
+    (for (line <- localfh.openr(pred_filename)) yield {
+      val preds_1 = line.split("""\s+""")
+      preds_1.map(_.split(":")).map {
+        // Map 1-based VW labels back to the 0-based memoized labels we use.
+        case Array(label, value) => (label.toInt - 1, value.toDouble)
+      }
+    }).toIndexedSeq
+  }
+}
+
+/**
+ * Train a classifying model using VowpalWabbit. When applied to a set of
+ * feature vectors, return a classifier object. You need to write out the
+ * features first, then pass in the feature file name.
+ */
+class VowpalWabbitTrainer(
+  val gaussian: Double,
+  val lasso: Double,
+  val vw_loss_function: String = "logistic",
+  val vw_multiclass: String = "oaa",
+  val vw_args: String = ""
+) extends VowpalWabbitBase {
+  def apply(num_classes: Int, feats_filename: String) = {
+    val extra_args = Seq("--" + vw_multiclass, s"$num_classes")
+    train_vw(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
+      extra_args)
+  }
+}
+
+/**
+ * Train a classifying model using VowpalWabbit. When applied to a set of
+ * feature vectors, return a classifier object. You need to call
+ * write_feature_file() first, then pass in the feature file name.
+ */
+class VowpalWabbitCostSensitiveTrainer(
+  val gaussian: Double,
+  val lasso: Double,
+  val vw_loss_function: String = "logistic",
+  val vw_multiclass: String = "oaa",
+  val vw_args: String = ""
+) extends VowpalWabbitBase {
+  def apply(num_classes: Int, feats_filename: String) = {
+    val multiclass_arg =
+      if (vw_multiclass == "oaa") "csoaa" else "wap"
+    val extra_args = Seq("--" + multiclass_arg, s"$num_classes")
+    train_vw(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
+      extra_args)
   }
 }

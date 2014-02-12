@@ -20,6 +20,7 @@ package opennlp.textgrounder
 package gridlocate
 
 import scala.util.Random
+import collection.mutable
 import math._
 
 import util.print.errprint
@@ -424,7 +425,8 @@ class VowpalWabbitGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co],
   classifier: VowpalWabbitClassifier,
-  featvec_factory: DocFeatVecFactory[Co]
+  featvec_factory: DocFeatVecFactory[Co],
+  cost_sensitive: Boolean
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   var doc_scores: Map[String, Array[Double]] = _
@@ -433,17 +435,44 @@ class VowpalWabbitGridRanker[Co](
     get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
   ) {
     val docs = grid.docfact.document_statuses_to_documents(get_docstats())
+    val titles = mutable.Buffer[String]()
 
-    val title_training_data =
-      docs.map/*Metered(task)*/ { doc =>
-      val feats = featvec_factory.get_features(doc)
-      // It doesn't matter what we give as the correct cell here
-      (doc.title, (feats, 0))
-    }.toIndexedSeq
+    val feature_file =
+      if (cost_sensitive) {
+        val costs =
+          grid.iter_nonempty_cells.map { cell =>
+            (featvec_factory.lookup_cell(cell), 0.0)
+          }
 
-    val (titles, training_data) = title_training_data.unzip
+        val training_data =
+          docs.map/*Metered(task)*/ { doc =>
+          val feats = featvec_factory.get_features(doc)
+          titles += doc.title
+          // It doesn't matter what we give as the correct costs here
+          (feats, costs)
+        }
+
+        classifier.write_cost_sensitive_feature_file(training_data)
+      } else {
+        val training_data =
+          docs.map/*Metered(task)*/ { doc =>
+          val feats = featvec_factory.get_features(doc)
+          titles += doc.title
+          // It doesn't matter what we give as the correct cell here
+          (feats, 0)
+        }
+
+        classifier.write_feature_file(training_data.toIterator)
+      }
     val list_of_scores =
-      classifier(training_data.toIterator).map { label_scores =>
+      classifier(feature_file).map { raw_label_scores =>
+        // Raw scores for cost-sensitive appear to be costs, i.e.
+        // lower is better, so negate.
+        val label_scores =
+          if (cost_sensitive)
+            raw_label_scores.map { case (label, score) => (label, -score) }
+          else
+            raw_label_scores
         val scores = label_scores.sortWith(_._1 < _._1).map(_._2)
         assert(scores.size ==
           featvec_factory.featvec_factory.mapper.number_of_labels)

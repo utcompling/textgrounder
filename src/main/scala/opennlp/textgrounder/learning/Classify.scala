@@ -502,7 +502,9 @@ object Classify extends ExperimentApp("Classify") {
         }
 
       // Return results_insts_lines
-      val results = classifier(test_instances.toIterator)
+      val feats_filename =
+        classifier.write_feature_file(test_instances.toIterator)
+      val results = classifier(feats_filename)
       val insts_results_lines =
         for ((result, (inst, truelab)) <-
              results zip test_instances) yield {

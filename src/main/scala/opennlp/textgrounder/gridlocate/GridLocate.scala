@@ -639,7 +639,8 @@ trait GridLocateFeatureParameters {
     ap.option[String]("classifier", "cl",
       default = "tadm",
       choices = Seq("random", "oracle", "perceptron", "avg-perceptron",
-        "pa-perceptron", "cost-perceptron", "mlogit", "tadm", "vowpal-wabbit"),
+        "pa-perceptron", "cost-perceptron", "mlogit", "tadm", "vowpal-wabbit",
+        "cost-vowpal-wabbit"),
       help = """Type of classifier to use when '--ranker=classify'.
 Possibilities are:
 
@@ -665,9 +666,12 @@ Possibilities are:
 'mlogit' (use R's mlogit() function to implement a multinomial conditional
   logit aka label-specific maxent model, a type of generalized linear model);
 
-'tadm' (use TADM to implement a label-specific maxent model);
+'tadm' (use TADM to implement a label-specific maxent or other model);
 
-'vowpal-wabbit' (use VowpalWabbit to implement a maxent model).
+'vowpal-wabbit' (use VowpalWabbit to implement a maxent or other model);
+
+'cost-vowpal-wabbit' (use VowpalWabbit to implement a cost-sensitive maxent
+  or other model).
 
 Default is '%default'.
 
@@ -937,7 +941,7 @@ reranking. See `--interpolate`.""")
 }
 
 trait GridLocateOptimizerParameters {
-  this: GridLocateParameters =>
+  this: GridLocateParameters with GridLocateFeatureParameters =>
   var iterations =
     ap.option[Int]("iterations", "it",
       metavar = "INT",
@@ -1051,10 +1055,15 @@ marginal calculation in TADM.""")
   var vw_multiclass =
     ap.option[String]("vw-multiclass", "vm",
       default = "oaa",
-      choices = Seq("oaa", "ect"),
+      choices = Seq("oaa", "ect", "wap"),
       help = """In Vowpal Wabbit, how to reduce a multiclass problem to a
 set of binary problems: One of 'oaa' (one against all), 'ect' (error-correcting
-tournament).""")
+tournament -- only for plain 'vowpal-wabbit'), 'wap' (weighted all pairs --
+only for 'cost-vowpal-wabbit').""")
+  if (classifier == "vowpal-wabbit" && vw_multiclass == "wap")
+    ap.error("--vw-multiclass wap not possible with --classifier vowpal-wabbit")
+  else if (classifier == "cost-vowpal-wabbit" && vw_multiclass == "ect")
+    ap.error("--vw-multiclass ect not possible with --classifier cost-vowpal-wabbit")
 
   var vw_args =
     ap.option[String]("vw-args",
@@ -1926,7 +1935,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
     if (params.classifier == "vowpal-wabbit")
-      create_vowpal_wabbit_classifier_ranker(ranker_name, grid)
+      create_vowpal_wabbit_classifier_ranker(ranker_name, grid,
+        cost_sensitive = false)
+    else if (params.classifier == "cost-vowpal-wabbit")
+      create_vowpal_wabbit_classifier_ranker(ranker_name, grid,
+        cost_sensitive = true)
     else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
@@ -2014,7 +2027,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * treating each cell as a possible class.
    */
   def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
-      grid: Grid[Co]) = {
+      grid: Grid[Co], cost_sensitive: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
       output_skip_message = true)
@@ -2022,31 +2035,72 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     // val task = show_progress("processing features in", "document")
 
-    val training_data =
-      docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
-      val feats = featvec_factory.get_features(doc)
-      (feats, featvec_factory.lookup_cell(correct_cell))
-    }
+    val classifier =
+      if (cost_sensitive) {
+        val cells =
+          grid.iter_nonempty_cells.map { cell =>
+            (cell, featvec_factory.lookup_cell(cell))
+          }
 
-    // Create classifier trainer.
-    val trainer = new VowpalWabbitTrainer(
-      gaussian = params.gaussian_penalty,
-      lasso = params.lasso_penalty,
-      vw_loss_function = params.vw_loss_function,
-      vw_multiclass = params.vw_multiclass,
-      vw_args = params.vw_args)
+        val training_data =
+          docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
+          val feats = featvec_factory.get_features(doc)
+          val cells_costs = cells.map { case (cell, label) =>
+            (label,
+              // Uncomment to always use cost 0.0 for the correct cell
+              // instead of actual error distance.  Doesn't seem to make
+              // much difference.
+              // if (label == correct_cell) 0.0 else
+              doc.distance_to_coord(cell.get_central_point))
+          }
+          (feats, cells_costs)
+        }
 
-    // Train classifier.
-    //
-    // Write the feature file before computing the number of labels
-    // because the process of writing the feature file iterates through
-    // the input data and memoizes all the labels; only after that is
-    // the number of labels correct in the featvec factory's mapper.
-    val feats_filename = trainer.write_feature_file(training_data)
-    val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
-    val classifier = trainer(num_labels, feats_filename)
+        // Create classifier trainer.
+        val trainer = new VowpalWabbitCostSensitiveTrainer(
+          gaussian = params.gaussian_penalty,
+          lasso = params.lasso_penalty,
+          vw_loss_function = params.vw_loss_function,
+          vw_multiclass = params.vw_multiclass,
+          vw_args = params.vw_args)
+
+        // Train classifier.
+        val feats_filename =
+          trainer.write_cost_sensitive_feature_file(training_data)
+        assert(cells.size ==
+          featvec_factory.featvec_factory.mapper.number_of_labels)
+        trainer(cells.size, feats_filename)
+      } else {
+        val training_data =
+          docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
+          val feats = featvec_factory.get_features(doc)
+          (feats, featvec_factory.lookup_cell(correct_cell))
+        }
+
+        // Create classifier trainer.
+        val trainer = new VowpalWabbitTrainer(
+          gaussian = params.gaussian_penalty,
+          lasso = params.lasso_penalty,
+          vw_loss_function = params.vw_loss_function,
+          vw_multiclass = params.vw_multiclass,
+          vw_args = params.vw_args)
+
+        // Train classifier.
+        //
+        // Write the feature file before computing the number of labels
+        // because the process of writing the feature file iterates through
+        // the input data and memoizes all the labels; only after that is
+        // the number of labels correct in the featvec factory's mapper.
+        //
+        // FIXME: We could solve this simply by iterating through the
+        // non-empty cells and calling lookup_cell(), as we do anyway in the
+        // cost-sensitive version above.
+        val feats_filename = trainer.write_feature_file(training_data)
+        val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
+        trainer(num_labels, feats_filename)
+      }
     new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
-      featvec_factory)
+      featvec_factory, cost_sensitive = cost_sensitive)
   }
 
   /**
