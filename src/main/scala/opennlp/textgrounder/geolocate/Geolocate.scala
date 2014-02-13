@@ -775,21 +775,39 @@ object GeolocateDocumentTag extends
       ("salience-file", full("salience", filetail)),
       ("whitelist-file", full("whitelist", filetail)),
       ("eval-file", full("eval-file", filetail_seq)),
-      ("ranker", valonly),
+      ("ranker", x => x match {
+        case "full-kl-divergence" => "fullKL"
+        case "partial-kl-divergence" => "KL"
+        case "symmetric-full-kl-divergence" => "symFullKL"
+        case "symmetric-partial-kl-divergence" => "symKL"
+        case "partial-cosine-similarity" => "cossim"
+        case "full-cosine-similarity" => "fullCossim"
+        case "smoothed-partial-cosine-similarity" => "smoothedCossim"
+        case "smoothed-full-cosine-similarity" => "smoothedFullCossim"
+        case "sum-frequency" => "sumfreq"
+        case "naive-bayes" => "nbayes"
+        case "classifier" => "cfier"
+        case "average-cell-probability" => "acp"
+        case "num-documents" => "numdocs"
+        case y: String => y
+      }),
       ("lang-model", xs => xs match {
         case (x:String, y:String) => x + y
       }),
       ("interpolate", x => x match {
-        case "yes" => "interpolate"
+        case "yes" => "interp"
         case "no" => "backoff"
         case _ => ""
       }),
       ("tf-idf", default),
+      ("naive-bayes-prior-weight", short("nbpweight")),
+      ("naive-bayes-prior", full("nbprior")),
+      ("naive-bayes-features", full("nbfeats")),
       ("rerank", default),
       ("rerank-optimizer", valonly),
-      ("rerank-features", full("feats")),
-      ("rerank-binning", full("bin")),
-      ("rerank-top-n", short("top")),
+      ("rerank-features", full("rfeats")),
+      ("rerank-binning", full("rbin")),
+      ("rerank-top-n", short("rtop")),
       ("rerank-num-training-splits", short("nsplits")),
       ("rerank-initial-weights", full("initweights")),
       ("rerank-random-restart", short("random-restart")),
@@ -797,16 +815,16 @@ object GeolocateDocumentTag extends
         case (x:String, y:String) => "rerank-" + x + y
       }),
       ("rerank-interpolate", x => x match {
-        case "yes" => "rerank-interpolate"
-        case "no" => "rerank-backoff"
+        case "yes" => "rinterp"
+        case "no" => "rbackoff"
         case _ => ""
       }),
-      ("pa-cost-type", full("pa-cost")),
-      ("pa-variant", short("pa-var")),
-      ("perceptron-aggressiveness", short("perceptron-aggr")),
-      ("perceptron-error-threshold", short("perceptron-errthresh")),
-      ("perceptron-rounds", short("perceptron-rounds")),
-      ("perceptron-decay", short("perceptron-decay")),
+      ("pa-cost-type", full("pacost")),
+      ("pa-variant", short("pavar")),
+      ("perceptron-aggressiveness", short("paggr")),
+      ("perceptron-error-threshold", short("perrthresh")),
+      ("perceptron-rounds", short("prounds")),
+      ("perceptron-decay", short("pdecay")),
       ("degrees-per-cell", short("deg")),
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
@@ -814,7 +832,7 @@ object GeolocateDocumentTag extends
       ("kd-tree", default),
       ("kd-split-method", valonly),
       ("kd-backoff", default),
-      ("kd-bucket-size", short("bucketsize")),
+      ("kd-bucket-size", short("bucketsz")),
       ("kd-interpolate-weight", short("kd-interpweight")),
       ("combined-kd-grid", default),
       ("center-method", valonly),
@@ -827,7 +845,8 @@ object GeolocateDocumentTag extends
       ("verbose", omit),
       ("results", omit),
       ("no-parallel", omit),
-      ("print-results", omit)
+      ("print-results", omit),
+      ("rough-ranker-args", full("rrargs"))
     )
 
     // Map listing how to handle params.
