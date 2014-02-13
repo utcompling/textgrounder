@@ -66,6 +66,24 @@ if [ "$full_id" = yes ]; then
   tag="$id"
   outfile="$outprefix$tag"
 else
+  # Truncate length to no more than 233 - $outprefix length so that when
+  # we add the date and possible .1, .2 etc. we still come in at no more
+  # than 255 chars.
+  id=$(perl -e "my \$x = <<'FOO';
+$id
+FOO
+  chomp(\$x);
+  my \$pref = <<'FOO';
+$outprefix
+FOO
+  chomp(\$pref);
+  my \$preflen = length(\$pref);
+  if (length(\$x) > 233 - \$preflen) {
+    print(substr(\$x, 0, 230 - \$preflen) . '...');
+  } else {
+    print(\$x);
+  }
+")
   if [ "`uname`" = "Darwin" ]; then
     # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
     # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
