@@ -485,13 +485,21 @@ class VowpalWabbitGridRanker[Co](
       }
     val list_of_scores =
       classifier(feature_file).map { raw_label_scores =>
-        // Raw scores for cost-sensitive appear to be costs, i.e.
-        // lower is better, so negate.
         val label_scores =
-          if (cost_sensitive)
+          if (cost_sensitive) {
+            // Raw scores for cost-sensitive appear to be costs, i.e.
+            // lower is better, so negate.
             raw_label_scores.map { case (label, score) => (label, -score) }
-          else
-            raw_label_scores
+          } else {
+            // Convert to proper log-probs.
+            val indiv_probs = raw_label_scores map { case (label, score) =>
+              (label, 1/(1 + math.exp(-score)))
+            }
+            val norm_sum = indiv_probs.map(_._2).sum
+            indiv_probs map { case (label, prob) =>
+              (label, math.log(prob/norm_sum))
+            }
+          }
         val scores = label_scores.sortWith(_._1 < _._1).map(_._2)
         assert(scores.size ==
           featvec_factory.featvec_factory.mapper.number_of_labels)
