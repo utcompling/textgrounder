@@ -1080,12 +1080,19 @@ abstract class GridDoc[Co : TextSerializer](
     "%s%s%s".format(title, coordstr, corpusstr)
   }
 
-  def distance_to_coord(coord2: Co): Double
-
+  /**
+   * Return distance between two coordinates.
+   */
+  def distance_between_coords(c1: Co, c2: Co): Double
+  /**
+   * Format a coordinate for human-readable display.
+   */
   def format_coord(coord2: Co): String
-
   /**
    * Output a distance with attached units
    */
   def output_distance(dist: Double): String
+
+  def distance_to_coord(coord2: Co) = distance_between_coords(coord, coord2)
+  def distance_to_cell(cell: GridCell[Co]) = distance_to_coord(cell.get_central_point)
 }

@@ -781,14 +781,6 @@ class RankedDocEvalResult[Co](
   document, pred_cell.grid,
   pred_cell.get_central_point
 ) {
-  /**
-   * "True distance" (rather than e.g. degree distance) between document's
-   * coordinate and the coordinate that would be predicted if we picked a given
-   * cell as the correct one.
-   */
-  def pred_truedist_for_cell(cell: GridCell[Co]) =
-    document.distance_to_coord(cell.get_central_point)
-
   override def print_result(doctag: String) {
     super.print_result(doctag)
     errprint(s"$doctag:  correct cell at rank: $correct_rank")
@@ -903,8 +895,8 @@ class FullRankedDocEvalResult[Co](
           else if (other_rank contains cell) Seq(s"${other_rank(cell)}")
           else Seq("--")
         Seq(index) ++ other_rank_column ++ Seq(score,
-          min_format_double(pred_truedist_for_cell(cell)),
-          document.format_coord(cell.get_central_point),
+          min_format_double(document.distance_to_cell(cell)),
+          cell.format_coord(cell.get_central_point),
           pretty_long(cell.num_docs),
           //pretty_long(cell.grid_lm.num_types),
           //pretty_double(cell.grid_lm.num_tokens),
@@ -932,7 +924,7 @@ class FullRankedDocEvalResult[Co](
       val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map {
         case ((cell, score), i) => (cell, i + 1) }.toMap
       val closest_half_with_dists =
-        kNN.map(n => (n, pred_truedist_for_cell(n))).
+        kNN.map(n => (n, document.distance_to_cell(n))).
           toIndexedSeq.sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
 
       closest_half_with_dists.foreach {
@@ -1103,7 +1095,7 @@ class RankedDocEvalStats[Co](
         (minerrors, cell_score_pair) =>
           val (cell_at_rank, score) = cell_score_pair
           val newbest =
-            minerrors.last min rankres.pred_truedist_for_cell(cell_at_rank)
+            minerrors.last min rankres.document.distance_to_cell(cell_at_rank)
           minerrors :+ newbest
       }
     val num_pred_cells = rankres.pred_cells.size

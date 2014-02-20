@@ -132,7 +132,7 @@ abstract class GridCell[Co](
   /**
    * Format a coordinate into a string.
    */
-  def format_coord(coord: Co): String
+  def format_coord(coord: Co) = grid.format_coord(coord)
 
   /**
    * Return a string representation of the cell.  Generally does not need
@@ -308,6 +308,19 @@ abstract class Grid[Co](
    * Total number of cells in the grid.
    */
   var total_num_cells: Int
+
+  /**
+   * Return distance between two coordinates.
+   */
+  def distance_between_coords(c1: Co, c2: Co): Double
+  /**
+   * Format a coordinate for human-readable display.
+   */
+  def format_coord(coord2: Co): String
+  /**
+   * Output a distance with attached units
+   */
+  def output_distance(dist: Double): String
 
   /**
    * Find the correct cell for the given coordinate. If no such cell exists,

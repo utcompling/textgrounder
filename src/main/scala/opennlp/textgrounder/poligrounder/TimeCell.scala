@@ -62,8 +62,6 @@ class TimeCell(
 
   def format_indices =
     "%s/%s" format (format_time(from), format_interval(to - from))
-
-  def format_coord(coord: TimeCoord) = coord.format
 }
 
 /**
@@ -110,7 +108,7 @@ class TimeGrid(
   categories: Seq[String],
   category_of_doc: TimeDoc => String,
   override val docfact: TimeDocFactory
-) extends Grid[TimeCoord](docfact) {
+) extends Grid[TimeCoord](docfact) with TimeCoordMixin {
 
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))

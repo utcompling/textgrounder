@@ -69,7 +69,7 @@ class KdTreeGrid(
   splitMethod: KdTree.SplitMethod,
   useBackoff: Boolean,
   interpolateWeight: Double
-) extends SphereGrid(docfact) {
+) extends RealSphereGrid(docfact) {
   /**
    * Total number of cells in the grid.
    */

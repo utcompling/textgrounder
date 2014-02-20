@@ -1652,8 +1652,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               // candidate is often the "best available" but not necessarily
               // the "best possible".
               if (correct == predicted) 0.0
-              else inst.doc.distance_to_coord(
-                     inst.get_cell(predicted).get_central_point)
+              else inst.doc.distance_to_cell(inst.get_cell(predicted))
             }
         }
       case "mlogit" =>
@@ -2034,7 +2033,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   def vowpal_wabbit_cost_function(doc: GridDoc[Co], cell: GridCell[Co]) = {
-    val dist = doc.distance_to_coord(cell.get_central_point)
+    val dist = doc.distance_to_cell(cell)
     params.vw_cost_function match {
       case "dist" => dist
       case "sqrt-dist" => math.sqrt(dist)

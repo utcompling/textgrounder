@@ -22,21 +22,20 @@ package geolocate
 
 import util.spherical._
 
-import gridlocate.{GridCell,Grid}
+import gridlocate.{GridCell,Grid,GridDocFactory}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class RealSphereCell(
-  grid: SphereGrid
-) extends SphereCell(grid) {
-  def format_coord(coord: SphereCoord) = coord.format
+abstract class RealSphereGrid(
+  docfact: GridDocFactory[SphereCoord]
+) extends SphereGrid(docfact) with SphereCoordMixin {
 }
 
 abstract class KMLSphereCell(
   grid: SphereGrid
-) extends RealSphereCell(grid) {
+) extends SphereCell(grid) {
   /**
    * Generate KML for a single cell.
    */

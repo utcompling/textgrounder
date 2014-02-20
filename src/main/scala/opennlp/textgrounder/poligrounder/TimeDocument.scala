@@ -34,20 +34,9 @@ class TimeDoc(
   lang_model: DocLangModel,
   val coord: TimeCoord,
   val user: String
-) extends GridDoc[TimeCoord](schema, lang_model) {
+) extends GridDoc[TimeCoord](schema, lang_model) with TimeCoordMixin {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
-
-  def coord_as_double(coor: TimeCoord) = coor match {
-    case null => Double.NaN
-    case TimeCoord(x) => x.toDouble / 1000
-  }
-
-  def distance_to_coord(coord2: TimeCoord) = {
-    (coord_as_double(coord2) - coord_as_double(coord)).abs
-  }
-  def format_coord(coord2: TimeCoord) = coord2.format
-  def output_distance(dist: Double) = "%s seconds" format dist
 }
 
 /**

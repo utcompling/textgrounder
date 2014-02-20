@@ -30,7 +30,7 @@ import gridlocate.{GridDocFactory, DocStatus}
 
 class CombinedModelGrid(
   docfact: SphereDocFactory, models: Seq[SphereGrid]
-) extends SphereGrid(docfact) {
+) extends RealSphereGrid(docfact) {
 
   override var total_num_cells: Int = models.map(_.total_num_cells).sum
 

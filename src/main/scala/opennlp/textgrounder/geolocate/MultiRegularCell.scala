@@ -198,7 +198,7 @@ class MultiRegularGrid(
   val cell_offset_degrees: SphereCoord,
   val width_of_multi_cell: Int,
   docfact: SphereDocFactory
-) extends SphereGrid(docfact) {
+) extends RealSphereGrid(docfact) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
