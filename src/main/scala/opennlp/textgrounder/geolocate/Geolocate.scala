@@ -473,22 +473,27 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       lang_model_factory: DocLangModelFactory) =
     new SphereDocFactory(this, lang_model_factory)
 
-  protected def create_grid(docfact: GridDocFactory[SphereCoord]) = {
-    val sphere_docfact = docfact.asInstanceOf[SphereDocFactory]
+  protected def create_grid(create_docfact: => GridDocFactory[SphereCoord]) = {
+    def create_sphere_docfact =
+      create_docfact.asInstanceOf[SphereDocFactory]
     val cod = SphereCoord.deserialize(params.cell_offset_degrees)
     def create_multi_regular_grid = {
-      new MultiRegularGrid(params.degrees_per_cell,
-        cod,
-        params.width_of_multi_cell, sphere_docfact)
+      new MultiRegularGrid(params.degrees_per_cell, cod,
+        params.width_of_multi_cell, create_sphere_docfact)
     }
     def create_kd_tree_grid = {
-      KdTreeGrid(sphere_docfact, params.kd_bucket_size, params.kd_split_method,
-        params.kd_use_backoff, params.kd_interpolate_weight)
+      KdTreeGrid(create_sphere_docfact, params.kd_bucket_size,
+        params.kd_split_method, params.kd_use_backoff,
+        params.kd_interpolate_weight)
     }
     if (params.combined_kd_grid) {
       val kdcg = create_kd_tree_grid
       val mrcg = create_multi_regular_grid
-      new CombinedModelGrid(sphere_docfact, Seq(mrcg, kdcg))
+      // The top-level grid is used when smoothing test documents and such.
+      // Both lower-level grids should have the same smoothing info since
+      // we used the same documents to populate both, so pick one.
+      new CombinedModelGrid(mrcg.docfact.asInstanceOf[SphereDocFactory],
+        Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
       create_kd_tree_grid
     } else {

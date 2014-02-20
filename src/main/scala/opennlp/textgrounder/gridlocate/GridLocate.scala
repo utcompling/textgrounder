@@ -1366,9 +1366,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       lang_model_factory: DocLangModelFactory): GridDocFactory[Co]
 
   /**
-   * Create an empty cell grid (Grid) given a document factory.
+   * Create an empty cell grid (Grid) given a function to create a
+   * document factory (in case we need to create multiple such factories).
    */
-  protected def create_grid(docfact: GridDocFactory[Co]): Grid[Co]
+  protected def create_grid(create_docfact: => GridDocFactory[Co]): Grid[Co]
 
   /**
    * Read the raw training documents.  This uses the values of the parameters
@@ -1453,9 +1454,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         (scaled_word_weights, missing_word_weight)
       } else
         (mutable.Map[Gram,Double](), 0.0)
-    val lang_model_factory = create_doc_lang_model_factory(weights, mww)
-    val docfact = create_document_factory(lang_model_factory)
-    val grid = create_grid(docfact)
+    val grid = create_grid {
+      val lang_model_factory = create_doc_lang_model_factory(weights, mww)
+      create_document_factory(lang_model_factory)
+    }
+
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
     // to this in docfact.

@@ -183,8 +183,8 @@ class PoligrounderDriver extends
   protected def create_document_factory(lang_model_factory: DocLangModelFactory) =
     new TimeDocFactory(this, lang_model_factory)
 
-  protected def create_grid(docfact: GridDocFactory[TimeCoord]) = {
-    val time_docfact = docfact.asInstanceOf[TimeDocFactory]
+  protected def create_grid(create_docfact: => GridDocFactory[TimeCoord]) = {
+    val time_docfact = create_docfact.asInstanceOf[TimeDocFactory]
     if (params.ideological_user_corpus == null)
       new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", time_docfact)
     else
