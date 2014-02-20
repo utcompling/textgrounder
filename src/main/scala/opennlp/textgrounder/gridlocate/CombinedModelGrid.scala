@@ -17,32 +17,28 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package geolocate
+package gridlocate
 
-import util.spherical.spheredist
-import util.spherical.SphereCoord
 import util.experiment._
 import util.error.warning
 import util.print.errprint
 import util.textdb.Row
 
-import gridlocate.{GridDocFactory, DocStatus}
+abstract class CombinedModelGrid[Co](
+  docfact: GridDocFactory[Co],
+  val models: Iterable[Grid[Co]]
+) extends Grid[Co](docfact) {
 
-class CombinedModelGrid(
-  docfact: SphereDocFactory, models: Seq[SphereGrid]
-) extends RealSphereGrid(docfact) {
+  override var total_num_cells = models.map(_.total_num_cells).sum
 
-  override var total_num_cells: Int = models.map(_.total_num_cells).sum
-
-  def find_best_cell_for_coord(coord: SphereCoord,
-      create_non_recorded: Boolean) = {
+  def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean) = {
     val candidates =
       models.flatMap(_.find_best_cell_for_coord(coord, create_non_recorded))
-    if (candidates.length == 0)
+    if (candidates.size == 0)
       None
     else
       Some(candidates.minBy(
-        cell => spheredist(cell.get_central_point, coord)))
+        cell => cell.grid.distance_between_coords(cell.get_central_point, coord)))
   }
 
   def add_training_documents_to_grid(
@@ -74,8 +70,7 @@ class CombinedModelGrid(
     num_non_empty_cells = models.map(_.num_non_empty_cells).sum
   }
 
-  def iter_nonempty_cells: Iterable[SphereCell] =
-    models.flatMap(_.iter_nonempty_cells)
+  def iter_nonempty_cells = models.flatMap(_.iter_nonempty_cells)
 }
 
 

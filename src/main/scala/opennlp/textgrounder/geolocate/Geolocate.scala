@@ -492,7 +492,7 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       // The top-level grid is used when smoothing test documents and such.
       // Both lower-level grids should have the same smoothing info since
       // we used the same documents to populate both, so pick one.
-      new CombinedModelGrid(mrcg.docfact.asInstanceOf[SphereDocFactory],
+      new CombinedSphereGrid(mrcg.docfact.asInstanceOf[SphereDocFactory],
         Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
       create_kd_tree_grid
