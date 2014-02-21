@@ -52,10 +52,10 @@ class KdTreeCell(
 }
 
 object KdTreeGrid {
-  def apply(docfact: SphereDocFactory, bucketSize: Int,
+  def apply(docfact: SphereDocFactory, id: String, bucketSize: Int,
             splitMethod: String, useBackoff: Boolean,
             interpolateWeight: Double = 0.0) : KdTreeGrid = {
-    new KdTreeGrid(docfact, bucketSize, splitMethod match {
+    new KdTreeGrid(docfact, id, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
       case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
@@ -65,11 +65,14 @@ object KdTreeGrid {
 
 class KdTreeGrid(
   docfact: SphereDocFactory,
+  id: String,
   bucketSize: Int,
   splitMethod: KdTree.SplitMethod,
   useBackoff: Boolean,
   interpolateWeight: Double
-) extends RealSphereGrid(docfact) {
+) extends RealSphereGrid(docfact, id) {
+  def short_type = "kd"
+
   /**
    * Total number of cells in the grid.
    */
@@ -136,7 +139,6 @@ class KdTreeGrid(
    */
   def initialize_cells() {
     total_num_cells = kdtree.getLeaves.size
-    num_non_empty_cells = total_num_cells
 
     // need to finish generating all the language models
     for (c <- nodes_to_cell.valuesIterator) {

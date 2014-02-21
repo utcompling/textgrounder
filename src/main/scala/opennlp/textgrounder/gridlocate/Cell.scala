@@ -300,14 +300,22 @@ abstract class GridCell[Co](
  *     `iter_nonempty_cells`.
  */
 abstract class Grid[Co](
-    val docfact: GridDocFactory[Co]
+    val docfact: GridDocFactory[Co],
+    val id: String
 ) {
   def driver = docfact.driver
 
   /**
+   * Short string identifying type of grid
+   */
+  def short_type: String
+
+  def id_str = s"$id.$short_type"
+
+  /**
    * Total number of cells in the grid.
    */
-  var total_num_cells: Int
+  def total_num_cells: Int
 
   /**
    * Return distance between two coordinates.
@@ -400,7 +408,7 @@ abstract class Grid[Co](
   /* Set once finish() is called. */
   var all_cells_computed = false
   /* Number of non-empty cells. */
-  var num_non_empty_cells = 0
+  var num_nonempty_cells = 0
 
   /**
    * Iterate over all non-empty cells, making sure to include the given cells
@@ -446,13 +454,17 @@ abstract class Grid[Co](
         note_globally = true,
         finish_globally = false
       ) map { stat =>
-        stat foreach_all {(_, _) => docfact.record_training_document_in_factory(stat)}
+        stat foreach_all { (_, _) =>
+          docfact.record_training_document_in_factory(stat)
+        }
         stat
       }
 
     val docs = docfact.document_statuses_to_documents(docstats)
     docs foreach { doc => add_document_to_grid(doc) }
+  }
 
+  protected def finish_document_factory() {
     // Compute overall backoff statistics.
     if (driver.params.verbose)
       errprint("Finishing global backoff stats...")
@@ -461,13 +473,13 @@ abstract class Grid[Co](
   }
 
   /**
-   * This function is called externally to initialize the cells when all
-   * documents have been added.  It is a wrapper around `initialize_cells()`,
-   * which is not meant to be called externally.  Normally this does not
-   * need to be overridden.
+   * This function is called externally when all documents have been added.
+   * It finishes initializing the document factory (which compute global
+   * backoff statistics for the added documents) and initialize the cells.
    */
   def finish_adding_documents() {
     assert(!all_cells_computed)
+    finish_document_factory()
     initialize_cells()
     all_cells_computed = true
     driver.heartbeat
@@ -479,25 +491,27 @@ abstract class Grid[Co](
    */
   def finish() {
     assert(all_cells_computed)
-    total_prior_weighting = iter_nonempty_cells.map { _.prior_weighting }.sum
+    val nonempty_cells = iter_nonempty_cells
+    num_nonempty_cells = nonempty_cells.size
+    total_prior_weighting = nonempty_cells.map { _.prior_weighting }.sum
 
-    driver.note_result("number-of-non-empty-cells", num_non_empty_cells,
+    driver.note_result("number-of-non-empty-cells", num_nonempty_cells,
       "Number of non-empty cells")
     driver.note_result("total-number-of-cells", total_num_cells,
       "Total number of cells")
-    val pct_non_empty = num_non_empty_cells.toDouble / total_num_cells * 100
-    driver.note_result("percent-non-empty-cells", pct_non_empty,
+    val pct_nonempty = num_nonempty_cells.toDouble / total_num_cells * 100
+    driver.note_result("percent-non-empty-cells", pct_nonempty,
       "Percent non-empty cells")
     val training_docs_with_coordinates =
       docfact.num_training_documents_with_coordinates_by_split("training").value
-    val training_docs_per_non_empty_cell =
-      training_docs_with_coordinates.toDouble / num_non_empty_cells
+    val training_docs_per_nonempty_cell =
+      training_docs_with_coordinates.toDouble / num_nonempty_cells
     driver.note_result("training-documents-per-non-empty-cell",
-      training_docs_per_non_empty_cell,
+      training_docs_per_nonempty_cell,
       "Training documents per non-emtpy cell")
     errprint(
-      "%d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
-      total_num_cells, num_non_empty_cells, pct_non_empty,
-      pretty_double(training_docs_per_non_empty_cell))
+      "%s: %d cells, %d (%.2f%%) non-empty, %s training docs/non-empty cell",
+      id_str, total_num_cells, num_nonempty_cells, pct_nonempty,
+      pretty_double(training_docs_per_nonempty_cell))
   }
 }

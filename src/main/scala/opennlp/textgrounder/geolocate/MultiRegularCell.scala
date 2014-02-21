@@ -197,8 +197,10 @@ class MultiRegularGrid(
   val degrees_per_cell: Double,
   val cell_offset_degrees: SphereCoord,
   val width_of_multi_cell: Int,
-  docfact: SphereDocFactory
-) extends RealSphereGrid(docfact) {
+  docfact: SphereDocFactory,
+  id: String
+) extends RealSphereGrid(docfact, id) {
+  def short_type = "mreg"
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -441,7 +443,6 @@ class MultiRegularGrid(
       case _ => {
         val newcell = new MultiRegularCell(this, index)
         if (record_created_cell) {
-          num_non_empty_cells += 1
           corner_to_multi_cell(index) = newcell
         }
         Some(newcell)

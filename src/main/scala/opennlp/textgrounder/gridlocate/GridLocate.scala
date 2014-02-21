@@ -141,9 +141,16 @@ Wikipedia article, etc.).
 Multiple such files can be given by specifying the option multiple
 times.""")
 
+  var train =
+    ap.multiPositional[String]("train",
+      help = """One or more training corpora. A separate grid is created for
+each corpus, and test documents are evaluated against all cells in all grids.
+This allows, for example, a given corpus to be clustered into sub-corpora,
+or even for multiple such clusterings to be given.""")
+
   if (ap.parsedValues) {
-    if (input.length == 0)
-      ap.error("Must specify input file(s) using --input")
+    if (input.length == 0 && train.length == 0)
+      ap.error("Must specify input file(s) using --input or positional params")
   }
 }
 
@@ -1240,17 +1247,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     filehand.openr(filename).toSet
   }
 
-  protected def read_stopwords() = {
+  protected def read_stopwords = {
     read_stopwords_from_file(get_file_handler, params.stopwords_file,
       params.language)
   }
 
   lazy protected val the_stopwords = {
     if (params.no_stopwords) Set[String]()
-    else read_stopwords()
+    else read_stopwords
   }
 
-  protected def read_whitelist() = {
+  protected def read_whitelist = {
     val filehand = get_file_handler
     val wfn = params.whitelist_file
     if(wfn == null || wfn.length == 0)
@@ -1259,7 +1266,46 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       filehand.openr(wfn).toSet
   }
 
-  lazy protected val the_whitelist = read_whitelist()
+  lazy protected val the_whitelist = read_whitelist
+
+  protected def read_weights_file = {
+    if (params.weights_file != null) {
+      val word_weights = mutable.Map[Gram,Double]()
+      if (params.verbose)
+        errprint("Reading word weights...")
+      for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
+        val word = row.gets("word")
+        val weight = row.get[Double]("weight")
+        val wordint = Unigram.to_index(word)
+        if (word_weights contains wordint)
+          warning("Word %s with weight %s already seen with weight %s",
+            word, weight, word_weights(wordint))
+        else if (weight < 0)
+          warning("Word %s with invalid negative weight %s",
+            word, weight)
+        else if (weight >= params.ignore_weights_below)
+          word_weights(wordint) = weight
+      }
+      // Scale the word weights to have an average of 1.
+      val values = word_weights.values
+      val avg = values.sum / values.size
+      assert(avg > 0, "Must have at least one non-ignored non-zero weight")
+      val scaled_word_weights = word_weights map {
+        case (word, weight) => (word, weight / avg)
+      }
+      val missing_word_weight =
+        if (params.missing_word_weight >= 0)
+          params.missing_word_weight / avg
+        else
+          1.0
+      if (params.verbose)
+        errprint("Reading word weights... done.")
+      (scaled_word_weights, missing_word_weight)
+    } else
+      (mutable.Map[Gram,Double](), 0.0)
+  }
+
+  lazy val the_weights = read_weights_file
 
   /** Return a function that will create a LangModelBuilder object,
    * given a LangModelFactory.
@@ -1366,43 +1412,79 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       lang_model_factory: DocLangModelFactory): GridDocFactory[Co]
 
   /**
+   * Create a document factory (GridDocFactory) from command-line parameters.
+   */
+  def create_document_factory_from_params = {
+    val (weights, mww) = the_weights
+    val lang_model_factory = create_doc_lang_model_factory(weights, mww)
+    create_document_factory(lang_model_factory)
+  }
+
+  /**
    * Create an empty cell grid (Grid) given a function to create a
    * document factory (in case we need to create multiple such factories).
    */
-  protected def create_grid(create_docfact: => GridDocFactory[Co]): Grid[Co]
+  protected def create_empty_grid(create_docfact: => GridDocFactory[Co],
+    id: String): Grid[Co]
 
   /**
-   * Read the raw training documents.  This uses the values of the parameters
+   * Read the raw training documents as a series of streams. Each stream is
+   * used to generate a separate grid. This uses the values of the parameters
    * to determine where to read the documents from and how many documents to
-   * read.  A "raw document" is simply an encapsulation of the fields used
-   * to create a document (as read directly from the corpus), along with the
+   * read.  A "raw document" is simply an encapsulation of the fields used to
+   * create a document (as read directly from the corpus), along with the
    * schema describing the fields.
    *
-   * @param docfact Document factory used to create documents.
-   * @param operation Name of logical operation, to be displayed in progress
-   *   messages.
-   * @return Iterator over raw documents.
+   * @return Iterable over pairs of an ID identifying the stream and a
+   *   function to generate an iterator over the raw documents. The function
+   *   takes a single argument, a string identifying the name of the logical
+   *   operation that is processing the corpus documents, to be displayed in
+   *   progress messages as the documents are read and processed. An example
+   *   operation might simply be "reading", which will produce the fuller
+   *   operation string "reading training documents", but it can also contain
+   *   a %s, e.g. "reading %s for generating classifier training data", in
+   *   which case the string "training documents" will be interpolated at
+   *   this point. The reason that a function is returned rather than an
+   *   Iterator directly is that some callers may need to process a given
+   *   set of raw training documents multiple times.
    */
-  def read_raw_training_documents(operation: String):
-      Iterator[DocStatus[Row]] = {
-    val task = show_progress(operation, "training document",
-        maxtime = params.max_time_per_stage,
-        maxitems = params.num_training_docs)
-    val dociter = params.input.toIterator.flatMapMetered(task) { dir =>
-        GridDocFactory.read_raw_documents_from_textdb(get_file_handler,
-          dir, "-training", with_messages = params.verbose)
-    }
-    for (doc <- dociter) yield {
-      val sleep_at = debugval("sleep-at-docs")
-      if (sleep_at != "") {
-        if (task.num_processed == sleep_at.toInt) {
-          errprint("Reached %s documents, sleeping...")
-          Thread.sleep(5000)
-        }
+  def read_raw_training_document_streams:
+      Iterable[(String, String => Iterator[DocStatus[Row]])] = {
+    (params.input ++ params.train).zipWithIndex.map {
+      case (dir, index) => {
+        val id = s"#${index + 1}"
+        (id, (operation: String) => {
+          val task = show_progress(s"$id $operation",
+            "training document",
+            maxtime = params.max_time_per_stage,
+            maxitems = params.num_training_docs)
+          val docs = GridDocFactory.read_raw_documents_from_textdb(
+            get_file_handler, dir, "-training", with_messages = params.verbose)
+          val sleep_at = debugval("sleep-at-docs")
+          docs.mapMetered(task) { doc =>
+            if (sleep_at != "" && task.num_processed == sleep_at.toInt) {
+              errprint("Reached %s documents, sleeping...")
+              Thread.sleep(5000)
+            }
+            doc
+          }
+        })
       }
-      doc
     }
   }
+
+  /**
+   * Read raw training documents as a combined iterator over all corpora.
+   *
+   * @param operation String identifying the name of the logical operation
+   *   that is processing the documents, to be displayed in progress
+   *   messages as the documents are read and processed. See
+   *   `read_raw_training_document_streams` above.
+   * @return Iterator over raw training documents.
+   */
+  def read_combined_raw_training_documents(operation: String) =
+    read_raw_training_document_streams.map(_._2).toIterator.flatMap(get_docs =>
+      get_docs(operation))
 
   /**
    * Create a cell grid that's populated with the specified training data.
@@ -1417,47 +1499,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   the grid cells.)
    */
   def create_grid_from_documents(
+      id: String,
       get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
-    val (weights, mww) =
-      if (params.weights_file != null) {
-        val word_weights = mutable.Map[Gram,Double]()
-        if (params.verbose)
-          errprint("Reading word weights...")
-        for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
-          val word = row.gets("word")
-          val weight = row.get[Double]("weight")
-          val wordint = Unigram.to_index(word)
-          if (word_weights contains wordint)
-            warning("Word %s with weight %s already seen with weight %s",
-              word, weight, word_weights(wordint))
-          else if (weight < 0)
-            warning("Word %s with invalid negative weight %s",
-              word, weight)
-          else if (weight >= params.ignore_weights_below)
-            word_weights(wordint) = weight
-        }
-        // Scale the word weights to have an average of 1.
-        val values = word_weights.values
-        val avg = values.sum / values.size
-        assert(avg > 0, "Must have at least one non-ignored non-zero weight")
-        val scaled_word_weights = word_weights map {
-          case (word, weight) => (word, weight / avg)
-        }
-        val missing_word_weight =
-          if (params.missing_word_weight >= 0)
-            params.missing_word_weight / avg
-          else
-            1.0
-        if (params.verbose)
-          errprint("Reading word weights... done.")
-        (scaled_word_weights, missing_word_weight)
-      } else
-        (mutable.Map[Gram,Double](), 0.0)
-    val grid = create_grid {
-      val lang_model_factory = create_doc_lang_model_factory(weights, mww)
-      create_document_factory(lang_model_factory)
-    }
+    val grid = create_empty_grid(create_document_factory_from_params, id)
 
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
@@ -1502,8 +1547,43 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   /**
    * Create a cell grid that's populated with training data, as read from
    * the corpus (or corpora) specified in the command-line parameters.
+   * If there are multiple input corpora, this will be a combined grid
+   * combining sub-grids for each input corpus.
    */
-  def initialize_grid = create_grid_from_documents(read_raw_training_documents)
+  def create_grid_from_document_streams(
+    streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
+  ) = {
+    if (streams.size == 1) {
+      val (id, get_rawdocs) = streams.head
+      create_grid_from_documents(id, get_rawdocs)
+    } else {
+      val grids = streams.map { case (id, get_rawdocs) =>
+        create_grid_from_documents(id, get_rawdocs)
+      }
+      val combined =
+        create_combined_grid(create_document_factory_from_params, "all", grids)
+      // We need to do this to get combined backoff stats for the test docs.
+      streams.foreach { case (id, get_rawdocs) =>
+        combined.add_training_documents_to_grid(get_rawdocs)
+      }
+      combined.finish_adding_documents()
+      combined.finish()
+      combined
+    }
+  }
+
+  def create_combined_grid(docfact: GridDocFactory[Co],
+    id: String, grids: Iterable[Grid[Co]]
+  ): InitializedCombinedGrid[Co]
+
+  /**
+   * Create a cell grid that's populated with training data, as read from
+   * the corpus (or corpora) specified in the command-line parameters.
+   * If there are multiple input corpora, this will be a combined grid
+   * combining sub-grids for each input corpus.
+   */
+  def initialize_grid =
+    create_grid_from_document_streams(read_raw_training_document_streams)
 
   /**
    * Create a ranker object corresponding to the given name. A ranker object
@@ -1779,7 +1859,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_ranker: GridRanker[Co] = {
     /* The basic ranker object. */
     def basic_ranker =
-      create_ranker_from_documents(read_raw_training_documents)
+      create_ranker_from_document_streams(read_raw_training_document_streams)
     if (params.reranker == "none") basic_ranker
     else if (params.reranker == "random") {
       val reranker = new RandomReranker(basic_ranker, params.rerank_top_n)
@@ -1892,7 +1972,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         /* Create the initial ranker from training data. */
         protected def create_initial_ranker(
           data: Iterable[DocStatus[Row]]
-        ) = create_ranker_from_documents(_ => data.toIterator)
+        ) = create_ranker_from_document_streams(Iterable(("rerank",
+          _ => data.toIterator)))
 
         /* Convert encapsulated raw documents into document-cell pairs.
          */
@@ -1909,7 +1990,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
      * wrapped in a DocStatus object). */
     val training_data = new Iterable[DocStatus[Row]] {
       def iterator =
-        read_raw_training_documents(
+        read_combined_raw_training_documents(
           "reading %s for generating reranker training data")
     }.view
     /* Train the reranker. */
@@ -1918,7 +1999,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   def get_docs_cells(grid: Grid[Co]) = {
     // Read the raw training documents.
-    val raw_training_docs = read_raw_training_documents(
+    val raw_training_docs = read_combined_raw_training_documents(
        "reading %s for generating classifier training data")
 
     get_docs_cells_from_raw_documents(grid, raw_training_docs)
@@ -2124,13 +2205,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   /**
    * Create a grid populated from the specified training documents
-   * (`create_grid_from_documents`), then create a ranker object that
+   * (`create_grid_from_document_streams`), then create a ranker object that
    * references this grid.
    */
-  def create_ranker_from_documents(
-    get_rawdocs: String => Iterator[DocStatus[Row]]
+  def create_ranker_from_document_streams(
+    streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
   ) = {
-    val grid = create_grid_from_documents(get_rawdocs)
+    val grid = create_grid_from_document_streams(streams)
     create_named_ranker(params.ranker, grid)
   }
 

@@ -473,16 +473,19 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       lang_model_factory: DocLangModelFactory) =
     new SphereDocFactory(this, lang_model_factory)
 
-  protected def create_grid(create_docfact: => GridDocFactory[SphereCoord]) = {
+  protected def create_empty_grid(
+      create_docfact: => GridDocFactory[SphereCoord],
+      id: String
+  ) = {
     def create_sphere_docfact =
       create_docfact.asInstanceOf[SphereDocFactory]
     val cod = SphereCoord.deserialize(params.cell_offset_degrees)
     def create_multi_regular_grid = {
       new MultiRegularGrid(params.degrees_per_cell, cod,
-        params.width_of_multi_cell, create_sphere_docfact)
+        params.width_of_multi_cell, create_sphere_docfact, id)
     }
     def create_kd_tree_grid = {
-      KdTreeGrid(create_sphere_docfact, params.kd_bucket_size,
+      KdTreeGrid(create_sphere_docfact, id, params.kd_bucket_size,
         params.kd_split_method, params.kd_use_backoff,
         params.kd_interpolate_weight)
     }
@@ -492,14 +495,19 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       // The top-level grid is used when smoothing test documents and such.
       // Both lower-level grids should have the same smoothing info since
       // we used the same documents to populate both, so pick one.
-      new CombinedSphereGrid(mrcg.docfact.asInstanceOf[SphereDocFactory],
-        Seq(mrcg, kdcg))
+      new UninitializedCombinedSphereGrid(mrcg.docfact.
+        asInstanceOf[SphereDocFactory], id, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
       create_kd_tree_grid
     } else {
       create_multi_regular_grid
     }
   }
+
+  def create_combined_grid(docfact: GridDocFactory[SphereCoord],
+      id: String, grids: Iterable[SphereGrid]) =
+    new InitializedCombinedSphereGrid(
+      docfact.asInstanceOf[SphereDocFactory], id, grids)
 
   protected def create_rough_ranker(args: Array[String]) = {
     val arg_parser = new ArgParser("RoughRanker")

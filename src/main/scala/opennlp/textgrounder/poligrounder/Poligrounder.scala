@@ -183,10 +183,13 @@ class PoligrounderDriver extends
   protected def create_document_factory(lang_model_factory: DocLangModelFactory) =
     new TimeDocFactory(this, lang_model_factory)
 
-  protected def create_grid(create_docfact: => GridDocFactory[TimeCoord]) = {
+  protected def create_empty_grid(
+      create_docfact: => GridDocFactory[TimeCoord],
+      id: String
+  ) = {
     val time_docfact = create_docfact.asInstanceOf[TimeDocFactory]
     if (params.ideological_user_corpus == null)
-      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", time_docfact)
+      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", time_docfact, id)
     else
       new TimeGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
         x => {
@@ -196,8 +199,12 @@ class PoligrounderDriver extends
             "conservative"
           else
             null
-        }, time_docfact)
+        }, time_docfact, id)
   }
+
+  // FIXME!
+  def create_combined_grid(docfact: GridDocFactory[TimeCoord],
+      id: String, grids: Iterable[Grid[TimeCoord]]) = ???
 
   // FIXME!
   def create_rough_ranker(args: Array[String]) = ???

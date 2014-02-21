@@ -241,7 +241,7 @@ class MoransDriver extends
         //println(wordMoransSum_Neighbors(thing._1))
         //println(wordMoransSum_Denom(thing._1))
         bw.write( thing._1 + "|" + wordMap_lookupMap._2(thing._1) + "|" + wordMap_lookupMap._3(thing._1) + "|" + wordMoransMap(thing._1) + String.format("%n"))
-        //println((grid.num_non_empty_cells).toDouble)
+        //println((grid.num_nonempty_cells).toDouble)
       }
     }
     bw.close()

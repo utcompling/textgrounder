@@ -107,8 +107,10 @@ class TimeGrid(
   after_chunk: (Long, Long),
   categories: Seq[String],
   category_of_doc: TimeDoc => String,
-  override val docfact: TimeDocFactory
-) extends Grid[TimeCoord](docfact) with TimeCoordMixin {
+  override val docfact: TimeDocFactory,
+  id: String
+) extends Grid[TimeCoord](docfact, id) with TimeCoordMixin {
+  def short_type = "time"
 
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))
@@ -164,12 +166,6 @@ class TimeGrid(
       val pair = pairs(category)
       pair.before_cell.finish()
       pair.after_cell.finish()
-      /* FIXME!!!  Computation of num_non_empty_cells should happen
-         automatically!  */
-      if (!pair.before_cell.is_empty)
-        num_non_empty_cells += 1
-      if (!pair.after_cell.is_empty)
-        num_non_empty_cells += 1
       for ((cell, name) <-
           Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
         errprint("Number of documents in %s-chunk: %s", name,

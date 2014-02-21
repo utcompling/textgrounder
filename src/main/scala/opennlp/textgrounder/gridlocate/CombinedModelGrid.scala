@@ -24,16 +24,22 @@ import util.error.warning
 import util.print.errprint
 import util.textdb.Row
 
-abstract class CombinedModelGrid[Co](
+/**
+ * A combined grid composed of sub-grids, with the cells of the grid consisting
+ * of the union of all cells of all the sub-grids.
+ */
+abstract class CombinedGrid[Co](
   docfact: GridDocFactory[Co],
-  val models: Iterable[Grid[Co]]
-) extends Grid[Co](docfact) {
+  id: String,
+  val grids: Iterable[Grid[Co]]
+) extends Grid[Co](docfact, id) {
+  def short_type = "comb"
 
-  override var total_num_cells = models.map(_.total_num_cells).sum
+  def total_num_cells = grids.map(_.total_num_cells).sum
 
   def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean) = {
     val candidates =
-      models.flatMap(_.find_best_cell_for_coord(coord, create_non_recorded))
+      grids.flatMap(_.find_best_cell_for_coord(coord, create_non_recorded))
     if (candidates.size == 0)
       None
     else
@@ -41,36 +47,68 @@ abstract class CombinedModelGrid[Co](
         cell => cell.grid.distance_between_coords(cell.get_central_point, coord)))
   }
 
+  protected def initialize_cells() { }
+
+  def iter_nonempty_cells = grids.flatMap(_.iter_nonempty_cells)
+}
+
+/**
+ * A combined grid which is created before the sub-grids are initialized
+ * with documents, so that the same documents are used to initialize the
+ * cells of each sub-grid. The document factory should be the same as
+ * one of the sub-grid's document factories -- this is possible because
+ * all sub-grids have the same documents in them.
+ */
+abstract class UninitializedCombinedGrid[Co](
+  docfact: GridDocFactory[Co],
+  id: String,
+  grids: Iterable[Grid[Co]]
+) extends CombinedGrid[Co](docfact, id, grids) {
+
   def add_training_documents_to_grid(
       get_rawdocs: String => Iterator[DocStatus[Row]]) {
-    // FIXME! This is broken because it ends up trying to compute the
-    // smoothing statistics multiple times (each time it iterates over the
-    // documents). We need to do this only once (probably after populating
-    // the grid). In reality we need to separate out the code that handles
-    // smoothing and other global mods.
-    for (model <- models)
-      model.add_training_documents_to_grid(get_rawdocs)
+    for (grid <- grids) grid.add_training_documents_to_grid(get_rawdocs)
   }
 
-  protected def initialize_cells() {
-    // Should never be called because we override finish().
-    assert(false)
-  }
+  // We don't want this to do anything because we assume that our document
+  // factory is the same as that of one of the sub-grids: See above.
+  override protected def finish_document_factory() { }
 
   override def finish_adding_documents() {
-    for (model <- models) {
-      model.finish_adding_documents()
-    }
+    for (grid <- grids) grid.finish_adding_documents()
+    super.finish_adding_documents()
   }
 
   override def finish() {
-    for (model <- models) {
-      model.finish()
-    }
-    num_non_empty_cells = models.map(_.num_non_empty_cells).sum
+    for (grid <- grids) grid.finish()
+    super.finish()
   }
-
-  def iter_nonempty_cells = models.flatMap(_.iter_nonempty_cells)
 }
 
+/**
+ * A combined grid which is created after the sub-grids are initialized
+ * with documents. The functions to initialize the grid should never be
+ * called, so they're stubbed out.
+ */
+abstract class InitializedCombinedGrid[Co](
+  docfact: GridDocFactory[Co],
+  id: String,
+  grids: Iterable[Grid[Co]]
+) extends CombinedGrid[Co](docfact, id, grids) {
 
+  for (grid <- grids) assert(grid.all_cells_computed)
+
+  def add_training_documents_to_grid(
+    get_rawdocs: String => Iterator[DocStatus[Row]]
+  ) {
+    // We need to process the documents again to compute combined global
+    // backoff stats for the test documents that we read in. (The alternative
+    // of trying to directly combine the backoff stats of the individual
+    // sub-grids is messier to implement.)
+    docfact.raw_documents_to_documents(
+      get_rawdocs("reading %s for combined global backoff stats"),
+      note_globally = true,
+      finish_globally = false
+    ).foreach { doc => () }
+  }
+}

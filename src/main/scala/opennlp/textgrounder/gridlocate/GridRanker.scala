@@ -53,7 +53,7 @@ abstract class GridRanker[Co](
   val grid: Grid[Co]
 ) extends Ranker[GridDoc[Co], GridCell[Co]] {
   /** Optional initialization stage passing one or more times over the
-   * data. */
+   * test data. */
   def initialize(
     get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
   ) { }

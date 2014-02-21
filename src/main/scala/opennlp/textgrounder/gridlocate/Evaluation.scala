@@ -876,7 +876,7 @@ class FullRankedDocEvalResult[Co](
     val other_rank_heading =
       if (other_rank_header != "") Seq(other_rank_header) else Seq()
     val predicted_headings = Seq(rank_header) ++ other_rank_heading ++ Seq(
-      "score", "dist(km)", "central-pt", "#doc",
+      "score", "dist(km)", "central-pt", "grid", "#doc",
       //"#type", "#token",
       "sal.")
     val predicted_cell_data =
@@ -897,6 +897,7 @@ class FullRankedDocEvalResult[Co](
         Seq(index) ++ other_rank_column ++ Seq(score,
           min_format_double(document.distance_to_cell(cell)),
           cell.format_coord(cell.get_central_point),
+          cell.grid.id_str,
           pretty_long(cell.num_docs),
           //pretty_long(cell.grid_lm.num_types),
           //pretty_double(cell.grid_lm.num_tokens),

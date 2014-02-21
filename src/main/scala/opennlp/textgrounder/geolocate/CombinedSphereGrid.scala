@@ -21,9 +21,14 @@ package geolocate
 
 import util.spherical.SphereCoord
 
-import gridlocate.CombinedModelGrid
+import gridlocate.{UninitializedCombinedGrid,InitializedCombinedGrid}
 
-class CombinedSphereGrid(
-  docfact: SphereDocFactory, models: Iterable[SphereGrid]
-) extends CombinedModelGrid[SphereCoord](docfact, models
+class UninitializedCombinedSphereGrid(
+  docfact: SphereDocFactory, id: String, models: Iterable[SphereGrid]
+) extends UninitializedCombinedGrid[SphereCoord](docfact, id, models
+) with SphereCoordMixin { }
+
+class InitializedCombinedSphereGrid(
+  docfact: SphereDocFactory, id: String, models: Iterable[SphereGrid]
+) extends InitializedCombinedGrid[SphereCoord](docfact, id, models
 ) with SphereCoordMixin { }
