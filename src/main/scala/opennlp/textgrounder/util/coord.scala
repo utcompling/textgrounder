@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  CombinedModelGrid.scala
+//  coord.scala
 //
-//  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
+//  Copyright (C) 2014 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -17,18 +17,22 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder
-package geolocate
+package util
+package coord
 
-import util.spherical.SphereCoord
-
-import gridlocate.{UninitializedCombinedGrid,InitializedCombinedGrid}
-
-class UninitializedCombinedSphereGrid(
-  docfact: SphereDocFactory, id: String, models: Iterable[SphereGrid]
-) extends UninitializedCombinedGrid[SphereCoord](docfact, id, models
-) with SphereCoordMixin { }
-
-class InitializedCombinedSphereGrid(
-  docfact: SphereDocFactory, id: String, models: Iterable[SphereGrid]
-) extends InitializedCombinedGrid[SphereCoord](docfact, id, models
-) with SphereCoordMixin { }
+/** A type class for auxiliary functions related to a coordinate type. */
+@annotation.implicitNotFound(msg = "No implicit CoordHandler defined for ${Co}.")
+trait CoordHandler[Co] {
+  /**
+   * Return distance between two coordinates.
+   */
+  def distance_between_coords(c1: Co, c2: Co): Double
+  /**
+   * Format a coordinate for human-readable display.
+   */
+  def format_coord(coord2: Co): String
+  /**
+   * Output a distance with attached units
+   */
+  def output_distance(dist: Double): String
+}

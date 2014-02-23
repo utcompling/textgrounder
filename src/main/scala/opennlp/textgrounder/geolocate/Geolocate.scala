@@ -495,19 +495,13 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       // The top-level grid is used when smoothing test documents and such.
       // Both lower-level grids should have the same smoothing info since
       // we used the same documents to populate both, so pick one.
-      new UninitializedCombinedSphereGrid(mrcg.docfact.
-        asInstanceOf[SphereDocFactory], id, Seq(mrcg, kdcg))
+      new UninitializedCombinedGrid(mrcg.docfact, id, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
       create_kd_tree_grid
     } else {
       create_multi_regular_grid
     }
   }
-
-  def create_combined_grid(docfact: GridDocFactory[SphereCoord],
-      id: String, grids: Iterable[SphereGrid]) =
-    new InitializedCombinedSphereGrid(
-      docfact.asInstanceOf[SphereDocFactory], id, grids)
 
   protected def create_rough_ranker(args: Array[String]) = {
     val arg_parser = new ArgParser("RoughRanker")

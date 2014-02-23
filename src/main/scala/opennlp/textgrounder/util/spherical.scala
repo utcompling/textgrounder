@@ -21,9 +21,9 @@ package util
 
 import scala.math._
 
-
 import net.liftweb
 
+import coord.CoordHandler
 import error.warning
 import math.MeanShift
 import serialize.TextSerializer
@@ -248,6 +248,13 @@ protected class SphericalPackage {
     def bounding_box_ne(points: Iterable[SphereCoord]) =
       SphereCoord(points.map(_.lat).max, points.map(_.long).max)
 
+  }
+
+  implicit object SphereCoordHandler extends CoordHandler[SphereCoord] {
+    def format_coord(coord: SphereCoord) = coord.format
+    def distance_between_coords(c1: SphereCoord, c2: SphereCoord) =
+      spheredist(c1, c2)
+    def output_distance(dist: Double) = km_and_miles(dist)
   }
 
   // Compute spherical distance in km (along a great circle) between two

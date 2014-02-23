@@ -25,7 +25,6 @@ import util.spherical._
 import util.textdb.{Row, Schema}
 import util.print._
 import util.time._
-import util.serialize.TextSerializer._
 
 import gridlocate._
 
@@ -34,7 +33,7 @@ class TimeDoc(
   lang_model: DocLangModel,
   val coord: TimeCoord,
   val user: String
-) extends GridDoc[TimeCoord](schema, lang_model) with TimeCoordMixin {
+) extends GridDoc[TimeCoord](schema, lang_model) {
   def has_coord = coord != null
   def title = if (coord != null) coord.toString else "unknown time"
 }

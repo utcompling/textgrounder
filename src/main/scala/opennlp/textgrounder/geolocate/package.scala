@@ -42,13 +42,6 @@ package geolocate {
      */
     val pred_degdist = degree_dist(stats.document.coord, stats.pred_coord)
   }
-
-  trait SphereCoordMixin {
-    def format_coord(coord: SphereCoord) = coord.format
-    def distance_between_coords(c1: SphereCoord, c2: SphereCoord) =
-      spheredist(c1, c2)
-    def output_distance(dist: Double) = km_and_miles(dist)
-  }
 }
 
 package object geolocate {
