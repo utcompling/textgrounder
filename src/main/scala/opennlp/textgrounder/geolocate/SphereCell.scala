@@ -31,7 +31,7 @@ import gridlocate.{GridCell,Grid,GridDocFactory}
 abstract class RealSphereGrid(
   docfact: GridDocFactory[SphereCoord],
   id: String
-) extends SphereGrid(docfact, id) with SphereCoordMixin {
+) extends SphereGrid(docfact, id) {
 }
 
 abstract class KMLSphereCell(

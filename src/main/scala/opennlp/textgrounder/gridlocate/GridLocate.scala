@@ -1573,8 +1573,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   def create_combined_grid(docfact: GridDocFactory[Co],
-    id: String, grids: Iterable[Grid[Co]]
-  ): InitializedCombinedGrid[Co]
+      id: String, grids: Iterable[Grid[Co]]) =
+    new InitializedCombinedGrid(docfact, id, grids)
 
   /**
    * Create a cell grid that's populated with training data, as read from

@@ -320,15 +320,20 @@ abstract class Grid[Co](
   /**
    * Return distance between two coordinates.
    */
-  def distance_between_coords(c1: Co, c2: Co): Double
+  def distance_between_coords(c1: Co, c2: Co) =
+    docfact.coord_handler.distance_between_coords(c1, c2)
+
   /**
    * Format a coordinate for human-readable display.
    */
-  def format_coord(coord2: Co): String
+  def format_coord(coord2: Co) =
+    docfact.coord_handler.format_coord(coord2)
+
   /**
    * Output a distance with attached units
    */
-  def output_distance(dist: Double): String
+  def output_distance(dist: Double) =
+    docfact.coord_handler.output_distance(dist)
 
   /**
    * Find the correct cell for the given coordinate. If no such cell exists,

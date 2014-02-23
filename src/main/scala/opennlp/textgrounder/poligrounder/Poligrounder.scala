@@ -203,10 +203,6 @@ class PoligrounderDriver extends
   }
 
   // FIXME!
-  def create_combined_grid(docfact: GridDocFactory[TimeCoord],
-      id: String, grids: Iterable[Grid[TimeCoord]]) = ???
-
-  // FIXME!
   def create_rough_ranker(args: Array[String]) = ???
 
   def run() {

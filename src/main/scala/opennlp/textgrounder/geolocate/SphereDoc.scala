@@ -24,7 +24,6 @@ import collection.mutable
 import util.spherical._
 import util.textdb.{Row, Schema}
 import util.error.warning_once
-import util.serialize.TextSerializer._
 
 import gridlocate._
 
@@ -33,7 +32,7 @@ abstract class RealSphereDoc(
   lang_model: DocLangModel,
   val coord: SphereCoord,
   override val salience: Option[Double]
-) extends GridDoc[SphereCoord](schema, lang_model) with SphereCoordMixin {
+) extends GridDoc[SphereCoord](schema, lang_model) {
   def has_coord = coord != null
 }
 

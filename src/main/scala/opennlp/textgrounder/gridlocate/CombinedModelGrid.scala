@@ -59,7 +59,7 @@ abstract class CombinedGrid[Co](
  * one of the sub-grid's document factories -- this is possible because
  * all sub-grids have the same documents in them.
  */
-abstract class UninitializedCombinedGrid[Co](
+class UninitializedCombinedGrid[Co](
   docfact: GridDocFactory[Co],
   id: String,
   grids: Iterable[Grid[Co]]
@@ -90,7 +90,7 @@ abstract class UninitializedCombinedGrid[Co](
  * with documents. The functions to initialize the grid should never be
  * called, so they're stubbed out.
  */
-abstract class InitializedCombinedGrid[Co](
+class InitializedCombinedGrid[Co](
   docfact: GridDocFactory[Co],
   id: String,
   grids: Iterable[Grid[Co]]

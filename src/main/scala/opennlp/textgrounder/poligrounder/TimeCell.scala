@@ -109,7 +109,7 @@ class TimeGrid(
   category_of_doc: TimeDoc => String,
   override val docfact: TimeDocFactory,
   id: String
-) extends Grid[TimeCoord](docfact, id) with TimeCoordMixin {
+) extends Grid[TimeCoord](docfact, id) {
   def short_type = "time"
 
   val pairs = categories.map {

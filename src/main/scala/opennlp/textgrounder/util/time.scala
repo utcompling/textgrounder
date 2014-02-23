@@ -19,6 +19,7 @@
 package opennlp.textgrounder
 package util
 
+import coord.CoordHandler
 import error.internal_error
 import serialize.TextSerializer
 import string.split_with_delim
@@ -234,6 +235,20 @@ protected class TimePackage {
   implicit object TimeCoord extends TextSerializer[TimeCoord] {
     def deserialize(foo: String) = TimeCoord(foo.toLong)
     def serialize(foo: TimeCoord) = "%s".format(foo.millis)
+  }
+
+  implicit object TimeCoordHandler extends CoordHandler[TimeCoord] {
+    def coord_as_double(coor: TimeCoord) = coor match {
+      case null => Double.NaN
+      case TimeCoord(x) => x.toDouble / 1000
+    }
+
+    def format_coord(coord: TimeCoord) = coord.format
+
+    def distance_between_coords(c1: TimeCoord, c2: TimeCoord) =
+      (coord_as_double(c2) - coord_as_double(c1)).abs
+
+    def output_distance(dist: Double) = "%s seconds" format dist
   }
 }
 

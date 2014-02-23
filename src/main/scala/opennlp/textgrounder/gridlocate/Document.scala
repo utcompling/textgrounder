@@ -26,6 +26,7 @@ import scala.util.control.Breaks._
 import java.io._
 
 import util.collection._
+import util.coord.CoordHandler
 import util.textdb._
 import util.textdb.TextDB._
 import util.spherical._
@@ -396,7 +397,7 @@ class DocLangModelFactory(
  * Factory for creating documents and maintaining statistics and certain
  * other info about them.
  */
-abstract class GridDocFactory[Co : TextSerializer](
+abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
   val driver: GridLocateDriver[Co],
   val lang_model_factory: DocLangModelFactory
 ) {
@@ -460,6 +461,8 @@ abstract class GridDocFactory[Co : TextSerializer](
     */
   val word_tokens_of_training_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_training_documents_with_coordinates_by_split")
+
+  def coord_handler = implicitly[CoordHandler[Co]]
 
   /**
    * Create, initialize and return a document from the given raw row.
@@ -995,7 +998,7 @@ case class DocValidationException(
  * @param lang_model_factory
  * @param lang_model Object containing language model of this document.
  */
-abstract class GridDoc[Co : TextSerializer](
+abstract class GridDoc[Co : TextSerializer : CoordHandler](
   val schema: Schema,
   val lang_model: DocLangModel
 ) {
@@ -1080,18 +1083,25 @@ abstract class GridDoc[Co : TextSerializer](
     "%s%s%s".format(title, coordstr, corpusstr)
   }
 
+  def coord_handler = implicitly[CoordHandler[Co]]
+
   /**
    * Return distance between two coordinates.
    */
-  def distance_between_coords(c1: Co, c2: Co): Double
+  def distance_between_coords(c1: Co, c2: Co) =
+    coord_handler.distance_between_coords(c1, c2)
+
   /**
    * Format a coordinate for human-readable display.
    */
-  def format_coord(coord2: Co): String
+  def format_coord(coord2: Co) =
+    coord_handler.format_coord(coord2)
+
   /**
    * Output a distance with attached units
    */
-  def output_distance(dist: Double): String
+  def output_distance(dist: Double) =
+    coord_handler.output_distance(dist)
 
   def distance_to_coord(coord2: Co) = distance_between_coords(coord, coord2)
   def distance_to_cell(cell: GridCell[Co]) = distance_to_coord(cell.get_central_point)
