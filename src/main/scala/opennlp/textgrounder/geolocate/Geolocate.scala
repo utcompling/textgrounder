@@ -354,30 +354,29 @@ uniform grid cell models?""")
 
   var eval_format =
     ap.option[String]("f", "eval-format",
-      default = "internal",
+      default = "textdb",
       must = Must({ x: String => x != "raw-text" },
         // FIXME!!
         "Raw-text reading not implemented yet"),
-      choices = Seq("internal", "raw-text" //, "pcl-travel"
+      choices = Seq("textdb", "raw-text" //, "pcl-travel"
       ),
       help = """Format of evaluation file(s).  The evaluation files themselves
 are specified using --eval-file.  The following formats are
 recognized:
 
-'internal' is the normal format.  It means to consider documents to be
-documents to evaluate, and to use the development or test set specified
-in the document file as the set of documents to evaluate.  There is
-no eval file for this format.
+'textdb' is the default and specifies that the evaluation files are one or more
+textdb corpora, as for the training data. In this case, '--eval-file' can be
+omitted, defaulting to the same location(s) as for the training data; see
+'--eval-file' for more information.
 
 'raw-text' assumes that the eval file is simply raw text.  (NOT YET
 IMPLEMENTED.)
 """)
 
-  if (eval_format == "internal") {
-    if (eval_file.length > 0)
-      ap.error("--eval-file should not be given when --eval-format=internal")
-  } else if (eval_file.length == 0)
-    ap.error("Must specify evaluation file(s) using --eval-file")
+  if (ap.parsedValues) {
+    if (eval_format != "textdb" && eval_file.size == 0)
+      ap.error("Must specify evaluation file(s) using --eval-file")
+  }
 
 //'pcl-travel' is another alternative.  It assumes that each evaluation file
 //is in PCL-Travel XML format, and uses each chapter in the evaluation
@@ -596,9 +595,15 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 //                get_file_handler, params.eval_file)
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
-          case "internal" => {
+          case "textdb" => {
+            val eval_location =
+              if (params.eval_file.size == 0)
+                params.input ++ params.train
+              else
+                params.eval_file
+
             val get_docstats = () =>
-              params.input.toIterator.flatMap(dir =>
+              eval_location.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
                   get_file_handler, dir, document_textdb_suffix))
             val evalobj = create_cell_evaluator(ranker)

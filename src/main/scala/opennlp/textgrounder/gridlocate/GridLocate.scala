@@ -107,14 +107,24 @@ Two- and three-letter ISO-639 codes can be used.  Currently recognized:
 English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   //// Input files
+
   var input =
-    ap.multiOption[String]("i", "input", "ic", "input-corpus",
-      metavar = "FILE",
-      help = """Input corpus, a textdb database (a type of flat-file
-database, with separate schema and data files). The value can be any of
-the following: Either the data or schema file of the database; the common
-prefix of the two; or the directory containing them, provided there is
-only one textdb in the directory.
+    ap.multiOption[String]("input", "i", "input-corpus", "ic",
+      help = """One or more training corpora. The corpora are in the format
+of a textdb database (a type of flat-file database, with separate schema and
+data files). A corpus can be specified in any of the following ways:
+Either the data or schema file of the database; the common prefix of the
+two; or the directory containing them, provided there is only one textdb
+in the directory.
+
+Training corpora can be specified either using '--input' (which may be
+repeated multiple times to specify multiple corpora) or as positional
+parameters after all options, or a combination of both.
+
+A separate grid is created for each corpus, and test documents are evaluated
+against all cells in all grids.  This allows, for example, a given corpus to
+be clustered into sub-corpora, each listed as a separate corpus -- or even
+for multiple such clusterings to be given.
 
 Documents in the corpus can be Wikipedia articles, individual tweets
 in Twitter, the set of all tweets for a given user, etc.  The corpus
@@ -136,21 +146,15 @@ names (e.g. "title", "split", "text", "coord") have pre-defined
 meanings, but arbitrary names are allowed, so that additional
 corpus-specific information can be provided (e.g. retweet info for
 tweets that were retweeted from some other tweet, article ID for a
-Wikipedia article, etc.).
-
-Multiple such files can be given by specifying the option multiple
-times.""")
+Wikipedia article, etc.).""")
 
   var train =
     ap.multiPositional[String]("train",
-      help = """One or more training corpora. A separate grid is created for
-each corpus, and test documents are evaluated against all cells in all grids.
-This allows, for example, a given corpus to be clustered into sub-corpora,
-or even for multiple such clusterings to be given.""")
+      help = """One or more training corpora. See '--input'.""")
 
   if (ap.parsedValues) {
-    if (input.length == 0 && train.length == 0)
-      ap.error("Must specify input file(s) using --input or positional params")
+    if (input.size + train.size == 0)
+      ap.error("Must specify a training corpus")
   }
 }
 
@@ -458,10 +462,17 @@ set). Default '%default'.""")
       metavar = "FILE",
       help = """File or directory containing files to evaluate on.
 Multiple such files/directories can be given by specifying the option multiple
-times.  If a directory is given, all files in the directory will be
+times. If a directory is given, all files in the directory will be
 considered (but if an error occurs upon parsing a file, it will be ignored).
-Each file is read in and then disambiguation is performed.  Not used during
-document geolocation when --eval-format=internal (the default).""")
+Each file is read in and then geolocation is performed.
+
+If --eval-format=textdb (the default), this option can be omitted, in which
+case it defaults to the same locations as are specified for the training
+corpus or corpora. This does not mean that evaluation will happen on the
+training set, because generally a textdb corpus used for geolocation has
+separate slices for training, devel and test (identified by suffixes in the
+base name of the corpus). The particular slice used for evaluation is
+specified using '--eval-set'.""")
 
   //// Eval output options
   var results =

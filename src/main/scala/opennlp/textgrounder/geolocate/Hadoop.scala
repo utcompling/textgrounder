@@ -171,7 +171,7 @@ trait HadoopGeolocateTextDBMixin extends HadoopTextDBMixin {
   val driver: TDriver
 
   def corpus_suffix = driver.document_textdb_suffix
-  def corpus_dirs = driver.params.input
+  def corpus_dirs = driver.params.input ++ driver.params.train
 }
 
 abstract class HadoopGeolocateApp(
@@ -245,11 +245,11 @@ class DocEvalMapper
 
   override def run(context: TContext) {
     super.init(context)
-    if (driver.params.eval_format != "internal")
+    if (driver.params.eval_format != "textdb")
       driver.params.parser.error(
-        "For Hadoop, '--eval-format' must be 'internal'")
+        "For Hadoop, '--eval-format' must be 'textdb'")
     else {
-      if (driver.params.input.length != 1) {
+      if (corpus_dirs.size != 1) {
         driver.params.parser.error(
           "FIXME: For Hadoop, currently need exactly one corpus")
       }
@@ -257,7 +257,7 @@ class DocEvalMapper
     val ranker = driver.create_ranker
     context.progress
     val schema = Schema.read_schema_from_textdb(filehand,
-      corpus_dirs(0), suffix_re = corpus_suffix)
+      corpus_dirs.head, suffix_re = corpus_suffix)
     context.progress
 
     class HadoopIterator extends Iterator[(FileHandler, String, String, Long)] {
