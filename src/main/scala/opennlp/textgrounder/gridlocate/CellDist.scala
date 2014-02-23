@@ -47,13 +47,14 @@ class CellDist[Co](
    * Return a ranked list of all the cells. We may need to add the
    * specified correct cell to the list. See `Ranker.evaluate`.
    */
-  def get_ranked_cells(correct: GridCell[Co], include_correct: Boolean) = {
+  def get_ranked_cells(correct: Option[GridCell[Co]],
+      include_correct: Boolean) = {
     val probs =
       if (!include_correct)
         cellprobs
       else
         // Elements on right override those on left
-        Map(correct -> 0.0) ++ cellprobs.toMap
+        Map(correct.get -> 0.0) ++ cellprobs.toMap
     // sort by second element of tuple, in reverse order
     probs.toIndexedSeq sortWith (_._2 > _._2)
   }

@@ -60,7 +60,7 @@ class GridReranker[Co](
 
   def rerank_candidates(item: GridDoc[Co],
       initial_ranking: Iterable[(GridCell[Co], Double)],
-      correct: GridCell[Co]) =
+      correct: Option[GridCell[Co]]) =
     wrapped.rerank_candidates(item, initial_ranking, correct)
 }
 

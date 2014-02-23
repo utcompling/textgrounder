@@ -47,7 +47,7 @@ import util.collection.is_reverse_sorted
  */
 trait Ranker[Query, Candidate] {
   /** Implementation of `evaluate`, to be provided by subclasses. */
-  def imp_evaluate(item: Query, correct: Candidate,
+  def imp_evaluate(item: Query, correct: Option[Candidate],
       include_correct: Boolean):
     Iterable[(Candidate, Double)]
 
@@ -56,7 +56,7 @@ trait Ranker[Query, Candidate] {
    * worst, with a score for each.  The score must not increase from any
    * candidate to the next one.
    *
-   * @param correct Correct candidate, for oracles, etc.
+   * @param correct Correct candidate (if known), for oracles, etc.
    * @param include_correct If true, the correct candidate must be included
    *   in the returned list, ranked as if it were just any other candidate.
    *   FIXME: Why is this necessary? I think the reason the correct candidate
@@ -65,7 +65,7 @@ trait Ranker[Query, Candidate] {
    *   initial ranking. (FIXME: But we skip training items where the cell is
    *   empty, in external_instances_to_query_candidate_pairs() ...)
    */
-  final def evaluate(item: Query, correct: Candidate,
+  final def evaluate(item: Query, correct: Option[Candidate],
       include_correct: Boolean) = {
     val scored_cands = imp_evaluate(item, correct, include_correct)
     assert(is_reverse_sorted(scored_cands.map(_._2)),

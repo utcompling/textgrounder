@@ -41,6 +41,28 @@ import util.debug._
 //                 General statistics on evaluation results                //
 /////////////////////////////////////////////////////////////////////////////
 
+/**
+ * A general trait holding SphereDoc-specific code for storing the
+ * result of evaluation on a document.  Here we simply compute the
+ * true and predicted "degree distances" -- i.e. measured in degrees,
+ * rather than in actual distance along a great circle.
+ */
+class SphereCorrectCellInfo(
+  cci: CorrectCellInfo[SphereCoord]
+) {
+  /**
+   * Distance in degrees between document's coordinate and central
+   * point of correct cell
+   */
+  val correct_degdist = degree_dist(cci.res.document.coord,
+    cci.correct_central_point)
+  /**
+   * Distance in degrees between doc's coordinate and predicted
+   * coordinate
+   */
+  val pred_degdist = degree_dist(cci.res.document.coord, cci.res.pred_coord)
+}
+
 //////// Statistics for geolocating documents
 
 /**
@@ -64,8 +86,8 @@ class SphereDocEvalStats(
 
   override def record_result(res: DocEvalResult[SphereCoord]) {
     wrapped.record_result(res)
-    degree_dists += res.pred_degdist
-    oracle_degree_dists += res.correct_degdist
+    degree_dists += res.correct.get.pred_degdist
+    oracle_degree_dists += res.correct.get.correct_degdist
   }
 
   val output_result_with_units: Double => String =
@@ -81,8 +103,10 @@ class SphereDocEvalStats(
 
   override def output_results() {
     wrapped.output_result_header()
-    wrapped.output_correct_results()
-    output_incorrect_results()
+    if (wrapped.total_instances > 0) {
+      wrapped.output_correct_results()
+      output_incorrect_results()
+    }
     wrapped.output_other_stats()
   }
 }
@@ -91,6 +115,9 @@ class SphereDocEvalStats(
  * SphereDoc version of `GroupedDocEvalStats`.  This keeps separate
  * sets of statistics for different subgroups of the test documents, i.e.
  * those within particular ranges of one or more quantities of interest.
+ *
+ * NOTE: DocEvalStats and subclasses are never invoked when the correct
+ * cell is unknown.
  */
 class GroupedSphereDocEvalStats(
   grid: SphereGrid,
@@ -127,8 +154,10 @@ class GroupedSphereDocEvalStats(
            to increments of 0.25 (see above). */
         /* True distance (in both km and degrees) as a fraction of
            cell size */
-        val frac_correct_truedist = res.correct_truedist / multigrid.km_per_cell
-        val frac_correct_degdist = res.correct_degdist / multigrid.degrees_per_cell
+        val frac_correct_truedist =
+          res.correct.get.correct_truedist / multigrid.km_per_cell
+        val frac_correct_degdist =
+          res.correct.get.correct_degdist / multigrid.degrees_per_cell
         /* Round the fractional distances to multiples of
            dist_fraction_increment */
         val fracinc = dist_fraction_increment
@@ -136,10 +165,10 @@ class GroupedSphereDocEvalStats(
           fracinc * floor(frac_correct_degdist / fracinc)
         val rounded_frac_correct_degdist =
           fracinc * floor(frac_correct_degdist / fracinc)
-        docs_by_true_dist_to_correct_central_point(rounded_frac_correct_truedist).
-          record_result(res)
-        docs_by_degree_dist_to_correct_central_point(rounded_frac_correct_degdist).
-          record_result(res)
+        docs_by_true_dist_to_correct_central_point(
+          rounded_frac_correct_truedist).record_result(res)
+        docs_by_degree_dist_to_correct_central_point(
+          rounded_frac_correct_degdist).record_result(res)
 
         /* For distance to central point of predicted cell, which may be large,
            since predicted cell may be nowhere near the correct cell.  Again we
@@ -147,21 +176,23 @@ class GroupedSphereDocEvalStats(
            listed in dist_fractions_for_error_dist (see above). */
         /* Predicted distance (in both km and degrees) as a fraction of
            cell size */
-        val frac_pred_truedist = res.pred_truedist / multigrid.km_per_cell
-        val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
-        docs_by_true_dist_to_pred_central_point.get_collector(frac_pred_truedist).
-          record_result(res)
-        docs_by_degree_dist_to_pred_central_point.get_collector(frac_pred_degdist).
-          record_result(res)
+        val frac_pred_truedist =
+          res.correct.get.pred_truedist / multigrid.km_per_cell
+        val frac_pred_degdist =
+          res.correct.get.pred_degdist / multigrid.degrees_per_cell
+        docs_by_true_dist_to_pred_central_point.
+          get_collector(frac_pred_truedist).record_result(res)
+        docs_by_degree_dist_to_pred_central_point.
+          get_collector(frac_pred_degdist).record_result(res)
        }
 
       case kdgrid: KdTreeGrid => {
         // for kd trees, we do something similar to above,
         // but round to the nearest km...
-        docs_by_true_dist_to_correct_central_point(round(res.correct_truedist)).
-          record_result(res)
-        docs_by_degree_dist_to_correct_central_point(round(res.correct_degdist)).
-          record_result(res)
+        docs_by_true_dist_to_correct_central_point(round(
+          res.correct.get.correct_truedist)).record_result(res)
+        docs_by_degree_dist_to_correct_central_point(round(
+          res.correct.get.correct_degdist)).record_result(res)
       }
     }
   }
@@ -223,7 +254,7 @@ class RankedSphereGridEvaluator(
   ranker, evalstats
 ) {
   override def imp_evaluate_document(document: GridDoc[SphereCoord],
-      correct_cell: GridCell[SphereCoord]) = {
+      correct_cell: Option[GridCell[SphereCoord]]) = {
     val result = super.imp_evaluate_document(document, correct_cell)
     result.right.map { res =>
       new RankedSphereDocEvalResult(
@@ -245,7 +276,7 @@ class RankedSphereDocEvalResult(
     if (debug("gridrank") ||
         (debuglist("gridrank") contains doctag.drop(1))) {
       val grsize = debugint("gridranksize", GeolocateConstants.gridranksize)
-      wrapped.correct_cell match {
+      wrapped.correct.get.correct_cell match {
         case multireg: MultiRegularCell =>
           multireg.grid.
             output_ranking_grid(
