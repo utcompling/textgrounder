@@ -127,7 +127,7 @@ class CellDistMostCommonToponymSphereGridRanker(
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
   val cdist_factory = new CellDistFactory[SphereCoord]
 
-  def return_ranked_cells(doc: SphereDoc, correct: SphereCell,
+  def return_ranked_cells(doc: SphereDoc, correct: Option[SphereCell],
       include_correct: Boolean) = {
     val lang_model = Unigram.check_unigram_lang_model(doc.grid_lm)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory
@@ -153,7 +153,7 @@ class SalienceMostCommonToponymSphereGridRanker(
   ranker_name: String,
   sphere_grid: SphereGrid
 ) extends SphereGridRanker(ranker_name, sphere_grid) {
-  def return_ranked_cells(doc: SphereDoc, correct: SphereCell,
+  def return_ranked_cells(doc: SphereDoc, correct: Option[SphereCell],
       include_correct: Boolean) = {
     val lang_model = Unigram.check_unigram_lang_model(doc.grid_lm)
     val wikipedia_fact = get_sphere_docfact(sphere_grid).wikipedia_subfactory

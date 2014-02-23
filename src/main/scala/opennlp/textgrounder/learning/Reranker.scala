@@ -81,10 +81,10 @@ trait Reranker[Query, Candidate]
    * `gridlocate` (`GridReranker`).
    */
   def rerank_candidates(item: Query,
-    initial_ranking: Iterable[(Candidate, Double)], correct: Candidate
+    initial_ranking: Iterable[(Candidate, Double)], correct: Option[Candidate]
   ): Iterable[(Candidate, Double)]
 
-  def evaluate_with_initial_ranking(item: Query, correct: Candidate,
+  def evaluate_with_initial_ranking(item: Query, correct: Option[Candidate],
       include_correct: Boolean) = {
     // Do initial ranking.
     val initial_ranking = initial_ranker.evaluate(item, correct,
@@ -105,7 +105,7 @@ trait Reranker[Query, Candidate]
     (initial_ranking, reranking)
   }
 
-  override def imp_evaluate(item: Query, correct: Candidate,
+  override def imp_evaluate(item: Query, correct: Option[Candidate],
       include_correct: Boolean) = {
     val (initial_ranking, reranking) =
       evaluate_with_initial_ranking(item, correct, include_correct)
@@ -125,7 +125,8 @@ class RandomReranker[Query, Candidate](
    * for each candidate.
    */
   def rerank_candidates(item: Query,
-      scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
+      scored_candidates: Iterable[(Candidate, Double)],
+      correct: Option[Candidate]) = {
     (new Random()).shuffle(scored_candidates)
   }
 }
@@ -187,7 +188,8 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
    * for each candidate.
    */
   def rerank_candidates(item: Query,
-      scored_candidates: Iterable[(Candidate, Double)], correct: Candidate) = {
+      scored_candidates: Iterable[(Candidate, Double)],
+      correct: Option[Candidate]) = {
     // For each candidate, compute a feature vector.
     val featvecs =
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
@@ -195,7 +197,10 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
     // Combine into an aggregate feature vector.
     val agg = AggregateFeatureVector(featvecs.toArray)
     if (write_test_data_file != None) {
-      find_label(scored_candidates, correct).map { label =>
+      // FIXME: Is this correct?
+      require(correct != None,
+        "Can't write test data file with unknown correct label")
+      find_label(scored_candidates, correct.get).map { label =>
         TrainingData.export_aggregate_to_file(write_test_data_file.get,
           agg, label)
       }
@@ -509,7 +514,7 @@ trait PointwiseClassifyingRerankerTrainer[
     query: Query, correct: Candidate, initial_ranker: Ranker[Query, Candidate]
   ): QueryTrainingInst = {
     val initial_candidates =
-      initial_ranker.evaluate(query, correct, include_correct = true)
+      initial_ranker.evaluate(query, Some(correct), include_correct = true)
     val top_candidates = initial_candidates.take(top_n)
     val cand_scores =
       if (top_candidates.find(_._1 == correct) != None)

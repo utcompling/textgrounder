@@ -289,7 +289,11 @@ class DocEvalMapper
     val evalobj = driver.create_cell_evaluator(ranker)
     for (result <- evalobj.evaluate_documents(get_docstats)) {
       context.write(new Text(ranker.ranker_name),
-        new DoubleWritable(result.pred_truedist))
+        // FIXME! This will crash if we try to use Hadoop when the
+        // document's correct coord is unknown. Either do something sensible
+        // or issue an error up front when incompatible combination of
+        // parameters is detected.
+        new DoubleWritable(result.correct.get.pred_truedist))
     }
   }
 }

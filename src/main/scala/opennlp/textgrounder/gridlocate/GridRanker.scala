@@ -78,11 +78,11 @@ abstract class SimpleGridRanker[Co](
    * included in the list.  Higher scores are better.  The results should
    * be in sorted order, with better cells earlier.
    */
-  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean):
     Iterable[(GridCell[Co], Double)]
 
-  def imp_evaluate(item: GridDoc[Co], correct: GridCell[Co],
+  def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) =
     return_ranked_cells(item, correct, include_correct)
 }
@@ -136,7 +136,7 @@ class RandomGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
     val shuffled = (new Random()).shuffle(cells)
@@ -155,7 +155,7 @@ class MostPopularGridRanker[Co] (
   grid: Grid[Co],
   salience: Boolean
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
     (for (cell <- cells) yield {
@@ -185,8 +185,8 @@ abstract class PointwiseScoreGridRanker[Co](
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_serially(doc: GridDoc[Co], correct: GridCell[Co],
-      include_correct: Boolean) = {
+  def return_ranked_cells_serially(doc: GridDoc[Co],
+      correct: Option[GridCell[Co]], include_correct: Boolean) = {
     for (cell <- grid.iter_nonempty_cells_including(correct, include_correct))
         yield {
       if (debug("ranking")) {
@@ -204,13 +204,13 @@ abstract class PointwiseScoreGridRanker[Co](
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells_parallel(doc: GridDoc[Co], correct: GridCell[Co],
-      include_correct: Boolean) = {
+  def return_ranked_cells_parallel(doc: GridDoc[Co],
+      correct: Option[GridCell[Co]], include_correct: Boolean) = {
     val cells = grid.iter_nonempty_cells_including(correct, include_correct)
     cells.par.map(c => (c, score_cell(doc, c)))
   }
 
-  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
     val parallel = !grid.driver.params.no_parallel
     val cell_buf = {
@@ -275,7 +275,7 @@ class KLDivergenceGridRanker[Co](
   }
 
   override def return_ranked_cells(doc: GridDoc[Co],
-      correct: GridCell[Co], include_correct: Boolean) = {
+      correct: Option[GridCell[Co]], include_correct: Boolean) = {
     val lang_model = doc.grid_lm
     // This will be used by `score_cell` above.
     self_kl_cache = lang_model.get_kl_divergence_cache()
@@ -522,7 +522,7 @@ class AverageCellProbabilityGridRanker[Co](
 
   val cdist_factory = create_cell_dist_factory
 
-  def return_ranked_cells(doc: GridDoc[Co], correct: GridCell[Co],
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
     val celldist =
       cdist_factory.get_cell_dist_for_lang_model(grid, doc.grid_lm)

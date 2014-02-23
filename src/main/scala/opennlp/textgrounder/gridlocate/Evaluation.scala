@@ -117,10 +117,6 @@ class EvalStats(
   }
 
   def output_result_header() {
-    if (total_instances == 0) {
-      warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
-      return
-    }
     errprint("Number of instances = %s", total_instances)
   }
 
@@ -133,6 +129,38 @@ class EvalStats(
 }
 
 //////// Statistics for locating documents
+
+/**
+ * Info about the correct cell for a predicted result.
+ *
+ */
+class CorrectCellInfo[Co](val res: DocEvalResult[Co]) {
+  /**
+   * Correct cell in the cell grid in which the document belongs
+   */
+  val correct_cell = res.grid.find_best_cell_for_document(res.document,
+    create_non_recorded = true).get
+
+  /**
+   * Number of documents in the correct cell
+   */
+  val num_docs_in_correct_cell = correct_cell.num_docs
+  /**
+   * Central point of the correct cell
+   */
+  val correct_central_point = correct_cell.get_central_point
+  /**
+   * "True distance" (rather than e.g. degree distance) between document's
+   * coordinate and central point of correct cell
+   */
+  val correct_truedist = res.document.distance_to_coord(correct_central_point)
+
+  /**
+   * "True distance" (rather than e.g. degree distance) between document's
+   * coordinate and predicted coordinate
+   */
+  val pred_truedist = res.document.distance_to_coord(res.pred_coord)
+}
 
 /**
  * General class for the result of evaluating a document.  Specifies a
@@ -158,29 +186,11 @@ class DocEvalResult[Co](
   val grid: Grid[Co],
   val pred_coord: Co
 ) {
-  /**
-   * Correct cell in the cell grid in which the document belongs
-   */
-  val correct_cell = grid.find_best_cell_for_document(document,
-    create_non_recorded = true).get
-  /**
-   * Number of documents in the correct cell
-   */
-  val num_docs_in_correct_cell = correct_cell.num_docs
-  /**
-   * Central point of the correct cell
-   */
-  val correct_central_point = correct_cell.get_central_point
-  /**
-   * "True distance" (rather than e.g. degree distance) between document's
-   * coordinate and central point of correct cell
-   */
-  val correct_truedist = document.distance_to_coord(correct_central_point)
-  /**
-   * "True distance" (rather than e.g. degree distance) between document's
-   * coordinate and predicted coordinate
-   */
-  val pred_truedist = document.distance_to_coord(pred_coord)
+  val correct =
+    if (document.has_coord)
+      Some(new CorrectCellInfo(this))
+    else
+      None
 
   protected def print_document(doctag: String) {
     errprint("%s:Document %s:", doctag, document)
@@ -200,32 +210,50 @@ class DocEvalResult[Co](
    */
   def print_result(doctag: String) {
     print_document(doctag)
-    errprint("%s:  Distance %s to correct cell central point at %s",
-      doctag, document.output_distance(correct_truedist),
-      document.format_coord(correct_central_point))
-    errprint("%s:  Distance %s to predicted cell central point at %s",
-      doctag, document.output_distance(pred_truedist),
-      document.format_coord(pred_coord))
-
-    errprint(s"$doctag:  correct cell: $correct_cell")
+    if (correct == None) {
+      errprint("%s:  Predicted cell central point at %s",
+        doctag, document.format_coord(pred_coord))
+    } else {
+      correct.foreach { cinfo =>
+        errprint("%s:  Distance %s to correct cell central point at %s",
+          doctag, document.output_distance(cinfo.correct_truedist),
+          document.format_coord(cinfo.correct_central_point))
+        errprint("%s:  Distance %s to predicted cell central point at %s",
+          doctag, document.output_distance(cinfo.pred_truedist),
+          document.format_coord(pred_coord))
+        errprint("%s:  correct cell: %s",
+          doctag, cinfo.correct_cell)
+      }
+    }
   }
 
-  def to_row = Seq(
-    "title" -> document.title,
-    "correct-coord" -> document.coord,
-    "numtypes" -> document.grid_lm.num_types,
-    "numtokens" -> document.grid_lm.num_tokens,
-    "rerank-lm-numtypes" -> document.rerank_lm.num_types,
-    "rerank-lm-numtokens" -> document.rerank_lm.num_tokens,
-    "correct-cell" -> correct_cell.format_location,
-    "correct-cell-true-center" -> correct_cell.get_true_center,
-    "correct-cell-centroid" -> correct_cell.get_centroid,
-    "correct-cell-central-point" -> correct_cell.get_central_point,
-    "correct-cell-numdocs" -> correct_cell.num_docs,
-    "pred-coord" -> pred_coord,
-    "oracle-dist" -> correct_truedist,
-    "error-dist" -> pred_truedist
-  )
+  def to_row = {
+    val always_info = Seq(
+      "title" -> document.title,
+      "pred-coord" -> pred_coord,
+      "numtypes" -> document.grid_lm.num_types,
+      "numtokens" -> document.grid_lm.num_tokens,
+      "rerank-lm-numtypes" -> document.rerank_lm.num_types,
+      "rerank-lm-numtokens" -> document.rerank_lm.num_tokens
+    )
+
+    val has_coord_info =
+      (if (!document.has_coord) Seq() else {
+        val cinfo = correct.get
+        Seq(
+          "error-dist" -> cinfo.pred_truedist,
+          "oracle-dist" -> cinfo.correct_truedist,
+          "correct-coord" -> document.coord,
+          "correct-cell" -> cinfo.correct_cell.format_location,
+          "correct-cell-true-center" -> cinfo.correct_cell.get_true_center,
+          "correct-cell-centroid" -> cinfo.correct_cell.get_centroid,
+          "correct-cell-central-point" -> cinfo.correct_cell.get_central_point,
+          "correct-cell-numdocs" -> cinfo.correct_cell.num_docs
+        )
+      })
+
+    always_info ++ has_coord_info
+  }
 
   /**
    * Return a "public" version of this result to be returned to callers.
@@ -238,6 +266,9 @@ class DocEvalResult[Co](
 /**
  * A basic class for accumulating statistics from multiple evaluation
  * results.
+ *
+ * NOTE: DocEvalStats and subclasses are never invoked when the correct
+ * cell is unknown.
  */
 trait DocEvalStats[Co] extends EvalStats {
   // "True dist" means actual distance in km's or whatever.
@@ -249,8 +280,8 @@ trait DocEvalStats[Co] extends EvalStats {
   val output_result_with_units: Double => String
 
   def record_result(res: DocEvalResult[Co]) {
-    true_dists += res.pred_truedist
-    oracle_true_dists += res.correct_truedist
+    true_dists += res.correct.get.pred_truedist
+    oracle_true_dists += res.correct.get.correct_truedist
   }
 
   override def output_incorrect_results() {
@@ -279,9 +310,12 @@ trait DocEvalStats[Co] extends EvalStats {
 /**
  * Class for accumulating statistics from multiple document evaluation results,
  * with separate sets of statistics for different intervals of error distances
- * and number of documents in correct cell. ("Grouped" in the sense that we may be
- * computing not only results for the documents as a whole but also for various
- * subgroups.)
+ * and number of documents in correct cell. ("Grouped" in the sense that we may
+ * be computing not only results for the documents as a whole but also for
+ * various subgroups.)
+ *
+ * NOTE: DocEvalStats and subclasses are never invoked when the correct
+ * cell is unknown.
  *
  * @tparam Co type of a coordinate
  *
@@ -339,7 +373,8 @@ class GroupedDocEvalStats[Co](
   }
 
   def record_result_by_range(res: DocEvalResult[Co]) {
-    val naitr = docs_by_naitr.get_collector(res.num_docs_in_correct_cell)
+    val naitr =
+      docs_by_naitr.get_collector(res.correct.get.num_docs_in_correct_cell)
     naitr.record_result(res)
   }
 
@@ -598,16 +633,28 @@ abstract class GridEvaluator[Co](
   }
 
   def output_results(isfinal: Boolean = false) {
-    evalstats.output_results() // all_results = isfinal)
+    if (evalstats.total_instances == 0) {
+      warning("No evaluation instances found")
+    } else
+      evalstats.output_results() // all_results = isfinal)
   }
 
   def get_correct_rank(candidates: Iterable[(GridCell[Co], Double)],
-      correct_cell: GridCell[Co]) = {
-    candidates.zipWithIndex.find {
-      case ((cell, score), index) => cell == correct_cell
-    } match {
-      case Some(((cell, score), index)) => index + 1
-      case None => 1000000000
+      correct_cell: Option[GridCell[Co]]) = {
+    correct_cell.map { correct =>
+      candidates.zipWithIndex.find {
+        case ((cell, score), index) => cell == correct
+      } match {
+        case Some(((cell, score), index)) => index + 1
+        case None => 1000000000
+      }
+    }
+  }
+
+  private def format_correct_rank(rank: Option[Int]) = {
+    rank match {
+      case Some(r) => s"$r"
+      case None => "unknown"
     }
   }
 
@@ -619,24 +666,30 @@ abstract class GridEvaluator[Co](
    *  pred_cells = List of predicted cells, from best to worst; each list
    *     entry is actually a tuple of (cell, score) where higher scores
    *     are better
-   *  correct_rank = Rank of correct cell among predicted cells
+   *  correct_rank = Rank of correct cell among predicted cells, if known
    *
    * @param document Document to evaluate.
-   * @param correct_cell Cell in the cell grid which contains the document.
+   * @param correct_cell Cell in the cell grid which contains the document,
+   *   possibly temporary and empty; or None if the document has no coordinate
+   *   (e.g. it's raw text).
    */
-  def return_ranked_cells(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
-    if (driver.params.oracle_results)
-      (Iterable((correct_cell, 0.0)), 1)
+  def return_ranked_cells(document: GridDoc[Co],
+      correct_cell: Option[GridCell[Co]]) = {
+    if (correct_cell != None && driver.params.oracle_results)
+      (Iterable((correct_cell.get, 0.0)), Some(1))
     else {
       ranker match {
-        case reranker: Reranker[GridDoc[Co], GridCell[Co]] if debug("reranker") => {
+        case reranker: Reranker[GridDoc[Co], GridCell[Co]]
+            if debug("reranker") => {
           val (initial_ranking, reranking) =
             reranker.evaluate_with_initial_ranking(document, correct_cell,
               include_correct = false)
           errprint("Correct cell initial rank: %s",
-            get_correct_rank(initial_ranking, correct_cell))
+            format_correct_rank(get_correct_rank(initial_ranking,
+              correct_cell)))
           val correct_rank = get_correct_rank(reranking, correct_cell)
-          errprint("Correct cell new rank: %s", correct_rank)
+          errprint("Correct cell new rank: %s",
+            format_correct_rank(correct_rank))
           (reranking, correct_rank)
         }
         case _ => {
@@ -662,9 +715,12 @@ abstract class GridEvaluator[Co](
    * optionally print out information on these results.
    *
    * @param document Document to evaluate.
-   * @param correct_cell Cell in the cell grid which contains the document.
+   * @param correct_cell Cell in the cell grid which contains the document,
+   *   possibly temporary and empty; or None if the document has no coordinate
+   *   (e.g. it's raw text).
    */
-  def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]
+  def imp_evaluate_document(document: GridDoc[Co],
+    correct_cell: Option[GridCell[Co]]
   ): Either[String, DocEvalResult[Co]]
 
   override def process_document_statuses(
@@ -689,21 +745,30 @@ abstract class GridEvaluator[Co](
   def evaluate_document(document: GridDoc[Co]) = {
     assert(document.grid_lm.finished)
     assert(document.rerank_lm.finished)
-    val maybe_correct_cell =
-      ranker.grid.find_best_cell_for_document(document,
-        create_non_recorded = true)
-    assert(maybe_correct_cell != None)
-    val correct_cell = maybe_correct_cell.get
+    val correct_cell =
+      if (!document.has_coord)
+        None
+      else {
+        val maybe_correct_cell =
+          ranker.grid.find_best_cell_for_document(document,
+            create_non_recorded = true)
+        assert(maybe_correct_cell != None)
+        maybe_correct_cell
+      }
     if (debug("ranking") || debug("commontop")) {
-      val naitr = correct_cell.num_docs
-      errprint("Evaluating document %s with %s documents in correct cell",
-        document, naitr)
+      correct_cell.foreach { cell =>
+        val naitr = cell.num_docs
+        errprint("Evaluating document %s with %s documents in correct cell",
+          document, naitr)
+      }
     }
     val result = imp_evaluate_document(document, correct_cell)
     result.right.map { res =>
-      evalstats.record_result(res)
-      if (res.num_docs_in_correct_cell == 0) {
-        evalstats.increment_counter("documents.no_training_documents_in_cell")
+      if (res.correct != None) {
+        evalstats.record_result(res)
+        if (res.correct.get.num_docs_in_correct_cell == 0) {
+          evalstats.increment_counter("documents.no_training_documents_in_cell")
+        }
       }
     }
     result
@@ -729,7 +794,7 @@ class RankedGridEvaluator[Co](
   ranker, evalstats
 ) {
   def imp_evaluate_document(document: GridDoc[Co],
-      correct_cell: GridCell[Co]) = {
+      correct_cell: Option[GridCell[Co]]) = {
     ranker match {
       case reranker: Reranker[GridDoc[Co], GridCell[Co]] => {
         val (initial_ranking, reranking) =
@@ -738,8 +803,9 @@ class RankedGridEvaluator[Co](
         val correct_rank = get_correct_rank(reranking, correct_cell)
         val initial_correct_rank =
           get_correct_rank(initial_ranking, correct_cell)
-        if (debug("skip-non-rerankable") && initial_correct_rank >
-            reranker.top_n)
+        // FIXME! Is this correct when initial correct rank unknown?
+        if (debug("skip-non-rerankable") && initial_correct_rank != None &&
+            initial_correct_rank.get > reranker.top_n)
           Left("correct cell not within rerankable subset " +
             s"(top ${reranker.top_n})")
         else
@@ -776,14 +842,16 @@ class RankedGridEvaluator[Co](
 class RankedDocEvalResult[Co](
   document: GridDoc[Co],
   val pred_cell: GridCell[Co],
-  val correct_rank: Int
+  val correct_rank: Option[Int]
 ) extends DocEvalResult[Co](
   document, pred_cell.grid,
   pred_cell.get_central_point
 ) {
   override def print_result(doctag: String) {
     super.print_result(doctag)
-    errprint(s"$doctag:  correct cell at rank: $correct_rank")
+    correct_rank.foreach { crank =>
+      errprint(s"$doctag:  correct cell at rank: $crank")
+    }
   }
 
   override def to_row = super.to_row ++ Seq(
@@ -791,24 +859,25 @@ class RankedDocEvalResult[Co](
     "pred-cell-true-center" -> pred_cell.get_true_center,
     "pred-cell-centroid" -> pred_cell.get_centroid,
     "pred-cell-central-point" -> pred_cell.get_central_point,
-    "pred-cell-numdocs" -> pred_cell.num_docs,
-    "correct-rank" -> correct_rank
-  )
+    "pred-cell-numdocs" -> pred_cell.num_docs) ++
+    (correct_rank.map { cr => "correct-rank" -> cr }.toSeq)
 }
 
 class RerankedDocEvalResult[Co](
   document: GridDoc[Co],
   pred_cell: GridCell[Co],
-  correct_rank: Int,
+  correct_rank: Option[Int],
   val initial_pred_cell: GridCell[Co],
-  val initial_correct_rank: Int
+  val initial_correct_rank: Option[Int]
 ) extends RankedDocEvalResult[Co](
   document, pred_cell, correct_rank
 ) {
   override def print_result(doctag: String) {
     super.print_result(doctag)
-    errprint("%s:  correct cell at initial rank: %s (vs. new %s)", doctag,
-      initial_correct_rank, correct_rank)
+    initial_correct_rank.foreach { icr =>
+    errprint(s"$doctag:  correct cell at initial rank: $icr " +
+      s"(vs. new ${correct_rank.get})")
+    }
   }
 
   override def to_row = super.to_row ++ Seq(
@@ -836,7 +905,7 @@ class RerankedDocEvalResult[Co](
 class FullRankedDocEvalResult[Co](
   document: GridDoc[Co],
   val pred_cells: IndexedSeq[(GridCell[Co], Double)],
-  correct_rank: Int
+  correct_rank: Option[Int]
 ) extends RankedDocEvalResult[Co](
   document, pred_cells.head._1, correct_rank
 ) {
@@ -856,14 +925,14 @@ class FullRankedDocEvalResult[Co](
    * @param cells Sequence of ranked scored cells.
    * @param doctag Document tag, prefixed to all lines
    * @param driver Driver object, to retrieve parameter values
-   * @param corr_rank Rank of correct cell
+   * @param corr_rank Rank of correct cell, if known
    * @param rank_header Header of column specifying the rank
-   * @param If given, another set of cell rankings to be given in another
-   *   column
-   * @param If given, header of column of other cell rankings
+   * @param other_rank If given, another set of cell rankings to be given
+   *   in another column
+   * @param other_rank_header If given, header of column of other cell rankings
    */
   protected def print_top_cell_table(cells: IndexedSeq[(GridCell[Co], Double)],
-      doctag: String, corr_rank: Int, rank_header: String,
+      doctag: String, corr_rank: Option[Int], rank_header: String,
       other_rank: Map[GridCell[Co], Int] = Map(),
       other_rank_header: String = "") {
     val num_cells_to_output =
@@ -871,14 +940,17 @@ class FullRankedDocEvalResult[Co](
          math.min(grid.driver.params.num_top_cells_to_output, cells.size)
       else cells.size
     val topranks = (1 to num_cells_to_output).toSeq
-    val ranks = if (corr_rank <= num_cells_to_output) topranks
-      else topranks ++ Seq(corr_rank)
+    val ranks =
+      if (corr_rank == None || corr_rank.get <= num_cells_to_output) topranks
+      else topranks ++ Seq(corr_rank.get)
     val other_rank_heading =
       if (other_rank_header != "") Seq(other_rank_header) else Seq()
-    val predicted_headings = Seq(rank_header) ++ other_rank_heading ++ Seq(
-      "score", "dist(km)", "central-pt", "grid", "#doc",
-      //"#type", "#token",
-      "sal.")
+    val predicted_headings =
+      Seq(rank_header) ++
+      other_rank_heading ++
+      Seq("score") ++
+      (if (document.has_coord) Seq("dist(km)") else Seq()) ++
+      Seq("central-pt", "grid", "#doc", /*"#type", "#token",*/ "sal.")
     val predicted_cell_data =
       (for (rank <- ranks) yield {
         val (cell, score, rankstr) =
@@ -887,21 +959,28 @@ class FullRankedDocEvalResult[Co](
             (c, min_format_double(s), s"$rank")
           } else {
             // This may be a faked cell, when the correct cell is empty
-            assert(rank == corr_rank, s"Expected $corr_rank but saw $rank")
-            (correct_cell, "--", "--")
+            assert(rank == corr_rank.get,
+              s"Expected ${corr_rank.get} but saw $rank")
+            (correct.get.correct_cell, "--", "--")
           }
-        val index = (if (rank == corr_rank) "*" else "") + rankstr
+        val index =
+          (if (corr_rank != None && rank == corr_rank.get) "*" else "") +
+          rankstr
         val other_rank_column = if (other_rank.isEmpty) Seq()
           else if (other_rank contains cell) Seq(s"${other_rank(cell)}")
           else Seq("--")
-        Seq(index) ++ other_rank_column ++ Seq(score,
-          min_format_double(document.distance_to_cell(cell)),
-          cell.format_coord(cell.get_central_point),
-          cell.grid.id_str,
-          pretty_long(cell.num_docs),
-          //pretty_long(cell.grid_lm.num_types),
-          //pretty_double(cell.grid_lm.num_tokens),
-          pretty_double(cell.salience))
+        Seq(index) ++ other_rank_column ++ Seq(score) ++
+          (if (document.has_coord)
+            Seq(min_format_double(document.distance_to_cell(cell)))
+           else Seq()) ++
+          Seq(
+            cell.format_coord(cell.get_central_point),
+            cell.grid.id_str,
+            pretty_long(cell.num_docs),
+            //pretty_long(cell.grid_lm.num_types),
+            //pretty_double(cell.grid_lm.num_tokens),
+            pretty_double(cell.salience)
+          )
       }).toSeq
     val fmt = table_column_format(predicted_headings +: predicted_cell_data)
 
@@ -918,7 +997,7 @@ class FullRankedDocEvalResult[Co](
   }
 
   protected def print_knn_result(doctag: String) {
-    if (grid.driver.params.print_knn_results) {
+    if (grid.driver.params.print_knn_results && document.has_coord) {
       val num_nearest_neighbors = grid.driver.params.num_nearest_neighbors
       val kNN = pred_cells.take(num_nearest_neighbors).map {
         case (cell, score) => cell }
@@ -940,7 +1019,7 @@ class FullRankedDocEvalResult[Co](
         doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
         document.output_distance(avg_dist_of_neighbors))
 
-      if (avg_dist_of_neighbors < pred_truedist)
+      if (avg_dist_of_neighbors < correct.get.pred_truedist)
         grid.driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
     }
   }
@@ -964,13 +1043,19 @@ class FullRankedDocEvalResult[Co](
       }
 
       output_relcontribgrams("predicted cell", pred_cell, "", Iterable())
-      output_relcontribgrams("correct cell", correct_cell, "", Iterable())
-      output_relcontribgrams("predicted cell", pred_cell,
-        "correct cell %s" format correct_cell, Iterable(correct_cell))
+      correct.foreach { cinfo =>
+        output_relcontribgrams("correct cell", cinfo.correct_cell, "",
+          Iterable())
+        output_relcontribgrams("predicted cell", pred_cell,
+          "correct cell %s" format cinfo.correct_cell,
+          Iterable(cinfo.correct_cell))
+      }
       output_relcontribgrams("predicted cell", pred_cell,
         "all others", pred_cells.map(_._1).tail)
-      output_relcontribgrams("correct cell", correct_cell,
-        "all others", pred_cells.map(_._1).filter(_ != correct_cell))
+      correct.foreach { cinfo =>
+        output_relcontribgrams("correct cell", cinfo.correct_cell,
+          "all others", pred_cells.map(_._1).filter(_ != cinfo.correct_cell))
+      }
     }
   }
 
@@ -996,14 +1081,14 @@ class FullRankedDocEvalResult[Co](
  * @param document document whose coordinate is predicted
  * @param pred_cells list of predicted cells with scores
  * @param correct_rank rank of the document's correct cell among all of the
- *        predicted cell
+ *        predicted cell, if known
  */
 class FullRerankedDocEvalResult[Co](
   document: GridDoc[Co],
   pred_cells: IndexedSeq[(GridCell[Co], Double)],
-  correct_rank: Int,
+  correct_rank: Option[Int],
   initial_pred_cells: IndexedSeq[(GridCell[Co], Double)],
-  initial_correct_rank: Int
+  initial_correct_rank: Option[Int]
 ) extends FullRankedDocEvalResult[Co](
   document, pred_cells, correct_rank
 ) {
@@ -1021,15 +1106,18 @@ class FullRerankedDocEvalResult[Co](
     print_top_cell_table(initial_pred_cells, doctag,
       initial_correct_rank, "init-rank", rerank, "rerank")
 
-    val initial_pred_cell = initial_pred_cells.head._1
-    val initial_pred_coord = initial_pred_cell.get_central_point
-    val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
+    if (document.has_coord) {
+      val initial_pred_cell = initial_pred_cells.head._1
+      val initial_pred_coord = initial_pred_cell.get_central_point
+      val initial_pred_truedist = document.distance_to_coord(initial_pred_coord)
 
-    errprint("%s:  Error distance change by reranking = %s - %s = %s",
-      doctag, document.output_distance(pred_truedist),
-      document.output_distance(initial_pred_truedist),
-      document.output_distance(pred_truedist - initial_pred_truedist)
-    )
+      errprint("%s:  Error distance change by reranking = %s - %s = %s",
+        doctag, document.output_distance(correct.get.pred_truedist),
+        document.output_distance(initial_pred_truedist),
+        document.output_distance(correct.get.pred_truedist -
+          initial_pred_truedist)
+      )
+    }
   }
 
   override def get_public_result =
@@ -1040,6 +1128,9 @@ class FullRerankedDocEvalResult[Co](
 /**
  * A class for accumulating statistics from multiple evaluation results,
  * including statistics on the rank of the correct cell.
+ *
+ * NOTE: DocEvalStats and subclasses are never invoked when the correct
+ * cell is unknown.
  */
 class RankedDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
@@ -1069,7 +1160,7 @@ class RankedDocEvalStats[Co](
 
     // Code formerly in EvalStatsWithRank.
     {
-      val corrank = rankres.correct_rank
+      val corrank = rankres.correct_rank.get
       assert(corrank >= 1)
       val correct = corrank == 1
       super.record_result(correct, reason = null)
@@ -1102,8 +1193,8 @@ class RankedDocEvalStats[Co](
     val num_pred_cells = rankres.pred_cells.size
     for (rank <- top_n_for_oracle_dists; if rank < num_pred_cells)
       oracle_true_dists_at(rank) :+= min_errors(rank)
-    true_dists += res.pred_truedist
-    oracle_true_dists += res.correct_truedist
+    true_dists += res.correct.get.pred_truedist
+    oracle_true_dists += res.correct.get.correct_truedist
   }
 
   override def output_correct_results() {
@@ -1158,9 +1249,11 @@ abstract class CoordGridEvaluator[Co](
 ) extends GridEvaluator[Co](
   ranker, evalstats
 ) {
-  def find_best_point(document: GridDoc[Co], correct_cell: GridCell[Co]): Co
+  def find_best_point(document: GridDoc[Co],
+      correct_cell: Option[GridCell[Co]]): Co
 
-  def imp_evaluate_document(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
+  def imp_evaluate_document(document: GridDoc[Co],
+      correct_cell: Option[GridCell[Co]]) = {
     val pred_coord = find_best_point(document, correct_cell)
     Right(new CoordDocEvalResult[Co](document, ranker.grid, pred_coord))
   }
@@ -1188,6 +1281,9 @@ class CoordDocEvalResult[Co](
 /**
  * A class for accumulating statistics from multiple evaluation results,
  * where the results directly specify a coordinate (rather than e.g. a cell).
+ *
+ * NOTE: DocEvalStats and subclasses are never invoked when the correct
+ * cell is unknown.
  */
 class CoordDocEvalStats[Co](
   driver_stats: ExperimentDriverStats,
@@ -1226,7 +1322,8 @@ class MeanShiftGridEvaluator[Co](
 ) extends CoordGridEvaluator[Co](
   ranker, evalstats
 ) {
-  def find_best_point(document: GridDoc[Co], correct_cell: GridCell[Co]) = {
+  def find_best_point(document: GridDoc[Co],
+      correct_cell: Option[GridCell[Co]]) = {
     val (pred_cells, correct_rank) = return_ranked_cells(document, correct_cell)
     val top_k = pred_cells.take(k_best).map(_._1.get_central_point).toIndexedSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)

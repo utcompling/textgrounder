@@ -1103,6 +1103,10 @@ abstract class GridDoc[Co : TextSerializer : CoordHandler](
   def output_distance(dist: Double) =
     coord_handler.output_distance(dist)
 
-  def distance_to_coord(coord2: Co) = distance_between_coords(coord, coord2)
+  def distance_to_coord(coord2: Co) = {
+    assert(has_coord)
+    distance_between_coords(coord, coord2)
+  }
+
   def distance_to_cell(cell: GridCell[Co]) = distance_to_coord(cell.get_central_point)
 }
