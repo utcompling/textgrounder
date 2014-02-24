@@ -475,15 +475,15 @@ base name of the corpus). The particular slice used for evaluation is
 specified using '--eval-set'.""")
 
   //// Eval output options
-  var results =
-    ap.option[String]("results", "res",
+  var results_file =
+    ap.option[String]("results-file", "results", "res",
       metavar = "FILE",
       help = """If specified, prefix of file to store results into.
-Results are also normally output to stderr for debugging purposes unless
-`--no-results` is given.  Results are stored as a textdb database, i.e. two
-files will be written, with extensions `.data.txt` and `.schema.txt`, with
-the former storing the data as tab-separated fields and the latter naming
-the fields.""")
+Results are stored as a textdb database, i.e. two files will be written,
+with extensions '.data.txt' and '.schema.txt', with the former storing the
+data as tab-separated fields and the latter naming the fields.
+
+See also '--print-results' for outputting human-readable results to stderr.""")
 
   var print_results =
     ap.flag("print-results", "show-results", "pr", "sr",

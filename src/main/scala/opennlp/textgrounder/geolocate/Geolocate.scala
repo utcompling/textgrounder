@@ -627,9 +627,9 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       note_result("time.running", elapsed)
       note_result("time.running.human", format_minutes_seconds(elapsed))
 
-      if (params.results != null) {
+      if (params.results_file != null) {
         val filehand = get_file_handler
-        write_results_file(results.toIterator, filehand, params.results)
+        write_results_file(results.toIterator, filehand, params.results_file)
       }
       results
     }
