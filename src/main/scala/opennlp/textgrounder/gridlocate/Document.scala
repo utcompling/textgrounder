@@ -778,6 +778,64 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
     raw_documents_to_document_statuses(rawdocs, note_globally, finish_globally)
   }
 
+  /**
+   * Read the text from one or more raw files, with each file treated as
+   * a document.
+   *
+   * @param filehand The FileHandler for the directory containing the files.
+   * @param dir File or directory containing the files.
+   * @param note_globally Whether to add each document's words to the global
+   *   backoff statistics.  Normally false, but may be true during
+   *   bootstrapping of those statistics.
+   * @param finish_globally Whether to compute global backoff statistics.
+   *   Normally true, but may be false during bootstrapping of those
+   *   statistics.
+   * @return Iterator over document statuses.
+   */
+  def read_document_statuses_from_raw_text(filehand: FileHandler, dir: String,
+      note_globally: Boolean = false, finish_globally: Boolean = true) = {
+    val schema = new Schema(Iterable(), Map("corpus-type" -> "raw-text"))
+    val fake_row = Row(schema, IndexedSeq())
+    val the_files = iter_files_recursively(filehand, Iterable(dir))
+    val files =
+      if (driver.params.verbose)
+        iter_files_with_message(filehand, the_files)
+      else
+        the_files
+    files.map { file =>
+      val lines = filehand.openr(file)
+      val words = lines.flatMap(_.split("""\s+""")).toIterable
+      if (words.size == 0) {
+        warning(s"Skipping empty file $file")
+        DocStatus[(Row, GridDoc[Co])](filehand, file, 1, None, "skipped",
+          "empty document", "")
+      } else {
+        val grid_lm =
+          lang_model_factory.grid_lang_model_factory.create_lang_model
+        grid_lm.add_document(words)
+        val rerank_lm =
+          if (driver.rerank_word_count_field == driver.grid_word_count_field)
+            grid_lm
+          else {
+            val lm =
+              lang_model_factory.rerank_lang_model_factory.create_lang_model
+            lm.add_document(words)
+            lm
+          }
+        val lang_model = new DocLangModel(grid_lm, rerank_lm)
+        val doc = create_document(fake_row, lang_model)
+        if (note_globally) {
+          doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
+        }
+        doc.lang_model.finish_before_global()
+        if (finish_globally)
+          doc.lang_model.finish_after_global()
+        DocStatus(filehand, file, 1, Some((fake_row, doc)), "processed",
+          "", "")
+      }
+    }
+  }
+
   def finish_document_loading() {
     if (debug("docstats"))
       output_document_statistics()
