@@ -355,9 +355,6 @@ uniform grid cell models?""")
   var eval_format =
     ap.option[String]("f", "eval-format",
       default = "textdb",
-      must = Must({ x: String => x != "raw-text" },
-        // FIXME!!
-        "Raw-text reading not implemented yet"),
       choices = Seq("textdb", "raw-text" //, "pcl-travel"
       ),
       help = """Format of evaluation file(s).  The evaluation files themselves
@@ -587,6 +584,12 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
     if (debug("no-evaluation"))
       Iterable()
     else {
+      val eval_location =
+        if (params.eval_file.size == 0)
+          params.input ++ params.train
+        else
+          params.eval_file
+
       val results_iter =
         params.eval_format match {
 //          case "pcl-travel" => {
@@ -596,12 +599,6 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
           case "textdb" => {
-            val eval_location =
-              if (params.eval_file.size == 0)
-                params.input ++ params.train
-              else
-                params.eval_file
-
             val get_docstats = () =>
               eval_location.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
@@ -609,7 +606,14 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(get_docstats)
           }
-          case "raw-text" => ???
+          case "raw-text" => {
+            val get_docstats = () =>
+              eval_location.toIterator.flatMap(dir =>
+                grid.docfact.read_document_statuses_from_raw_text(
+                  get_file_handler, dir))
+            val evalobj = create_cell_evaluator(ranker)
+            evalobj.evaluate_documents(get_docstats)
+          }
         }
       // The call to `toIndexedSeq` forces evaluation of the Iterator
       val results = results_iter.toIndexedSeq
