@@ -1616,7 +1616,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           create_naive_bayes_features(params.naive_bayes_feature_list)
         new NaiveBayesGridRanker[Co](ranker_name, grid, features)
       }
-      case "classifier" => create_classifier_ranker(ranker_name, grid)
+      case "classifier" => create_classifier_ranker(ranker_name, grid,
+        grid.iter_nonempty_cells.toIndexedSeq)
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = true)
@@ -2008,18 +2009,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     reranker_trainer(training_data)
   }
 
-  def get_docs_cells(grid: Grid[Co]) = {
-    // Read the raw training documents.
-    val raw_training_docs = read_combined_raw_training_documents(
-       "reading %s for generating classifier training data")
-
-    get_docs_cells_from_raw_documents(grid, raw_training_docs)
-  }
-
-  def get_docs_cells_from_raw_documents(grid: Grid[Co],
-      raw_docs: Iterator[DocStatus[Row]]) = {
-    // Convert raw documents into document-cell pairs, for the correct cell.
-    grid.docfact.raw_documents_to_documents(raw_docs) flatMap {
+  // Convert documents into document-cell pairs, for the correct cell.
+  def get_docs_cells_from_documents(grid: Grid[Co],
+      docs: Iterator[GridDoc[Co]]) = {
+    docs flatMap {
       doc =>
         // Convert document to (doc, cell) pair.  But if a cell
         // can't be found (i.e. there were no training docs in the
@@ -2031,21 +2024,57 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
+  // Convert raw documents into document-cell pairs, for the correct cell.
+  def get_docs_cells_from_raw_documents(grid: Grid[Co],
+      raw_docs: Iterator[DocStatus[Row]]) = {
+    get_docs_cells_from_documents(grid,
+      grid.docfact.raw_documents_to_documents(raw_docs))
+  }
+
+  // Fetch document-cell pairs, for the correct cell, from training data.
+  // The training documents can either be passed in (if they are cached
+  // for speed) or read from external training data. Filter to match only
+  // documents whose correct cell is one of the specified candidates.
+  def get_docs_cells(grid: Grid[Co],
+      candidates: IndexedSeq[GridCell[Co]],
+      docs: Iterable[GridDoc[Co]] = Iterable()) = {
+    val docs_cells =
+      if (docs.size == 0) {
+        val raw_training_docs = read_combined_raw_training_documents(
+           "reading %s for generating classifier training data")
+        get_docs_cells_from_raw_documents(grid, raw_training_docs)
+      } else {
+        get_docs_cells_from_documents(grid, docs.toIterator)
+      }
+    docs_cells.filter { case (doc, cell) =>
+      candidates contains cell
+    }
+  }
+
   /**
    * Create a ranker that uses a classifier to do its work, treating each
    * cell as a possible class.
+   *
+   * @param ranker_name An identifying string, usually "classifier".
+   * @param candidates Candidates (aka classes, labels) that the classifier
+   *   chooses among.
+   * @param docs Training documents. If omitted or empty, read external
+   *   training documents according to '--input' and/or positional params.
    */
-  def create_classifier_ranker(ranker_name: String, grid: Grid[Co]) = {
+  def create_classifier_ranker(ranker_name: String,
+      grid: Grid[Co], candidates: IndexedSeq[GridCell[Co]],
+      docs: Iterable[GridDoc[Co]] = Iterable()) = {
+    candidates.foreach { cand => assert(cand.grid == grid) }
     if (params.classifier == "vowpal-wabbit")
-      create_vowpal_wabbit_classifier_ranker(ranker_name, grid,
-        cost_sensitive = false)
+      create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
+        docs, cost_sensitive = false)
     else if (params.classifier == "cost-vowpal-wabbit")
-      create_vowpal_wabbit_classifier_ranker(ranker_name, grid,
-        cost_sensitive = true)
+      create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
+        docs, cost_sensitive = true)
     else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
-      val docs_cells = get_docs_cells(grid)
+      val docs_cells = get_docs_cells(grid, candidates, docs)
 
       /*
        * We need to do the following during training:
@@ -2075,8 +2104,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val training_instances =
         docs_cells.mapMetered(task) { case (doc, correct_cell) =>
           // Maybe do it in parallel.
-          val cells = grid.iter_nonempty_cells
-          val maybepar_cells = cells
+          val maybepar_cells = candidates
           // FIXME: This does not yet work because memoization isn't
           // thread-safe. See the comments for FeatureLabelMapper.
           /*
@@ -2084,8 +2112,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             if (!debug("parallel-classifier-training")
                 //params.no_parallel || debug("no-parallel-classifier-training")
                )
-              cells
-            else cells.par
+              candidates
+            else candidates.par
           */
 
           // Iterate over cells.
@@ -2138,25 +2166,26 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * treating each cell as a possible class.
    */
   def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
-      grid: Grid[Co], cost_sensitive: Boolean) = {
+      grid: Grid[Co], candidates: IndexedSeq[GridCell[Co]],
+      docs: Iterable[GridDoc[Co]], cost_sensitive: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
       output_skip_message = true)
-    val docs_cells = get_docs_cells(grid)
+    val docs_cells = get_docs_cells(grid, candidates, docs)
 
     // val task = show_progress("processing features in", "document")
 
     val classifier =
       if (cost_sensitive) {
-        val cells =
-          grid.iter_nonempty_cells.map { cell =>
+        val cells_labels =
+          candidates.map { cell =>
             (cell, featvec_factory.lookup_cell(cell))
           }
 
         val training_data =
           docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
           val feats = featvec_factory.get_features(doc)
-          val cells_costs = cells.map { case (cell, label) =>
+          val cells_costs = cells_labels.map { case (cell, label) =>
             (label,
               // Uncomment to always use cost 0.0 for the correct cell
               // instead of actual error distance.  Doesn't seem to make
@@ -2178,9 +2207,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         // Train classifier.
         val feats_filename =
           trainer.write_cost_sensitive_feature_file(training_data)
-        assert(cells.size ==
+        assert(cells_labels.size ==
           featvec_factory.featvec_factory.mapper.number_of_labels)
-        trainer(cells.size, feats_filename)
+        trainer(cells_labels.size, feats_filename)
       } else {
         val training_data =
           docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>

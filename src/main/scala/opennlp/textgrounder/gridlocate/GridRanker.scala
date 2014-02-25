@@ -458,17 +458,16 @@ class VowpalWabbitGridRanker[Co](
 
     val feature_file =
       if (cost_sensitive) {
-        val costs =
-          grid.iter_nonempty_cells.map { cell =>
-            (featvec_factory.lookup_cell(cell), 0.0)
-          }
+        val labels_costs =
+          (0 until featvec_factory.featvec_factory.mapper.number_of_labels
+            ).map { label => (label, 0.0) }
 
         val training_data =
           docs.map/*Metered(task)*/ { doc =>
           val feats = featvec_factory.get_features(doc)
           titles += doc.title
           // It doesn't matter what we give as the correct costs here
-          (feats, costs)
+          (feats, labels_costs)
         }
 
         classifier.write_cost_sensitive_feature_file(training_data)
@@ -510,7 +509,21 @@ class VowpalWabbitGridRanker[Co](
 
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val scores = doc_scores(doc.title)
-    scores(featvec_factory.lookup_cell(cell))
+    // We might be asked about a cell outside of the set of candidates,
+    // especially when we have a limited set of possible candidates.
+    // Note that the set of labels that the classifier knows about may
+    // be less than the number in the 'candidates' class param,
+    // particularly in the non-cost-sensitive case, where the classifier
+    // only knows about labels corresponding to candidates with a non-zero
+    // number of training documents in them. (In the cost-sensitive case
+    // we have to supply costs for all labels for each training document,
+    // and we go ahead and convert all candidates to labels.)
+    featvec_factory.lookup_cell_if(cell) match {
+      case Some(label) =>
+        scores(label)
+      case None =>
+        Double.NegativeInfinity
+    }
   }
 }
 

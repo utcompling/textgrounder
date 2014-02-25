@@ -64,7 +64,7 @@ trait FeatVecFactory[Co] {
 
   /** Convert a cell to an index. Cached for speed and to avoid excessive
     * memory generation of strings. */
-  def lookup_cell(cell: GridCell[Co]) = {
+  def lookup_cell(cell: GridCell[Co]): LabelIndex = {
     cell_to_index.get(cell) match {
       case Some(index) => index
       case None => {
@@ -76,6 +76,10 @@ trait FeatVecFactory[Co] {
       }
     }
   }
+
+  /** Convert a cell to an existing index. Don't create any new indices. */
+  def lookup_cell_if(cell: GridCell[Co]): Option[LabelIndex] =
+    cell_to_index.get(cell)
 
   val logarithmic_base = 2.0
 
