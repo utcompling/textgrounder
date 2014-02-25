@@ -47,6 +47,19 @@ abstract class CombinedGrid[Co](
         cell => cell.grid.distance_between_coords(cell.get_central_point, coord)))
   }
 
+  def create_subdivided_grid_from_subdivisions(docfact: GridDocFactory[Co],
+    id: String, grids: Iterable[Grid[Co]]
+  ): CombinedGrid[Co]
+
+  def create_subdivided_grid(create_docfact: => GridDocFactory[Co],
+      id: String) =
+    create_subdivided_grid_from_subdivisions(create_docfact, id,
+      grids.map(_.create_subdivided_grid(create_docfact, id))
+    )
+
+  def get_subdivided_cells(cell: GridCell[Co]) =
+    grids.flatMap(_.get_subdivided_cells(cell))
+
   protected def initialize_cells() { }
 
   def iter_nonempty_cells = grids.flatMap(_.iter_nonempty_cells)
@@ -64,6 +77,10 @@ class UninitializedCombinedGrid[Co](
   id: String,
   grids: Iterable[Grid[Co]]
 ) extends CombinedGrid[Co](docfact, id, grids) {
+
+  def create_subdivided_grid_from_subdivisions(docfact: GridDocFactory[Co],
+    id: String, grids: Iterable[Grid[Co]]
+  ) = new UninitializedCombinedGrid(docfact, id, grids)
 
   def add_training_documents_to_grid(
       get_rawdocs: String => Iterator[DocStatus[Row]]) {
@@ -97,6 +114,10 @@ class InitializedCombinedGrid[Co](
 ) extends CombinedGrid[Co](docfact, id, grids) {
 
   for (grid <- grids) assert(grid.all_cells_computed)
+
+  def create_subdivided_grid_from_subdivisions(docfact: GridDocFactory[Co],
+    id: String, grids: Iterable[Grid[Co]]
+  ) = new InitializedCombinedGrid(docfact, id, grids)
 
   def add_training_documents_to_grid(
     get_rawdocs: String => Iterator[DocStatus[Row]]

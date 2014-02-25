@@ -206,7 +206,6 @@ abstract class RectangularCell(
   def get_boundary = {
     val sw = get_southwest_coord
     val ne = get_northeast_coord
-    val center = get_true_center
     val nw = SphereCoord(ne.lat, sw.long)
     val se = SphereCoord(sw.lat, ne.long)
     Seq(sw, nw, ne, se)

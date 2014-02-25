@@ -520,6 +520,7 @@ trait GridLocateRankParameters {
         Seq("sum-frequency"),
         Seq("naive-bayes", "nb"),
         Seq("classifier"),
+        Seq("hierarchical-classifier", "hier-classifier"),
         Seq("average-cell-probability", "avg-cell-prob", "acp"),
         Seq("salience", "internal-link"),
         Seq("random"),
@@ -655,6 +656,22 @@ Default %default.""")
       help = """Arguments to use when running the rough ranker that computes
 a sort of prior value in rough-to-fine ranking, for the fine Naive-Bayes
 ranker. This is for use with '--naive-bayes-features rough-ranker'.""")
+
+  var num_levels =
+    ap.option[Int]("num-levels", "nl",
+      metavar = "LEVELS",
+      default = 2,
+      must = be_>(0),
+      help = """Number of levels when doing hierarchical ranking.
+Default %default.""")
+
+  var beam_size =
+    ap.option[Int]("beam-size", "bs",
+      metavar = "SIZE",
+      default = 10,
+      must = be_>(0),
+      help = """Number of top-ranked items to keep at each level when
+doing hierarchical ranking. Default %default.""")
 }
 
 trait GridLocateFeatureParameters {
@@ -1485,6 +1502,20 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
+   * Fetch raw training documents as a combined iterator over all corpora.
+   *
+   * @param operation String identifying the name of the logical operation
+   *   that is processing the documents, to be displayed in progress
+   *   messages as the documents are read and processed. See
+   *   `read_raw_training_document_streams` above.
+   * @param streams Set of iterators over raw training documents.
+   * @return Iterator over raw training documents.
+   */
+  def get_combined_raw_training_documents(operation: String,
+      streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) =
+    streams.map(_._2).toIterator.flatMap(get_docs => get_docs(operation))
+
+  /**
    * Read raw training documents as a combined iterator over all corpora.
    *
    * @param operation String identifying the name of the logical operation
@@ -1494,8 +1525,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @return Iterator over raw training documents.
    */
   def read_combined_raw_training_documents(operation: String) =
-    read_raw_training_document_streams.map(_._2).toIterator.flatMap(get_docs =>
-      get_docs(operation))
+    get_combined_raw_training_documents(operation,
+      read_raw_training_document_streams)
 
   /**
    * Create a cell grid that's populated with the specified training data.
@@ -1510,10 +1541,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   the grid cells.)
    */
   def create_grid_from_documents(
+      supergrid: Option[Grid[Co]],
+      level: Int,
       id: String,
       get_rawdocs: String => Iterator[DocStatus[Row]]
   ) = {
-    val grid = create_empty_grid(create_document_factory_from_params, id)
+    val levelsuff = if (level == 0) "" else s".l$level"
+    val grid = supergrid match {
+      case None =>
+        create_empty_grid(create_document_factory_from_params, id + levelsuff)
+      case Some(superg) =>
+        superg.create_subdivided_grid(create_document_factory_from_params,
+          superg.id + levelsuff)
+    }
 
     // This accesses all the above items, either directly through the variables
     // storing them, or (as for the stopwords and whitelist) through the pointer
@@ -1562,14 +1602,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * combining sub-grids for each input corpus.
    */
   def create_grid_from_document_streams(
+    supergrid: Option[Grid[Co]],
+    level: Int,
     streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
   ) = {
     if (streams.size == 1) {
       val (id, get_rawdocs) = streams.head
-      create_grid_from_documents(id, get_rawdocs)
+      create_grid_from_documents(supergrid, level, id, get_rawdocs)
     } else {
+      // FIXME! We need to retrieve the component grids from the combined
+      // supergrid and create a subgrid from each.
+      assert(false, "Don't yet know how to handle hierarchical classifier w/multiple grids")
       val grids = streams.map { case (id, get_rawdocs) =>
-        create_grid_from_documents(id, get_rawdocs)
+        create_grid_from_documents(supergrid, level, id, get_rawdocs)
       }
       val combined =
         create_combined_grid(create_document_factory_from_params, "all", grids)
@@ -1594,7 +1639,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * combining sub-grids for each input corpus.
    */
   def initialize_grid =
-    create_grid_from_document_streams(read_raw_training_document_streams)
+    create_grid_from_document_streams(None, 0,
+      read_raw_training_document_streams)
 
   /**
    * Create a ranker object corresponding to the given name. A ranker object
@@ -1617,7 +1663,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new NaiveBayesGridRanker[Co](ranker_name, grid, features)
       }
       case "classifier" => create_classifier_ranker(ranker_name, grid,
-        grid.iter_nonempty_cells.toIndexedSeq)
+        grid.iter_nonempty_cells)
+      case "hierarchical-classifier" => ??? // Should have been handled above
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
           partial = true)
@@ -2032,22 +2079,30 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   // Fetch document-cell pairs, for the correct cell, from training data.
-  // The training documents can either be passed in (if they are cached
-  // for speed) or read from external training data. Filter to match only
-  // documents whose correct cell is one of the specified candidates.
+  // The document-cell pairs can either be passed in already (if they are
+  // cached for speed) or read from external training data.
   def get_docs_cells(grid: Grid[Co],
-      candidates: IndexedSeq[GridCell[Co]],
-      docs: Iterable[GridDoc[Co]] = Iterable()) = {
-    val docs_cells =
-      if (docs.size == 0) {
-        val raw_training_docs = read_combined_raw_training_documents(
-           "reading %s for generating classifier training data")
-        get_docs_cells_from_raw_documents(grid, raw_training_docs)
-      } else {
-        get_docs_cells_from_documents(grid, docs.toIterator)
-      }
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
+    if (xdocs_cells.size == 0) {
+      val raw_training_docs = read_combined_raw_training_documents(
+         "reading %s for generating classifier training data")
+      get_docs_cells_from_raw_documents(grid, raw_training_docs)
+    } else {
+      xdocs_cells.toIterator
+    }
+  }
+
+  // Fetch document-cell pairs, for the correct cell, from training data.
+  // The document-cell pairs can either be passed in already (if they are
+  // cached for speed) or read from external training data. Filter to match
+  // only documents whose correct cell is one of the specified candidates.
+  def get_filtered_docs_cells(grid: Grid[Co],
+      candidates: Iterable[GridCell[Co]],
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
+    val docs_cells = get_docs_cells(grid, xdocs_cells)
+    val cand_set = candidates.toSet
     docs_cells.filter { case (doc, cell) =>
-      candidates contains cell
+      cand_set contains cell
     }
   }
 
@@ -2058,23 +2113,25 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @param ranker_name An identifying string, usually "classifier".
    * @param candidates Candidates (aka classes, labels) that the classifier
    *   chooses among.
-   * @param docs Training documents. If omitted or empty, read external
-   *   training documents according to '--input' and/or positional params.
+   * @param xdocs_cells Training documents and corresponding correct cells.
+   *   If omitted or empty, read external training documents according to
+   *   '--input' and/or positional params.
    */
   def create_classifier_ranker(ranker_name: String,
-      grid: Grid[Co], candidates: IndexedSeq[GridCell[Co]],
-      docs: Iterable[GridDoc[Co]] = Iterable()) = {
+      grid: Grid[Co], candidates: Iterable[GridCell[Co]],
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
     candidates.foreach { cand => assert(cand.grid == grid) }
+    xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
+    val docs_cells = get_filtered_docs_cells(grid, candidates, xdocs_cells)
     if (params.classifier == "vowpal-wabbit")
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs, cost_sensitive = false)
+        docs_cells, cost_sensitive = false)
     else if (params.classifier == "cost-vowpal-wabbit")
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs, cost_sensitive = true)
+        docs_cells, cost_sensitive = true)
     else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
-      val docs_cells = get_docs_cells(grid, candidates, docs)
 
       /*
        * We need to do the following during training:
@@ -2147,7 +2204,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val classifier =
         trainer(TrainingData(training_instances.toIndexedSeq,
           remove_non_choice_specific_columns = false))
-      new ClassifierGridRanker[Co](ranker_name, grid, classifier,
+      new IndivClassifierGridRanker[Co](ranker_name, grid, classifier,
         featvec_factory)
     }
   }
@@ -2162,16 +2219,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   /**
-   * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
-   * treating each cell as a possible class.
+   * Create a classifer that uses Vowpal Wabbit to do its work,
+   * treating each cell in the candidate list as a possible class.
    */
-  def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
-      grid: Grid[Co], candidates: IndexedSeq[GridCell[Co]],
-      docs: Iterable[GridDoc[Co]], cost_sensitive: Boolean) = {
+  def create_vowpal_wabbit_classifier(grid: Grid[Co],
+      candidates: Iterable[GridCell[Co]],
+      docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
+      cost_sensitive: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
       output_skip_message = true)
-    val docs_cells = get_docs_cells(grid, candidates, docs)
 
     // val task = show_progress("processing features in", "document")
 
@@ -2239,8 +2296,79 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
         trainer(num_labels, feats_filename)
       }
+    (classifier, featvec_factory)
+  }
+
+  /**
+   * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
+   * treating each cell as a possible class.
+   *
+   * @param xdocs_cells Training documents and corresponding correct cells.
+   *   If omitted or empty, read external training documents according to
+   *   '--input' and/or positional params.
+   */
+  def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
+      grid: Grid[Co], candidates: Iterable[GridCell[Co]],
+      docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
+      cost_sensitive: Boolean) = {
+    val (classifier, featvec_factory) =
+      create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
+        cost_sensitive)
     new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
       featvec_factory, cost_sensitive = cost_sensitive)
+   }
+
+  /**
+   * Create a hierarchical classifier ranker, which classifies at multiple
+   * levels, from coarse to fine.
+   */
+  def create_hierarchical_classifier_ranker(ranker_name: String,
+      streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) = {
+    val coarse_grid = create_grid_from_document_streams(None, 1, streams)
+    val candidates = coarse_grid.iter_nonempty_cells
+    val raw_training_docs =
+      get_combined_raw_training_documents(
+        "reading %s for hierarchical classifier training data",
+        streams)
+    val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
+      raw_training_docs).toIndexedSeq
+    val coarse_ranker = create_classifier_ranker(ranker_name, coarse_grid,
+      candidates, docs_cells)
+    val grids = mutable.Buffer[Grid[Co]]()
+    grids += coarse_grid
+    var lastgrid = coarse_grid
+    var lastcands = candidates
+    // FIXME! What happens when we are reading multiple streams and creating
+    // multiple grids? docs_cells combines all the streams; does this make
+    // sense?
+    val finer_rankers = for (i <- 2 to params.num_levels) yield {
+      val subgrid =
+        create_grid_from_document_streams(Some(lastgrid), i, streams)
+      // docs_cells contains cells from the coarsest grid; we need to redo
+      // it to contain cells from the subgrid we just created.
+      val finer_docs_cells =
+        get_docs_cells_from_documents(subgrid, docs_cells.toIterator.map {
+          case (doc, cell) => doc }
+        ).toIndexedSeq
+      val subcands_lists_ranker_entries =
+        lastcands.map { cand =>
+          val subcands = subgrid.get_subdivided_cells(cand)
+          val subranker = create_classifier_ranker(ranker_name,
+            subgrid, subcands, finer_docs_cells)
+          (subcands, cand -> subranker)
+        }
+      val (subcands_lists, ranker_entries) =
+        subcands_lists_ranker_entries.unzip
+      val subcands = subcands_lists.flatten
+      val rankers = ranker_entries.toMap
+      grids += subgrid
+      lastgrid = subgrid
+      lastcands = subcands
+      rankers
+    }
+
+    new HierarchicalClassifierGridRanker[Co](ranker_name, grids,
+      coarse_ranker, finer_rankers, docs_cells, params.beam_size)
   }
 
   /**
@@ -2251,8 +2379,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_ranker_from_document_streams(
     streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
   ) = {
-    val grid = create_grid_from_document_streams(streams)
-    create_named_ranker(params.ranker, grid)
+    if (params.ranker == "hierarchical-classifier")
+      create_hierarchical_classifier_ranker(params.ranker, streams)
+    else {
+      val grid = create_grid_from_document_streams(None, 0, streams)
+      create_named_ranker(params.ranker, grid)
+    }
   }
 
   /**

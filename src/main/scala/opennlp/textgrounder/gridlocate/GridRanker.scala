@@ -180,6 +180,9 @@ abstract class PointwiseScoreGridRanker[Co](
    */
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]): Double
 
+  def get_candidates(correct: Option[GridCell[Co]], include_correct: Boolean) =
+    grid.iter_nonempty_cells_including(correct, include_correct)
+
   /**
    * Compare a language model (for a document, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
@@ -187,8 +190,7 @@ abstract class PointwiseScoreGridRanker[Co](
    */
   def return_ranked_cells_serially(doc: GridDoc[Co],
       correct: Option[GridCell[Co]], include_correct: Boolean) = {
-    for (cell <- grid.iter_nonempty_cells_including(correct, include_correct))
-        yield {
+    for (cell <- get_candidates(correct, include_correct)) yield {
       if (debug("ranking")) {
         errprint(
           "Nonempty cell at indices %s = location %s, num_documents = %s",
@@ -206,7 +208,7 @@ abstract class PointwiseScoreGridRanker[Co](
    */
   def return_ranked_cells_parallel(doc: GridDoc[Co],
       correct: Option[GridCell[Co]], include_correct: Boolean) = {
-    val cells = grid.iter_nonempty_cells_including(correct, include_correct)
+    val cells = get_candidates(correct, include_correct)
     cells.par.map(c => (c, score_cell(doc, c)))
   }
 
@@ -426,17 +428,56 @@ class NaiveBayesGridRanker[Co](
 }
 
 /** Use a classifier (normally maxent) for comparing document and cell. */
-class ClassifierGridRanker[Co](
+abstract class ClassifierGridRanker[Co](
+  ranker_name: String,
+  grid: Grid[Co],
+  featvec_factory: CandidateFeatVecFactory[Co]
+) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+
+  // Only include the cells corresponding to those labels that the classifier
+  // knows, possibly plus the correct cell if required.
+  override def get_candidates(correct: Option[GridCell[Co]],
+      include_correct: Boolean) = {
+    val cands =
+      (0 until featvec_factory.featvec_factory.mapper.number_of_labels
+      ).map { label => featvec_factory.index_to_cell(label) }
+    if (!include_correct || cands.find(_ == correct.get) != None)
+      cands
+    else
+      correct.get +: cands
+  }
+
+  /**
+   * Score a document by directly invoking the classifier, rather than
+   * by looking up a cache of scores, if such a cache exists.
+   */
+  def score_doc_directly(doc: GridDoc[Co]): Iterable[(GridCell[Co], Double)]
+}
+
+/**
+ * A classifier where we can use the normal LinearClassifier mechanism,
+ * i.e. where we have the weights directly available and can cheaply score
+ * an individual cell of an individual document. */
+class IndivClassifierGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co],
   classifier: LinearClassifier,
   featvec_factory: CandidateFeatVecFactory[Co]
-) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+) extends ClassifierGridRanker[Co](ranker_name, grid, featvec_factory) {
 
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
     val fv = featvec_factory(doc, cell, 0, 0, is_training = false)
-    classifier.score_label(fv, featvec_factory.lookup_cell(cell))
+    // We might be asked about a cell outside of the set of candidates,
+    // especially when we have a limited set of possible candidates.
+    // See comment in VowpalWabbitGridRanker for more info.
+    featvec_factory.lookup_cell_if(cell) match {
+      case Some(label) => classifier.score_label(fv, label)
+      case None => Double.NegativeInfinity
+    }
   }
+
+  def score_doc_directly(doc: GridDoc[Co]) =
+    return_ranked_cells(doc, None, include_correct = false)
 }
 
 /** Use a Vowpal Wabbit classifier for comparing document and cell. */
@@ -446,7 +487,7 @@ class VowpalWabbitGridRanker[Co](
   classifier: VowpalWabbitClassifier,
   featvec_factory: DocFeatVecFactory[Co],
   cost_sensitive: Boolean
-) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
+) extends ClassifierGridRanker[Co](ranker_name, grid, featvec_factory) {
 
   var doc_scores: Map[String, Array[Double]] = _
 
@@ -454,6 +495,11 @@ class VowpalWabbitGridRanker[Co](
     get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
   ) {
     val docs = grid.docfact.document_statuses_to_documents(get_docstats())
+    doc_scores = score_test_docs(docs).toMap
+  }
+
+  def score_test_docs(docs: Iterator[GridDoc[Co]]
+      ): Iterable[(String, Array[Double])] = {
     val titles = mutable.Buffer[String]()
 
     val feature_file =
@@ -480,7 +526,7 @@ class VowpalWabbitGridRanker[Co](
           (feats, 0)
         }
 
-        classifier.write_feature_file(training_data.toIterator)
+        classifier.write_feature_file(training_data)
       }
     val list_of_scores =
       classifier(feature_file).map { raw_label_scores =>
@@ -504,7 +550,8 @@ class VowpalWabbitGridRanker[Co](
           featvec_factory.featvec_factory.mapper.number_of_labels)
         scores
       }
-    doc_scores = (titles zip list_of_scores).toMap
+    assert(titles.size == list_of_scores.size)
+    titles zip list_of_scores
   }
 
   def score_cell(doc: GridDoc[Co], cell: GridCell[Co]) = {
@@ -512,18 +559,114 @@ class VowpalWabbitGridRanker[Co](
     // We might be asked about a cell outside of the set of candidates,
     // especially when we have a limited set of possible candidates.
     // Note that the set of labels that the classifier knows about may
-    // be less than the number in the 'candidates' class param,
-    // particularly in the non-cost-sensitive case, where the classifier
-    // only knows about labels corresponding to candidates with a non-zero
-    // number of training documents in them. (In the cost-sensitive case
-    // we have to supply costs for all labels for each training document,
-    // and we go ahead and convert all candidates to labels.)
+    // be less than the number in the 'candidates' param passed to
+    // create_classifier_ranker(), particularly in the non-cost-sensitive
+    // case, where the classifier only knows about labels corresponding
+    // to candidates with a non-zero number of training documents in them.
+    // (In the cost-sensitive case we have to supply costs for all labels
+    // for each training document, and we go ahead and convert all
+    // candidates to labels.)
     featvec_factory.lookup_cell_if(cell) match {
-      case Some(label) =>
-        scores(label)
-      case None =>
-        Double.NegativeInfinity
+      case Some(label) => scores(label)
+      case None => Double.NegativeInfinity
     }
+  }
+
+  /**
+   * Score a document by directly invoking the classifier (which requires
+   * spawning the VW app), rather than by looking up a cache of scores.
+   */
+  def score_doc_directly(doc: GridDoc[Co]) = {
+    val scores = score_test_docs(Iterator(doc)).head._2
+    val cands = get_candidates(None, include_correct = false)
+    assert(scores.size == cands.size)
+    cands zip scores
+  }
+}
+
+/** Use a hierarchical classifier for comparing document and
+  * cell. We work as follows:
+  *
+  * 1. Classify at the coarsest grid level, over all the cells in that grid.
+  *    Take the top N for some beam size.
+  * 2. For each grid cell, classify among the subdividing cells at the next
+  *    finer grid. This computes e.g. p(C2|C1) for cell C1 at the coarsest
+  *    level and cell C2 at the next finer level. Compute e.g. p(C1,C2) =
+  *    p(C1) * p(C2|C1); again take the top N.
+  * 3. Repeat till we reach the finest level.
+  *
+  * We need one classifier over all the non-empty cells at the coarsest level,
+  * then for each subsequent level except the finest, as many classifiers
+  * as there are non-empty cells on that level.
+  *
+  * @param ranker_name Identifying string, usually "classifier".
+  * @param grids List of successive hierarchical grids, from coarse to fine.
+  * @param coarse_ranker Ranker at coarsest level for all cells at
+  *   that level.
+  * @param finer_rankers Sequence of maps, one per grid other than at the
+  *   coarsest level, mapping a grid cell at a coarser level to a ranker
+  *   over the subdivided cells of that cell at the next finer level.
+  * @param beam_size Number of top-ranked cells we keep from one level to
+  *   the next.
+  * @param cost_sensitive Whether we are doing cost-sensitive classification.
+  */
+class HierarchicalClassifierGridRanker[Co](
+  ranker_name: String,
+  grids: Iterable[Grid[Co]],
+  coarse_ranker: ClassifierGridRanker[Co],
+  finer_rankers: Iterable[Map[GridCell[Co], ClassifierGridRanker[Co]]],
+  training_docs_cells: Iterable[(GridDoc[Co], GridCell[Co])],
+  beam_size: Int
+) extends SimpleGridRanker[Co](ranker_name, grids.last) {
+
+  val coarsest_grid = grids.head
+  // val finest_grid = grids.last
+
+  override def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+  ) {
+    coarse_ranker.initialize(get_docstats)
+  }
+
+  def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
+      include_correct: Boolean): Iterable[(GridCell[Co], Double)] = {
+    val raw_prev_scores =
+      for (cell <- coarsest_grid.iter_nonempty_cells) yield {
+        val score = coarse_ranker.score_cell(doc, cell)
+        (cell, score)
+      }
+    var prev_scores =
+      raw_prev_scores.toIndexedSeq.sortWith(_._2 > _._2)
+    for ((finer, rankers) <- grids.tail zip finer_rankers) {
+      // Cells at previous level that will be propagated to new level
+      val beamed_prev_scores = prev_scores.take(beam_size)
+      val new_scores = for ((old_cell, old_score) <- beamed_prev_scores) yield {
+        val ranker = rankers(old_cell)
+        val doc_ranked_scores =
+          ranker.score_doc_directly(doc).toIndexedSeq.sortWith(_._2 > _._2)
+        val (top_cell, top_score) = doc_ranked_scores.head
+        (top_cell, old_score + top_score)
+      }
+      prev_scores = new_scores.sortWith(_._2 > _._2)
+      /*
+      The other way of doing hierarchical classification, constructing new
+      classifiers on the fly.
+
+      // Expand each cell to one or more cells at new level. Convert to set
+      // to remove duplicates, then back to indexed sequence.
+      val new_cells =
+        prev_cells.flatMap { finer.get_subdivided_cells(_) }.toSet.toIndexedSeq
+      val new_ranker = finer.driver.create_classifier_ranker(
+        ranker_name, finer, new_cells, training_docs_cells)
+      val new_scores =
+        if (finer == finest_grid)
+          new_ranker.evaluate(doc, correct, include_correct)
+        else
+          new_ranker.evaluate(doc, None, false)
+      prev_scores = new_scores.toIndexedSeq
+      */
+    }
+    prev_scores
   }
 }
 

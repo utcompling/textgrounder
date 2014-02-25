@@ -249,6 +249,15 @@ cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
 
+  var subdivide_factor =
+    ap.option[Int]("subdivide-factor", "sd",
+      default = 2,
+      must = be_>=(2),
+      help = """Factor to use when subdividing grid cells in hierarchical
+classification. Must be an integer >= 2. This represents the factor in each
+dimension, e.g. if the factor is 3 then each cell will be divided into 9
+smaller cells. Default %default.""")
+
   // Handle different ways of specifying grid size
 
   def check_set(value: Double) = {

@@ -117,6 +117,13 @@ class TimeGrid(
   }.toMap
   var total_num_cells = 2 * categories.length
 
+  // FIXME!
+  def create_subdivided_grid(create_docfact: => GridDocFactory[TimeCoord],
+    id: String) = ???
+
+  // FIXME!
+  def get_subdivided_cells(cell: GridCell[TimeCoord]) = ???
+
   def find_best_cell_for_coord(coord: TimeCoord,
       create_non_recorded: Boolean) = ???
 

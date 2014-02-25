@@ -29,7 +29,7 @@ import util.experiment._
 import util.textdb.Row
 import util.debug._
 
-import gridlocate.DocStatus
+import gridlocate.{DocStatus, GridDocFactory}
 
 /////////////////////////////////////////////////////////////////////////////
 //                         A regularly spaced grid                         //
@@ -418,6 +418,46 @@ class MultiRegularGrid(
   }
 
   /*************** End conversion functions *************/
+
+  def create_subdivided_grid(create_docfact: => GridDocFactory[SphereCoord],
+      id: String) = {
+    val new_docfact = create_docfact.asInstanceOf[SphereDocFactory]
+    new MultiRegularGrid(degrees_per_cell /
+        new_docfact.driver.params.subdivide_factor,
+      cell_offset_degrees, width_of_multi_cell, new_docfact, id)
+  }
+
+  def get_subdivided_cells(cell: SphereCell) = {
+    cell match {
+      case rec: RectangularCell => {
+        val jitter = 0.0001
+        val sw = rec.get_southwest_coord
+        val jitter_sw = SphereCoord(sw.lat + jitter, sw.long + jitter)
+        val sw_index = coord_to_multi_cell_index(jitter_sw)
+        val ne = rec.get_northeast_coord
+        val jitter_ne = SphereCoord(ne.lat - jitter, ne.long - jitter)
+        val ne_index = coord_to_multi_cell_index(jitter_ne)
+        // Conceivably, the larger cell might wrap across 180 degrees,
+        // meaning the NE longitude index will be less than the SW one.
+        // We need to "unwrap" in that case so we are always iterating
+        // upwards; we will re-wrap when coerce() is called.
+        var ne_index_longind = ne_index.longind
+        while (ne_index_longind < sw_index.longind)
+          ne_index_longind += (maximum_longind - minimum_longind + 1)
+        assert(sw_index.latind <= ne_index.latind)
+        val indices =
+          for (
+            i <- sw_index.latind to ne_index.latind;
+            j <- sw_index.longind to ne_index_longind
+          ) yield RegularCellIndex.coerce(this, i, j)
+        indices.flatMap { index =>
+          find_cell_for_cell_index(index, create = false,
+            record_created_cell = false)
+        }
+      }
+      case _ => ???
+    }
+  }
 
   /**
    * For a given coordinate, iterate over the multi cells containing the

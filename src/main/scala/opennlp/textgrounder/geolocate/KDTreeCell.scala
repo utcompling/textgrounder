@@ -34,7 +34,7 @@ import util.textdb.Row
 
 import langmodel.UnigramLangModel
 
-import gridlocate.DocStatus
+import gridlocate.{DocStatus, GridDocFactory}
 
 class KdTreeCell(
   cellgrid: KdTreeGrid,
@@ -81,6 +81,13 @@ class KdTreeGrid(
 
   val nodes_to_cell: Map[KdTree, KdTreeCell] = Map()
   val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
+
+  // FIXME!
+  def create_subdivided_grid(create_docfact: => GridDocFactory[SphereCoord],
+    id: String) = ???
+
+  // FIXME!
+  def get_subdivided_cells(cell: SphereCell) = ???
 
   def add_training_documents_to_grid(
       get_rawdocs: String => Iterator[DocStatus[Row]]) {
@@ -130,6 +137,8 @@ class KdTreeGrid(
     // here if we've never seen an evaluation point before.
     Option(leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long))))
   }
+
+  def get_overlapping_cells(cell: SphereCell) = ???
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),

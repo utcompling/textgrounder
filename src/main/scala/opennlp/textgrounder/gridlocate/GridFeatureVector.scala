@@ -58,20 +58,20 @@ trait FeatVecFactory[Co] {
   val binning_status: BinningStatus
 
   // Convert cells to label indices without regenerating strings constantly.
-  val cell_to_index = mutable.Map[GridCell[Co], LabelIndex]()
+  val cell_to_index_map = mutable.Map[GridCell[Co], LabelIndex]()
   // Convert in the opposite direction.
-  val index_to_cell = mutable.Map[LabelIndex, GridCell[Co]]()
+  val index_to_cell_map = mutable.Map[LabelIndex, GridCell[Co]]()
 
   /** Convert a cell to an index. Cached for speed and to avoid excessive
     * memory generation of strings. */
   def lookup_cell(cell: GridCell[Co]): LabelIndex = {
-    cell_to_index.get(cell) match {
+    cell_to_index_map.get(cell) match {
       case Some(index) => index
       case None => {
         val center = cell.format_coord(cell.get_true_center)
         val label = featvec_factory.mapper.label_to_index(center)
-        cell_to_index += cell -> label
-        index_to_cell += label -> cell
+        cell_to_index_map += cell -> label
+        index_to_cell_map += label -> cell
         label
       }
     }
@@ -79,7 +79,13 @@ trait FeatVecFactory[Co] {
 
   /** Convert a cell to an existing index. Don't create any new indices. */
   def lookup_cell_if(cell: GridCell[Co]): Option[LabelIndex] =
-    cell_to_index.get(cell)
+    cell_to_index_map.get(cell)
+
+  /** Convert label index to cell. Must be valid. */
+  def index_to_cell(label: LabelIndex) = {
+    assert(label >= 0 && label < featvec_factory.mapper.number_of_labels)
+    index_to_cell_map(label)
+  }
 
   val logarithmic_base = 2.0
 

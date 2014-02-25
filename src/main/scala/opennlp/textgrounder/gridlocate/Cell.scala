@@ -336,6 +336,24 @@ abstract class Grid[Co](
     docfact.coord_handler.output_distance(dist)
 
   /**
+   * Create another grid with each cell subdivided. The relevant command-line
+   * parameters, which will be specific to each type of grid, determine
+   * how to subdivide the cells.
+   *
+   * @param create_docfact Same as in `create_empty_grid`.
+   * @param id Same as in `create_empty_grid`.
+   */
+  def create_subdivided_grid(create_docfact: => GridDocFactory[Co],
+    id: String): Grid[Co]
+
+  /**
+   * If this grid was created by subdividing another grid, then, for a given
+   * cell in that grid, return the corresponding subdivided cells in this
+   * grid. Error if this grid was not created by subdivision.
+   */
+  def get_subdivided_cells(cell: GridCell[Co]): Iterable[GridCell[Co]]
+
+  /**
    * Find the correct cell for the given coordinate. If no such cell exists,
    * return None if `create_non_recorded` is false.  Else, create an empty
    * cell to hold the coordinates -- but do *NOT* record the cell or otherwise
