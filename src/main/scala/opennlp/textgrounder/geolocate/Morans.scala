@@ -52,7 +52,11 @@ class MoransDriver extends
 
   def run() {
     //First Create Grid
-    val grid = initialize_grid
+    val xgrid = initialize_grid
+    val grid = xgrid match {
+      case g: MultiRegularGrid => g
+      case _ => throw new IllegalArgumentException("Morans needs a regular grid, not a K-d grid")
+    }
     println("######Starting Morans#######")
     val wordMoransMap = Map[Int, Double]()
     val wordMoransSum_Numer = Map[Int, Double]()
@@ -60,19 +64,20 @@ class MoransDriver extends
     val wordMoransSum_Neighbors = Map[Int, Double]()
 
     //println(grid.asInstanceOf[AnyRef].getClass.getSimpleName)
-    val wordMap_lookupMap = getWordMeans(grid.asInstanceOf[MultiRegularGrid])
+    val wordMap_lookupMap = getWordMeans(grid)
 
-    for (cell <- grid.iter_nonempty_cells) {
+    for (xcell <- grid.iter_nonempty_cells) {
+      val cell = xcell.asInstanceOf[MultiRegularCell]
       //println("Cell: %s" format cell)
       /*println("#############")
-      println(cell.asInstanceOf[MultiRegularCell].index.latind)
-      println(cell.asInstanceOf[MultiRegularCell].index.longind)
+      println(cell.index.latind)
+      println(cell.index.longind)
       println("#############")*/
 
       //println(cell.asInstanceOf[AnyRef].getClass.getSimpleName)
       val lm = Unigram.check_unigram_lang_model(cell.lang_model.grid_lm)
 
-      val index = cell.asInstanceOf[MultiRegularCell].index
+      val index = cell.index
       //New way of calculating Morans.  Every cell that contains any data will have a probability for every word. Every cell can be the focus of a window
       for (key <- wordMap_lookupMap._2){
 
@@ -80,28 +85,28 @@ class MoransDriver extends
         //println(key._2)
         val mean = wordMap_lookupMap._1(word)
 
-        val CAF = cellProb((index.latind + 1), index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CAF = cellProb((index.latind + 1), index.longind, grid, word)
         //println("Cell Above Prob " + CAF)
 
         //Cell Below Frequency (CBF)
-        val CBF = cellProb((index.latind - 1), index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CBF = cellProb((index.latind - 1), index.longind, grid, word)
 
-        //val CBF = cellProb((cell.asInstanceOf[MultiRegularCell].index.latind - 1), cell.asInstanceOf[MultiRegularCell].index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        //val CBF = cellProb((cell.index.latind - 1), cell.index.longind, grid, word)
         //println("Cell Below Prob " + CBF)
 
         //Cell Left Frequency (CLF)
-        val CLF = cellProb(index.latind, (index.longind - 1) , grid.asInstanceOf[MultiRegularGrid], word)
-        //val CLF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, (cell.asInstanceOf[MultiRegularCell].index.longind - 1), grid.asInstanceOf[MultiRegularGrid], word)
+        val CLF = cellProb(index.latind, (index.longind - 1) , grid, word)
+        //val CLF = cellProb(cell.index.latind, (cell.index.longind - 1), grid, word)
         //println("Cell Left Prob " + CLF)
 
         //Cell Right Frequency (CRF)
-        val CRF = cellProb(index.latind, (index.longind + 1), grid.asInstanceOf[MultiRegularGrid], word)
-        //val CRF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, (cell.asInstanceOf[MultiRegularCell].index.longind + 1), grid.asInstanceOf[MultiRegularGrid], word)
+        val CRF = cellProb(index.latind, (index.longind + 1), grid, word)
+        //val CRF = cellProb(cell.index.latind, (cell.index.longind + 1), grid, word)
         //println("Cell Right Prob " + CRF)
 
         //Cell Frequency (CF)
-        val CF = cellProb(index.latind, index.longind, grid.asInstanceOf[MultiRegularGrid], word)
-        //val CF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, cell.asInstanceOf[MultiRegularCell].index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CF = cellProb(index.latind, index.longind, grid, word)
+        //val CF = cellProb(cell.index.latind, cell.index.longind, grid, word)
         //println("Cell Center Prob " + CF)
 
         val morans_numerator = CalcNumer(CF, CAF, CBF, CLF, CRF, mean)._1
@@ -154,25 +159,25 @@ class MoransDriver extends
 
         //println(wordMap_lookupMap._2(word))
 
-        val index = cell.asInstanceOf[MultiRegularCell].index
+        val index = cell.index
         //Cell Above Frequency (CAF)
-        val CAF = cellProb((index.latind + 1), index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CAF = cellProb((index.latind + 1), index.longind, grid, word)
         //println(CAF)
 
         //Cell Below Frequency (CBF)
-        val CBF = cellProb((cell.asInstanceOf[MultiRegularCell].index.latind - 1), cell.asInstanceOf[MultiRegularCell].index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CBF = cellProb((cell.index.latind - 1), cell.index.longind, grid, word)
         //println(CBF)
 
         //Cell Left Frequency (CLF)
-        val CLF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, (cell.asInstanceOf[MultiRegularCell].index.longind - 1), grid.asInstanceOf[MultiRegularGrid], word)
+        val CLF = cellProb(cell.index.latind, (cell.index.longind - 1), grid, word)
         //println(CLF)
 
         //Cell Right Frequency (CRF)
-        val CRF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, (cell.asInstanceOf[MultiRegularCell].index.longind + 1), grid.asInstanceOf[MultiRegularGrid], word)
+        val CRF = cellProb(cell.index.latind, (cell.index.longind + 1), grid, word)
         //println(CRF)
 
         //Cell Frequency (CF)
-        val CF = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, cell.asInstanceOf[MultiRegularCell].index.longind, grid.asInstanceOf[MultiRegularGrid], word)
+        val CF = cellProb(cell.index.latind, cell.index.longind, grid, word)
         //println(CF)
 
         //Morans_Numerator (CF - Mean)*(CAF - Mean) + (CF - Mean)*(CBF - Mean) + (CF - Mean)*(CLF-Mean) + (CF-Mean)*(CRF-Mean)
@@ -248,7 +253,7 @@ class MoransDriver extends
   }
   def cellProb(latind:Int, longind:Int, grid:MultiRegularGrid, word:Int) = {
     //Check below line for possible problem
-    val cell = grid.asInstanceOf[MultiRegularGrid].find_cell_for_cell_index(RegularCellIndex(latind, longind), create=false, record_created_cell=false)
+    val cell = grid.find_cell_for_cell_index(RegularCellIndex(latind, longind), create=false, record_created_cell=false)
     val CF = cell match {
       case Some(cell) => Unigram.check_unigram_lang_model(cell.lang_model.grid_lm).gram_prob(word)
       case None => -99.9

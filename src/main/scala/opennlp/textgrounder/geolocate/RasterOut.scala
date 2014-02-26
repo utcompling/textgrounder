@@ -44,12 +44,16 @@ class RasterDriver extends
   // }
 
   def run() {
-  	val grid = initialize_grid
+    val xgrid = initialize_grid
+    val grid = xgrid match {
+      case g: MultiRegularGrid => g
+      case _ => throw new IllegalArgumentException("RasterOut needs a regular grid, not a K-d grid")
+    }
 
-  	println("###### Starting Raster ######")
-  	println(params.word_raster)
-  	//println(RasterOutParameters.word_raster)
-  	//println(RasterOutParameters.raster_output)
+    println("###### Starting Raster ######")
+    println(params.word_raster)
+    //println(RasterOutParameters.word_raster)
+    //println(RasterOutParameters.raster_output)
     //First Create Grid
     println(params.raster_output)
     println(params.word_raster)
@@ -63,23 +67,23 @@ class RasterDriver extends
     val wordMoransMap = Map[Int, Double]()
     val cellsInfo = Map[String, List[String]]()
 
-    //println(grid.asInstanceOf[AnyRef].getClass.getSimpleName)
-    val wordMap_lookupMap = getWordMeans(grid.asInstanceOf[MultiRegularGrid])
+    //println(grid.getClass.getSimpleName)
+    val wordMap_lookupMap = getWordMeans(grid)
 
     val word = word_raster
     val wordid = wordMap_lookupMap._2(word)
     val degsize = (params.degrees_per_cell).toString()
 
-    for (cell <- grid.iter_nonempty_cells) {
+    for (xcell <- grid.iter_nonempty_cells) {
+      val cell = xcell.asInstanceOf[MultiRegularCell]
 
-  		val w_coord = cell.asInstanceOf[MultiRegularCell].get_southwest_coord.long
-      val s_coord = cell.asInstanceOf[MultiRegularCell].get_southwest_coord.lat
+      val w_coord = cell.get_southwest_coord.long
+      val s_coord = cell.get_southwest_coord.lat
 
+      val index = cell.index
 
-  		val index = cell.asInstanceOf[MultiRegularCell].index
-
-  		val CP = cellProb(cell.asInstanceOf[MultiRegularCell].index.latind, cell.asInstanceOf[MultiRegularCell].index.longind, grid.asInstanceOf[MultiRegularGrid], wordid)
-  		cellsInfo += ((index.latind + "-" + index.longind) -> List(CP.toString(), w_coord.toString(), s_coord.toString()))
+      val CP = cellProb(cell.index.latind, cell.index.longind, grid, wordid)
+      cellsInfo += ((index.latind + "-" + index.longind) -> List(CP.toString(), w_coord.toString(), s_coord.toString()))
 
       val lm = Unigram.check_unigram_lang_model(cell.lang_model.grid_lm)
 
@@ -192,7 +196,7 @@ class RasterDriver extends
   }
   def cellProb(latind:Int, longind:Int, grid:MultiRegularGrid, word:Int) = {
     //Check below line for possible problem
-    val cell = grid.asInstanceOf[MultiRegularGrid].find_cell_for_cell_index(RegularCellIndex(latind, longind), create=false, record_created_cell=false)
+    val cell = grid.find_cell_for_cell_index(RegularCellIndex(latind, longind), create=false, record_created_cell=false)
     val CF = cell match {
       case Some(cell) => Unigram.check_unigram_lang_model(cell.lang_model.grid_lm).gram_prob(word)
       case None => -99.9
