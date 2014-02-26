@@ -253,7 +253,7 @@ class MoransDriver extends
   }
   def cellProb(latind:Int, longind:Int, grid:MultiRegularGrid, word:Int) = {
     //Check below line for possible problem
-    val cell = grid.find_cell_for_cell_index(RegularCellIndex(latind, longind), create=false, record_created_cell=false)
+    val cell = grid.find_cell_for_cell_index(RegularCellIndex(grid, latind, longind), create=false, record_created_cell=false)
     val CF = cell match {
       case Some(cell) => Unigram.check_unigram_lang_model(cell.lang_model.grid_lm).gram_prob(word)
       case None => -99.9

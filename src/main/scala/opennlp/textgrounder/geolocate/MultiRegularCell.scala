@@ -77,12 +77,25 @@ import gridlocate.DocStatus
 /**
  * The index of a regular cell, using "cell index" integers, as described
  * above.
+ *
+ * Note that the constructor is marked as private, meaning that you cannot
+ * create an index simply with a latitude and longitude. Instead, you must
+ * either use the three-argument constructor (the `apply` function defined
+ * in the companion class), which checks that the indices are valid, or
+ * the `coerce` function, which forces the indices to be valid if they are
+ * out of bounds (by wrapping or truncating).
  */
-case class RegularCellIndex(latind: Int, longind: Int) {
+case class RegularCellIndex private (latind: Int, longind: Int) {
   def toFractional = FractionalRegularCellIndex(latind, longind)
 }
 
 object RegularCellIndex {
+  /**
+   * Construct a RegularCellIndex, checking that the given indices are
+   * valid for the specified grid.
+   */
+  def apply(grid: MultiRegularGrid, latind: Int, longind: Int):
+      RegularCellIndex = {
   /* SCALABUG: Why do I need to specify RegularCellIndex as the return type
      here?  And why is this not required in the almost identical construction
      in SphereCoord?  I get this error (not here, but where the object is
@@ -92,11 +105,10 @@ object RegularCellIndex {
      [error]     RegularCellIndex(latind, longind)
      [error]     ^
      */
-  def apply(grid: MultiRegularGrid, latind: Int, longind: Int):
-      RegularCellIndex = {
-    require(valid(grid, latind, longind),
-      "Coordinate indices (%s,%s) invalid for grid %s"
-        format (latind, longind, grid))
+    if (grid.initialized)
+      require(valid(grid, latind, longind),
+        "Coordinate indices (%s,%s) invalid for grid %s"
+          format (latind, longind, grid))
     new RegularCellIndex(latind, longind)
   }
 
@@ -122,6 +134,11 @@ object RegularCellIndex {
     (newlatind, newlongind)
   }
 
+  /**
+   * Construct a RegularCellIndex by coercing the given indices to be
+   * in bounds if they aren't already. Latitude indices are truncated to
+   * the maximum/minimum, and longitude indices are wrapped.
+   */
   def coerce(grid: MultiRegularGrid, latind: Int, longind: Int) = {
     val (newlatind, newlongind) = coerce_indices(grid, latind, longind)
     apply(grid, newlatind, newlongind)
@@ -218,6 +235,9 @@ class MultiRegularGrid(
    */
   val modded_cod = SphereCoord(cell_offset_degrees.lat % degrees_per_cell,
     cell_offset_degrees.long % degrees_per_cell)
+  // Bootstrapping to avoid problems creating a RegularCellIndex when
+  // min/max indices not yet initialized
+  var initialized = false
   val maximum_index =
     coord_to_tiling_cell_index(SphereCoord(maximum_latitude - 1e-10,
       maximum_longitude - 1e-10))
@@ -227,6 +247,7 @@ class MultiRegularGrid(
     coord_to_tiling_cell_index(SphereCoord(minimum_latitude, minimum_longitude))
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
+  initialized = true
 
 
   /**
@@ -254,7 +275,7 @@ class MultiRegularGrid(
   def coord_to_tiling_cell_index(coord: SphereCoord) = {
     val latind = floor((coord.lat - modded_cod.lat) / degrees_per_cell).toInt
     val longind = floor((coord.long - modded_cod.long) / degrees_per_cell).toInt
-    RegularCellIndex(latind, longind)
+    RegularCellIndex(this, latind, longind)
   }
 
   /**
@@ -467,7 +488,7 @@ class MultiRegularGrid(
     val indices =
       for (i <- minimum_latind to maximum_latind;
            j <- minimum_longind to maximum_longind)
-         yield RegularCellIndex(i, j)
+         yield RegularCellIndex(this, i, j)
 
     // This doesn't take much time so turn it off.
     // driver.show_progress("generating non-empty", "Earth-tiling cell").
