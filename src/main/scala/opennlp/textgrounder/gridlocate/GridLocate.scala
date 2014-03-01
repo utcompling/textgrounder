@@ -300,55 +300,6 @@ away.""")
       help = """Adjust word counts according to TF-IDF weighting (i.e.
 downweight words that occur in many documents).""")
 
-  //// Options used when doing Naive Bayes geolocation
-//FIXME: No longer clear what the idea of the following was.
-//  var naive_bayes_word_weighting =
-//    ap.option[String]("naive-bayes-word-weighting", "nbw",
-//      metavar = "STRATEGY",
-//      default = "fixed",
-//      choices = Seq("fixed", "distance-weighted"),
-//      help = """Strategy for weighting the different probabilities
-//that go into Naive Bayes.  If 'fixed', use fixed weights for the prior
-//probability and likelihood, according to '--naive-bayes-prior-weight'.
-//If 'distance-weighted' weight each word according to distance from the
-//toponym (????).""")
-  var naive_bayes_prior_weight =
-    ap.option[Double]("naive-bayes-prior-weight", "nbpw",
-      metavar = "WEIGHT",
-      default = 0.5,
-      must = be_and(be_>=(0.0), be_<=(1.0)),
-      help = """Relative weight to assign to the prior probability (vs.
-the likelihood) when doing Naive Bayes ranking.  Default 0.5, which does
-standard unweighted Naive Bayes.""")
-  var naive_bayes_prior =
-    ap.option[String]("naive-bayes-prior", "nbp",
-      metavar = "STRATEGY",
-      default = "uniform",
-      choices = Seq("uniform", "salience", "log-salience", "num-docs",
-        "log-num-docs"),
-      help = """Strategy for computing the prior probability when doing
-Naive Bayes ranking. Possibilities are 'uniform', 'salience', 'log-salience',
-'num-docs', and 'log-num-docs'. Default %default.""")
-  var naive_bayes_features =
-    ap.option[String]("naive-bayes-features", "nbf",
-      metavar = "STRATEGY",
-      default = "terms",
-      help = """Which features to use when using Naive Bayes to rank
-the cells for a document. Possibilities are:
-
-'terms' (use the terms of the language model);
-
-'rough-ranker' (run a ranker -- usually at a coarser grid partition -- and
-  use its scores as a feature);
-
-Multiple feature types can be specified, separated by spaces or commas.
-
-Default %default.""")
-
-  lazy val naive_bayes_feature_list =
-    get_feature_list(naive_bayes_features, Seq("terms", "rough-ranker"),
-      "naive-bayes-features")
-
   var stopwords_file =
     ap.option[String]("stopwords-file",
       metavar = "FILE",
@@ -648,6 +599,62 @@ simple algorithms meant for comparison purposes.
 
 """ + ranker_baseline_help +
 """Default is '%default'.""")
+
+  //// Options used when doing Naive Bayes geolocation
+//FIXME: No longer clear what the idea of the following was.
+//  var naive_bayes_word_weighting =
+//    ap.option[String]("naive-bayes-word-weighting", "nbw",
+//      metavar = "STRATEGY",
+//      default = "fixed",
+//      choices = Seq("fixed", "distance-weighted"),
+//      help = """Strategy for weighting the different probabilities
+//that go into Naive Bayes.  If 'fixed', use fixed weights for the prior
+//probability and likelihood, according to '--naive-bayes-prior-weight'.
+//If 'distance-weighted' weight each word according to distance from the
+//toponym (????).""")
+  var naive_bayes_prior_weight =
+    ap.option[Double]("naive-bayes-prior-weight", "nbpw",
+      metavar = "WEIGHT",
+      default = 0.5,
+      must = be_and(be_>=(0.0), be_<=(1.0)),
+      help = """Relative weight to assign to the prior probability (vs.
+the likelihood) when doing Naive Bayes ranking.  Default 0.5, which does
+standard unweighted Naive Bayes.""")
+  var naive_bayes_prior =
+    ap.option[String]("naive-bayes-prior", "nbp",
+      metavar = "STRATEGY",
+      default = "uniform",
+      choices = Seq("uniform", "salience", "log-salience", "num-docs",
+        "log-num-docs"),
+      help = """Strategy for computing the prior probability when doing
+Naive Bayes ranking. Possibilities are 'uniform', 'salience', 'log-salience',
+'num-docs', and 'log-num-docs'. Default %default.""")
+  var naive_bayes_features =
+    ap.option[String]("naive-bayes-features", "nbf",
+      metavar = "STRATEGY",
+      default = "terms",
+      help = """Which features to use when using Naive Bayes to rank
+the cells for a document. Possibilities are:
+
+'terms' (use the terms of the language model);
+
+'rough-ranker' (run a ranker -- usually at a coarser grid partition -- and
+  use its scores as a feature);
+
+Multiple feature types can be specified, separated by spaces or commas.
+
+Default %default.""")
+
+  lazy val naive_bayes_feature_list =
+    get_feature_list(naive_bayes_features, Seq("terms", "rough-ranker"),
+      "naive-bayes-features")
+
+  var rough_ranker_args =
+    ap.option[String]("rough-ranker-args", "rra",
+      default = "",
+      help = """Arguments to use when running the rough ranker that computes
+a sort of prior value in rough-to-fine ranking, for the fine Naive-Bayes
+ranker. This is for use with '--naive-bayes-features rough-ranker'.""")
 }
 
 trait GridLocateFeatureParameters {
@@ -826,13 +833,6 @@ the original ranking score, when reranking), 'random' (set to random).""")
 set of weights will be averaged. This only makes sense when
 '--initialize-weights random', and implements random restarting.
 NOT CURRENTLY IMPLEMENTED.""")
-
-  var rough_ranker_args =
-    ap.option[String]("rough-ranker-args", "rra",
-      default = "",
-      help = """Arguments to use when running the rough ranker that computes
-a sort of prior value in rough-to-fine ranking, for the fine Naive-Bayes
-ranker. This is for use with '--naive-bayes-features rough-ranker'.""")
 }
 
 trait GridLocateRerankParameters {
