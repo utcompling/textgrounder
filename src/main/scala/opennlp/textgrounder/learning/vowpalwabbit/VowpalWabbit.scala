@@ -26,6 +26,7 @@ import util.debug._
 import util.io.localfh
 import util.metering._
 import util.print.errprint
+import util.verbose._
 
 import java.io.File
 
@@ -102,7 +103,8 @@ import java.io.File
  */
 protected trait VowpalWabbitBase {
   def train_vw(feats_filename: String, gaussian: Double, lasso: Double,
-      vw_loss_function: String, vw_args: String, extra_args: Seq[String]) = {
+      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+      verbose: MsgVerbosity = MsgNormal) = {
     // We make the writing happen in a different step because the number of
     // classes might not be known until we do so.
     //
@@ -113,8 +115,10 @@ protected trait VowpalWabbitBase {
       File.createTempFile("textgrounder.vw.cache.train", null).toString
     val model_filename =
       File.createTempFile("textgrounder.vw.model", null).toString
-    errprint(s"Writing VW training cache to $cache_filename")
-    errprint(s"Writing VW model to $model_filename")
+    if (verbose != MsgQuiet) {
+      errprint(s"Writing VW training cache to $cache_filename")
+      errprint(s"Writing VW model to $model_filename")
+    }
     // The options mean:
     //
     // -k: If the cache file already exists, overwrite it instead of using it
@@ -139,7 +143,7 @@ protected trait VowpalWabbitBase {
         // Split on an empty string wrongly returns Array("")
         (if (vw_args == "") Seq() else vw_args.split("""\s+""").toSeq)
     errprint("Executing: %s", vw_cmd_line mkString " ")
-    time_action("running VowpalWabbit") {
+    time_action("running VowpalWabbit", verbose) {
       vw_cmd_line !
     }
     if (!debug("preserve-tmp-files")) {
@@ -161,13 +165,15 @@ protected trait VowpalWabbitBase {
    * @param file File to write features to.
    */
   def write_feature_file(
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
+    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)],
+    verbose: MsgVerbosity = MsgNormal
   ) = {
     var feats_filename =
       File.createTempFile("textgrounder.vw.feats.test", null).toString
-    errprint(s"Writing features to $feats_filename")
+    if (verbose != MsgQuiet)
+      errprint(s"Writing features to $feats_filename")
 
-    val task = new Meter("processing features in", "document")
+    val task = new Meter("processing features in", "document", verbose)
 
     val f = localfh.openw(feats_filename)
     features.foreachMetered(task) { case (feats, correct) =>
@@ -203,13 +209,15 @@ protected trait VowpalWabbitBase {
    */
   def write_cost_sensitive_feature_file(
     features: Iterator[(Iterable[(FeatureValue, String, Double)],
-      Iterable[(LabelIndex, Double)])]
+      Iterable[(LabelIndex, Double)])],
+    verbose: MsgVerbosity = MsgNormal
   ) = {
     var feats_filename =
       File.createTempFile("textgrounder.vw.feats.test", null).toString
-    errprint(s"Writing features to $feats_filename")
+    if (verbose != MsgQuiet)
+      errprint(s"Writing features to $feats_filename")
 
-    val task = new Meter("processing features in", "document")
+    val task = new Meter("processing features in", "document", verbose)
 
     val f = localfh.openw(feats_filename)
     features.foreachMetered(task) { case (feats, costs) =>
@@ -269,7 +277,7 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
    *   For example, with logistic loss, the scores can be transformed to
    *   probabilities using the logistic function followed by normalization.
    */
-  def apply(feats_filename: String, verbose: Boolean = true
+  def apply(feats_filename: String, verbose: MsgVerbosity = MsgNormal
       ): Iterable[Array[(LabelIndex, Double)]] = {
     // We need two temporary files: one used by VW as a cache, and one
     // where VW writes the raw predictions. In addition we need the file
@@ -281,13 +289,15 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
     val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
           "-i", model_filename, "--raw_predictions", pred_filename,
-          "--compressed", "-t") ++ (if (verbose) Seq() else Seq("--quiet"))
-    if (verbose) {
+          "--compressed", "-t") ++ (
+        if (verbose == MsgVerbose) Seq() else Seq("--quiet")
+      )
+    if (verbose != MsgQuiet) {
       errprint(s"Writing VW eval cache to $cache_filename")
       errprint(s"Writing VW raw predictions to $pred_filename")
       errprint("Executing: %s", vw_cmd_line mkString " ")
     }
-    time_action("running VowpalWabbit") {
+    time_action("running VowpalWabbit", verbose) {
       vw_cmd_line !
     }
     val results = (for (line <- localfh.openr(pred_filename)) yield {

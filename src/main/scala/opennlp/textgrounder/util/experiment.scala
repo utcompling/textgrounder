@@ -30,6 +30,7 @@ import print.{errprint, set_stdout_stderr_utf_8}
 import text._
 import textdb.{Encoder, TextDB}
 import time.format_minutes_seconds
+import verbose._
 
 protected class ExperimentPackage {
   /**
@@ -85,7 +86,7 @@ protected class ExperimentPackage {
     }
 
     def show_progress(verb: String, item_name: String,
-      verbose: Boolean = false,
+      verbose: MsgVerbosity = MsgNormal,
       secs_between_output: Double = 15, maxtime: Double = 0.0,
       maxitems: Int = 0
     ): Meter =

@@ -30,8 +30,9 @@ import util.error.warning
 import util.io.localfh
 import util.math.argmax
 import util.metering._
-import util.print.errprint
 import util.numeric.format_double
+import util.print.errprint
+import util.verbose._
 
 object ClassifierConstants {
   private val default_weights_to_print = 100
@@ -320,7 +321,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
   def iterate(error_threshold: Double, max_iterations: Int)(
       fun: Int => (Int, Int, Double)) = {
     val task = new Meter("running", "classifier training iteration",
-      verbose = true)
+      verbose = MsgVerbose)
     task.start()
     var iter = 0
     var total_adjustment = 0.0

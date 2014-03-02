@@ -26,6 +26,7 @@ import math._
 import util.print.errprint
 import util.debug._
 import util.textdb.Row
+import util.verbose._
 
 import langmodel._
 import learning._
@@ -501,6 +502,7 @@ class VowpalWabbitGridRanker[Co](
   def score_test_docs(docs: Iterator[GridDoc[Co]], verbose: Boolean = true
       ): Iterable[(String, Array[Double])] = {
     val titles = mutable.Buffer[String]()
+    val verbosity = if (verbose) MsgNormal else MsgQuiet
 
     val feature_file =
       if (cost_sensitive) {
@@ -516,7 +518,7 @@ class VowpalWabbitGridRanker[Co](
           (feats, labels_costs)
         }
 
-        classifier.write_cost_sensitive_feature_file(training_data)
+        classifier.write_cost_sensitive_feature_file(training_data, verbosity)
       } else {
         val training_data =
           docs.map/*Metered(task)*/ { doc =>
@@ -526,10 +528,10 @@ class VowpalWabbitGridRanker[Co](
           (feats, 0)
         }
 
-        classifier.write_feature_file(training_data)
+        classifier.write_feature_file(training_data, verbosity)
       }
     val list_of_scores =
-      classifier(feature_file, verbose).map { raw_label_scores =>
+      classifier(feature_file, verbosity).map { raw_label_scores =>
         val label_scores =
           if (cost_sensitive) {
             // Raw scores for cost-sensitive appear to be costs, i.e.

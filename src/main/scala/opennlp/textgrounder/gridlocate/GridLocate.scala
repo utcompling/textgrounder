@@ -22,15 +22,16 @@ package gridlocate
 import collection.mutable
 
 import util.argparser._
-import util.spherical._
+import util.debug._
 import util.error.warning
 import util.experiment._
 import util.io.{FileHandler,localfh}
 import util.metering._
 import util.os.output_resource_usage
 import util.print._
+import util.spherical._
 import util.textdb._
-import util.debug._
+import util.verbose._
 
 import learning._
 import learning.perceptron._
@@ -1225,9 +1226,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   // because we can't create a show_progress without it, would have to
   // rename.
   override def show_progress(verb: String, item_name: String,
-      verbose: Boolean = false, secs_between_output: Double = 15,
+      verbose: MsgVerbosity = MsgNormal, secs_between_output: Double = 15,
       maxtime: Double = 0.0, maxitems: Int = 0
-    ) = super.show_progress(verb, item_name, verbose = params.verbose,
+    ) = super.show_progress(verb, item_name,
+      verbose = if (params.verbose) MsgVerbose else MsgNormal,
       secs_between_output = secs_between_output, maxtime = maxtime,
       maxitems = maxitems)
 
