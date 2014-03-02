@@ -244,7 +244,7 @@ protected trait VowpalWabbitBase {
 class VowpalWabbitClassifier private[vowpalwabbit] (
   val model_filename: String
 ) extends VowpalWabbitBase {
-  def apply(feats_filename: String) = {
+  def apply(feats_filename: String, verbose: Boolean = true) = {
     // We need two temporary files: one used by VW as a cache, and one
     // where VW writes the raw predictions. In addition we need the file
     // holding the features and the file holding the written-out model.
@@ -252,14 +252,17 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
       java.io.File.createTempFile("textgrounder.vw.cache.test", null).toString
     val pred_filename =
       java.io.File.createTempFile("textgrounder.vw.pred", null).toString
-    errprint(s"Writing VW eval cache to $cache_filename")
-    errprint(s"Writing VW raw predictions to $pred_filename")
-    val vw_cmd_line_start =
+    val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
           "-i", model_filename, "--raw_predictions", pred_filename,
-          "--compressed", "-t")
+          "--compressed", "-t") ++ (if (verbose) Seq() else Seq("--quiet"))
+    if (verbose) {
+      errprint(s"Writing VW eval cache to $cache_filename")
+      errprint(s"Writing VW raw predictions to $pred_filename")
+      errprint("Executing: %s", vw_cmd_line mkString " ")
+    }
     time_action("running VowpalWabbit") {
-      vw_cmd_line_start !
+      vw_cmd_line !
     }
     (for (line <- localfh.openr(pred_filename)) yield {
       val preds_1 = line.split("""\s+""")

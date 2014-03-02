@@ -498,7 +498,7 @@ class VowpalWabbitGridRanker[Co](
     doc_scores = score_test_docs(docs).toMap
   }
 
-  def score_test_docs(docs: Iterator[GridDoc[Co]]
+  def score_test_docs(docs: Iterator[GridDoc[Co]], verbose: Boolean = true
       ): Iterable[(String, Array[Double])] = {
     val titles = mutable.Buffer[String]()
 
@@ -529,7 +529,7 @@ class VowpalWabbitGridRanker[Co](
         classifier.write_feature_file(training_data)
       }
     val list_of_scores =
-      classifier(feature_file).map { raw_label_scores =>
+      classifier(feature_file, verbose).map { raw_label_scores =>
         val label_scores =
           if (cost_sensitive) {
             // Raw scores for cost-sensitive appear to be costs, i.e.
@@ -577,7 +577,10 @@ class VowpalWabbitGridRanker[Co](
    * spawning the VW app), rather than by looking up a cache of scores.
    */
   def score_doc_directly(doc: GridDoc[Co]) = {
-    val scores = score_test_docs(Iterator(doc)).head._2
+    // Be quiet unless --verbose is given since we may be executing on
+    // large numbers of test docs.
+    val scores = score_test_docs(Iterator(doc),
+      verbose = grid.driver.params.verbose).head._2
     val cands = get_candidates(None, include_correct = false)
     assert(scores.size == cands.size)
     cands zip scores

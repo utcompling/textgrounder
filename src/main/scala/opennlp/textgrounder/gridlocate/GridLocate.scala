@@ -2341,9 +2341,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // FIXME! What happens when we are reading multiple streams and creating
     // multiple grids? docs_cells combines all the streams; does this make
     // sense?
-    val finer_rankers = for (i <- 2 to params.num_levels) yield {
+    val finer_rankers = for (level <- 2 to params.num_levels) yield {
+      val num_cands = lastcands.size
+      errprint("Beginning hierarchical level %s: Creating %s classifiers",
+        level, num_cands)
       val subgrid =
-        create_grid_from_document_streams(Some(lastgrid), i, streams)
+        create_grid_from_document_streams(Some(lastgrid), level, streams)
       // docs_cells contains cells from the coarsest grid; we need to redo
       // it to contain cells from the subgrid we just created.
       val finer_docs_cells =
@@ -2351,7 +2354,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           case (doc, cell) => doc }
         ).toIndexedSeq
       val subcands_lists_ranker_entries =
-        lastcands.map { cand =>
+        lastcands.zipWithIndex.map { case (cand, index) =>
+          errprint("Level %s: Creating classifier %s/%s", level,
+            index + 1, num_cands)
           val subcands = subgrid.get_subdivided_cells(cand)
           val subranker = create_classifier_ranker(ranker_name,
             subgrid, subcands, finer_docs_cells)
