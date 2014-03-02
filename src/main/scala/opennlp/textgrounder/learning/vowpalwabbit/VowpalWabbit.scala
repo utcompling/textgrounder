@@ -27,6 +27,8 @@ import util.io.localfh
 import util.metering._
 import util.print.errprint
 
+import java.io.File
+
 /**
  * This implements an interface onto the Vowpal Wabbit machine learning
  * package.
@@ -108,9 +110,9 @@ protected trait VowpalWabbitBase {
     // one used by VW as a cache, and one where the model is written to.
     // The last one needs to be preserved for evaluation.
     val cache_filename =
-      java.io.File.createTempFile("textgrounder.vw.cache.train", null).toString
+      File.createTempFile("textgrounder.vw.cache.train", null).toString
     val model_filename =
-      java.io.File.createTempFile("textgrounder.vw.model", null).toString
+      File.createTempFile("textgrounder.vw.model", null).toString
     errprint(s"Writing VW training cache to $cache_filename")
     errprint(s"Writing VW model to $model_filename")
     // The options mean:
@@ -140,6 +142,11 @@ protected trait VowpalWabbitBase {
     time_action("running VowpalWabbit") {
       vw_cmd_line !
     }
+    if (!debug("preserve-tmp-files")) {
+      (new File(cache_filename)).delete
+      (new File(feats_filename)).delete
+      (new File(model_filename)).deleteOnExit
+    }
     new VowpalWabbitClassifier(model_filename)
   }
 
@@ -157,7 +164,7 @@ protected trait VowpalWabbitBase {
     features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)]
   ) = {
     var feats_filename =
-      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
+      File.createTempFile("textgrounder.vw.feats.test", null).toString
     errprint(s"Writing features to $feats_filename")
 
     val task = new Meter("processing features in", "document")
@@ -199,7 +206,7 @@ protected trait VowpalWabbitBase {
       Iterable[(LabelIndex, Double)])]
   ) = {
     var feats_filename =
-      java.io.File.createTempFile("textgrounder.vw.feats.test", null).toString
+      File.createTempFile("textgrounder.vw.feats.test", null).toString
     errprint(s"Writing features to $feats_filename")
 
     val task = new Meter("processing features in", "document")
@@ -244,14 +251,33 @@ protected trait VowpalWabbitBase {
 class VowpalWabbitClassifier private[vowpalwabbit] (
   val model_filename: String
 ) extends VowpalWabbitBase {
-  def apply(feats_filename: String, verbose: Boolean = true) = {
+  /**
+   * Apply a Vowpal Wabbit multi-class classifier.
+   *
+   * @param feats_filename Filename containing sparse feature vectors
+   *   describing the test instances. This should be created using
+   *   `write_feature_file` or `write_cost_sensitive_feature_file`.
+   *   NOTE: This filename will be deleted after the classifier has been
+   *   run, on the assumption that it is a temporary file, unless the
+   *   debug flag 'preserve-tmp-files' is set. There is currently no
+   *   programmatic way to specify that a given feature file should be
+   *   preserved.
+   * @return An Iterable of arrays (with one array per test instance) of
+   *   pairs of class labels and scores. The class labels are integers
+   *   starting at 0. Whether the scores can be transformed into
+   *   probabilities depends on the parameters set during training.
+   *   For example, with logistic loss, the scores can be transformed to
+   *   probabilities using the logistic function followed by normalization.
+   */
+  def apply(feats_filename: String, verbose: Boolean = true
+      ): Iterable[Array[(LabelIndex, Double)]] = {
     // We need two temporary files: one used by VW as a cache, and one
     // where VW writes the raw predictions. In addition we need the file
     // holding the features and the file holding the written-out model.
     val cache_filename =
-      java.io.File.createTempFile("textgrounder.vw.cache.test", null).toString
+      File.createTempFile("textgrounder.vw.cache.test", null).toString
     val pred_filename =
-      java.io.File.createTempFile("textgrounder.vw.pred", null).toString
+      File.createTempFile("textgrounder.vw.pred", null).toString
     val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
           "-i", model_filename, "--raw_predictions", pred_filename,
@@ -264,13 +290,19 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
     time_action("running VowpalWabbit") {
       vw_cmd_line !
     }
-    (for (line <- localfh.openr(pred_filename)) yield {
+    val results = (for (line <- localfh.openr(pred_filename)) yield {
       val preds_1 = line.split("""\s+""")
       preds_1.map(_.split(":")).map {
         // Map 1-based VW labels back to the 0-based memoized labels we use.
         case Array(label, value) => (label.toInt - 1, value.toDouble)
       }
     }).toIndexedSeq
+    if (!debug("preserve-tmp-files")) {
+      (new File(cache_filename)).delete
+      (new File(pred_filename)).delete
+      (new File(feats_filename)).delete
+    }
+    results
   }
 }
 
@@ -286,6 +318,20 @@ class VowpalWabbitTrainer(
   val vw_multiclass: String = "oaa",
   val vw_args: String = ""
 ) extends VowpalWabbitBase {
+  /**
+   * Train a Vowpal Wabbit multi-class classifier.
+   *
+   * @param num_classes Number of classes.
+   * @param feats_filename Filename containing sparse feature vectors
+   *   describing the training data. This should be created using
+   *   `write_feature_file`. NOTE: This filename will be deleted after
+   *   the classifier has been trained, on the assumption that it is a
+   *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
+   *   There is currently no programmatic way to specify that a given
+   *   feature file should be preserved.
+   * @return A `VowpalWabbitClassifier` object, used to classify test
+   *   instances.
+   */
   def apply(num_classes: Int, feats_filename: String) = {
     val extra_args = Seq("--" + vw_multiclass, s"$num_classes")
     train_vw(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
@@ -305,6 +351,20 @@ class VowpalWabbitCostSensitiveTrainer(
   val vw_multiclass: String = "oaa",
   val vw_args: String = ""
 ) extends VowpalWabbitBase {
+  /**
+   * Train a Vowpal Wabbit multi-class cost-sensitive classifier.
+   *
+   * @param num_classes Number of classes.
+   * @param feats_filename Filename containing sparse feature vectors
+   *   describing the training data. This should be created using
+   *   `write_cost_sensitive_feature_file`. NOTE: This filename will be
+   *   deleted after the classifier has been trained, on the assumption that
+   *   it is a temporary file, unless the debug flag 'preserve-tmp-files' is
+   *   set. There is currently no programmatic way to specify that a given
+   *   feature file should be preserved.
+   * @return A `VowpalWabbitClassifier` object, used to classify test
+   *   instances.
+   */
   def apply(num_classes: Int, feats_filename: String) = {
     val multiclass_arg =
       if (vw_multiclass == "oaa") "csoaa" else "wap"
