@@ -570,7 +570,8 @@ class VowpalWabbitGridRanker[Co](
           featvec_factory.featvec_factory.mapper.number_of_labels)
         scores
       }
-    assert(titles.size == list_of_scores.size)
+    assert(titles.size == list_of_scores.size,
+      s"Something wrong with model: ${classifier.model_filename}")
     titles zip list_of_scores
   }
 

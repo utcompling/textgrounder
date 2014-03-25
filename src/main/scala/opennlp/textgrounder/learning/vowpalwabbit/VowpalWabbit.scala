@@ -151,6 +151,15 @@ protected trait VowpalWabbitBase {
       (new File(feats_filename)).delete
       (new File(model_filename)).deleteOnExit
     }
+    val model_length = (new File(model_filename)).length
+    if (model_length < 256) {
+        val badmess = s"Model filename $model_filename has length $model_length < 256, probably bad"
+      if (debug("warn-on-bad-model"))
+        errprint(badmess)
+      else
+        require(model_length >= 256, badmess)
+    }
+
     new VowpalWabbitClassifier(model_filename)
   }
 
