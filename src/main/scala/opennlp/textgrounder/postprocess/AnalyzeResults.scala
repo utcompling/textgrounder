@@ -28,6 +28,7 @@ import util.io
 import util.math._
 import util.print._
 import util.serialize.TextSerializer
+import util.table.table_column_format
 import util.textdb._
 
 import util.debug._
@@ -40,7 +41,7 @@ class AnalyzeResultsParameters(ap: ArgParser) {
 to see the extent to which they are balanced or unbalanced.""")
 
   var correct_cell_distribution = ap.option[String]("correct-cell-distribution",
-    "correct-cell-distrib", "tcd",
+    "correct-cell-distrib", "ccd",
     metavar = "FILE",
     help="""Output Zipfian distribution of correct cells,
 to see the extent to which they are balanced or unbalanced.""")
@@ -77,15 +78,27 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
   def create_param_object(ap: ArgParser) = new AnalyzeResultsParameters(ap)
 
   def output_freq_of_freq(filehand: io.FileHandler, file: String,
-      map: collection.Map[String, Int]) {
+      map: collection.Map[String, Int],
+      cell_stats: collection.Map[String, CellStats]) {
+    val headings = Seq("rank", "cell", "central-pt", "count", "numdocs", "cum")
     val numcells = map.values.sum
     var sofar = 0
     val outf = filehand.openw(file)
-    for (((cell, count), ind) <-
-        map.toSeq.sortWith(_._2 > _._2).zipWithIndex) {
-      sofar += count
-      outf.println("%s  %s  %s  %.2f%%" format (
-        ind + 1, cell, count, sofar.toDouble / numcells * 100))
+    val results =
+      for (((cell, count), ind) <-
+          map.toSeq.sortWith(_._2 > _._2).zipWithIndex) yield {
+        sofar += count
+        val stats = cell_stats(cell)
+        val central_pt = SphereCoord.deserialize(stats.central_point).format
+        Seq(s"${ind + 1}", cell, central_pt, s"$count",
+          s"${stats.numdocs}",
+          "%.2f%%" format (sofar.toDouble / numcells * 100))
+    }
+    val fmt = table_column_format(headings +: results)
+    outf.println(fmt.format(headings: _*))
+    outf.println("-" * 70)
+    results.map { line =>
+      outf.println(fmt.format(line: _*))
     }
     outf.close()
   }
@@ -100,7 +113,10 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
     pr("Range: [%.2f%s to %.2f%s]", nums.min, units, nums.max, units)
   }
 
+  case class CellStats(numdocs: Int, central_point: String)
+
   def run_program(args: Array[String]) = {
+    val cell_stats = mutable.Map[String, CellStats]()
     val correct_cells = intmap[String]()
     val pred_cells = intmap[String]()
     var numtokens = Vector[Double]()
@@ -117,7 +133,13 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
     val filehand = io.localfh
     for (row <- TextDB.read_textdb(filehand, params.input)) {
       correct_cells(row.gets("correct-cell")) += 1
-      correct_cells(row.gets("pred-cell")) += 1
+      pred_cells(row.gets("pred-cell")) += 1
+      cell_stats(row.gets("correct-cell")) =
+        CellStats(row.get[Int]("correct-cell-numdocs"),
+          row.gets("correct-cell-central-point"))
+      cell_stats(row.gets("pred-cell")) =
+        CellStats(row.get[Int]("pred-cell-numdocs"),
+          row.gets("pred-cell-central-point"))
       val correct_coord = row.get[SphereCoord]("correct-coord")
       def dist_to(field: String) =
         spheredist(correct_coord, row.get[SphereCoord](field))
@@ -144,9 +166,11 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
     print_stats("Word types per document", "", numtypes map { _.toDouble })
     print_stats("Word tokens per document", "", numtokens map { _.toDouble })
     if (params.pred_cell_distribution != null)
-      output_freq_of_freq(filehand, params.pred_cell_distribution, pred_cells)
+      output_freq_of_freq(filehand, params.pred_cell_distribution, pred_cells,
+        cell_stats)
     if (params.correct_cell_distribution != null)
-      output_freq_of_freq(filehand, params.correct_cell_distribution, correct_cells)
+      output_freq_of_freq(filehand, params.correct_cell_distribution,
+        correct_cells, cell_stats)
     0
   }
 }
