@@ -669,6 +669,14 @@ class HierarchicalClassifierGridRanker[Co](
         val doc_ranked_scores =
           ranker.score_doc_directly(doc).toIndexedSeq.sortWith(_._2 > _._2)
         val (top_cell, top_score) = doc_ranked_scores.head
+        if (debug("hier-classifier")) {
+          errprint(s"Old cell: ${old_cell.format_coord(old_cell.get_central_point)} (old score $old_score)")
+          val mapper_doc_ranked_scores = doc_ranked_scores map {
+            case (cell, score) => (cell.format_coord(cell.get_central_point), score)
+          }
+          errprint(s"Doc ranked scores: $mapper_doc_ranked_scores")
+          errprint(s"Substituting: Top cell ${top_cell.format_coord(top_cell.get_central_point)}, top score $top_score, total score ${old_score + top_score}")
+        }
         (top_cell, old_score + top_score)
       }
       prev_scores = new_scores.sortWith(_._2 > _._2)
