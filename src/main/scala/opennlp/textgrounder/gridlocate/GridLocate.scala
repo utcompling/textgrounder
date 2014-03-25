@@ -1116,6 +1116,12 @@ of the distance), 'log-dist' (use the log of the distance).""")
       default = "",
       help = """Miscellaneous arguments to pass to Vowpal Wabbit at training
 time.""")
+
+  var nested_vw_args =
+    ap.option[String]("nested-vw-args",
+      help = """Miscellaneous arguments to pass to Vowpal Wabbit at training
+time, for levels other than the top one in a hierarchical classifier.
+Defaults to the same arguments as '--vw-args'.""")
 }
 
 trait GridLocateMiscParameters {
@@ -2123,16 +2129,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def create_classifier_ranker(ranker_name: String,
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
-      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable(),
+      nested: Boolean = false) = {
     candidates.foreach { cand => assert(cand.grid == grid) }
     xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
     val docs_cells = get_filtered_docs_cells(grid, candidates, xdocs_cells)
     if (params.classifier == "vowpal-wabbit")
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs_cells, cost_sensitive = false)
+        docs_cells, cost_sensitive = false, nested = nested)
     else if (params.classifier == "cost-vowpal-wabbit")
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs_cells, cost_sensitive = true)
+        docs_cells, cost_sensitive = true, nested = nested)
     else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
@@ -2229,12 +2236,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_vowpal_wabbit_classifier(grid: Grid[Co],
       candidates: Iterable[GridCell[Co]],
       docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
-      cost_sensitive: Boolean) = {
+      cost_sensitive: Boolean,
+      nested: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
       output_skip_message = true)
 
     // val task = show_progress("processing features in", "document")
+
+    val vw_args =
+      if (nested && params.nested_vw_args != null) params.nested_vw_args
+      else params.vw_args
 
     val classifier =
       if (cost_sensitive) {
@@ -2263,7 +2275,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           lasso = params.lasso_penalty,
           vw_loss_function = params.vw_loss_function,
           vw_multiclass = params.vw_multiclass,
-          vw_args = params.vw_args)
+          vw_args = vw_args)
 
         // Train classifier.
         val feats_filename =
@@ -2284,7 +2296,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           lasso = params.lasso_penalty,
           vw_loss_function = params.vw_loss_function,
           vw_multiclass = params.vw_multiclass,
-          vw_args = params.vw_args)
+          vw_args = vw_args)
 
         // Train classifier.
         //
@@ -2314,10 +2326,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
       docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
-      cost_sensitive: Boolean) = {
+      cost_sensitive: Boolean, nested: Boolean) = {
     val (classifier, featvec_factory) =
       create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
-        cost_sensitive)
+        cost_sensitive, nested)
     new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
       featvec_factory, cost_sensitive = cost_sensitive)
    }
@@ -2363,7 +2375,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             index + 1, num_cands)
           val subcands = subgrid.get_subdivided_cells(cand)
           val subranker = create_classifier_ranker(ranker_name,
-            subgrid, subcands, finer_docs_cells)
+            subgrid, subcands, finer_docs_cells, nested = true)
           (subcands, cand -> subranker)
         }
       val (subcands_lists, ranker_entries) =
