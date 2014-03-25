@@ -487,7 +487,8 @@ class VowpalWabbitGridRanker[Co](
   grid: Grid[Co],
   classifier: VowpalWabbitClassifier,
   featvec_factory: DocFeatVecFactory[Co],
-  cost_sensitive: Boolean
+  cost_sensitive: Boolean,
+  normalize: Boolean = false
 ) extends ClassifierGridRanker[Co](ranker_name, grid, featvec_factory) {
 
   var doc_scores: Map[String, Array[Double]] = _
@@ -499,6 +500,23 @@ class VowpalWabbitGridRanker[Co](
     doc_scores = score_test_docs(docs).toMap
   }
 
+  // Score the test documents in `docs` by calling Vowpal Wabbit. Return
+  // an Iterable over tuples of document title and array of log-probabilities,
+  // with one probability per possible label. Multi-label classifiers are
+  // implemented in Vowpal Wabbit as a set of one-against-all binary
+  // classifiers, and the probabilities as directly returned by Vowpal Wabbit
+  // reflect the likelihood that a given label is correct compared with the
+  // others. In general, these probabilities won't be normalized. If
+  // `normalize` is true, normalize the probabilities so that they add up
+  // to one (although remember that we return log-probabilities, which
+  // naturally will not sum to one). Normalizing the probabilities creates a
+  // proper probability distribution but eliminates information on the
+  // absolute amount of compatibility with a given label. (E.g., if none of
+  // the labels match the test document very well, but one matches much
+  // better than the others, it will have a very high probability, although
+  // this may not mean much.).
+  //
+  // If `verbose` is true, output messages from Vowpal Wabbit as it runs.
   def score_test_docs(docs: Iterator[GridDoc[Co]], verbose: Boolean = true
       ): Iterable[(String, Array[Double])] = {
     val titles = mutable.Buffer[String]()
@@ -542,7 +560,7 @@ class VowpalWabbitGridRanker[Co](
             val indiv_probs = raw_label_scores map { case (label, score) =>
               (label, 1/(1 + math.exp(-score)))
             }
-            val norm_sum = indiv_probs.map(_._2).sum
+            val norm_sum = if (normalize) indiv_probs.map(_._2).sum else 1.0
             indiv_probs map { case (label, prob) =>
               (label, math.log(prob/norm_sum))
             }
