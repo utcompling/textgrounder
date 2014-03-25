@@ -439,7 +439,8 @@ See also '--print-results' for outputting human-readable results to stderr.""")
 
   var print_results =
     ap.flag("print-results", "show-results", "pr", "sr",
-      help = """Show individual results for each test document.""")
+      help = """Show individual results for each test document. Use
+'--num-top-cells-to-output' to control size of outputted tables.""")
 
   var print_knn_results =
     ap.flag("print-knn-results", "show-knn-results", "pkr", "skr",
@@ -455,12 +456,13 @@ and setting so many counters breaks some Hadoop installations.""")
     ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
       must = be_>(0),
       help = """Number of nearest neighbors (k in kNN), if
-`--print-knn-results`; default is %default.""")
+'--print-knn-results'. Default is %default.""")
 
   var num_top_cells_to_output =
-    ap.option[Int]("num-top-cells-to-output", "num-top-cells", default = 5,
-      help = """Number of nearest neighbor cells to output; default is %default;
--1 means output all""")
+    ap.option[Int]("num-top-cells-to-output", "num-top-cells", "ntc",
+      default = 5,
+      help = """Number of top cells to output when '--print-results'; -1 means
+output all. Default is %default.""")
 
   //// Restricting documents evaluated
   var oracle_results =
