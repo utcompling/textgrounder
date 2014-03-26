@@ -1122,6 +1122,13 @@ time.""")
       help = """Miscellaneous arguments to pass to Vowpal Wabbit at training
 time, for levels other than the top one in a hierarchical classifier.
 Defaults to the same arguments as '--vw-args'.""")
+
+  var fallback_vw_args =
+    ap.option[String]("fallback-vw-args",
+      default = "",
+      help = """HACK! If Vowpal Wabbit fails to produce a model using the
+arguments in '--vw-args' or '--nested-vw-args', fall back to using the
+arguments here, which should always work.""")
 }
 
 trait GridLocateMiscParameters {
@@ -2248,7 +2255,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       if (nested && params.nested_vw_args != null) params.nested_vw_args
       else params.vw_args
 
-    val classifier =
+    def create_classifier(vw_args: String) = {
       if (cost_sensitive) {
         val cells_labels =
           candidates.map { cell =>
@@ -2312,6 +2319,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
         trainer(num_labels, feats_filename)
       }
+    }
+
+    val classifier =
+      try {
+        create_classifier(vw_args)
+      } catch {
+        case e:VowpalWabbitModelError => {
+          errprint(s"Warning, bad model, falling back to args '${params.fallback_vw_args}'")
+          create_classifier(params.fallback_vw_args)
+        }
+      }
+
     (classifier, featvec_factory)
   }
 

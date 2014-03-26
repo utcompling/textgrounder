@@ -23,6 +23,7 @@ import scala.sys.process._
 
 import learning._
 import util.debug._
+import util.error._
 import util.io.localfh
 import util.metering._
 import util.print.errprint
@@ -99,6 +100,14 @@ import java.io.File
  */
 
 /**
+ * Bad model was created (bug in Vowpal Wabbit, probably).
+ */
+case class VowpalWabbitModelError(
+  message: String,
+  cause: Option[Throwable] = None
+) extends RethrowableRuntimeException(message, cause)
+
+/**
  * Common code to the various Vowpal Wabbit trainers and classifiers.
  */
 protected trait VowpalWabbitBase {
@@ -152,12 +161,12 @@ protected trait VowpalWabbitBase {
       (new File(model_filename)).deleteOnExit
     }
     val model_length = (new File(model_filename)).length
-    if (model_length < 256) {
+    if (model_length == 0 /* < 256 */) {
         val badmess = s"Model filename $model_filename has length $model_length < 256, probably bad"
       if (debug("warn-on-bad-model"))
         errprint(badmess)
       else
-        require(model_length >= 256, badmess)
+        throw new VowpalWabbitModelError(badmess)
     }
 
     new VowpalWabbitClassifier(model_filename)
