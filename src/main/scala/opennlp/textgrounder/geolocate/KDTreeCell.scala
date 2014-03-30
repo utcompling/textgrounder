@@ -41,13 +41,13 @@ class KdTreeCell(
   val kdleaf : KdTree
 ) extends RectangularCell(cellgrid) {
 
-  def get_northeast_coord =
+  def get_southwest_coord =
     new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
 
-  def get_southwest_coord =
+  def get_northeast_coord =
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
 
-  // FIXME! Describe path down to leaf.
+  // FIXME! Describe path down to this node.
   def format_indices = "Placeholder"
 }
 
