@@ -2138,8 +2138,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
       xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable(),
       nested: Boolean = false) = {
-    candidates.foreach { cand => assert(cand.grid == grid) }
-    xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
+    // FIXME: This doesn't apply for K-d trees under hierarchical
+    // classification, where we have a copy of the grid that shares the
+    // same cells.
+    // candidates.foreach { cand => assert(cand.grid == grid) }
+    // xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
     val docs_cells = get_filtered_docs_cells(grid, candidates, xdocs_cells)
     if (params.classifier == "vowpal-wabbit")
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,

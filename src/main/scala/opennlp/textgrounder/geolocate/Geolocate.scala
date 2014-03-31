@@ -326,12 +326,27 @@ tiling cell to compute each multi cell.  If the value is more than
       help = """Specifies we should use a KD tree rather than uniform
 grid cell.""")
 
+  var kd_coarse_bucket_size =
+    ap.option[Int]("kd-coarse-bucket-size", "kdcbs", "coarse-bucket-size",
+      default = 0,
+      metavar = "INT",
+      must = be_>=(0),
+      help = """Bucket size used to create the coarsest level when doing
+hierarchical classification using K-d trees. Must be greater than the value
+specified using '--kd-bucket-size'. If 0 (the default), set to twice the
+value of '--kd-bucket-size'.""")
+
   var kd_bucket_size =
     ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default = 200,
       metavar = "INT",
       must = be_>(0),
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
+
+  if (kd_coarse_bucket_size == 0)
+    kd_coarse_bucket_size = kd_bucket_size * 2
+  else if (kd_coarse_bucket_size <= kd_bucket_size)
+    ap.error(s"Coarse bucket size $kd_coarse_bucket_size must be greater than fine bucket size $kd_bucket_size")
 
   var kd_split_method =
     ap.option[String]("kd-split-method", "kdsm", metavar = "SPLIT_METHOD",
@@ -490,9 +505,14 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
         params.width_of_multi_cell, create_sphere_docfact, id)
     }
     def create_kd_tree_grid = {
-      KdTreeGrid(create_sphere_docfact, id, params.kd_bucket_size,
-        params.kd_split_method, params.kd_use_backoff,
-        params.kd_interpolate_weight)
+      val cutoff_bucket_size =
+        if (params.ranker == "hierarchical-classifier")
+          params.kd_coarse_bucket_size
+        else 0
+      new KdTreeGrid(create_sphere_docfact, id, params.kd_bucket_size,
+        KdTreeGrid.kd_split_method_to_enum(params.kd_split_method),
+        params.kd_use_backoff, params.kd_interpolate_weight,
+        cutoffBucketSize = cutoff_bucket_size)
     }
     if (params.combined_kd_grid) {
       val kdcg = create_kd_tree_grid

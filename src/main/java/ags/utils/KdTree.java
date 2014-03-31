@@ -106,6 +106,14 @@ public class KdTree {
             return right.getLeaf(location);
     }
 
+    public KdTree getLeft() {
+      return left;
+    }
+
+    public KdTree getRight() {
+      return right;
+    }
+
     /**
      * Add a point and associated value to the tree
      */
