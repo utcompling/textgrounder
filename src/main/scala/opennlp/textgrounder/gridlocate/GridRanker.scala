@@ -654,6 +654,7 @@ class HierarchicalClassifierGridRanker[Co](
 
   def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean): Iterable[(GridCell[Co], Double)] = {
+    // First, we rank each cell at the coarsest level.
     val raw_prev_scores =
       for (cell <- coarsest_grid.iter_nonempty_cells) yield {
         val score = coarse_ranker.score_cell(doc, cell)
@@ -661,13 +662,18 @@ class HierarchicalClassifierGridRanker[Co](
       }
     var prev_scores =
       raw_prev_scores.toIndexedSeq.sortWith(_._2 > _._2)
+    // Then, for each grid at the next finer level ...
     for ((finer, rankers) <- grids.tail zip finer_rankers) {
-      // Cells at previous level that will be propagated to new level
+      // First, reduce the cells at previous level that will be propagated to
+      // new level by the beam size
       val beamed_prev_scores = prev_scores.take(beam_size)
+      // For each cell being considered ...
       val new_scores = for ((old_cell, old_score) <- beamed_prev_scores) yield {
+        // Find the corresponding ranker and run it
         val ranker = rankers(old_cell)
         val doc_ranked_scores =
           ranker.score_doc_directly(doc).toIndexedSeq.sortWith(_._2 > _._2)
+        // Fetch the top cell and corresponding log-probability
         val (top_cell, top_score) = doc_ranked_scores.head
         if (debug("hier-classifier")) {
           errprint(s"Old cell: ${old_cell.format_coord(old_cell.get_central_point)} (old score $old_score)")
@@ -677,8 +683,11 @@ class HierarchicalClassifierGridRanker[Co](
           errprint(s"Doc ranked scores: $mapper_doc_ranked_scores")
           errprint(s"Substituting: Top cell ${top_cell.format_coord(top_cell.get_central_point)}, top score $top_score, total score ${old_score + top_score}")
         }
+        // Return top cell, accumulate log-probabilities across all levels
         (top_cell, old_score + top_score)
       }
+      // Send scored cells to next level, sorted so they can be reduced by
+      // the beam size
       prev_scores = new_scores.sortWith(_._2 > _._2)
       /*
       The other way of doing hierarchical classification, constructing new
