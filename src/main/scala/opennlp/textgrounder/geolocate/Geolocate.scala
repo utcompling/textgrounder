@@ -798,6 +798,27 @@ object GeolocateDocumentTag extends
       xs map { x => filetail(x) } mkString "+"
     }
 
+    def shorten_classifier(cfier: String) =
+      cfier match {
+        case "vowpal-wabbit" => "VW"
+        case "cost-vowpal-wabbit" => "costVW"
+        case "perceptron" => "percep"
+        case "avg-perceptron" => "avgPercep"
+        case "pa-perceptron" => "PAPercep"
+        case "cost-perceptron" => "costPercep"
+        case _ => cfier
+      }
+
+    def shorten_features(feats: String) = {
+      val repl = feats.replace("matching", "match").
+        replace("-count", "Cnt").
+        replace("-prob", "Pr").
+        replace("-product", "Prod").
+        replace("-quotient", "Quot")
+      // Convert foo-bar-baz to fooBarBaz
+      "-([a-z])".r.replaceAllIn(repl, m => m.group(1).toUpperCase)
+    }
+
     /////// How to handle params.
 
     /**
@@ -832,10 +853,16 @@ object GeolocateDocumentTag extends
         case "sum-frequency" => "sumfreq"
         case "naive-bayes" => "nbayes"
         case "classifier" => "cfier"
+        case "hierarchical-classifier" => "hierCfier"
         case "average-cell-probability" => "acp"
         case "num-documents" => "numdocs"
         case y: String => y
       }),
+      ("classifier",
+        x => "cfier=" + shorten_classifier(x.asInstanceOf[String])),
+      ("classify-features",
+        x=> "cfeats=" + shorten_features(x.asInstanceOf[String])),
+      ("classify-binning", full("cbin")),
       ("lang-model", xs => xs match {
         case (x:String, y:String) => x + y
       }),
@@ -848,14 +875,17 @@ object GeolocateDocumentTag extends
       ("naive-bayes-prior-weight", short("nbpweight")),
       ("naive-bayes-prior", full("nbprior")),
       ("naive-bayes-features", full("nbfeats")),
-      ("rerank", default),
-      ("rerank-optimizer", valonly),
-      ("rerank-features", full("rfeats")),
+      ("num-levels", short("nlevels")),
+      ("beam-size", short("beamsz")),
+      ("reranker",
+        x => "reranker=" + shorten_classifier(x.asInstanceOf[String])),
+      ("rerank-features",
+        x=> "rfeats=" + shorten_features(x.asInstanceOf[String])),
       ("rerank-binning", full("rbin")),
-      ("rerank-top-n", short("rtop")),
+      ("rerank-top-n", short("topn")),
       ("rerank-num-training-splits", short("nsplits")),
-      ("rerank-initial-weights", full("initweights")),
-      ("rerank-random-restart", short("random-restart")),
+      ("initial-weights", full("initWeights")),
+      ("random-restart", short("rndRestart")),
       ("rerank-lang-model", xs => xs match {
         case (x:String, y:String) => "rerank-" + x + y
       }),
@@ -864,12 +894,14 @@ object GeolocateDocumentTag extends
         case "no" => "rbackoff"
         case _ => ""
       }),
+      ("iterations", short("iter")),
       ("pa-cost-type", full("pacost")),
       ("pa-variant", short("pavar")),
       ("perceptron-aggressiveness", short("paggr")),
       ("perceptron-error-threshold", short("perrthresh")),
-      ("perceptron-rounds", short("prounds")),
       ("perceptron-decay", short("pdecay")),
+      ("gaussian-penalty", full("l2")),
+      ("lasso-penalty", full("l1")),
       ("degrees-per-cell", short("deg")),
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
@@ -886,12 +918,16 @@ object GeolocateDocumentTag extends
       ("eval-set", valonly),
       ("num-training-docs", short("ntrain")),
       ("num-test-docs", short("ntest")),
-      ("debug", default),
+      ("num-top-cells-to-output", short("ncellout")),
       ("verbose", omit),
       ("results", omit),
       ("no-parallel", omit),
       ("print-results", omit),
-      ("rough-ranker-args", full("rrargs"))
+      ("rough-ranker-args", full("rrargs")),
+      ("vw-args", full("VWargs")),
+      ("nested-vw-args", full("nestVWargs")),
+      ("fallback-vw-args", full("fallbVWargs")),
+      ("debug", full("dbg"))
     )
 
     // Map listing how to handle params.
