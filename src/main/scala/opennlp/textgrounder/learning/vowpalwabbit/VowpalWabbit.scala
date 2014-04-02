@@ -161,8 +161,10 @@ protected trait VowpalWabbitBase {
       (new File(model_filename)).deleteOnExit
     }
     val model_length = (new File(model_filename)).length
-    if (model_length == 0 /* < 256 */) {
-        val badmess = s"Model filename $model_filename has length $model_length < 256, probably bad"
+    if (model_length > 0 && model_length < 256)
+        errprint(s"Model filename $model_filename has length $model_length < 256, probably bad")
+    if (model_length == 0) {
+        val badmess = s"Model filename $model_filename has length 0, definitely bad"
       if (debug("warn-on-bad-model"))
         errprint(badmess)
       else
