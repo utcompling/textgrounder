@@ -61,6 +61,25 @@ package object table {
   }
 
   /**
+   * Format a table consisting of a series of lines, each of which contains
+   * a series of columns. The first line is a set of column headers.
+   * First computes the maximum size of each column and then formats
+   * appropriately so everything fits. Outputs a line of dashes between
+   * header and remaining lines.
+   *
+   * @param headers Column headers for columns to format.
+   * @param lines Lines of column values to format.
+   * @param maxcolsize Maximum size of a column.
+   */
+  def format_table_with_header(headers: Iterable[String],
+      lines: Iterable[Iterable[String]], maxcolsize: Int = 40) = {
+    val fmt = table_column_format(headers +: lines.toSeq)
+    val header_line = fmt.format(headers.toSeq: _*)
+    (Iterable(header_line, "-" * header_line.size) ++
+      lines.map { line => fmt.format(line.toSeq: _*) }) mkString "\n"
+  }
+
+  /**
    * Given a list of tuples, output the list, one line per tuple.
    *
    * @param outfile If specified, send output to this stream instead of

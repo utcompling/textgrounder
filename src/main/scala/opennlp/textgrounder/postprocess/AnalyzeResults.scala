@@ -28,7 +28,7 @@ import util.io
 import util.math._
 import util.print._
 import util.serialize.TextSerializer
-import util.table.table_column_format
+import util.table.format_table_with_header
 import util.textdb._
 
 import util.debug._
@@ -77,6 +77,8 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
 
   def create_param_object(ap: ArgParser) = new AnalyzeResultsParameters(ap)
 
+  def fmt_sphere_coord(coord: String) = SphereCoord.deserialize(coord).format
+
   def output_freq_of_freq(filehand: io.FileHandler, file: String,
       map: collection.Map[String, Int],
       cell_stats: collection.Map[String, CellStats]) {
@@ -89,17 +91,21 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
           map.toSeq.sortWith(_._2 > _._2).zipWithIndex) yield {
         sofar += count
         val stats = cell_stats(cell)
-        val central_pt = SphereCoord.deserialize(stats.central_point).format
-        Seq(s"${ind + 1}", cell, central_pt, s"$count",
+        val Array(cell_sw_str,cell_ne_str) = cell.split(":")
+        val cell_sw = fmt_sphere_coord(cell_sw_str)
+        val cell_ne = fmt_sphere_coord(cell_ne_str)
+        val central_pt = fmt_sphere_coord(stats.central_point)
+        Seq(s"${ind + 1}", s"$cell_sw:$cell_ne", central_pt, s"$count",
           s"${stats.numdocs}",
           "%.2f%%" format (sofar.toDouble / numcells * 100))
     }
-    val fmt = table_column_format(headings +: results)
-    outf.println(fmt.format(headings: _*))
-    outf.println("-" * 70)
-    results.map { line =>
-      outf.println(fmt.format(line: _*))
-    }
+    outf.println(format_table_with_header(headings, results))
+    //val fmt = table_column_format(headings +: results)
+    //fmt.format(headings: _*))
+    //outf.println("-" * 70)
+    //results.map { line =>
+    //  outf.println(fmt.format(line: _*))
+    //}
     outf.close()
   }
 
