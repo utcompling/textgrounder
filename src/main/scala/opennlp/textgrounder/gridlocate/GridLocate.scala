@@ -722,7 +722,7 @@ Default is '%default'.
 
 For the perceptron classifiers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
-`--perceptron-rounds`.""")
+`--iterations`.""")
 
   protected def with_binned(feats: String*) =
     feats flatMap { f => Seq(f, f + "-binned") }
@@ -768,10 +768,10 @@ the cells for a document. Possibilities are:
 'gram-cell-count' (when a gram exists in the document, create a feature with
   the cell gram count as the value);
 
-'gram-doc-count' (when a gram exists in the document, create a feature with
+'gram-doc-prob' (when a gram exists in the document, create a feature with
   the document gram probability as the value);
 
-'gram-cell-count' (when a gram exists in the document, create a feature with
+'gram-cell-prob' (when a gram exists in the document, create a feature with
   the cell gram probability as the value);
 
 'matching-gram-*' (same as 'gram-*' but create a feature only when the gram --
@@ -895,7 +895,7 @@ Default is '%default'.
 
 For the perceptron optimizers, see also `--pa-variant`,
 `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
-`--perceptron-rounds`.""")
+`--iterations`.""")
 
   var rerank_features =
     ap.option[String]("rerank-features", "rf",
