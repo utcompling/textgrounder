@@ -85,7 +85,7 @@ export USE_PERMUTED=yes
 run-processwiki split-dump
 
 # Now make everything be simultaneous if possible
-export NUM_SIMULTANEOUS=8
+export NUM_SIMULTANEOUS=20
 
 for step in $steps; do
   echo "Beginning at `date`: run-processwiki $step"

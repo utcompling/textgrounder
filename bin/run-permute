@@ -89,7 +89,7 @@ PERMUTED_DUMP_FILE="$WP_VERSION-permuted-pages-articles.xml.bz2"
 PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE="$WP_VERSION-permuted-$ORIG_DOCUMENT_DATA_SUFFIX"
 
 if [ -z "$NUM_SPLITS" ]; then
-  NUM_SPLITS=8
+  NUM_SPLITS=20
   echo "Setting number of splits to default value of $NUM_SPLITS"
 else
   echo "Setting number of splits to $NUM_SPLITS, taken from env. var. NUM_SPLITS"
