@@ -209,11 +209,12 @@ test that everything is in place and working.
    /Library/Java/JavaVirtualMachines/jdk1.7.0_45.jdk/Contents/Home (on
    newer versions, e.g. 10.7 or above), or possible in a place like
    /System/Library/Frameworks/JavaVM.framework/Versions/Current. On
-   the UTexas TACC Longhorn system it might be somewhere like
-   /share/apps/teragrid/jdk64/jdk1.7.0_45/. On the University of Maryland
-   (UMD) CLIP machines running Red Hat Enterprise Linux, it might be
-   /usr/lib/jvm/jre-1.6.0-sun.x86_64. You can often figure this out by
-   running `which java` to see where the `java` executable is located.
+   the UTexas TACC Maverick system it's probably /usr/java/default.
+   On the University of Maryland (UMD) CLIP machines running Red Hat
+   Enterprise Linux, it might be /usr/lib/jvm/jre-1.6.0-sun.x86_64.
+   You can often figure this out by running `which java` to see where
+   the `java` executable is located, although you may sometimes need
+   to chase some symlinks (e.g. 'ls -l' or 'pwd -P').
 
 
 ------ II. Download and build TextGrounder ------
@@ -254,10 +255,10 @@ The data necessary for running depends on the intended application.
 
 1. For the Geolocate subproject:
 
-   1. If you are on a UTexas Comp Ling machine or the UTexas Longhorn cluster,
+   1. If you are on a UTexas Comp Ling machine or the UTexas Maverick cluster,
       the data is already there.  Just set the environment variable
       TG_ON_COMP_LING_MACHINES to something non-blank if you're on a UTexas
-      Comp Ling machine; likewise for TG_ON_LONGHORN if you're on Longhorn.
+      Comp Ling machine; likewise for TG_ON_MAVERICK if you're on Maverick.
    2. If you have access to either of the above machines, look in
       `bin/config-geolocate` to see where the environment variable
       TG_GROUPS_DIR points to, and copy the relevant TextGrounder corpora out
@@ -631,18 +632,22 @@ be copied into HDFS, since the /fs/clip-political file system is not visible
 to the task nodes.
 
 
-8. Running under TACC Longhorn
+8. Running under TACC Maverick
 
-TACC is a supercomputer center at the University of Texas.  The Longhorn
+TACC is a supercomputer center at the University of Texas.  The Maverick
 cluster is where Ben Wing's tweet data is primarily stored.  This cluster
-has about 256 8-core machines, of which 48 are available for running
-Hadoop.  In order to use Hadoop, a subset of these machines must be requested
+has about ??? 20-core machines. Note that Maverick is a replacement for
+Longhorn, which was set up to allow for Hadoop jobs. Unfortunately, no
+such jobs can be run on Maverick currently, although this may change.
+
+[[Old text: Longhorn has 48 nodes are available for running Hadoop.
+In order to use Hadoop, a subset of these machines must be requested
 for a period of time, up to a maximum of 24 hours.  Once these machines are
 available, one is made the job tracker and name node.  Hadoop servers are
 started on this machine and an HDFS file system formatted.  This means that
 data cannot be stored long-term in HDFS.  All file systems are visible on
 all machines, so there is no need to copy data into HDFS, although it
-must be copied out.
+must be copied out.]]
 
 
 9. Copy data into HDFS
@@ -650,9 +655,9 @@ must be copied out.
 If it is necessary to copy data into HDFS, use 'hadoop fs -put' to copy
 a directory tree into HDFS, which can then be accessed using a relative
 URL.  If data is to be read from a local file system, it will need to be
-accessed using an absolute URL with the 'file:///' prefix, e.g. on Longhorn:
+accessed using an absolute URL with the 'file:///' prefix, e.g. on Maverick:
 
-file:///scratch/01683/benwing/corpora/twitter-pull/all-spritzer
+file:///work/01683/benwing/maverick/corpora/twitter-pull/all-spritzer
 
 
 10. Copy data out of HDFS

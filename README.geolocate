@@ -9,9 +9,9 @@ Specifying where the corpora are located
 The corpora are located using the environment variable TG_CORPUS_DIR.
 If this is unset, and TG_GROUPS_DIR is set, it will be initialized to
 the 'corpora' subdirectory of this variable.  If you are running
-directly on Longhorn, you can set TG_ON_LONGHORN to 'yes', which will
+directly on Maverick, you can set TG_ON_MAVERICK to 'yes', which will
 set things up appropriately to use the corpora located in
-/scratch/01683/benwing/corpora.
+/work/01683/benwing/maverick/corpora.
 
 ====================
 Running under Hadoop
@@ -80,8 +80,8 @@ and underneath the latter should be the 'docthresh-*' subdirectories.
 machine with a copy of the relevant portions of /groups/corpora and
 /groups/projects in the same places, set `TG_ON_COMP_LING_MACHINES` to a
 non-empty value and it will initialize those three for you.  If you are
-running on the UTexas Longhorn cluster, set `TG_ON_LONGHORN` to a non-empty
-value and the variables will be initialized appropriately for Longhorn.)
+running on the UTexas Maverick cluster, set `TG_ON_MAVERICK` to a non-empty
+value and the variables will be initialized appropriately for Maverick.)
 
 The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
 

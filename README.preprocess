@@ -215,7 +215,7 @@ last three steps, do this:
 $ download-preprocess-wiki preprocess convert set-permissions
 
 This can be useful either when the process crashes due to a bug or runs
-out of time on Longhorn (esp. when processing the English wikipedia).
+out of time on Maverick (esp. when processing the English wikipedia).
 
 ------ In detail ------
 
@@ -585,9 +585,10 @@ WP_VERSION=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwiki
 
    If you want to generate bigram counts for all articles, you could use a
    similar command line, although it might take a couple of days to complete.
-   If you're on Longhorn, where you only have 24-hour time slots, you might
-   consider using the "divide-and-conquer" mode.  The first thing is to
-   split the dump file, like this:
+   If you're on Maverick, where you only have 24-hour time slots (FIXME:
+   This was true under Longhorn -- is it still the case for Maverick?),
+   you might consider using the "divide-and-conquer" mode.  The first thing
+   is to split the dump file, like this:
 
 WP_VERSION=enwiki-20111007 run-processwiki split-dump
 
@@ -597,12 +598,12 @@ WP_VERSION=enwiki-20111007 run-processwiki split-dump
    Then, each operation you want to do in divide-and-conquer mode, run it
    by setting NUM_SIMULTANEOUS to something more than 1, e.g.
 
-WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-bigram-counts
+WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=20 run-processwiki all-bigram-counts
 
    (although you probably want to wrap it in 'run-nohup').  Essentially,
-   this runs 8 simultaneous run-processwiki processes (which fits well with
-   the workhorse Longhorn machines, since they are 8-core), one on each of
-   the 8 splits, and then concatenates the results together at the end.
+   this runs 20 simultaneous run-processwiki processes (which fits well with
+   the workhorse Maverick machines, since they are 20-core), one on each of
+   the 20 splits, and then concatenates the results together at the end.
    You can set a NUM_SIMULTANEOUS that's lower than the number of splits,
    and you get only that much simultaneity.
 
@@ -615,9 +616,7 @@ in approximate order of generation.
 enwiki-20111007-pages-articles.xml.bz2
   Raw dump of article text, downloaded from
   http://download.wikimedia.org/enwiki/20111007/
-
-
-, specifying coordinates (geotags) of articles in the dump file,
+  , specifying coordinates (geotags) of articles in the dump file,
   when such information can be extracted.  Extracting the information
   involves a large amount of tricky and tedious parsing of the articles.
 
