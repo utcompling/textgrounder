@@ -27,9 +27,9 @@
 #       structure on another machine, just set TG_ON_COMP_LING_MACHINES to
 #       "yes", and the variables will all get set properly.
 #
-#    d. If you're on the UTexas Longhorn cluster, you can use the data
-#       stored under `/scratch/01683/benwing` by setting TG_ON_LONGHORN to
-#       "yes", and the variables will all get set properly.
+#    d. If you're on the UTexas Maverick cluster, you can use the data
+#       stored under `/work/01683/benwing/maverick` by setting TG_ON_MAVERICK
+#       to "yes", and the variables will all get set properly.
 #
 #    e. If you're running under Hadoop, set TG_USE_HDFS to "yes"; then,
 #       TG_GROUPS_DIR will be set to the value of TG_HADOOP_DIR
@@ -93,6 +93,8 @@ elif [ "$TG_ON_COMP_LING_MACHINES" = yes ]; then
   TG_GROUPS_DIR=/groups
 elif [ "$TG_ON_LONGHORN" = yes ]; then
   TG_GROUPS_DIR=/scratch/01683/benwing
+elif [ "$TG_ON_MAVERICK" = yes ]; then
+  TG_GROUPS_DIR=/work/01683/benwing/maverick
 fi
 
 if [ -n "$TG_GROUPS_DIR" ]; then
