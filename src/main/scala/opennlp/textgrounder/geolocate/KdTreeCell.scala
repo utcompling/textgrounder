@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  KDTreeGrid.scala
+//  KdTreeCell.scala
 //
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
 //  Copyright (C) 2011-2014 Ben Wing, The University of Texas at Austin
