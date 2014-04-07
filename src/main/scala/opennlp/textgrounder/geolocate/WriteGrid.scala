@@ -49,7 +49,7 @@ class WriteGridDriver extends
     val grid = initialize_grid
     val rows = for (cell <- grid.iter_nonempty_cells) yield cell.to_row
     note_result("textdb-type", "textgrounder-grid")
-    write_textdb_values_with_results(util.io.localfh, params.output,
+    write_constructed_textdb_with_results(util.io.localfh, params.output,
       rows.iterator)
   }
 }

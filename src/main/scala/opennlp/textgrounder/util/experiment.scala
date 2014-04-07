@@ -123,7 +123,7 @@ protected class ExperimentPackage {
      * points in the execution of the experiment, of results that should be
      * included later on in a textdb file that is outputted to record the
      * result of running the experiment. The textdb file itself is written
-     * using a call to `write_textdb_values_with_results`. The results that
+     * using a call to `write_constructed_textdb_with_results`. The results that
      * are noted here are stored in the fixed fields of the textdb. The
      * parameters used to invoke the application that runs the experiment are
      * automatically recorded in this fashion (see
@@ -179,9 +179,9 @@ protected class ExperimentPackage {
      *   no tabs or newlines). If necessary, pre-convert the object to a
      *   string and encode it properly.
      */
-    def write_textdb_values_with_results(filehand: FileHandler, base: String,
+    def write_constructed_textdb_with_results(filehand: FileHandler, base: String,
       data: Iterator[Iterable[(String, Any)]]) =
-        TextDB.write_textdb_values(filehand, base, data, results_to_output,
+        TextDB.write_constructed_textdb(filehand, base, data, results_to_output,
           field_description)
 
     /********************************************************************/

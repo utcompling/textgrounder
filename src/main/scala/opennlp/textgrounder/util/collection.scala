@@ -207,7 +207,7 @@ protected class CollectionPackage {
   def stringmap[T](default: String = "") = defaultmap[T,String](default)
 
   /**
-   * A default map which maps from T to an (extendable) array of type U.
+   * A default map which maps from T to an (extendable) Buffer of type U.
    * The default value is an empty Buffer of type U.  Calls of the sort
    * `map(key) += item` will add the item to the Buffer stored as the
    * value of the key rather than changing the value itself. (After doing

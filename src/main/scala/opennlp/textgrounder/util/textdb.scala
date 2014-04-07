@@ -776,29 +776,50 @@ package textdb {
       textdb_file_matching_patterns(filehand, dir, suffix, data_ending_text)
 
     /**
-     * Output a textdb database. (If you want more control over the output,
-     * e.g. to output multiple data files, use `TextDBWriter`.)
+     * Output a textdb database from a schema and a set of field values,
+     * each item specifying the field values for a given row in the database.
+     * (If you want more control over the output, e.g. to output multiple
+     * data files, use `TextDBWriter`.)
+     *
+     * @param filehand File handler object of the file system to write to
+     * @param base Prefix of schema and data files
+     * @param schema Schema to write out
+     * @param fieldvals Iterator over field values (an Iterable of Strings)
+     * @param data Data to write out, as an iterator over rows.
+     */
+    def write_textdb_fieldvals(filehand: FileHandler, base: String,
+      schema: Schema, lines: Iterator[Iterable[String]]
+    ) {
+      schema.output_constructed_schema_file(filehand, base)
+      val outfile = TextDB.construct_data_file(base)
+      val outstr = filehand.openw(outfile)
+      lines.foreach { line => outstr.println(schema.make_line(line)) }
+      outstr.close()
+    }
+
+    /**
+     * Output a textdb database from a set of rows, typically from another
+     * read-in textdb database, with the schema coming from those rows.
+     * (If you want more control over the output, e.g. to output multiple
+     * data files, use `TextDBWriter`.)
      *
      * @param filehand File handler object of the file system to write to
      * @param base Prefix of schema and data files
      * @param data Data to write out, as an iterator over rows.
      */
-    def write_textdb(filehand: FileHandler, base: String,
+    def write_textdb_rows(filehand: FileHandler, base: String,
       data: Iterator[Row]
     ) {
       val first = data.next
       val res2 = Iterator(first) ++ data
-      val schema = first.schema
-      schema.output_constructed_schema_file(filehand, base)
-      val outfile = TextDB.construct_data_file(base)
-      val outstr = filehand.openw(outfile)
-      res2.foreach { res => outstr.println(res.to_line) }
-      outstr.close()
+      write_textdb_fieldvals(filehand, base, first.schema,
+        res2.map(_.fieldvals))
     }
 
     /**
-     * Output a textdb database. (If you want more control over the output,
-     * e.g. to output multiple data files, use `TextDBWriter`.)
+     * Output a textdb database from scratch, with the schema constructed
+     * from the parameters passed in. (If you want more control over the
+     * output, e.g. to output multiple data files, use `TextDBWriter`.)
      *
      * @param filehand File handler object of the file system to write to
      * @param base Prefix of schema and data files
@@ -817,7 +838,7 @@ package textdb {
      *   normally a tab character. (FIXME: There may be dependencies elsewhere
      *   on the separator being a tab, e.g. in EncodeDecode.)
      */
-    def write_textdb_values(filehand: FileHandler, base: String,
+    def write_constructed_textdb(filehand: FileHandler, base: String,
       data: Iterator[Iterable[(String, Any)]],
       fixed_values: BaseMap[String, String] = Map[String, String](),
       field_description: BaseMap[String, String] = Map[String, String](),
@@ -827,13 +848,8 @@ package textdb {
       val res2 = Iterator(first) ++ data
       val fields = first.map(_._1)
       val schema = new Schema(fields, fixed_values, field_description)
-      schema.output_constructed_schema_file(filehand, base)
-      val outfile = TextDB.construct_data_file(base)
-      val outstr = filehand.openw(outfile)
-      res2.foreach { res =>
-        outstr.println(schema.make_line(res.map("%s" format _._2)))
-      }
-      outstr.close()
+      write_textdb_fieldvals(filehand, base, schema,
+        res2.map(_.map("%s" format _._2)))
     }
 
     /**
