@@ -672,7 +672,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
     rawdocs: Iterator[DocStatus[Row]],
     note_globally: Boolean,
     finish_globally: Boolean
-  ) = {
+  ): Iterator[DocStatus[(Row, GridDoc[Co])]] = {
     val docstats =
       rawdocs map { rawdoc =>
         raw_document_to_document_status(rawdoc, note_globally)
@@ -705,7 +705,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    */
   def document_statuses_to_documents(
     rowdocstats: Iterator[DocStatus[(Row, GridDoc[Co])]]
-  ) = {
+  ): Iterator[GridDoc[Co]] = {
     val docstats =
       rowdocstats map { _ map_all { case (raw, cooked) => cooked } }
     new DocCounterTrackerFactory[GridDoc[Co]](driver).
@@ -1000,7 +1000,7 @@ object GridDocFactory {
    * @param suffix Suffix specifying a particular corpus if many exist in
    *   the same dir (e.g. "-dev")
    * @param with_messages If true, display messages about files being loaded.
-   * @return Iterator over document statuses.
+   * @return Iterator over document statuses of raw documents.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
       suffix: String = "", with_messages: Boolean = false
