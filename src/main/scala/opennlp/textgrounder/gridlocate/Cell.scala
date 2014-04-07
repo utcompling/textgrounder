@@ -189,8 +189,8 @@ abstract class GridCell[Co](
        Strictly, this is a violation of the "don't train on your evaluation
        set" rule.  The reason motivating this was that
 
-       (1) The salience isused only in Naive Bayes, and only in establishing
-       a prior probability.  Hence it isn' the main indicator.
+       (1) The salience is used only in Naive Bayes, and only in establishing
+       a prior probability.  Hence it isn't the main indicator.
        (2) Often, nearly all the salience for a given cell comes from
        a particular document -- e.g. the Wikipedia article for the primary
        city in the cell.  If we pull the salience for this document
