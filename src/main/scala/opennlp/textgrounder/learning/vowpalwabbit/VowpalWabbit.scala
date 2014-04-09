@@ -174,6 +174,11 @@ protected trait VowpalWabbitBase {
     new VowpalWabbitClassifier(model_filename)
   }
 
+  def sanitize_feature(feat: String) = {
+    feat.replace(":", "_").replace("|", "_").replace(" ", "_").
+      replace("\r", "_").replace("\n", "_").replace("\t", "_")
+  }
+
   /**
    * Write out a set of data instances, described by their features,
    * to a file.
@@ -208,7 +213,7 @@ protected trait VowpalWabbitBase {
       // seems to want labels in this format.
       val line = s"${correct + 1} | " +
         feats.map { case (_, feat, value) =>
-          val goodfeat = feat.replace(":", "_")
+          val goodfeat = sanitize_feature(feat)
           s"$goodfeat:$value"
         }.mkString(" ")
       f.println(line)
@@ -259,7 +264,7 @@ protected trait VowpalWabbitBase {
         }.mkString(" ") +
         " | " +
         feats.map { case (_, feat, value) =>
-          val goodfeat = feat.replace(":", "_")
+          val goodfeat = sanitize_feature(feat)
           s"$goodfeat:$value"
         }.mkString(" ")
       f.println(line)
