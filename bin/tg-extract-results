@@ -160,7 +160,7 @@ for x in ${1+"$@"}; do
     avg=$(echo "2k $mean $median + 2/p" | dc)
   fi
   acc=$(echo "$results" | egrep 'Percent correct at rank <= 1 =' | perl -pe 's/.*= (.*?)%.*/$1/')
-  numeval=$(echo "$results" | egrep 'Number of instances' | perl -pe 's/.*= (.*?) *$/$1/')
+  numeval=$(echo "$results" | egrep 'instances.total' | perl -pe 's/.*= (.*?) *$/$1/')
   numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
   finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' "$x")
   # Convert runtime from "24 minutes 5 seconds" or "0 minutes 6 seconds"
