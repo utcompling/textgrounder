@@ -2259,6 +2259,15 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       else params.vw_args
 
     def create_classifier(vw_args: String) = {
+      // Create classifier trainer.
+      val trainer = new VowpalWabbitBatchTrainer(
+        gaussian = params.gaussian_penalty,
+        lasso = params.lasso_penalty,
+        vw_loss_function = params.vw_loss_function,
+        vw_multiclass = params.vw_multiclass,
+        vw_args = vw_args,
+        cost_sensitive = cost_sensitive)
+
       if (cost_sensitive) {
         val cells_labels =
           candidates.map { cell =>
@@ -2279,14 +2288,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           (feats, cells_costs)
         }
 
-        // Create classifier trainer.
-        val trainer = new VowpalWabbitCostSensitiveTrainer(
-          gaussian = params.gaussian_penalty,
-          lasso = params.lasso_penalty,
-          vw_loss_function = params.vw_loss_function,
-          vw_multiclass = params.vw_multiclass,
-          vw_args = vw_args)
-
         // Train classifier.
         val feats_filename =
           trainer.write_cost_sensitive_feature_file(training_data)
@@ -2299,14 +2300,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val feats = featvec_factory.get_features(doc)
           (feats, featvec_factory.lookup_cell(correct_cell))
         }
-
-        // Create classifier trainer.
-        val trainer = new VowpalWabbitTrainer(
-          gaussian = params.gaussian_penalty,
-          lasso = params.lasso_penalty,
-          vw_loss_function = params.vw_loss_function,
-          vw_multiclass = params.vw_multiclass,
-          vw_args = vw_args)
 
         // Train classifier.
         //

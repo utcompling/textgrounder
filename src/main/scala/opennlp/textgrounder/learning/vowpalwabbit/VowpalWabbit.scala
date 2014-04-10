@@ -111,7 +111,7 @@ case class VowpalWabbitModelError(
  * Common code to the various Vowpal Wabbit trainers and classifiers.
  */
 protected trait VowpalWabbitBase {
-  def train_vw(feats_filename: String, gaussian: Double, lasso: Double,
+  def train_vw_model(feats_filename: String, gaussian: Double, lasso: Double,
       vw_loss_function: String, vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
     // We make the writing happen in a different step because the number of
@@ -146,7 +146,7 @@ protected trait VowpalWabbitBase {
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
           "-f", model_filename) ++
         extra_args ++
-        Seq("--loss_function", vw_loss_function, "--compressed") ++
+        Seq("--loss_function", vw_loss_function) ++
         (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
         (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
         // Split on an empty string wrongly returns Array("")
@@ -171,12 +171,38 @@ protected trait VowpalWabbitBase {
         throw new VowpalWabbitModelError(badmess)
     }
 
-    new VowpalWabbitClassifier(model_filename)
+    model_filename
+  }
+
+  def vw_extra_args(vw_multiclass: String, num_classes: Int,
+      cost_sensitive: Boolean) = {
+    if (cost_sensitive) {
+      val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
+      Seq("--" + multiclass_arg, s"$num_classes")
+    } else {
+      Seq("--" + vw_multiclass, s"$num_classes")
+    }
   }
 
   def sanitize_feature(feat: String) = {
     feat.replace(":", "_").replace("|", "_").replace(" ", "_").
       replace("\r", "_").replace("\n", "_").replace("\t", "_")
+  }
+
+  /**
+   * Convert a single data instance into external format.
+   */
+  def externalize_data_instance(
+    feats: Iterable[(FeatureValue, String, Double)],
+    correct: LabelIndex
+  ) = {
+    // Map 0-based memoized labels to 1-based labels for VW, which
+    // seems to want labels in this format.
+    s"${correct + 1} | " +
+      feats.map { case (_, feat, value) =>
+        val goodfeat = sanitize_feature(feat)
+        s"$goodfeat:$value"
+      }.mkString(" ")
   }
 
   /**
@@ -209,17 +235,29 @@ protected trait VowpalWabbitBase {
           errprint(s"  $prefix: $feat = $value")
         }
       }
-      // Map 0-based memoized labels to 1-based labels for VW, which
-      // seems to want labels in this format.
-      val line = s"${correct + 1} | " +
-        feats.map { case (_, feat, value) =>
-          val goodfeat = sanitize_feature(feat)
-          s"$goodfeat:$value"
-        }.mkString(" ")
-      f.println(line)
+      f.println(externalize_data_instance(feats, correct))
     }
     f.close()
     feats_filename
+  }
+
+  /**
+   * Convert a single data instance into external format.
+   */
+  def externalize_cost_sensitive_data_instance(
+    feats: Iterable[(FeatureValue, String, Double)],
+    costs: Iterable[(LabelIndex, Double)]
+  ) = {
+    // Map 0-based memoized labels to 1-based labels for VW, which
+    // seems to want labels in this format.
+    costs.map { case (label, cost) =>
+      s"${label + 1}:$cost"
+    }.mkString(" ") +
+    " | " +
+    feats.map { case (_, feat, value) =>
+      val goodfeat = sanitize_feature(feat)
+      s"$goodfeat:$value"
+    }.mkString(" ")
   }
 
   /**
@@ -256,18 +294,7 @@ protected trait VowpalWabbitBase {
           errprint(s"  $prefix: $feat = $value")
         }
       }
-      // Map 0-based memoized labels to 1-based labels for VW, which
-      // seems to want labels in this format.
-      val line =
-        costs.map { case (label, cost) =>
-          s"${label + 1}:$cost"
-        }.mkString(" ") +
-        " | " +
-        feats.map { case (_, feat, value) =>
-          val goodfeat = sanitize_feature(feat)
-          s"$goodfeat:$value"
-        }.mkString(" ")
-      f.println(line)
+      f.println(externalize_cost_sensitive_data_instance(feats, costs))
     }
     f.close()
     feats_filename
@@ -281,11 +308,23 @@ protected trait VowpalWabbitBase {
  * As when training, you need to write out the features first, then pass
  * in the feature file name.
  */
-class VowpalWabbitClassifier private[vowpalwabbit] (
+abstract class VowpalWabbitClassifier(
   val model_filename: String
 ) extends VowpalWabbitBase {
+}
+
+/**
+ * Classify data instances using VowpalWabbit. When applied to a set of
+ * feature vectors, return a set of vectors holding scores, which should
+ * be convertible to probabilities by exponentiating and normalizing.
+ * As when training, you need to write out the features first, then pass
+ * in the feature file name.
+ */
+class VowpalWabbitBatchClassifier private[vowpalwabbit] (
+  model_filename: String
+) extends VowpalWabbitClassifier(model_filename) {
   /**
-   * Apply a Vowpal Wabbit multi-class classifier.
+   * Apply a Vowpal Wabbit multi-class batch classifier.
    *
    * @param feats_filename Filename containing sparse feature vectors
    *   describing the test instances. This should be created using
@@ -341,70 +380,196 @@ class VowpalWabbitClassifier private[vowpalwabbit] (
   }
 }
 
-/**
- * Train a classifying model using VowpalWabbit. When applied to a set of
- * feature vectors, return a classifier object. You need to write out the
- * features first, then pass in the feature file name.
- */
-class VowpalWabbitTrainer(
-  val gaussian: Double,
-  val lasso: Double,
-  val vw_loss_function: String = "logistic",
-  val vw_multiclass: String = "oaa",
-  val vw_args: String = ""
-) extends VowpalWabbitBase {
+class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String,
+  raw_filename: String, pid: Int, port: Int
+) extends VowpalWabbitClassifier(model_filename) {
+  var raw_file_seek_point = 0L
   /**
-   * Train a Vowpal Wabbit multi-class classifier.
+   * Apply a Vowpal Wabbit multi-class daemon classifier.
    *
-   * @param num_classes Number of classes.
    * @param feats_filename Filename containing sparse feature vectors
-   *   describing the training data. This should be created using
-   *   `write_feature_file`. NOTE: This filename will be deleted after
-   *   the classifier has been trained, on the assumption that it is a
-   *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
-   *   There is currently no programmatic way to specify that a given
-   *   feature file should be preserved.
-   * @return A `VowpalWabbitClassifier` object, used to classify test
-   *   instances.
+   *   describing the test instances. This should be created using
+   *   `write_feature_file` or `write_cost_sensitive_feature_file`.
+   *   NOTE: This filename will be deleted after the classifier has been
+   *   run, on the assumption that it is a temporary file, unless the
+   *   debug flag 'preserve-tmp-files' is set. There is currently no
+   *   programmatic way to specify that a given feature file should be
+   *   preserved.
+   * @return An Iterable of arrays (with one array per test instance) of
+   *   pairs of class labels and scores. The class labels are integers
+   *   starting at 0. Whether the scores can be transformed into
+   *   probabilities depends on the parameters set during training.
+   *   For example, with logistic loss, the scores can be transformed to
+   *   probabilities using the logistic function followed by normalization.
    */
-  def apply(num_classes: Int, feats_filename: String) = {
-    val extra_args = Seq("--" + vw_multiclass, s"$num_classes")
-    train_vw(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      extra_args)
+  def apply(input: String, verbose: MsgVerbosity = MsgNormal
+      ): Iterable[Array[(LabelIndex, Double)]] = {
+    import java.net.Socket
+    import java.io._
+    val socket = new Socket("localhost", port)
+    val outstream = socket.getOutputStream
+    val out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(outstream)))
+    val instream = new InputStreamReader(socket.getInputStream)
+    val in = new BufferedReader(instream)
+    if (debug("vw-daemon"))
+      errprint("Outputting to socket: [%s]", input)
+    out.println(input)
+    out.flush()
+    val linein = in.readLine
+    if (debug("vw-daemon"))
+      errprint("Read from socket: [%s]", linein)
+    // Thread.sleep(1000)
+    val rawf = new RandomAccessFile(raw_filename, "r")
+    rawf.seek(raw_file_seek_point)
+    val bytes = new Array[Byte]((rawf.length - rawf.getFilePointer).toInt)
+    rawf.read(bytes)
+    raw_file_seek_point = rawf.length
+    val instr = new String(bytes)
+    if (debug("vw-daemon"))
+      errprint("Read from raw file: [%s]", instr)
+    val lines = instr.split("\n")
+    val results = (for (line <- lines) yield {
+      val preds_1 = line.split("""\s+""")
+      preds_1.map(_.split(":")).map {
+        // Map 1-based VW labels back to the 0-based memoized labels we use.
+        case Array(label, value) => (label.toInt - 1, value.toDouble)
+      }
+    }).toIndexedSeq
+    socket.close
+    results
   }
 }
 
 /**
- * Train a classifying model using VowpalWabbit. When applied to a set of
- * feature vectors, return a classifier object. You need to call
- * write_feature_file() first, then pass in the feature file name.
+ * Train a batch classifying model using VowpalWabbit. When applied to a set of
+ * feature vectors, return a classifier object. You need to write out the
+ * features first, then pass in the feature file name.
  */
-class VowpalWabbitCostSensitiveTrainer(
+class VowpalWabbitBatchTrainer(
   val gaussian: Double,
   val lasso: Double,
   val vw_loss_function: String = "logistic",
   val vw_multiclass: String = "oaa",
-  val vw_args: String = ""
+  val vw_args: String = "",
+  val cost_sensitive: Boolean = false
 ) extends VowpalWabbitBase {
+  def train_vw_batch(feats_filename: String, gaussian: Double, lasso: Double,
+      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+      verbose: MsgVerbosity = MsgNormal) = {
+    val model_filename = train_vw_model(feats_filename, gaussian, lasso,
+      vw_loss_function, vw_args, extra_args, verbose)
+    new VowpalWabbitBatchClassifier(model_filename)
+  }
+
   /**
-   * Train a Vowpal Wabbit multi-class cost-sensitive classifier.
+   * Train a Vowpal Wabbit multi-class batch classifier.
    *
    * @param num_classes Number of classes.
    * @param feats_filename Filename containing sparse feature vectors
    *   describing the training data. This should be created using
-   *   `write_cost_sensitive_feature_file`. NOTE: This filename will be
-   *   deleted after the classifier has been trained, on the assumption that
-   *   it is a temporary file, unless the debug flag 'preserve-tmp-files' is
-   *   set. There is currently no programmatic way to specify that a given
+   *   `write_feature_file` or `write_cost_sensitive_feature_file` (for
+   *   the cost-sensitive version). NOTE: This filename will be deleted after
+   *   the classifier has been trained, on the assumption that it is a
+   *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
+   *   There is currently no programmatic way to specify that a given
    *   feature file should be preserved.
-   * @return A `VowpalWabbitClassifier` object, used to classify test
+   * @return A `VowpalWabbitBatchClassifier` object, used to classify test
    *   instances.
    */
   def apply(num_classes: Int, feats_filename: String) = {
-    val multiclass_arg =
-      if (vw_multiclass == "oaa") "csoaa" else "wap"
-    val extra_args = Seq("--" + multiclass_arg, s"$num_classes")
-    train_vw(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      extra_args)
+    train_vw_batch(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
+      vw_extra_args(vw_multiclass, num_classes, cost_sensitive))
+  }
+}
+
+/**
+ * Train a daemon classifying model using VowpalWabbit. When applied to a set
+ * of feature vectors, return a classifier object. You need to write out the
+ * features first, then pass in the feature file name.
+ */
+class VowpalWabbitDaemonTrainer(
+  val gaussian: Double,
+  val lasso: Double,
+  val vw_loss_function: String = "logistic",
+  val vw_multiclass: String = "oaa",
+  val vw_args: String = "",
+  val cost_sensitive: Boolean = false
+) extends VowpalWabbitBase {
+  def train_vw_daemon(feats_filename: String, gaussian: Double, lasso: Double,
+      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+      verbose: MsgVerbosity = MsgNormal) = {
+    val model_filename = train_vw_model(feats_filename, gaussian, lasso,
+      vw_loss_function, vw_args, extra_args, verbose)
+
+    // We need four temporary files: one used by VW as a cache, one
+    // where VW writes the raw predictions, and two to (very temporarily)
+    // hold the process ID and port used for communication. In addition we
+    // need the file holding the written-out model.
+    val cache_filename =
+      File.createTempFile("textgrounder.vw.cache.test", null).toString
+    val pred_filename =
+      File.createTempFile("textgrounder.vw.pred", null).toString
+    val pid_file_filename =
+      File.createTempFile("textgrounder.vw.pid-file", null).toString
+    val port_file_filename =
+      File.createTempFile("textgrounder.vw.port-file", null).toString
+    val vw_cmd_line =
+      Seq("vw", "-k", "--cache_file", cache_filename,
+          "-i", model_filename, "--raw_predictions", pred_filename,
+          "-t", "--daemon", "--pid_file", pid_file_filename,
+          "--port", "0", "--port_file", port_file_filename) ++ (
+        if (verbose == MsgVerbose) Seq() else Seq() // Seq("--quiet")
+      )
+    if (verbose != MsgQuiet) {
+      errprint(s"Writing VW eval cache to $cache_filename")
+      errprint(s"Writing VW raw predictions to $pred_filename")
+      errprint("Executing: %s", vw_cmd_line mkString " ")
+    }
+    val cmdline = vw_cmd_line mkString " "
+    val redir_cmdline = s"$cmdline > /dev/null 2>&1"
+    val sh_cmdline = Seq("/bin/sh", "-c", redir_cmdline)
+    //val proc = new java.lang.ProcessBuilder(vw_cmd_line: _*).start()
+    (sh_cmdline !)
+    // Thread.sleep(1000)
+    val pid_lines = localfh.openr(pid_file_filename)
+    val pid = pid_lines.next.toInt
+    pid_lines.close()
+    val port_lines = localfh.openr(port_file_filename)
+    val port = port_lines.next.toInt
+    port_lines.close()
+    if (debug("vw-daemon"))
+      errprint("PID is %s, port is %s", pid, port)
+    if (!debug("preserve-tmp-files")) {
+      (new File(cache_filename)).deleteOnExit
+      (new File(pred_filename)).deleteOnExit
+      (new File(pid_file_filename)).delete
+      (new File(port_file_filename)).delete
+    }
+    if (!debug("preserve-vw-daemon")) {
+      scala.sys.addShutdownHook {
+        s"kill $pid" !
+      }
+    }
+    new VowpalWabbitDaemonClassifier(model_filename, pred_filename, pid, port)
+  }
+
+  /**
+   * Train a Vowpal Wabbit multi-class daemon classifier.
+   *
+   * @param num_classes Number of classes.
+   * @param feats_filename Filename containing sparse feature vectors
+   *   describing the training data. This should be created using
+   *   `write_feature_file` or `write_cost_sensitive_feature_file` (for
+   *   the cost-sensitive version). NOTE: This filename will be deleted after
+   *   the classifier has been trained, on the assumption that it is a
+   *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
+   *   There is currently no programmatic way to specify that a given
+   *   feature file should be preserved.
+   * @return A `VowpalWabbitDaemonClassifier` object, used to classify test
+   *   instances.
+   */
+  def apply(num_classes: Int, feats_filename: String) = {
+    train_vw_daemon(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
+      vw_extra_args(vw_multiclass, num_classes, cost_sensitive))
   }
 }

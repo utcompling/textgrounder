@@ -485,7 +485,7 @@ class IndivClassifierGridRanker[Co](
 class VowpalWabbitGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co],
-  classifier: VowpalWabbitClassifier,
+  classifier: VowpalWabbitBatchClassifier,
   featvec_factory: DocFeatVecFactory[Co],
   cost_sensitive: Boolean,
   normalize: Boolean = false

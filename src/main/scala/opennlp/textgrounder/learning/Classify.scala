@@ -49,7 +49,7 @@ class ClassifyParameters(ap: ArgParser) {
   var method =
     ap.option[String]("method", "m",
        choices = Seq("perceptron", "avg-perceptron", "pa-perceptron", "mlogit",
-         "tadm", "vowpalwabbit"),
+         "tadm", "vw-batch", "vw-daemon"),
        default = "perceptron",
        help = """Method to use for classification: 'perceptron'
 (perceptron using the basic algorithm); 'avg-perceptron' (perceptron using
@@ -59,8 +59,9 @@ error rate, rather than steadily improving); 'pa-perceptron'
 (passive-aggressive perceptron, which usually leads to steady but gradually
 dropping-off error rate improvements with increased number of iterations);
 'mlogit' (use a conditional logit model implemented by R's 'mlogit()'
-function); 'tadm' (use Rob Malouf's TADM package); 'vowpalwabbit'
-(use John Langford's Vowpal Wabbit package). Default %default.""")
+function); 'tadm' (use Rob Malouf's TADM package); 'vw-batch'
+(use John Langford's Vowpal Wabbit package in batch mode); 'vw-daemon'
+(use Vowpal Wabbit in daemon mode). Default %default.""")
 
   var trainSource =
     ap.option[String]("t", "train",
@@ -454,22 +455,24 @@ object Classify extends ExperimentApp("Classify") {
       }
     }
 
-    /** Handle "bulk classifiers", which require that batches of
-     * test instances be evaluated at a time for efficiency purposes.
-     * (Basically, a separate program gets spawned each time we need to
-     * evaluate, and expects a set of test instances, whereas in the
-     * indiv classifiers, the weights are directly available so that we
-     * can do the classification ourselves.)
+    /** Handle Vowpal Wabbit as either a "batch classifier", which requires that
+     * batches of test instances be evaluated at a time for efficiency purposes,
+     * or a "daemon classifier", which is able to evaluate test instances one
+     * at a time. Basically, in the indiv classifiers above, the weights are
+     * directly available so that we can do the classification ourselves, but
+     * in the case of VW we need to run a program to do the classification. VW
+     * can be run either in batch mode or daemon mode. In the latter case, it
+     * stays resident in memory and communication with it is by means of a
+     * network socket.
      *
-     * Currently this is only Vowpal Wabbit. Vowpal Wabbit does feature
-     * hashing and reduces multiclass classification to a set of
-     * binary classifications (using either the "one against all"
+     * Vowpal Wabbit features hashing and reduces multiclass classification
+     * to a set of binary classifications (using either the "one against all"
      * or "error-correcting tournament" strategy), and for efficient
-     * one-at-a-time evaluation would need an IPC interface onto the
-     * running VW executable.
+     * one-at-a-time evaluation we would need to use the --daemon IPC interface
+     * onto the running VW executable.
      */
-    def handle_bulk_classifier() = {
-      val (classifier, test_instances, factory) =
+    def handle_vw_classifier(daemon: Boolean) = {
+      val (training_instances, test_instances, factory, numlabs) =
         if (label_specific) {
           error("Can't handle label-specific input yet with Vowpal Wabbit")
         } else {
@@ -487,29 +490,47 @@ object Classify extends ExperimentApp("Classify") {
             error(
               s"Found $numlabs different labels, when at least 2 are needed.")
           }
+          (training_instances, test_instances, factory, numlabs)
+        }
 
+      val insts_results_lines =
+        if (daemon) {
           // Train a classifier
-          assert(params.method == "vowpalwabbit")
-          errprint("Using TADM trainer")
-          val trainer = new VowpalWabbitTrainer(
+          errprint("Using Vowpal Wabbit daemon trainer")
+          val trainer = new VowpalWabbitDaemonTrainer(
             gaussian = params.gaussian,
             lasso = params.lasso)
 
-          val feats_filename =
+          val train_feats_filename =
             trainer.write_feature_file(training_instances.toIterator)
-          val classifier = trainer(numlabs, feats_filename)
-          (classifier, test_instances, factory)
-        }
+          val classifier = trainer(numlabs, train_feats_filename)
 
-      // Return results_insts_lines
-      val feats_filename =
-        classifier.write_feature_file(test_instances.toIterator)
-      val results = classifier(feats_filename)
-      val insts_results_lines =
-        for ((result, (inst, truelab)) <-
-             results zip test_instances) yield {
-          val scores = result.sortWith(_._2 > _._2)
-          (inst, get_table_line(factory.mapper, scores, truelab))
+          for ((inst, truelab) <- test_instances) yield {
+            val extline = classifier.externalize_data_instance(inst, truelab)
+            // Scores in reverse sorted order
+            val scores = classifier(extline).head.sortWith(_._2 > _._2)
+            (inst, get_table_line(factory.mapper, scores, truelab))
+          }
+        } else {
+          // Train a classifier
+          errprint("Using Vowpal Wabbit batch trainer")
+          val trainer = new VowpalWabbitBatchTrainer(
+            gaussian = params.gaussian,
+            lasso = params.lasso)
+
+          val train_feats_filename =
+            trainer.write_feature_file(training_instances.toIterator)
+          val classifier = trainer(numlabs, train_feats_filename)
+
+          // Return insts_results_lines
+          val test_feats_filename =
+            classifier.write_feature_file(test_instances.toIterator)
+          val results = classifier(test_feats_filename)
+          for ((result, (inst, truelab)) <-
+               results zip test_instances) yield {
+            val scores = result.sortWith(_._2 > _._2)
+            (inst, get_table_line(factory.mapper, scores, truelab))
+          }
         }
       output_results(factory.mapper.number_of_labels, insts_results_lines) {
         (inst, prefix) =>
@@ -519,7 +540,8 @@ object Classify extends ExperimentApp("Classify") {
       }
     }
 
-    if (params.method == "vowpalwabbit") handle_bulk_classifier()
+    if (params.method == "vw-batch") handle_vw_classifier(daemon = false)
+    else if (params.method == "vw-daemon") handle_vw_classifier(daemon = true)
     else handle_indiv_classifier()
 
     output.flush
