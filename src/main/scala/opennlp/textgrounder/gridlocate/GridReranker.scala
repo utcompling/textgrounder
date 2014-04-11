@@ -74,7 +74,8 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   ranker_name: String,
   val trainer: SingleWeightLinearClassifierTrainer[GridRerankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRerankerInst[Co]
+    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRerankerInst[Co],
+    FeatureVector, AggregateFeatureVector, TrainingData[GridRerankerInst[Co]]
     ] { self =>
   protected def create_rerank_classifier(
     training_data: TrainingData[GridRerankerInst[Co]]
@@ -110,7 +111,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
    * initial ranker.
    */
   override protected def create_reranker(
-    _rerank_classifier: ScoringClassifier,
+    _rerank_classifier: ScoringClassifier[FeatureVector],
     _initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
   ) = {
     val reranker = super.create_reranker(_rerank_classifier, _initial_ranker)

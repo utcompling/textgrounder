@@ -25,6 +25,10 @@ import util.io.localfh
 import util.metering._
 import util.print.errprint
 
+trait GenTrainingData[DI] {
+  def data: Iterable[(DI, LabelIndex)]
+}
+
 /**
  * Training data for a classifier or similar.
  *
@@ -34,7 +38,7 @@ import util.print.errprint
 case class TrainingData[DI <: DataInstance](
   data: Iterable[(DI, LabelIndex)],
   removed_features: Set[FeatIndex]
-) {
+) extends GenTrainingData[DI] {
   def check_valid() {
     val head = data.head._1.feature_vector
     // This should force evaluation of `insts` if it's a stream
@@ -162,8 +166,8 @@ case class TrainingData[DI <: DataInstance](
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
           case agg: AggregateFeatureVector =>
-            TrainingData.export_aggregate_for_mlogit(agg, correct_label,
-              index, removed_features)
+            TrainingData.export_aggregate_for_mlogit(agg,
+              correct_label, index, removed_features)
           case _ => ???
         }
     })
@@ -176,8 +180,9 @@ case class TrainingData[DI <: DataInstance](
     val task = new Meter("writing", "rerank training instance")
     data.foreachMetered(task) { case (inst, correct_label) =>
       val agg = AggregateFeatureVector.check_aggregate(inst)
-      TrainingData.export_aggregate_to_file(file, agg, correct_label,
-        include_length = include_length, memoized_features = memoized_features,
+      TrainingData.export_aggregate_to_file(file, agg,
+        correct_label, include_length = include_length,
+        memoized_features = memoized_features,
         no_values = no_values)
     }
     file.close()
@@ -196,8 +201,8 @@ case class TrainingData[DI <: DataInstance](
       case ((inst, correct_label), index) =>
         inst.feature_vector match {
           case agg: AggregateFeatureVector =>
-            TrainingData.export_aggregate_for_mlogit(agg, correct_label,
-              index, removed_features)
+            TrainingData.export_aggregate_for_mlogit(agg,
+              correct_label, index, removed_features)
           case _ => ???
         }
     })

@@ -2045,6 +2045,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           featvec
         }
 
+        def create_aggregate_feature_vector(fvs: Iterable[FeatureVector]) =
+          new AggregateFeatureVector(fvs.toArray)
+
+        def create_training_data(
+          data: Iterable[(GridRerankerInst[Co], LabelIndex)]
+        ) = {
+          val result = TrainingData(data)
+          val training_data_file = debugval("write-rerank-training-data")
+          if (training_data_file != "")
+            result.export_to_file(training_data_file)
+          result
+        }
+
         /* Create the initial ranker from training data. */
         protected def create_initial_ranker(
           data: Iterable[DocStatus[Row]]

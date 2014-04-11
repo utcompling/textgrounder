@@ -147,8 +147,7 @@ class RandomReranker[Query, Candidate](
  * a "candidate feature vector" combining individual features describing
  * the compatibility between query and candidate.  The feature vectors for
  * all N candidates get grouped into an "aggregate feature vector"
- * (of type `AggregateFeatureVector`), which is then passed to the
- * classifier to be scored.
+ * (of type `AFV`), which is then passed to the classifier to be scored.
  *
  * @tparam Query type of a query
  * @tparam Candidate type of a possible candidate
@@ -157,10 +156,10 @@ class RandomReranker[Query, Candidate](
  * @param top_n Number of top candidates from initial ranker to rerank.
  * @param rerank_classifier Scoring classifier for use in reranking.
  */
-abstract class PointwiseClassifyingReranker[Query, Candidate](
+abstract class PointwiseClassifyingReranker[Query, Candidate, FV, AFV <: FV](
   val initial_ranker: Ranker[Query, Candidate],
   val top_n: Int,
-  rerank_classifier: ScoringClassifier
+  rerank_classifier: ScoringClassifier[FV]
 ) extends Reranker[Query, Candidate] {
   // FIXME! This is really ugly.
   val write_test_data_file = {
@@ -181,7 +180,9 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
    */
   protected def create_candidate_eval_featvec(query: Query,
     candidate: Candidate, initial_score: Double, initial_rank: Int
-  ): FeatureVector
+  ): FV
+
+  def create_aggregate_feature_vector(fvs: Iterable[FV]): AFV
 
   /**
    * Rerank a set of top candidates, given the query and the initial score
@@ -195,14 +196,15 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
       for (((candidate, score), rank) <- scored_candidates.zipWithIndex)
         yield create_candidate_eval_featvec(item, candidate, score, rank)
     // Combine into an aggregate feature vector.
-    val agg = AggregateFeatureVector(featvecs.toArray)
+    val agg = create_aggregate_feature_vector(featvecs)
     if (write_test_data_file != None) {
       // FIXME: Is this correct?
       require(correct != None,
         "Can't write test data file with unknown correct label")
       find_label(scored_candidates, correct.get).map { label =>
-        TrainingData.export_aggregate_to_file(write_test_data_file.get,
-          agg, label)
+        TrainingData.export_aggregate_to_file(
+          write_test_data_file.get,
+          agg.asInstanceOf[AggregateFeatureVector], label)
       }
     }
     // Rescore component vectors using classifier.
@@ -223,7 +225,8 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
          * the score for the two of them. Given the two feature vectors,
          * and the weight vector, multiply the features by their weights
          * and sort. */
-        val agg_fvs = agg.fetch_sparse_featvecs
+        val xagg = agg.asInstanceOf[AggregateFeatureVector]
+        val agg_fvs = xagg.fetch_sparse_featvecs
         val old_head_label = find_label(scored_candidates, old_head).get
         val old_head_featvec = agg_fvs(old_head_label)
         val new_head_label = find_label(scored_candidates, new_head).get
@@ -249,7 +252,7 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
           for (((feat, value, weight), index) <-
                sig_feats.view.zipWithIndex.take(num_items)) {
             errprint("#%s: %s (%s) = %s*%s = %s", index + 1,
-              agg.format_feature(feat), feat, weight, value, weight*value)
+              xagg.format_feature(feat), feat, weight, value, weight*value)
           }
         }
         errprint("For old, correct #1, %s:", old_head)
@@ -360,7 +363,7 @@ abstract class PointwiseClassifyingReranker[Query, Candidate](
  *   instances directly usable by the reranker, consisting of feature vectors)
  */
 trait PointwiseClassifyingRerankerTrainer[
-  Query, Candidate, ExtInst, FTI <: DataInstance
+  Query, Candidate, ExtInst, FTI, FV, AFV <: FV, TD <: GenTrainingData[FTI]
 ] extends RerankerLike[Query, Candidate] { self =>
 
   /**
@@ -395,16 +398,15 @@ trait PointwiseClassifyingRerankerTrainer[
      *    feature vector.
      */
     def aggregate_featvec(
-      create_candidate_featvec: (Query, Candidate, Double, Int) =>
-        FeatureVector
+      create_candidate_featvec: (Query, Candidate, Double, Int) => FV
     ) = {
       // Get sequence of feature vectors
       val featvecs =
         (for (((cand, score), rank) <- cand_scores.zipWithIndex) yield
-          create_candidate_featvec(query, cand, score, rank)).toArray
-      val agg = AggregateFeatureVector(featvecs)
+          create_candidate_featvec(query, cand, score, rank))
+      val agg = create_aggregate_feature_vector(featvecs)
       if (debug("rescale-features"))
-        agg.rescale_featvecs()
+        agg.asInstanceOf[AggregateFeatureVector].rescale_featvecs()
       agg
     }
 
@@ -436,8 +438,7 @@ trait PointwiseClassifyingRerankerTrainer[
    * candidate (corresponding to an index into the FTI's aggregate feature
    * vector).
    */
-  protected def create_rerank_classifier(data: TrainingData[FTI]
-    ): ScoringClassifier
+  protected def create_rerank_classifier(data: TD): ScoringClassifier[FV]
 
   /**
    * Create a candidate feature vector (see above) to feed to
@@ -451,7 +452,9 @@ trait PointwiseClassifyingRerankerTrainer[
    */
   protected def create_candidate_eval_featvec(query: Query,
     candidate: Candidate, initial_score: Double, initial_rank: Int
-  ): FeatureVector
+  ): FV
+
+  def create_aggregate_feature_vector(fvs: Iterable[FV]): AFV
 
   /**
    * Create an initial ranker based on a set of external instances.
@@ -502,6 +505,9 @@ trait PointwiseClassifyingRerankerTrainer[
    * Display an candidate (typically for debugging purposes).
    */
   def format_candidate(candidate: Candidate) = candidate.toString
+
+  def create_training_data(data: Iterable[(FTI, LabelIndex)]
+    ): TD
 
   /**
    * Generate a query training instance. See `QueryTrainingInst` above.
@@ -610,10 +616,7 @@ trait PointwiseClassifyingRerankerTrainer[
     val query_training_data = get_query_training_data(ext_training_data)
     val aggregate_fvs =
       query_training_data_to_feature_vectors(query_training_data)
-    val feature_training_data = TrainingData(aggregate_fvs)
-    val training_data_file = debugval("write-rerank-training-data")
-    if (training_data_file != "")
-      feature_training_data.export_to_file(training_data_file)
+    val feature_training_data = create_training_data(aggregate_fvs)
     create_rerank_classifier(feature_training_data)
   }
 
@@ -622,16 +625,18 @@ trait PointwiseClassifyingRerankerTrainer[
    * initial ranker.
    */
   protected def create_reranker(
-    rerank_classifier: ScoringClassifier,
+    rerank_classifier: ScoringClassifier[FV],
     initial_ranker: Ranker[Query, Candidate]
   ): Reranker[Query, Candidate] = {
-    new PointwiseClassifyingReranker[Query, Candidate](
+    new PointwiseClassifyingReranker[Query, Candidate, FV, AFV](
         initial_ranker, self.top_n, rerank_classifier) {
       protected def create_candidate_eval_featvec(query: Query,
           candidate: Candidate, initial_score: Double, initial_rank: Int) = {
         self.create_candidate_eval_featvec(query, candidate,
           initial_score, initial_rank)
       }
+      def create_aggregate_feature_vector(fvs: Iterable[FV]) =
+        self.create_aggregate_feature_vector(fvs)
     }
   }
 

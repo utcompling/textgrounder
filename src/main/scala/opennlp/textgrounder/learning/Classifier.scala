@@ -50,10 +50,11 @@ object ClassifierConstants {
  *   trainers, this encapsulates a feature vector and possibly other
  *   application-specific data.
  */
-trait ClassifierLike[DI <: DataInstance] {
+trait ClassifierLike[DI] {
   /** Return number of labels associated with a given instance. (In
     * fixed-depth classifiers, this value is the same for all instances.) */
   def number_of_labels(inst: DI): Int
+  def pretty_print_labeled(inst: DI, prefix: String, correct: LabelIndex)
 }
 
 trait DataInstance {
@@ -96,25 +97,25 @@ trait DataInstance {
  *    feature vector must vary from instance to instance (using an
  *    `AggregateFeatureVector`).
  */
-trait Classifier extends ClassifierLike[FeatureVector] {
+trait Classifier[DI] extends ClassifierLike[DI] {
   /** Classify a given instance, returning the label (from 0 to
     * `number_of_labels`-1). */
-  def classify(inst: FeatureVector): LabelIndex
+  def classify(inst: DI): LabelIndex
 }
 
-trait ScoringClassifier extends Classifier {
+trait ScoringClassifier[DI] extends Classifier[DI] {
   /** Score a given instance for a single label. */
-  def score_label(inst: FeatureVector, label: LabelIndex): Double
+  def score_label(inst: DI, label: LabelIndex): Double
 
   /** Return the best label. */
-  def classify(inst: FeatureVector) =
+  def classify(inst: DI) =
     argmax(0 until number_of_labels(inst)) { score_label(inst, _) }
 
   /** Score a given instance.  Return a sequence of predicted scores, of
     * the same length as the number of labels present.  There is one score
     * per label, and the maximum score corresponds to the single predicted
     * label if such a prediction is desired. */
-  def score(inst: FeatureVector): IndexedSeq[Double] =
+  def score(inst: DI): IndexedSeq[Double] =
     (0 until number_of_labels(inst)).map(score_label(inst, _)).toIndexedSeq
 
 //  /** Score a given instance and generate probabilities of each possible
@@ -122,7 +123,7 @@ trait ScoringClassifier extends Classifier {
 //    * probabilities. Return a sequence of predicted probabilities, of
 //    * the same length as the number of labels present, as with `score`.
 //    */
-//  def maxent_prob(inst: FeatureVector): IndexedSeq[Double] = {
+//  def maxent_prob(inst: DI): IndexedSeq[Double] = {
 //    val exp_scores = score(inst).map { math.exp(_) }
 //    val sum = exp_scores.sum
 //    exp_scores.map { _/sum }
@@ -135,7 +136,7 @@ trait ScoringClassifier extends Classifier {
     * and second labels is the margin between the predicted and best
     * non-predicted label, which can be viewed as a confidence measure.
     */
-  def sorted_scores(inst: FeatureVector) = {
+  def sorted_scores(inst: DI) = {
     val scores = score(inst)
     ((0 until scores.size) zip scores).sortWith(_._2 > _._2)
   }
@@ -206,28 +207,33 @@ object LinearClassifier {
   }
 }
 
+trait LinearClassifierLike[DI <: DataInstance] extends ClassifierLike[DI] {
+  def pretty_print_labeled(inst: DI, prefix: String,
+    correct: LabelIndex) = inst.pretty_print_labeled(prefix, correct)
+}
+
 abstract class LinearClassifier(
   val weights: VectorAggregate
-) extends ScoringClassifier {
+) extends ScoringClassifier[FeatureVector]
+    with LinearClassifierLike[FeatureVector] {
   def score_label(inst: FeatureVector, label: LabelIndex) =
     inst.dot_product(weights(label), label)
 }
 
 /** Mix-in for a fixed-depth classifier (or trainer thereof). */
-trait FixedDepthClassifierLike[DI <: DataInstance]
+trait FixedDepthClassifierLike[DI]
     extends ClassifierLike[DI] {
   val num_labels: Int
   def number_of_labels(inst: DI) = num_labels
 }
 
 /** Mix-in for a variable-depth classifier (or trainer thereof). */
-trait VariableDepthClassifierLike[DI <: DataInstance]
+trait VariableDepthClassifierLike[DI]
     extends ClassifierLike[DI] {
-  def number_of_labels(inst: DI) = inst.feature_vector.depth
 }
 
 /** Mix-in for a binary classifier (or trainer thereof). */
-trait BinaryClassifierLike[DI <: DataInstance]
+trait BinaryClassifierLike[DI]
     extends FixedDepthClassifierLike[DI] {
   val num_labels = 2
 }
@@ -240,6 +246,7 @@ class FixedDepthLinearClassifier(weights: VectorAggregate, val num_labels: Int)
 class VariableDepthLinearClassifier(weights: VectorAggregate)
     extends LinearClassifier(weights)
       with VariableDepthClassifierLike[FeatureVector] {
+  def number_of_labels(inst: FeatureVector) = inst.feature_vector.depth
 }
 
 /**
@@ -271,7 +278,7 @@ class BinaryLinearClassifier (
  *
  * @tparam DI Type of data instance used in training the classifier.
  */
-trait ClassifierTrainer[DI <: DataInstance]
+trait ClassifierTrainer[DI]
     extends ClassifierLike[DI] {
 }
 
@@ -282,7 +289,8 @@ trait ClassifierTrainer[DI <: DataInstance]
  * @tparam DI Type of data instance used in training the classifier.
  */
 trait LinearClassifierTrainer[DI <: DataInstance]
-    extends ClassifierTrainer[DI] {
+    extends ClassifierTrainer[DI]
+    with LinearClassifierLike[DI] {
   val factory: VectorAggregateFactory
 
   /** Check that the arguments passed in are kosher, and return an array of
@@ -378,7 +386,8 @@ trait LinearClassifierTrainer[DI <: DataInstance]
     *
     * @return Tuple of weights and number of iterations required
     *   to compute them. */
-  def get_weights(training_data: TrainingData[DI]): (VectorAggregate, Int)
+  def get_weights(training_data: TrainingData[DI]
+    ): (VectorAggregate, Int)
 
   /** Create a linear classifier. */
   def create_classifier(weights: VectorAggregate): LinearClassifier
@@ -479,7 +488,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
 
  * @tparam DI Type of data instance used in training the classifier.
  */
-trait MultiCorrectLabelClassifierTrainer[DI <: DataInstance]
+trait MultiCorrectLabelClassifierTrainer[DI]
     extends ClassifierTrainer[DI] {
   /** Return set of "yes" labels associated with an instance.  Currently only
     * one yes label per instance, but this could be changed by redoing this
@@ -526,6 +535,7 @@ trait SingleWeightLinearClassifierTrainer[DI <: DataInstance]
 
   def create_classifier(weights: VectorAggregate) =
     new VariableDepthLinearClassifier(weights)
+  def number_of_labels(inst: DI) = inst.feature_vector.depth
 }
 
 /**
