@@ -20,6 +20,7 @@ package opennlp.textgrounder
 package learning.vowpalwabbit
 
 import scala.sys.process._
+import scala.util.control.Breaks._
 
 import learning._
 import util.debug._
@@ -546,12 +547,28 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
     val linein = in.readLine
     if (debug("vw-daemon"))
       errprint("Read from socket: [%s]", linein)
-    // Thread.sleep(1000)
-    val rawf = new RandomAccessFile(raw_filename, "r")
-    rawf.seek(raw_file_seek_point)
-    val bytes = new Array[Byte]((rawf.length - rawf.getFilePointer).toInt)
-    rawf.read(bytes)
-    raw_file_seek_point = rawf.length
+    //Thread.sleep(100)
+    // HACK! There is a race condition where we don't always see all lines
+    // written to the file when multiple lines are written. So we check
+    // to see if things end with two newlines, as they should in
+    // label-dependent mode, and if not, loop until they do. Note that
+    // we have to do this before closing the socket or the rest of the file
+    // won't get written; not sure why.
+    var bytes: Array[Byte] = null
+    var new_seek_point = 0L
+    breakable {
+      while (true) {
+        val rawf = new RandomAccessFile(raw_filename, "r")
+        rawf.seek(raw_file_seek_point)
+        bytes = new Array[Byte]((rawf.length - rawf.getFilePointer).toInt)
+        rawf.read(bytes)
+        new_seek_point = rawf.length
+        rawf.close
+        if (!label_dependent || (new String(bytes.takeRight(2))) == "\n\n")
+          break
+      }
+    }
+    raw_file_seek_point = new_seek_point
     val instr = new String(bytes)
     if (debug("vw-daemon"))
       errprint("Read from raw file: [%s]", instr)
@@ -568,6 +585,8 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
         case Array(label, value) => (label.toInt - 1, value.toDouble)
       }
     }).toIndexedSeq
+    in.close
+    out.close
     socket.close
     results
   }

@@ -147,7 +147,8 @@ class VowpalWabbitLabelDependentScoringClassifier(
     val results =
       cfier(input, label_dependent = true)
     val sorted_results = results.head.toIndexedSeq.sortWith(_._1 < _._1)
-    assert(sorted_results.size == rafv.data.size)
+    assert(sorted_results.size == rafv.data.size,
+      s"Expected size ${rafv.data.size} but got ${sorted_results.size}: $sorted_results")
     sorted_results.map(_._2)
   }
 }
