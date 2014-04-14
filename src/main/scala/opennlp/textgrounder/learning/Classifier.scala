@@ -103,20 +103,16 @@ trait Classifier[DI] extends ClassifierLike[DI] {
   def classify(inst: DI): LabelIndex
 }
 
+/**
+ * A classifier which is capable of returning scores for the different
+ * possible labels, rather than just the best label.
+ */
 trait ScoringClassifier[DI] extends Classifier[DI] {
-  /** Score a given instance for a single label. */
-  def score_label(inst: DI, label: LabelIndex): Double
-
-  /** Return the best label. */
-  def classify(inst: DI) =
-    argmax(0 until number_of_labels(inst)) { score_label(inst, _) }
-
   /** Score a given instance.  Return a sequence of predicted scores, of
     * the same length as the number of labels present.  There is one score
     * per label, and the maximum score corresponds to the single predicted
     * label if such a prediction is desired. */
-  def score(inst: DI): IndexedSeq[Double] =
-    (0 until number_of_labels(inst)).map(score_label(inst, _)).toIndexedSeq
+  def score(inst: DI): IndexedSeq[Double]
 
 //  /** Score a given instance and generate probabilities of each possible
 //    * label, assuming a maxent (exponential) transformation of the scores to
@@ -140,6 +136,27 @@ trait ScoringClassifier[DI] extends Classifier[DI] {
     val scores = score(inst)
     ((0 until scores.size) zip scores).sortWith(_._2 > _._2)
   }
+}
+
+/**
+ * A scoring classifier for which it's possible to score an individual
+ * which is capable of returning scores for the different
+ * possible labels, rather than just the best label.
+ */
+trait IndivScoringClassifier[DI] extends ScoringClassifier[DI] {
+  /** Score a given instance for a single label. */
+  def score_label(inst: DI, label: LabelIndex): Double
+
+  /** Return the best label. */
+  def classify(inst: DI) =
+    argmax(0 until number_of_labels(inst)) { score_label(inst, _) }
+
+  /** Score a given instance.  Return a sequence of predicted scores, of
+    * the same length as the number of labels present.  There is one score
+    * per label, and the maximum score corresponds to the single predicted
+    * label if such a prediction is desired. */
+  def score(inst: DI): IndexedSeq[Double] =
+    (0 until number_of_labels(inst)).map(score_label(inst, _)).toIndexedSeq
 }
 
 object LinearClassifier {
@@ -214,7 +231,7 @@ trait LinearClassifierLike[DI <: DataInstance] extends ClassifierLike[DI] {
 
 abstract class LinearClassifier(
   val weights: VectorAggregate
-) extends ScoringClassifier[FeatureVector]
+) extends IndivScoringClassifier[FeatureVector]
     with LinearClassifierLike[FeatureVector] {
   def score_label(inst: FeatureVector, label: LabelIndex) =
     inst.dot_product(weights(label), label)

@@ -862,7 +862,7 @@ trait GridLocateRerankParameters {
     ap.option[String]("reranker", "rer",
       default = "none",
       choices = Seq("none", "random", "oracle", "perceptron", "avg-perceptron",
-        "pa-perceptron", "cost-perceptron", "mlogit", "tadm"),
+        "pa-perceptron", "cost-perceptron", "mlogit", "tadm", "vowpal-wabbit"),
       help = """Type of strategy to use when reranking.  Possibilities are:
 
 'none' (no reranking);
@@ -889,7 +889,9 @@ trait GridLocateRerankParameters {
 'mlogit' (use R's mlogit() function to implement a multinomial conditional
   logit aka maxent ranking model, a type of generalized linear model);
 
-'tadm' (use TADM to implement a maxent ranking model).
+'tadm' (use TADM to implement a maxent or other ranking model);
+
+'vowpal-wabbit' (use VowpalWabbit to implement a maxent or other ranking model).
 
 Default is '%default'.
 
@@ -1949,7 +1951,139 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   /**
    * Create a reranker that uses a classifier to do its work.
    */
-  def create_classifier_reranker: GridRanker[Co] = {
+  def create_vowpal_wabbit_classifier_reranker: GridRanker[Co] = {
+    /* Factory object for generating candidate feature vectors
+     * to be ranked. There is one such feature vector per cell to be
+     * ranked for a given document; many of the features describe
+     * the compatibility between the document and cell, e.g. of their
+     * language models.
+     */
+    val candidate_featvec_factory =
+      create_combined_featvec_factory(params.rerank_feature_list,
+        params.rerank_binning, "rerank-features", attach_label = false,
+        include_doc_only = true, include_doc_cell = true)
+
+    val vw_daemon_trainer =
+      new VowpalWabbitDaemonTrainer(
+        gaussian = params.gaussian_penalty,
+        lasso = params.lasso_penalty,
+        vw_loss_function = params.vw_loss_function)
+    /* Object for training a reranker. */
+    val reranker_trainer =
+      new VowpalWabbitGridRerankerTrainer[Co](
+        params.reranker, vw_daemon_trainer, params.vw_args
+      ) {
+        val top_n = params.rerank_top_n
+        val number_of_splits = params.rerank_num_training_splits
+
+        val mapper =
+          candidate_featvec_factory.featvec_factory.mapper
+        assert(mapper.number_of_labels == 0)
+        for (i <- 0 until params.rerank_top_n) {
+          mapper.label_to_index(s"#${i + 1}")
+        }
+
+        /* Create the candidate feature vector during training or evaluation,
+         * by invoking the candidate feature vector factory (see above).
+         */
+        def imp_create_candidate_featvec(query: GridDoc[Co],
+            candidate: GridCell[Co], initial_score: Double,
+            initial_rank: Int, prefix: String) = {
+          val featvec_values =
+            candidate_featvec_factory.get_features(query, candidate,
+              initial_score, initial_rank)
+          val featvec = RawSimpleFeatureVector(featvec_values)
+          if (debug("features")) {
+            errprint("%s: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
+              prefix, query, candidate, initial_score,
+              initial_rank, featvec.pretty_format(prefix))
+          }
+          featvec
+        }
+
+        protected def query_training_data_to_feature_vectors(
+          data: Iterable[QueryTrainingInst]
+        ): Iterable[(RawAggregateFeatureVector, LabelIndex)] = {
+
+          val task = show_progress("converting QTI's to",
+            "aggregate feature vector")
+
+          def create_candidate_featvec(query: GridDoc[Co],
+              candidate: GridCell[Co], initial_score: Double,
+              initial_rank: Int) = {
+            val prefix = "#%s-%s: Training" format (task.num_processed + 1,
+              initial_rank)
+            imp_create_candidate_featvec(query, candidate, initial_score,
+              initial_rank, prefix)
+          }
+
+          val maybepar_data = data
+          // FIXME: This does not yet work because memoization isn't
+          // thread-safe. See the comments for FeatureLabelMapper.
+          /*
+          val maybepar_data =
+            if (!debug("parallel-classifier-training")
+                //params.no_parallel || debug("no-parallel-classifier-training")
+               )
+              data
+            else data.par
+          */
+
+          maybepar_data.mapMetered(task) { qti =>
+            val agg_fv = qti.aggregate_featvec(create_candidate_featvec)
+            val label = qti.label
+            (agg_fv, label)
+          }.seq
+        }
+
+        // Create the candidate feature vector during evaluation.
+        protected def create_candidate_eval_featvec(query: GridDoc[Co],
+            candidate: GridCell[Co], initial_score: Double,
+            initial_rank: Int) =
+          imp_create_candidate_featvec(query, candidate, initial_score,
+            initial_rank, "Eval")
+
+        def create_aggregate_feature_vector(fvs: Iterable[RawFeatureVector]) =
+          RawAggregateFeatureVector(fvs.map { rfv =>
+            rfv.asInstanceOf[RawSimpleFeatureVector].data })
+
+        def create_training_data(
+          data: Iterable[(RawAggregateFeatureVector, LabelIndex)]
+        ) = RawAggregateTrainingData(data)
+
+        /* Create the initial ranker from training data. */
+        protected def create_initial_ranker(
+          data: Iterable[DocStatus[Row]]
+        ) = create_ranker_from_document_streams(Iterable(("rerank",
+          _ => data.toIterator)))
+
+        /* Convert encapsulated raw documents into document-cell pairs.
+         */
+        protected def external_instances_to_query_candidate_pairs(
+          insts: Iterator[DocStatus[Row]],
+          initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
+        ) = {
+          val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
+          get_docs_cells_from_raw_documents(grid_ranker.grid, insts)
+        }
+      }
+
+    /* Training data, in the form of an iterable over raw documents (suitably
+     * wrapped in a DocStatus object). */
+    val training_data = new Iterable[DocStatus[Row]] {
+      def iterator =
+        read_combined_raw_training_documents(
+          "reading %s for generating reranker training data")
+    }.view
+    /* Train the reranker. */
+    reranker_trainer(training_data)
+  }
+
+  /**
+   * Create a reranker that uses a classifier to do its work, other
+   * than VowpalWabbit.
+   */
+  def create_non_vw_classifier_reranker: GridRanker[Co] = {
     /* Factory object for generating candidate feature vectors
      * to be ranked. There is one such feature vector per cell to be
      * ranked for a given document; many of the features describe
@@ -1978,6 +2112,33 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           mapper.label_to_index(s"#${i + 1}")
         }
 
+        /* Create the candidate feature vector during training or evaluation,
+         * by invoking the candidate feature vector factory (see above).
+         * This may need to operate differently during training and
+         * evaluation, in particular in that new features cannot be created
+         * during evaluation. Hence, e.g., when handling a previously unseen
+         * word we need to skip it rather than creating a previously unseen
+         * feature. The reason for this is that creating a new feature would
+         * increase the total size of the feature vectors and weight vector(s),
+         * which we can't do after training has completed. Typically
+         * the difference down to 'to_index()' vs. 'to_index_if()'
+         * when memoizing.
+         */
+        def imp_create_candidate_featvec(query: GridDoc[Co],
+            candidate: GridCell[Co], initial_score: Double,
+            initial_rank: Int, is_training: Boolean,
+            prefix: String) = {
+          val featvec =
+            candidate_featvec_factory(query, candidate, initial_score,
+              initial_rank, is_training = is_training)
+          if (debug("features")) {
+            errprint("%s: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
+              prefix, query, candidate, initial_score,
+              initial_rank, featvec.pretty_format(prefix))
+          }
+          featvec
+        }
+
         protected def query_training_data_to_feature_vectors(
           data: Iterable[QueryTrainingInst]
         ): Iterable[(GridRerankerInst[Co], LabelIndex)] = {
@@ -1988,17 +2149,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           def create_candidate_featvec(query: GridDoc[Co],
               candidate: GridCell[Co], initial_score: Double,
               initial_rank: Int) = {
-            val featvec =
-              candidate_featvec_factory(query, candidate, initial_score,
-                initial_rank, is_training = true)
-            if (debug("features")) {
-              val prefix = "#%s-%s" format (task.num_processed + 1,
-                initial_rank)
-              errprint("%s: Training: For query %s, candidate %s, initial score %s, initial rank %s, featvec %s",
-                prefix, query, candidate, initial_score,
-                initial_rank, featvec.pretty_format(prefix))
-            }
-            featvec
+            val prefix = "#%s-%s: Training" format (task.num_processed + 1,
+              initial_rank)
+            imp_create_candidate_featvec(query, candidate, initial_score,
+              initial_rank, is_training = true, prefix)
           }
 
           val maybepar_data = data
@@ -2021,29 +2175,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           }.seq
         }
 
-        /* Create the candidate feature vector during evaluation, by
-         * invoking the candidate feature vector factory (see above).
-         * This may need to operate differently than during training,
-         * in particular in that new features cannot be created. Hence,
-         * e.g., when handling a previously unseen word we need to skip
-         * it rather than creating a previously unseen feature. The
-         * reason for this is that creating a new feature would increase
-         * the total size of the feature vectors and weight vector(s),
-         * which we can't do after training has completed. Typically
-         * the difference down to 'to_index()' vs. 'to_index_if()'
-         * when memoizing.
-         */
+        // Create the candidate feature vector during evaluation.
         protected def create_candidate_eval_featvec(query: GridDoc[Co],
             candidate: GridCell[Co], initial_score: Double,
-            initial_rank: Int) = {
-          val featvec =
-            candidate_featvec_factory(query, candidate, initial_score,
-              initial_rank, is_training = false)
-          if (debug("features"))
-            errprint("Eval: For query %s, candidate %s, initial score %s, featvec %s",
-              query, candidate, initial_score, featvec)
-          featvec
-        }
+            initial_rank: Int) =
+          imp_create_candidate_featvec(query, candidate, initial_score,
+            initial_rank, is_training = false, "Eval")
 
         def create_aggregate_feature_vector(fvs: Iterable[FeatureVector]) =
           new AggregateFeatureVector(fvs.toArray)
@@ -2084,6 +2221,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }.view
     /* Train the reranker. */
     reranker_trainer(training_data)
+  }
+
+  /**
+   * Create a reranker that uses a classifier to do its work.
+   */
+  def create_classifier_reranker: GridRanker[Co] = {
+    if (params.reranker == "vowpal-wabbit")
+      create_vowpal_wabbit_classifier_reranker
+    else
+      create_non_vw_classifier_reranker
   }
 
   // Convert documents into document-cell pairs, for the correct cell.
@@ -2272,14 +2419,21 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       else params.vw_args
 
     def create_classifier(vw_args: String) = {
+      def vw_extra_args(vw_multiclass: String, num_classes: Int,
+          cost_sensitive: Boolean) = {
+        if (cost_sensitive) {
+          val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
+          Seq("--" + multiclass_arg, s"$num_classes")
+        } else {
+          Seq("--" + vw_multiclass, s"$num_classes")
+        }
+      }
+
       // Create classifier trainer.
       val trainer = new VowpalWabbitBatchTrainer(
         gaussian = params.gaussian_penalty,
         lasso = params.lasso_penalty,
-        vw_loss_function = params.vw_loss_function,
-        vw_multiclass = params.vw_multiclass,
-        vw_args = vw_args,
-        cost_sensitive = cost_sensitive)
+        vw_loss_function = params.vw_loss_function)
 
       if (cost_sensitive) {
         val cells_labels =
@@ -2306,7 +2460,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           trainer.write_cost_sensitive_feature_file(training_data)
         assert(cells_labels.size ==
           featvec_factory.featvec_factory.mapper.number_of_labels)
-        trainer(cells_labels.size, feats_filename)
+        trainer(feats_filename, vw_args, vw_extra_args(
+          params.vw_multiclass, cells_labels.size, cost_sensitive))
       } else {
         val training_data =
           docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
@@ -2326,7 +2481,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         // cost-sensitive version above.
         val feats_filename = trainer.write_feature_file(training_data)
         val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
-        trainer(num_labels, feats_filename)
+        trainer(feats_filename, vw_args, vw_extra_args(
+          params.vw_multiclass, num_labels, cost_sensitive))
       }
     }
 

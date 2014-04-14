@@ -29,7 +29,7 @@ import util.metering._
 import util.print.errprint
 import util.verbose._
 
-import java.io.File
+import java.io.{File, PrintStream}
 
 /**
  * This implements an interface onto the Vowpal Wabbit machine learning
@@ -59,9 +59,13 @@ import java.io.File
  * label is #1, with 0 cost.
  *
  * There's also a cost-sensitive label-dependent format (with option
- * -csoaa_ldf or -wap_ldf, which takes an argument that should be either
- * "multiline" or "singleline"; presumably "multiline" is what's described
- * below). See this post from Hal Daume:
+ * -csoaa_ldf or -wap_ldf, which takes an argument that should be one of
+ * "multiline", "multiline-classifier", "singleline", or
+ * "singleline-classifier" (or equivalently "m", "mc", "s", "sc"); the
+ * classifier variants use the same input format as the non-classifier
+ * formats but are implemented using a binary classifier instead of by
+ * regression. The multiline format is what's described below.
+ * See this post from Hal Daume:
  *
  * https://groups.yahoo.com/neo/groups/vowpal_wabbit/conversations/topics/626
  *
@@ -71,17 +75,24 @@ import java.io.File
  * 1:1.0 2:0.0 | b c d
  * 1:1.0 3:2.0 | a b c
  *
- * and the equivalent in label-dependent format:
+ * and the equivalent in label-dependent format (fixed up from the email):
  *
- * 1 1.0 | a_1 b_1 c_1
- * 2 0.0 | a_2 b_2 c_2
- * 3 2.0 | a_3 b_3 c_3
+ * ============== cut =============
+ * 1:1.0 | a_1 b_1 c_1
+ * 2:0.0 | a_2 b_2 c_2
+ * 3:2.0 | a_3 b_3 c_3
  *
- * 1 1.0 | b_1 c_1 d_1
- * 2 0.0 | b_2 c_2 d_2
+ * 1:1.0 | b_1 c_1 d_1
+ * 2:0.0 | b_2 c_2 d_2
  *
- * 1 1.0 | a_1 b_1 c_1
- * 3 2.0 | a_3 b_3 c_3
+ * 1:1.0 | a_1 b_1 c_1
+ * 3:2.0 | a_3 b_3 c_3
+ *
+ * ============== cut =============
+ *
+ * The format for a data instance for testing is the same as for training
+ * except that the correct label or cost may be omitted (it should be ignored
+ * if given).
  *
  * It's not necessary to memoize features to indices, and might be better
  * not to, because VW will do that for you using feature hashing.
@@ -174,16 +185,6 @@ protected trait VowpalWabbitBase {
     model_filename
   }
 
-  def vw_extra_args(vw_multiclass: String, num_classes: Int,
-      cost_sensitive: Boolean) = {
-    if (cost_sensitive) {
-      val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
-      Seq("--" + multiclass_arg, s"$num_classes")
-    } else {
-      Seq("--" + vw_multiclass, s"$num_classes")
-    }
-  }
-
   def sanitize_feature(feat: String) = {
     feat.replace(":", "_").replace("|", "_").replace(" ", "_").
       replace("\r", "_").replace("\n", "_").replace("\t", "_")
@@ -215,9 +216,8 @@ protected trait VowpalWabbitBase {
    *   feature name and a value.
    * @param file File to write features to.
    */
-  def write_feature_file(
-    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)],
-    verbose: MsgVerbosity = MsgNormal
+  def gen_write_feature_file(verbose: MsgVerbosity = MsgNormal)(
+      process_features: (PrintStream, Meter) => Unit
   ) = {
     var feats_filename =
       File.createTempFile("textgrounder.vw.feats.test", null).toString
@@ -227,22 +227,45 @@ protected trait VowpalWabbitBase {
     val task = new Meter("processing features in", "document", verbose)
 
     val f = localfh.openw(feats_filename)
-    features.foreachMetered(task) { case (feats, correct) =>
-      if (debug("features")) {
-        val prefix = "#%s" format (task.num_processed + 1)
-        errprint(s"$prefix: Correct = $correct")
-        feats.foreach { case (_, feat, value) =>
-          errprint(s"  $prefix: $feat = $value")
-        }
-      }
-      f.println(externalize_data_instance(feats, correct))
-    }
+    process_features(f, task)
     f.close()
     feats_filename
   }
 
   /**
-   * Convert a single data instance into external format.
+   * Write out a set of data instances, described by their features,
+   * to a file.
+   *
+   * @param features An iterator over data instances. Each instance is
+   *   a tuple of an iterable over features and a memoized correct label.
+   *   Each feature is described by a feature type (ignored), a
+   *   feature name and a value.
+   * @param file File to write features to.
+   */
+  def write_feature_file(
+    features: Iterator[(Iterable[(FeatureValue, String, Double)], LabelIndex)],
+    verbose: MsgVerbosity = MsgNormal
+  ) = {
+    gen_write_feature_file(verbose) { (f, task) =>
+      features.foreachMetered(task) { case (feats, correct) =>
+        if (debug("features")) {
+          val prefix = "#%s" format (task.num_processed + 1)
+          errprint(s"$prefix: Correct = $correct")
+          feats.foreach { case (_, feat, value) =>
+            errprint(s"  $prefix: $feat = $value")
+          }
+        }
+        f.println(externalize_data_instance(feats, correct))
+      }
+    }
+  }
+
+  /**
+   * Convert a single cost-sensitive data instance into external format.
+   *
+   * @param feats Iterable over features. Each feature is described by
+   *   a feature type (ignored), a feature name and a value.
+   * @param costs Costs associated with distinct labels.
    */
   def externalize_cost_sensitive_data_instance(
     feats: Iterable[(FeatureValue, String, Double)],
@@ -275,29 +298,133 @@ protected trait VowpalWabbitBase {
       Iterable[(LabelIndex, Double)])],
     verbose: MsgVerbosity = MsgNormal
   ) = {
-    var feats_filename =
-      File.createTempFile("textgrounder.vw.feats.test", null).toString
-    if (verbose != MsgQuiet)
-      errprint(s"Writing features to $feats_filename")
-
-    val task = new Meter("processing features in", "document", verbose)
-
-    val f = localfh.openw(feats_filename)
-    features.foreachMetered(task) { case (feats, costs) =>
-      if (debug("features")) {
-        val prefix = "#%s" format (task.num_processed + 1)
-        errprint(s"$prefix: ${costs.size} labels, ${feats.size} features")
-        costs.foreach { case (label, cost) =>
-          errprint(s"  $prefix: Label $label: cost $cost")
+    gen_write_feature_file(verbose) { (f, task) =>
+      features.foreachMetered(task) { case (feats, costs) =>
+        if (debug("features")) {
+          val prefix = "#%s" format (task.num_processed + 1)
+          errprint(s"$prefix: ${costs.size} labels, ${feats.size} features")
+          costs.foreach { case (label, cost) =>
+            errprint(s"  $prefix: Label $label: cost $cost")
+          }
+          feats.foreach { case (_, feat, value) =>
+            errprint(s"  $prefix: $feat = $value")
+          }
         }
-        feats.foreach { case (_, feat, value) =>
-          errprint(s"  $prefix: $feat = $value")
-        }
+        f.println(externalize_cost_sensitive_data_instance(feats, costs))
       }
-      f.println(externalize_cost_sensitive_data_instance(feats, costs))
     }
-    f.close()
-    feats_filename
+  }
+
+  /**
+   * Convert a single label-dependent data instance
+   * into external format. Meant to be used in a println statement.
+   *
+   * @param label_info Iterable over per-label info, consisting of
+   *   an iterable over per-feature info. Each feature is
+   *   described by a feature type (ignored), a feature name and a value.
+   * @param correct Correct label
+   */
+  def externalize_label_dependent_data_instance(
+    label_info: Iterable[Iterable[(FeatureValue, String, Double)]],
+    correct: LabelIndex
+  ) = {
+    externalize_cost_sensitive_label_dependent_data_instance(
+      label_info.zipWithIndex.map { case (feats, index) =>
+        (if (index == correct) 0.0 else 1.0, feats)
+      }
+    )
+  }
+
+  /**
+   * Write out a set of label-dependent data instances to
+   * a file, where each label is described by features, and there is a
+   * single correct label.
+   *
+   * @param features An iterator over data instances. Each instance is
+   *   an iterable of per-label info, consisting of the features of the
+   *   label, an iterable over per-feature info. Each feature is described
+   *   by a feature type (ignored), a feature name and a value.
+   * @param file File to write features to.
+   */
+  def write_label_dependent_feature_file(
+    features: Iterator[(Iterable[Iterable[(FeatureValue, String, Double)]], LabelIndex)],
+    verbose: MsgVerbosity = MsgNormal
+  ) = {
+    gen_write_feature_file(verbose) { (f, task) =>
+      features.foreachMetered(task) { case (label_info, correct) =>
+        if (debug("features")) {
+          val outer_prefix = "#%s" format (task.num_processed + 1)
+          errprint("$outer_prefix: ${label_info.size} labels, correct: ${correct + 1 }")
+          label_info.zipWithIndex.map { case (feats, index) =>
+            val label = index + 1
+            val prefix = "$outer_prefix.$label"
+            errprint(s"  $prefix: ${feats.size} features")
+            feats.foreach { case (_, feat, value) =>
+              errprint(s"    $prefix: $feat = $value")
+            }
+          }
+        }
+        f.println(externalize_label_dependent_data_instance(
+          label_info, correct))
+      }
+    }
+  }
+
+  /**
+   * Convert a single cost-sensitive label-dependent data instance
+   * into external format. Meant to be used in a println statement.
+   *
+   * @param label_info Iterable over per-label info, consisting of a tuple
+   *   of the cost associated with the label and the features of the
+   *   label, an iterable over per-feature info. Each feature is
+   *   described by a feature type (ignored), a feature name and a value.
+   */
+  def externalize_cost_sensitive_label_dependent_data_instance(
+    label_info: Iterable[(Double, Iterable[(FeatureValue, String, Double)])]
+  ) = {
+    // Remember that VW wants 1-based labels.
+    label_info.zipWithIndex.map { case ((cost, feats), index) =>
+      s"${index + 1}:$cost | " +
+        feats.map { case (_, feat, value) =>
+          val goodfeat = sanitize_feature(feat)
+          s"$goodfeat:$value"
+        }.mkString(" ")
+    }.mkString("\n") + "\n"
+  }
+
+  /**
+   * Write out a set of cost-sensitive label-dependent data instances to
+   * a file, where each label is described by features and a cost.
+   *
+   * @param features An iterator over data instances. Each instance is
+   *   an iterable of per-label info, consisting of a tuple of the cost
+   *   associated with the label and the features of the label, an iterable
+   *   over per-feature info. Each feature is described by a feature type
+   *   (ignored), a feature name and a value.
+   * @param file File to write features to.
+   */
+  def write_cost_sensitive_label_dependent_feature_file(
+    features: Iterator[Iterable[(Double, Iterable[(FeatureValue, String, Double)])]],
+    verbose: MsgVerbosity = MsgNormal
+  ) = {
+    gen_write_feature_file(verbose) { (f, task) =>
+      features.foreachMetered(task) { label_info =>
+        if (debug("features")) {
+          val outer_prefix = "#%s" format (task.num_processed + 1)
+          errprint("$outer_prefix: ${label_info.size} labels")
+          label_info.zipWithIndex.map { case ((cost, feats), index) =>
+            val label = index + 1
+            val prefix = "$outer_prefix.$label"
+            errprint(s"  $prefix: cost $cost, ${feats.size} features")
+            feats.foreach { case (_, feat, value) =>
+              errprint(s"    $prefix: $feat = $value")
+            }
+          }
+        }
+        f.println(externalize_cost_sensitive_label_dependent_data_instance(
+          label_info))
+      }
+    }
   }
 }
 
@@ -387,23 +514,24 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
   /**
    * Apply a Vowpal Wabbit multi-class daemon classifier.
    *
-   * @param feats_filename Filename containing sparse feature vectors
-   *   describing the test instances. This should be created using
-   *   `write_feature_file` or `write_cost_sensitive_feature_file`.
-   *   NOTE: This filename will be deleted after the classifier has been
-   *   run, on the assumption that it is a temporary file, unless the
-   *   debug flag 'preserve-tmp-files' is set. There is currently no
-   *   programmatic way to specify that a given feature file should be
-   *   preserved.
+   * @param input String describing the test instance(s). The format of
+   *   the string will vary depending on whether the classifier is
+   *   cost-sensitive or not and label-dependent or not.  It should
+   *   have been created with one of the `externalize*_data_instance`
+   *   functions.
+   * @param label_dependent True if the classifier is label-dependent
+   *   (required because the output is different in this case)
    * @return An Iterable of arrays (with one array per test instance) of
    *   pairs of class labels and scores. The class labels are integers
    *   starting at 0. Whether the scores can be transformed into
    *   probabilities depends on the parameters set during training.
    *   For example, with logistic loss, the scores can be transformed to
    *   probabilities using the logistic function followed by normalization.
+   *   (FIXME: Or simply by exponentiating and normalizing?)
    */
-  def apply(input: String, verbose: MsgVerbosity = MsgNormal
-      ): Iterable[Array[(LabelIndex, Double)]] = {
+  def apply(input: String, label_dependent: Boolean = false,
+      verbose: MsgVerbosity = MsgNormal
+  ): Iterable[Array[(LabelIndex, Double)]] = {
     import java.net.Socket
     import java.io._
     val socket = new Socket("localhost", port)
@@ -427,7 +555,12 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
     val instr = new String(bytes)
     if (debug("vw-daemon"))
       errprint("Read from raw file: [%s]", instr)
-    val lines = instr.split("\n")
+    // In the label-dependent case, we have one score per line, with
+    // a blank line separating sets of scores. Otherwise, we have all the
+    // scores on the same line, separated by blanks. This corresponds to
+    // the input, which is multi-line in the label-dependent case, single-line
+    // otherwise.
+    val lines = instr.split(if (label_dependent) "\n\n" else "\n")
     val results = (for (line <- lines) yield {
       val preds_1 = line.split("""\s+""")
       preds_1.map(_.split(":")).map {
@@ -448,10 +581,7 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
 class VowpalWabbitBatchTrainer(
   val gaussian: Double,
   val lasso: Double,
-  val vw_loss_function: String = "logistic",
-  val vw_multiclass: String = "oaa",
-  val vw_args: String = "",
-  val cost_sensitive: Boolean = false
+  val vw_loss_function: String = "logistic"
 ) extends VowpalWabbitBase {
   def train_vw_batch(feats_filename: String, gaussian: Double, lasso: Double,
       vw_loss_function: String, vw_args: String, extra_args: Seq[String],
@@ -464,7 +594,6 @@ class VowpalWabbitBatchTrainer(
   /**
    * Train a Vowpal Wabbit multi-class batch classifier.
    *
-   * @param num_classes Number of classes.
    * @param feats_filename Filename containing sparse feature vectors
    *   describing the training data. This should be created using
    *   `write_feature_file` or `write_cost_sensitive_feature_file` (for
@@ -476,9 +605,10 @@ class VowpalWabbitBatchTrainer(
    * @return A `VowpalWabbitBatchClassifier` object, used to classify test
    *   instances.
    */
-  def apply(num_classes: Int, feats_filename: String) = {
+  def apply(feats_filename: String, vw_args: String,
+      extra_args: Seq[String]) = {
     train_vw_batch(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      vw_extra_args(vw_multiclass, num_classes, cost_sensitive))
+      extra_args)
   }
 }
 
@@ -490,10 +620,7 @@ class VowpalWabbitBatchTrainer(
 class VowpalWabbitDaemonTrainer(
   val gaussian: Double,
   val lasso: Double,
-  val vw_loss_function: String = "logistic",
-  val vw_multiclass: String = "oaa",
-  val vw_args: String = "",
-  val cost_sensitive: Boolean = false
+  val vw_loss_function: String = "logistic"
 ) extends VowpalWabbitBase {
   def train_vw_daemon(feats_filename: String, gaussian: Double, lasso: Double,
       vw_loss_function: String, vw_args: String, extra_args: Seq[String],
@@ -526,6 +653,8 @@ class VowpalWabbitDaemonTrainer(
       errprint("Executing: %s", vw_cmd_line mkString " ")
     }
     val cmdline = vw_cmd_line mkString " "
+    // We need to redirect the output and stderr to /dev/null or the
+    // process hangs instead of completing. FIXME: Not sure why.
     val redir_cmdline = s"$cmdline > /dev/null 2>&1"
     val sh_cmdline = Seq("/bin/sh", "-c", redir_cmdline)
     //val proc = new java.lang.ProcessBuilder(vw_cmd_line: _*).start()
@@ -556,7 +685,6 @@ class VowpalWabbitDaemonTrainer(
   /**
    * Train a Vowpal Wabbit multi-class daemon classifier.
    *
-   * @param num_classes Number of classes.
    * @param feats_filename Filename containing sparse feature vectors
    *   describing the training data. This should be created using
    *   `write_feature_file` or `write_cost_sensitive_feature_file` (for
@@ -568,8 +696,9 @@ class VowpalWabbitDaemonTrainer(
    * @return A `VowpalWabbitDaemonClassifier` object, used to classify test
    *   instances.
    */
-  def apply(num_classes: Int, feats_filename: String) = {
+  def apply(feats_filename: String, vw_args: String,
+      extra_args: Seq[String]) = {
     train_vw_daemon(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      vw_extra_args(vw_multiclass, num_classes, cost_sensitive))
+      extra_args)
   }
 }
