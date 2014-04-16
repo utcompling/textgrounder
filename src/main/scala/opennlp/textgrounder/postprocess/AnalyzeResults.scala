@@ -109,9 +109,17 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
     outf.close()
   }
 
-  def print_stats(prefix: String, units: String, nums: IndexedSeq[Double]) {
+  def print_stats(prefix: String, nums: IndexedSeq[Double],
+      km: Boolean = false) {
     def pr(fmt: String, args: Any*) {
       outprint("%s: %s", prefix, fmt format (args: _*))
+    }
+    val units = if (km) " km" else ""
+    if (km) {
+      val num_within_161 = nums.count(_ <= 161)
+      val num_total = nums.size
+      pr("Acc@161: %.2f%% (%s/%s)", num_within_161.toDouble / num_total * 100,
+        num_within_161, num_total)
     }
     pr("Mean: %.2f%s +/- %.2f%s", mean(nums), units, stddev(nums), units)
     pr("Median: %.2f%s", median(nums), units)
@@ -161,16 +169,16 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
       if (row.get[Int]("correct-rank") == 1)
         numcorrect += 1
     }
-    outprint("Accuracy: %.4f (%s/%s)" format
-      ((numcorrect.toDouble / numseen), numcorrect, numseen))
-    print_stats("Oracle distance to central point", " km", oracle_dist_central_point)
-    print_stats("Oracle distance to centroid", " km", oracle_dist_centroid)
-    print_stats("Oracle distance to true center", " km", oracle_dist_true_center)
-    print_stats("Error distance to central point", " km", error_dist_central_point)
-    print_stats("Error distance to centroid", " km", error_dist_centroid)
-    print_stats("Error distance to true center", " km", error_dist_true_center)
-    print_stats("Word types per document", "", numtypes map { _.toDouble })
-    print_stats("Word tokens per document", "", numtokens map { _.toDouble })
+    outprint("Accuracy: %.2f%% (%s/%s)" format
+      (numcorrect.toDouble / numseen * 100, numcorrect, numseen))
+    print_stats("Oracle distance to central point", oracle_dist_central_point, km = true)
+    print_stats("Oracle distance to centroid", oracle_dist_centroid, km = true)
+    print_stats("Oracle distance to true center", oracle_dist_true_center, km = true)
+    print_stats("Error distance to central point", error_dist_central_point, km = true)
+    print_stats("Error distance to centroid", error_dist_centroid, km = true)
+    print_stats("Error distance to true center", error_dist_true_center, km = true)
+    print_stats("Word types per document", numtypes map { _.toDouble })
+    print_stats("Word tokens per document", numtokens map { _.toDouble })
     if (params.pred_cell_distribution != null)
       output_freq_of_freq(filehand, params.pred_cell_distribution, pred_cells,
         cell_stats)

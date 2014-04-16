@@ -288,6 +288,13 @@ trait DocEvalStats[Co] extends EvalStats {
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
+
+    // FIXME! This is a hack that breaks that abstraction layer,
+    // since the concept of "within 161km" is only defined when we have
+    // distances in km (in package 'geolocate' not 'gridlocate').
+    output_fraction("  Accuracy@161", true_dists.count(_ <= 161),
+      true_dists.size)
+
     val results = Seq(
       ("mean-true-error-distance",
        "Mean true error distance",

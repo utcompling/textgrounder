@@ -12,6 +12,7 @@ averagesort=
 meansort=
 mediansort=
 accuracysort=
+acc161sort=
 numevalsort=
 numtrainsort=
 filesort=
@@ -22,6 +23,7 @@ omit_average=
 omit_mean=
 omit_median=
 omit_accuracy=
+omit_acc161=
 omit_numeval=
 omit_numtrain=
 omit_file=
@@ -35,6 +37,7 @@ while true; do
     --sort-mean ) sort=yes ; meansort=yes; shift ;;
     --sort-median ) sort=yes ; mediansort=yes; shift ;;
     --sort-accuracy | --sort-acc ) sort=yes ; accuracysort=yes; shift ;;
+    --sort-acc161 ) sort=yes ; acc161sort=yes; shift ;;
     --sort-numeval ) sort=yes ; numevalsort=yes; shift ;;
     --sort-numtrain ) sort=yes ; numtrainsort=yes; shift ;;
     --sort-file | --sort-name ) sort=yes ; filesort=yes; shift ;;
@@ -46,6 +49,7 @@ while true; do
     --omit-mean ) omit_mean=yes; shift ;;
     --omit-median ) omit_median=yes; shift ;;
     --omit-accuracy | --omit-acc ) omit_accuracy=yes; shift ;;
+    --omit-acc161 ) omit_acc161=yes; shift ;;
     --omit-numeval ) omit_numeval=yes; shift ;;
     --omit-numtrain ) omit_numtrain=yes; shift ;;
     --omit-file | --omit-name ) omit_file=yes; shift ;;
@@ -77,6 +81,10 @@ accuracycol=$curcol
 if [ -z "$omit_accuracy" ]; then
   let curcol=$curcol+1
 fi
+acc161col=$curcol
+if [ -z "$omit_acc161" ]; then
+  let curcol=$curcol+1
+fi
 meancol=$curcol
 if [ -z "$omit_mean" ]; then
   let curcol=$curcol+1
@@ -103,7 +111,7 @@ if [ -z "$omit_file" ]; then
 fi
 
 if [ "$verbose" != yes ]; then
-  #echo "  #Eval   #Train  %Accur. Mean   Median  Average  Runtime    RSS    File"
+  #echo "  #Eval   #Train  %Acc. Acc@161 Mean   Median  Average  Runtime    RSS    File"
   if [ -z "$omit_numeval" ]; then
     echo -n "  #Eval "
   fi
@@ -113,8 +121,11 @@ if [ "$verbose" != yes ]; then
   if [ -z "$omit_accuracy" ]; then
     echo -n " %Acc. "
   fi
+  if [ -z "$omit_acc161" ]; then
+    echo -n "Acc@161 "
+  fi
   if [ -z "$omit_mean" ]; then
-    echo -n "  Mean  "
+    echo -n " Mean  "
   fi
   if [ -z "$omit_median" ]; then
     echo -n " Median "
@@ -160,6 +171,7 @@ for x in ${1+"$@"}; do
     avg=$(echo "2k $mean $median + 2/p" | dc)
   fi
   acc=$(echo "$results" | egrep 'Percent correct at rank <= 1 =' | perl -pe 's/.*= (.*?)%.*/$1/')
+  acc161=$(echo "$results" | egrep 'Accuracy@161 =' | perl -pe 's/.*= (.*?)%.*/$1/')
   numeval=$(echo "$results" | egrep 'instances.total' | perl -pe 's/.*= (.*?) *$/$1/')
   numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
   finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' "$x")
@@ -210,9 +222,37 @@ for x in ${1+"$@"}; do
   else
     skip=yes
   fi
+  if [ -z "$numeval" ]; then
+    numeval="NA"
+  fi
+  if [ -z "$numtrain" ]; then
+    numtrain="NA"
+  fi
+  if [ -z "$acc" ]; then
+    acc="NA"
+  fi
+  if [ -z "$acc161" ]; then
+    acc161="NA"
+  fi
+  if [ -z "$mean" ]; then
+    mean="NA"
+  fi
+  if [ -z "$median" ]; then
+    median="NA"
+  fi
+  if [ -z "$avg" ]; then
+    avg="NA"
+  fi
+  if [ -z "$runtime" ]; then
+    runtime="NA"
+  fi
+  if [ -z "$rss" ]; then
+    rss="NA"
+  fi
   numeval=$(printf '%7s' "$numeval")
   numtrain=$(printf '%8s' "$numtrain")
   acc=$(printf '%6s' "$acc")
+  acc161=$(printf '%6s' "$acc161")
   mean=$(printf '%7s' "$mean")
   median=$(printf '%7s' "$median")
   avg=$(printf '%7s' "$avg")
@@ -224,6 +264,7 @@ for x in ${1+"$@"}; do
     echo "Median: [$median]"
     echo "Average: [$avg]"
     echo "%Accuracy: [$acc]"
+    echo "Acc@161: [$acc161]"
     echo "#Eval: [$numeval]"
     echo "#Train: [$numtrain]"
     echo "Runtime: [$runtime]"
@@ -244,6 +285,9 @@ for x in ${1+"$@"}; do
     fi
     if [ -z "$omit_accuracy" ]; then
       echo -n "$acc "
+    fi
+    if [ -z "$omit_acc161" ]; then
+      echo -n "$acc161 "
     fi
     if [ -z "$omit_mean" ]; then
       echo -n "$mean "
@@ -280,6 +324,8 @@ elif [ "$mediansort" = yes ]; then
   output ${1+"$@"} | sort -n -k $mediancol
 elif [ "$accuracysort" = yes ]; then
   output ${1+"$@"} | sort -nr -k $accuracycol
+elif [ "$acc161sort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k $acc161col
 elif [ "$numevalsort" = yes ]; then
   output ${1+"$@"} | sort -nr -k $numevalcol
 elif [ "$numtrainsort" = yes ]; then
