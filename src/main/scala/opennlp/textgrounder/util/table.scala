@@ -95,7 +95,7 @@ package object table {
     if (maxrows >= 0)
       its = its.slice(0, maxrows)
     for ((key, value) <- its)
-      outfile.println("%s%s = %s" format (indent, key, value))
+      outfile.println(s"$indent$key = $value")
   }
 
   /**

@@ -19,6 +19,7 @@ package opennlp.textgrounder
 package postprocess
 
 import scala.util.control.Breaks._
+import scala.collection.mutable
 
 import util.argparser._
 import util.collection._
@@ -39,6 +40,13 @@ class VWWeightsParameters(ap: ArgParser) {
     "ih",
     metavar = "FILE",
     help="""File output using --invert_hash argument in Vowpal Wabbit.""")
+
+  var highest_weight = ap.option[String]("highest-weight",
+    "hw",
+    metavar = "FILE",
+    help="""File to output highest seen weight for given feature.
+There is a separate weight for each combination of feature and cell.
+This outputs the highest weight seen for any cell.""")
 
   var debug =
     ap.option[String]("d", "debug", metavar = "FLAGS",
@@ -83,7 +91,8 @@ object VWWeights extends ExperimentApp("VWWeights") {
     }).toMap
   }
 
-  def get_names(file: String): Map[Int, String] = {
+  // Mapping from feature ID to (feature-name, cell)
+  def get_names(file: String): Map[Int, (String, Int)] = {
     val fh = localfh.openr(file)
     breakable {
       while (true) {
@@ -94,10 +103,11 @@ object VWWeights extends ExperimentApp("VWWeights") {
     }
     val name_count = intmap[String]()
     (for (line <- fh) yield {
-      val Array(name, featnum, _) = line.split(":")
+      val Array(feat, featnum, _) = line.split(":")
+      // Features in the VW files normally begin with " ^"
+      val name = if (feat.startsWith(" ^")) feat.drop(2) else feat
       name_count(name) += 1
-      val tagged_name = s"$name:${name_count(name)}"
-      (featnum.toInt, tagged_name)
+      (featnum.toInt, (name, name_count(name)))
     }).toMap
   }
 
@@ -105,10 +115,23 @@ object VWWeights extends ExperimentApp("VWWeights") {
     val names = get_names(params.invert_hash)
     val weights = get_weights(params.readable_model)
     val named_weights = weights map { case (featnum, weight) =>
-      val name = names.getOrElse(featnum, "???")
-      (name, weight)
+      val (name, cell) = names.getOrElse(featnum, ("???", 0))
+      val tagged_name = s"$name:cell"
+      ((name, cell), weight)
     }
-    output_reverse_sorted_table(named_weights)
+    val sorted_weights = named_weights.toSeq.sortWith(_._2 > _._2)
+    if (params.highest_weight != null) {
+      val highest_weight = mutable.Map[String, Double]()
+      sorted_weights.foreach { case ((name, cell), weight) =>
+        if (!highest_weight.contains(name))
+          highest_weight(name) = weight
+      }
+      output_reverse_sorted_table(highest_weight,
+        outfile = localfh.openw(params.highest_weight))
+    }
+    sorted_weights.foreach { case ((name, cell), weight) =>
+      println(s"$name:$cell = $weight")
+    }
     0
   }
 }
