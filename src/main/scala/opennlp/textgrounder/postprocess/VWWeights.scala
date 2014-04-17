@@ -121,9 +121,11 @@ object VWWeights extends ExperimentApp("VWWeights") {
     }
     val sorted_weights = named_weights.toSeq.sortWith(_._2 > _._2)
     if (params.highest_weight != null) {
-      val highest_weight = mutable.Map[String, Double]()
+      val highest_weight = doublemap[String]()
       sorted_weights.foreach { case ((name, cell), weight) =>
-        if (!highest_weight.contains(name))
+        // Under normal circumstances, the first weight we see will
+        // be the highest, but not always because of negative weights
+        if (weight.abs > highest_weight(name).abs)
           highest_weight(name) = weight
       }
       output_reverse_sorted_table(highest_weight,
