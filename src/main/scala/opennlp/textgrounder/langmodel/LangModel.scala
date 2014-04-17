@@ -489,9 +489,9 @@ abstract class LangModel(val factory: LangModelFactory) {
     assert(!finished)
     assert(!finished_before_global)
     imp_finish_before_global()
-    if (empty)
-      throw new LangModelCreationException(
-        "Attempt to create an empty lang model: %s" format this)
+    // if (empty)
+    //  throw new LangModelCreationException(
+    //    "Attempt to create an empty lang model: %s" format this)
     finished_before_global = true
   }
 
@@ -651,20 +651,13 @@ abstract class LangModel(val factory: LangModelFactory) {
 
   def gram_prob(gram: Gram): Double = {
     assert(finished)
-    if (empty)
-      throw new IllegalStateException(
-        "Attempt to lookup gram %s in empty lang model %s"
-        format (gram_to_string(gram), this))
+    //assert(!empty,
+    //  s"Attempt to lookup ${gram_to_string(gram)} in empty lang model ${this}")
     val prob = imp_gram_prob(gram)
     // Write this way because if negated as an attempt to catch bad values,
     // it won't catch NaN, which fails all comparisons.
-    if (prob >= 0 && prob <= 1)
-      ()
-    else {
-      errprint("Out-of-bounds prob %s for gram %s",
-        prob, gram_to_string(gram))
-      assert(false)
-    }
+    assert(prob >= 0 && prob <= 1,
+      s"Out-of-bounds prob $prob for gram ${gram_to_string(gram)}")
     prob
   }
 
@@ -688,11 +681,11 @@ abstract class LangModel(val factory: LangModelFactory) {
 
   def mle_gram_prob(gram: Gram): Double = {
     assert(finished)
-    if (empty)
-      throw new IllegalStateException("Attempt to lookup gram %s in empty lang model %s"
-        format (gram_to_string(gram), this))
-    val count = if (contains(gram)) get_gram(gram) else 0.0
-    count.toDouble/num_tokens
+    // Write this way so we're not tripped up by empty lang model
+    if (contains(gram)) {
+      assert(num_tokens > 0)
+      get_gram(gram).toDouble/num_tokens
+    } else 0.0
   }
 
   /**

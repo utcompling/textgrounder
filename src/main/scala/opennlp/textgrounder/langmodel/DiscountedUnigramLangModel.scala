@@ -217,8 +217,10 @@ abstract class DiscountedUnigramLangModel(
       }
     }
     normalization_factor = num_tokens
-    assert(normalization_factor > 0,
-      "Zero normalization factor for lm %s" format this)
+    // assert(normalization_factor > 0,
+    //  "Zero normalization factor for lm %s" format this)
+    if (normalization_factor == 0)
+      normalization_factor = 1
     //if (LangModelConstants.use_sorted_list)
     //  counts = new SortedList(counts)
     //if (debug("discount-factor") || debug("discountfactor"))
