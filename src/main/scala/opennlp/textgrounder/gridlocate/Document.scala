@@ -524,7 +524,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
                 if (debug("stack-trace") || debug("stacktrace"))
                   e.printStackTrace
                 throw new DocValidationException(
-                  "Bad value for field: %s" format e, Some(e))
+                  s"Bad value for field: $e", Some(e))
               }
             }
           }
@@ -1130,16 +1130,16 @@ abstract class GridDoc[Co : TextSerializer : CoordHandler](
     field match {
       case "title" => title
       case "coord" => if (has_coord) put_x(coord) else ""
-      case _ => internal_error("Unrecognized field name %s" format field)
+      case _ => internal_error(s"Unrecognized field name $field")
     }
   }
 
   override def toString = {
-    val coordstr = if (has_coord) " at %s".format(coord) else ""
+    val coordstr = if (has_coord) s" at $coord" else ""
     val corpus_name = schema.get_fixed_field_or_else("corpus-name", null)
     val corpusstr =
-      if (corpus_name != null) " (corpus %s)".format(corpus_name) else ""
-    "%s%s%s".format(title, coordstr, corpusstr)
+      if (corpus_name != null) s" (corpus $corpus_name)" else ""
+    s"$title$coordstr$corpusstr"
   }
 
   def coord_handler = implicitly[CoordHandler[Co]]

@@ -93,7 +93,7 @@ class EvalStats(
     var percent =
       if (total == 0) "indeterminate percent"
       else "%5.2f%%" format (100 * amount.toDouble / total)
-    errprint("%s = %s/%s = %s", header, amount, total, percent)
+    errprint(s"$header = $amount/$total = $percent")
   }
 
   def output_correct_results() {
@@ -103,7 +103,7 @@ class EvalStats(
   def output_incorrect_results() {
     output_fraction("Percent incorrect", incorrect_instances, total_instances)
     for ((reason, descr) <- incorrect_reasons) {
-      output_fraction("  %s" format descr,
+      output_fraction(s"  $descr",
         get_counter("instances.incorrect." + reason), total_instances)
     }
   }
@@ -112,12 +112,12 @@ class EvalStats(
     for (field <- driver_stats.list_local_counters("", recursive = true)) {
       val count = driver_stats.get_local_counter(field)
       driver_stats.note_result(field, count)
-      errprint("%s = %s", field, count)
+      errprint(s"$field = $count")
     }
   }
 
   def output_result_header() {
-    errprint("Number of scored instances = %s", total_instances)
+    errprint(s"Number of scored instances = $total_instances")
   }
 
   def output_results() {
@@ -195,7 +195,7 @@ class DocEvalResult[Co](
       None
 
   protected def print_document(doctag: String) {
-    errprint("%s:Document %s:", doctag, document)
+    errprint(s"$doctag:Document $document:")
     // errprint("%s:Document language model: %s", doctag, document.grid_lm)
     errprint("%s:  %s types, %f tokens",
       doctag, document.grid_lm.num_types,
@@ -310,7 +310,7 @@ trait DocEvalStats[Co] extends EvalStats {
        median(oracle_true_dists))
     )
     for ((field, desc, value) <- results) {
-      errprint("  %s = %s", desc, output_result_with_units(value))
+      errprint(s"  $desc = ${output_result_with_units(value)}")
       driver_stats.note_result(field, value, desc)
     }
   }
@@ -416,8 +416,7 @@ class GroupedDocEvalStats[Co](
     for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
       errprint("")
       errprint("Results for documents where number of documents")
-      errprint("  in correct cell is in the range [%s,%s]:",
-        lower, upper - 1)
+      errprint(s"  in correct cell is in the range [$lower,${upper - 1}]:")
       obj.output_results()
     }
   }
@@ -519,10 +518,10 @@ abstract class CorpusEvaluator[Co](
     var statnum = 0
     val result_stats =
       for (stat <- docstats) yield {
-        // errprint("Processing document: %s", stat)
+        // errprint(s"Processing document: $stat")
         statnum += 1
         stat.map_result { case (row, doc) =>
-          val doctag = "#%s" format statnum
+          val doctag = s"#$statnum"
           val (skip, reason) = would_skip_by_parameters()
           if (skip)
             (None, "skipped", reason, doctag)
@@ -579,9 +578,9 @@ abstract class CorpusEvaluator[Co](
       errprint("")
       errprint("Final results for ranker %s: All %s documents processed:",
         ranker_name, task.num_processed)
-      errprint("Ending operation at %s", curtimehuman)
+      errprint(s"Ending operation at $curtimehuman")
       output_results(isfinal = true)
-      errprint("Ending final results for ranker %s", ranker_name)
+      errprint(s"Ending final results for ranker $ranker_name")
       output_resource_usage()
     } )
   }
@@ -764,8 +763,8 @@ abstract class GridEvaluator[Co](
     if (debug("ranking") || debug("commontop")) {
       correct_cell.foreach { cell =>
         val naitr = cell.num_docs
-        errprint("Evaluating document %s with %s documents in correct cell",
-          document, naitr)
+        errprint(
+    s"Evaluating document $document with $naitr documents in correct cell")
       }
     }
     val result = imp_evaluate_document(document, correct_cell)
