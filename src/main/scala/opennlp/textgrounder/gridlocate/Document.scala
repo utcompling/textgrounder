@@ -513,7 +513,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         num_records_by_split(split) += 1
 
         def catch_doc_validation[T](body: => T) = {
-          if (debug("rethrow"))
+          if (debug("no-catch"))
             body
           else {
             try {

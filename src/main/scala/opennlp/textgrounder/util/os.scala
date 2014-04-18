@@ -113,10 +113,20 @@ at the beginning of your program, in order to use get_program_time_usage""")
   }
 
   def wrap_call[Ret](fn: => Ret, errval: Ret) = {
-    try {
+    if (debug.debug("no-catch"))
       fn
-    } catch {
-      case e: Exception => { errprint("%s", e); errval }
+    else {
+      try {
+        fn
+      } catch {
+        case e: Exception => {
+          if (debug.debug("stack-trace") || debug.debug("stacktrace"))
+            e.printStackTrace
+          else
+            errprint(s"$e")
+          errval
+        }
+      }
     }
   }
 
