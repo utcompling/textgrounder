@@ -112,7 +112,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
     -1L
   }
 
-  def wrap_call[Ret](fn: => Ret, errval: Ret) = {
+  def wrap_call[Ret](fn: => Ret, errprefix: String, errval: Ret) = {
     if (debug.debug("no-catch"))
       fn
     else {
@@ -120,10 +120,11 @@ at the beginning of your program, in order to use get_program_time_usage""")
         fn
       } catch {
         case e: Exception => {
-          if (debug.debug("stack-trace") || debug.debug("stacktrace"))
+          if (debug.debug("stack-trace") || debug.debug("stacktrace")) {
+            errprint(s"$errprefix:")
             e.printStackTrace
-          else
-            errprint(s"$e")
+          } else
+            errprint(s"$errprefix: $e")
           errval
         }
       }
@@ -136,7 +137,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
       wraperr: Boolean = true): Long = {
     if (wraperr)
       return wrap_call(get_program_memory_usage_ps(
-        virtual=virtual, wraperr=false), -1L)
+        virtual=virtual, wraperr=false), "get_program_memory_usage_ps", -1L)
     val header = if (virtual) "vsz" else "rss"
     val input =
       io.capture_subprocess_output("ps", "-p", getpid_str, "-o", header)
@@ -153,7 +154,7 @@ at the beginning of your program, in order to use get_program_time_usage""")
       wraperr: Boolean = true): Long = {
     if (wraperr)
       return wrap_call(get_program_memory_usage_proc(
-        virtual=virtual, wraperr=false), -1L)
+        virtual=virtual, wraperr=false), "get_program_memory_usage_proc", -1L)
     val header = if (virtual) "VmSize:" else "VmRSS:"
     if (!((new File("/proc/self/status")).exists))
       return -1L
