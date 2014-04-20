@@ -315,7 +315,10 @@ class DefaultUnigramLangModelBuilder(
         )
       raw_keys_set += word
       keys_dynarr += word
-      values_dynarr += count
+      if (debug("pretend-words-seen-once"))
+        values_dynarr += 1
+      else
+        values_dynarr += count
     }
   }
 
