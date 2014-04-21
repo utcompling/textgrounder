@@ -2553,8 +2553,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         get_docs_cells_from_documents(subgrid, docs_cells.toIterator.map {
           case (doc, cell) => doc }
         ).toIndexedSeq
-      val subcands_lists_ranker_entries =
-        lastcands.zipWithIndex.map { case (cand, index) =>
+      val subcands_lists_ranker_entries = {
+        val lastcands2 =
+          if (debug("parallel-hier-classifier")) lastcands.par
+          else lastcands
+        lastcands2.zipWithIndex.map { case (cand, index) =>
           errprint("Level %s: Creating classifier %s/%s", level,
             index + 1, num_cands)
           val subcands = subgrid.get_subdivided_cells(cand)
@@ -2567,7 +2570,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val subranker = create_classifier_ranker(ranker_name,
             subgrid, subcands, finer_docs_cells, nested = true)
           (subcands, cand -> subranker)
-        }
+        }.seq
+      }
       val (subcands_lists, ranker_entries) =
         subcands_lists_ranker_entries.unzip
       val subcands = subcands_lists.flatten
