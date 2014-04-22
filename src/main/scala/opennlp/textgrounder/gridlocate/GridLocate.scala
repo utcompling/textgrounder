@@ -317,42 +317,65 @@ words in the list will be used when creating a language model from a corpus;
 all others will be ignored. Format is one word per line. When specifying a
 whitelist, the stopwords in '--stopwords-file' will still be ignored.""")
 
-  var weights_file =
-    ap.option[String]("weights-file",
+  var whitelist_weight_file =
+    ap.option[String]("whitelist-weight-file",
+       metavar = "FILE",
+       help = """File containing a set of words and weights, with some
+fraction of the top-weighted words serving as a whitelist. Unlike the file in
+'--weights-file', the words are not weighted non-uniformly. To specify the
+cutoff, use either '--weight-cutoff-value' or '--weight-cutoff-percent'.
+The file should have the word and weight separated by a tab character.""")
+
+  var word_weight_file =
+    ap.option[String]("word-weight-file",
        metavar = "FILE",
        help = """File containing a set of word weights for weighting words
 non-uniformly (e.g. so that more geographically informative words are weighted
-higher). The file should be in textdb format, with `word` and `weight` fields.
-The weights do not need to be normalized but must not be negative. They will
-be normalized so that the average is 1. Each time a word is read in, it will
-be given a count corresponding to its normalized weight rather than a count
-of 1.
+higher). The file should have the word and weight separated by a tab
+character. The weights do not need to be normalized but must not be negative.
+They will be normalized so that the average is 1. Each time a word is read in,
+it will be given a count corresponding to its normalized weight rather than a
+count of 1.
 
 The parameter value can be any of the following: Either the data or schema
 file of the database; the common prefix of the two; or the directory containing
 them, provided there is only one textdb in the directory.""")
+
+  var weight_cutoff_value =
+    ap.option[Double]("weight-cutoff-value", "wcv",
+       metavar = "WEIGHT",
+       default = Double.MinValue,
+       help = """If given, ignore words whose weights are below the given
+value. This is used by '--whilelist-weight-file' and '--word-weight-file'.
+If you specify this in conjunction with '--word-weight-file', you might also
+want to specify `--missing-word-weight 0` so that words with a missing or
+ignored weight are assigned a weight of 0 rather than the average of the
+weights that have been seen.""")
+
+  var weight_cutoff_percent =
+    ap.option[Double]("weight-cutoff-percent", "wcp",
+       metavar = "WEIGHT",
+       default = 100.0,
+       must = be_and(be_>=(0.0), be_<=(100.0)),
+       help = """If given, use only the top N percent of the weights, for the
+value N specified.  This is used by '--whilelist-weight-file' and
+'--word-weight-file'. If you specify this in conjunction with
+'--word-weight-file', you might also want to specify `--missing-word-weight 0`
+so that words with a missing or ignored weight are assigned a weight of 0
+rather than the average of the weights that have been seen.""")
 
   var missing_word_weight =
     ap.option[Double]("missing-word-weight", "mww",
        metavar = "WEIGHT",
        default = -1.0,
        help = """Weight to use for words not given in the word-weight
-file, when `--weights-file` is given. If negative (the default), use
+file, when `--word-weight-file` is given. If negative (the default), use
 the average of all weights in the file, which treats them as if they
 have no special weight. It is possible to set this value to zero, in
 which case unspecified words will be ignored.""")
 
-  var ignore_weights_below =
-    ap.option[Double]("ignore-weights-below", "iwb",
-       metavar = "WEIGHT",
-       help = """If given, ignore words whose weights are below the given
-value. If you specify this, you might also want to specify
-`--missing-word-weight 0` so that words with a missing or ignored weight are
-assigned a weight of 0 rather than the average of the weights that have been
-seen.""")
-
   var output_training_cell_lang_models =
-    ap.flag("output-training-cell-lang-models", "output-training-cells",
+    ap.flag("output-training-cell-lang-models", "output-training-cells", "otc",
       help = """Output the training cell lang models after they've been trained.""")
 }
 
@@ -1313,16 +1336,47 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       filehand.openr(wfn).toSet
   }
 
-  lazy protected val the_whitelist = read_whitelist
+  protected def read_whitelist_weight_file = {
+    if (params.whitelist_weight_file != null) {
+      val word_weights = mutable.Map[String,Double]()
+      if (params.verbose)
+        errprint("Reading whitelist weights...")
+      var numwords = 0
+      for (row <- get_file_handler.openr(params.whitelist_weight_file)) {
+        val Array(word, weightstr) = row.split("\t")
+        val weight = weightstr.toDouble
+        if (word_weights contains word)
+          warning("Word %s with weight %s already seen with weight %s",
+            word, weight, word_weights(word))
+        else {
+          numwords += 1
+          if (weight >= params.weight_cutoff_value)
+            word_weights(word) = weight
+        }
+      }
+      if (params.weight_cutoff_percent == 100.0)
+        word_weights.keys.toSet
+      else {
+        val sorted_word_weights = word_weights.toSeq.sortBy(-_._2)
+        val num_to_take =
+          (params.weight_cutoff_percent / 100.0 * numwords).toInt
+        sorted_word_weights.take(num_to_take).map(_._1).toSet
+      }
+    } else Set[String]()
+  }
 
-  protected def read_weights_file = {
-    if (params.weights_file != null) {
+  lazy protected val the_whitelist =
+    read_whitelist ++ read_whitelist_weight_file
+
+  protected def read_word_weight_file = {
+    if (params.word_weight_file != null) {
       val word_weights = mutable.Map[Gram,Double]()
       if (params.verbose)
         errprint("Reading word weights...")
-      for (row <- TextDB.read_textdb(get_file_handler, params.weights_file)) {
-        val word = row.gets("word")
-        val weight = row.get[Double]("weight")
+      var numwords = 0
+      for (row <- get_file_handler.openr(params.word_weight_file)) {
+        val Array(word, weightstr) = row.split("\t")
+        val weight = weightstr.toDouble
         val wordint = Unigram.to_index(word)
         if (word_weights contains wordint)
           warning("Word %s with weight %s already seen with weight %s",
@@ -1330,14 +1384,26 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         else if (weight < 0)
           warning("Word %s with invalid negative weight %s",
             word, weight)
-        else if (weight >= params.ignore_weights_below)
-          word_weights(wordint) = weight
+        else {
+          numwords += 1
+          if (weight >= params.weight_cutoff_value)
+            word_weights(wordint) = weight
+        }
       }
+      val chopped_word_weights =
+        if (params.weight_cutoff_percent == 100.0)
+          word_weights
+        else {
+          val sorted_word_weights = word_weights.toSeq.sortBy(-_._2)
+          val num_to_take =
+            (params.weight_cutoff_percent / 100.0 * numwords).toInt
+          sorted_word_weights.take(num_to_take).toMap
+        }
       // Scale the word weights to have an average of 1.
-      val values = word_weights.values
+      val values = chopped_word_weights.values
       val avg = values.sum / values.size
       assert(avg > 0, "Must have at least one non-ignored non-zero weight")
-      val scaled_word_weights = word_weights map {
+      val scaled_word_weights = chopped_word_weights map {
         case (word, weight) => (word, weight / avg)
       }
       val missing_word_weight =
@@ -1352,7 +1418,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       (mutable.Map[Gram,Double](), 0.0)
   }
 
-  lazy val the_weights = read_weights_file
+  lazy val word_weights = read_word_weight_file
 
   /** Return a function that will create a LangModelBuilder object,
    * given a LangModelFactory.
@@ -1462,7 +1528,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * Create a document factory (GridDocFactory) from command-line parameters.
    */
   def create_document_factory_from_params = {
-    val (weights, mww) = the_weights
+    val (weights, mww) = word_weights
     val lang_model_factory = create_doc_lang_model_factory(weights, mww)
     create_document_factory(lang_model_factory)
   }
