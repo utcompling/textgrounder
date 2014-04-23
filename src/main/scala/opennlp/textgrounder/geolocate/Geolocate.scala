@@ -372,7 +372,7 @@ Default value '%default' means no interpolation is used.""")
   //// Combining the kd-tree model with the cell-grid model
   val combined_kd_grid =
     ap.flag("combined-kd-grid", help = """Combine both the KD tree and
-uniform grid cell models?""")
+uniform grid cell models.""")
 
   ////////////// Begin former GeolocateDocParameters
 
@@ -719,7 +719,10 @@ object GeolocateDocumentTag extends
 
   override def run_program(args: Array[String]) = {
     /////// Various ways of handling params
-
+  
+    // Convert foo-bar-baz or foo_bar_baz to fooBarBaz
+    def snake_to_camel_case(str: String) =
+      "[-_]([a-z])".r.replaceAllIn(str, m => m.group(1).toUpperCase)
     /**
      * Output the value only. Typical for choice options.
      */
@@ -756,7 +759,7 @@ object GeolocateDocumentTag extends
         // If true (a flag), only the flag's name
         case true => "%s" format name
         case _ => "%s%s%s" format (
-          name,
+          snake_to_camel_case(name),
           if (noequals) "" else "=",
           handler(value)
         )
@@ -816,7 +819,7 @@ object GeolocateDocumentTag extends
         replace("-product", "Prod").
         replace("-quotient", "Quot")
       // Convert foo-bar-baz to fooBarBaz
-      "-([a-z])".r.replaceAllIn(repl, m => m.group(1).toUpperCase)
+      snake_to_camel_case(repl)
     }
 
     /////// How to handle params.
@@ -836,11 +839,12 @@ object GeolocateDocumentTag extends
           tail
       } mkString "+"
       ),
-      ("weights-file", full("weights", filetail)),
+      ("word-weight-file", full("wordWeight", filetail)),
       ("stopwords-file", full("stopwords", filetail)),
       ("salience-file", full("salience", filetail)),
       ("whitelist-file", full("whitelist", filetail)),
-      ("eval-file", full("eval-file", filetail_seq)),
+      ("whitelist-weight-file", full("whitelistWeight", filetail)),
+      ("eval-file", full("evalFile", filetail_seq)),
       ("ranker", x => x match {
         case "full-kl-divergence" => "fullKL"
         case "partial-kl-divergence" => "KL"
@@ -909,10 +913,20 @@ object GeolocateDocumentTag extends
       ("kd-tree", default),
       ("kd-split-method", valonly),
       ("kd-backoff", default),
+      ("kd-coarse-bucket-size", short("coarseBucketsz")),
       ("kd-bucket-size", short("bucketsz")),
-      ("kd-interpolate-weight", short("kd-interpweight")),
+      ("kd-interpolate-weight", short("kdInterpWeight")),
       ("combined-kd-grid", default),
       ("center-method", valonly),
+      ("weight-cutoff-value", short("cutoffVal")),
+      ("weight-cutoff-percent", short("cutoffPct")),
+      ("missing-word-weight", short("missingWeight")),
+      ("weight-abs", default),
+      ("coord-strategy", valonly),
+      ("k-best", short("kbest")),
+      ("mean-shift-window", short("msWindow")),
+      ("mean-shift-max-stddev", short("msMaxStddev")),
+      ("mean-shift-max-iterations", short("msMaxIter")),
       ("language", full("lang")),
       ("num-nearest-neighbors", short("knn")),
       ("eval-set", valonly),
@@ -926,7 +940,7 @@ object GeolocateDocumentTag extends
       ("rough-ranker-args", full("rrargs")),
       ("vw-args", full("VWargs")),
       ("nested-vw-args", full("nestVWargs")),
-      ("fallback-vw-args", full("fallbVWargs")),
+      ("fallback-vw-args", full("fbVWargs")),
       ("debug", full("dbg"))
     )
 
@@ -954,7 +968,7 @@ object GeolocateDocumentTag extends
               handling_map(name) != null)
             handling_map(name)
           else if (arg_parser.getType(name) == classOf[Boolean])
-            echo(name)
+            echo(snake_to_camel_case(name))
           else
             full(name)
         fn(value)
