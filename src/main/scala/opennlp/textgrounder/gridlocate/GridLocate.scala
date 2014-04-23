@@ -1143,6 +1143,20 @@ only for 'cost-vowpal-wabbit').""")
 'dist' (use the error distance directly), 'sqrt-dist' (use the square root
 of the distance), 'log-dist' (use the log of the distance).""")
 
+  var save_vw_model =
+    ap.option[String]("save-vw-model", "svm",
+      default = "",
+      help = """Save the created Vowpal Wabbit model the specified filename.
+If unspecified, a temporary file will be created to hold the model, and
+deleted upon exit unless '--debug preserve-tmp-files' is given. When
+doing hierarchical classification, only the top-level model is saved.""")
+
+  var load_vw_model =
+    ap.option[String]("load-vw-model", "lvm",
+      default = "",
+      help = """If specified, load a previously trained Vowpal Wabbit model
+from the given filename instead of training a new model.""")
+
   var vw_args =
     ap.option[String]("vw-args",
       default = "",
@@ -1757,7 +1771,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new NaiveBayesGridRanker[Co](ranker_name, grid, features)
       }
       case "classifier" => create_classifier_ranker(ranker_name, grid,
-        grid.iter_nonempty_cells)
+        grid.iter_nonempty_cells, Iterable())
       case "hierarchical-classifier" => ??? // Should have been handled above
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
@@ -2026,7 +2040,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   /**
    * Create a reranker that uses a classifier to do its work.
    */
-  def create_vowpal_wabbit_classifier_reranker: GridRanker[Co] = {
+  def create_vowpal_wabbit_classifier_reranker(load_vw_model: String
+      ): GridRanker[Co] = {
     /* Factory object for generating candidate feature vectors
      * to be ranked. There is one such feature vector per cell to be
      * ranked for a given document; many of the features describe
@@ -2040,10 +2055,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     val vw_daemon_trainer =
       new VowpalWabbitDaemonTrainer
+
+    if (load_vw_model != "") {
+      assert(false, "--load-vw-model not yet implemented for reranker")
+      // vw_daemon_trainer.load_vw_model(load_vw_model)
+    }
+
     /* Object for training a reranker. */
     val reranker_trainer =
       new VowpalWabbitGridRerankerTrainer[Co](
-        params.reranker, vw_daemon_trainer, params.vw_args
+        params.reranker, vw_daemon_trainer, params.save_vw_model,
+        params.vw_args
       ) {
         val top_n = params.rerank_top_n
         val number_of_splits = params.rerank_num_training_splits
@@ -2300,7 +2322,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def create_classifier_reranker: GridRanker[Co] = {
     if (params.reranker == "vowpal-wabbit")
-      create_vowpal_wabbit_classifier_reranker
+      create_vowpal_wabbit_classifier_reranker(params.load_vw_model)
     else
       create_non_vw_classifier_reranker
   }
@@ -2363,26 +2385,32 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @param candidates Candidates (aka classes, labels) that the classifier
    *   chooses among.
    * @param xdocs_cells Training documents and corresponding correct cells.
-   *   If omitted or empty, read external training documents according to
+   *   If empty, read external training documents according to
    *   '--input' and/or positional params.
    */
   def create_classifier_ranker(ranker_name: String,
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
-      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable(),
+      // IMPORTANT: Don't calculate xdocs_cells till necessary, to avoid
+      // reloading the training documents when we are loading a pre-saved
+      // model.
+      xdocs_cells: => Iterable[(GridDoc[Co], GridCell[Co])],
       nested: Boolean = false) = {
     // FIXME: This doesn't apply for K-d trees under hierarchical
     // classification, where we have a copy of the grid that shares the
     // same cells.
     // candidates.foreach { cand => assert(cand.grid == grid) }
     // xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
-    val docs_cells = get_filtered_docs_cells(grid, candidates, xdocs_cells)
-    if (params.classifier == "vowpal-wabbit")
+    // Make this lazy so we don't calculate it if not necessary; see comment
+    // above.
+    lazy val docs_cells =
+      get_filtered_docs_cells(grid, candidates, xdocs_cells)
+    if (params.classifier == "vowpal-wabbit" ||
+        params.classifier == "cost-vowpal-wabbit") {
       create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs_cells, cost_sensitive = false, nested = nested)
-    else if (params.classifier == "cost-vowpal-wabbit")
-      create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs_cells, cost_sensitive = true, nested = nested)
-    else {
+        docs_cells, params.load_vw_model,
+        cost_sensitive = (params.classifier == "cost-vowpal-wabbit"),
+        nested = nested)
+    } else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
 
@@ -2477,117 +2505,125 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def create_vowpal_wabbit_classifier(grid: Grid[Co],
       candidates: Iterable[GridCell[Co]],
-      docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
-      cost_sensitive: Boolean,
-      nested: Boolean) = {
+      // IMPORTANT: Don't calculate docs_cells till necessary, to avoid
+      // reloading the training documents when we are loading a pre-saved
+      // model.
+      docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
+      load_vw_model: String, cost_sensitive: Boolean, nested: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
-      output_skip_message = true)
+        output_skip_message = true)
 
-    // val task = show_progress("processing features in", "document")
+    // Sort the candidates by coordinate so we get a more predictable and
+    // consistent mapping between cells and labels.
+    val sorted_candidates =
+      candidates.toSeq.sortWith((c1, c2) =>
+        grid.less_than_coord(c1.get_true_center, c2.get_true_center))
 
-    val vw_args =
-      if (nested && params.nested_vw_args != null) params.nested_vw_args
-      else params.vw_args
+    // Do this first so there's an entry in the featvec_factory for each
+    // non-empty cell, even when loading a model.
+    val cells_labels =
+      sorted_candidates.map { cell =>
+        (cell, featvec_factory.lookup_cell(cell))
+      }
 
-    def create_classifier(vw_args: String) = {
-      def vw_extra_args(vw_multiclass: String, num_classes: Int,
-          cost_sensitive: Boolean) = {
-        val gaussian = params.gaussian_penalty
-        val lasso = params.lasso_penalty
-        (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
-        (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
-        Seq("--loss_function", params.vw_loss_function) ++
-        (if (cost_sensitive) {
-          val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
-          Seq("--" + multiclass_arg, s"$num_classes")
+    // Create classifier trainer.
+    val trainer = new VowpalWabbitBatchTrainer
+
+    if (!nested && load_vw_model != "")
+      (trainer.load_vw_model(load_vw_model), featvec_factory)
+    else {
+      // val task = show_progress("processing features in", "document")
+
+      val vw_args =
+        if (nested && params.nested_vw_args != null) params.nested_vw_args
+        else params.vw_args
+
+      def create_classifier(vw_args: String) = {
+        def vw_extra_args(vw_multiclass: String, num_classes: Int,
+            cost_sensitive: Boolean) = {
+          val gaussian = params.gaussian_penalty
+          val lasso = params.lasso_penalty
+          (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
+          (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
+          Seq("--loss_function", params.vw_loss_function) ++
+          (if (cost_sensitive) {
+            val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
+            Seq("--" + multiclass_arg, s"$num_classes")
+          } else {
+            Seq("--" + vw_multiclass, s"$num_classes")
+          })
+        }
+
+        val feats_filename = if (cost_sensitive) {
+          val training_data =
+            docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
+            val feats = featvec_factory.get_features(doc)
+            val cells_costs = cells_labels.map { case (cell, label) =>
+              (label,
+                // Uncomment to always use cost 0.0 for the correct cell
+                // instead of actual error distance.  Doesn't seem to make
+                // much difference.
+                // if (label == correct_cell) 0.0 else
+                vowpal_wabbit_cost_function(doc, cell))
+            }
+            (feats, cells_costs)
+          }
+
+          // Train classifier.
+          val feats_filename =
+            trainer.write_cost_sensitive_feature_file(training_data)
+          assert(cells_labels.size ==
+            featvec_factory.featvec_factory.mapper.number_of_labels)
+          feats_filename
         } else {
-          Seq("--" + vw_multiclass, s"$num_classes")
-        })
-      }
-
-      // Create classifier trainer.
-      val trainer = new VowpalWabbitBatchTrainer
-
-      if (cost_sensitive) {
-        val cells_labels =
-          candidates.map { cell =>
-            (cell, featvec_factory.lookup_cell(cell))
+          val training_data =
+            docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
+            val feats = featvec_factory.get_features(doc)
+            (feats, featvec_factory.lookup_cell(correct_cell))
           }
 
-        val training_data =
-          docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
-          val feats = featvec_factory.get_features(doc)
-          val cells_costs = cells_labels.map { case (cell, label) =>
-            (label,
-              // Uncomment to always use cost 0.0 for the correct cell
-              // instead of actual error distance.  Doesn't seem to make
-              // much difference.
-              // if (label == correct_cell) 0.0 else
-              vowpal_wabbit_cost_function(doc, cell))
-          }
-          (feats, cells_costs)
+          trainer.write_feature_file(training_data)
         }
 
         // Train classifier.
-        val feats_filename =
-          trainer.write_cost_sensitive_feature_file(training_data)
-        assert(cells_labels.size ==
-          featvec_factory.featvec_factory.mapper.number_of_labels)
-        trainer(feats_filename, vw_args, vw_extra_args(
-          params.vw_multiclass, cells_labels.size, cost_sensitive))
-      } else {
-        val training_data =
-          docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
-          val feats = featvec_factory.get_features(doc)
-          (feats, featvec_factory.lookup_cell(correct_cell))
+        val num_labels =
+          featvec_factory.featvec_factory.mapper.number_of_labels
+        trainer(feats_filename, if (nested) "" else params.save_vw_model,
+          vw_args, vw_extra_args(params.vw_multiclass, num_labels,
+            cost_sensitive))
+      }
+
+      val classifier =
+        try {
+          create_classifier(vw_args)
+        } catch {
+          case e:VowpalWabbitModelError => {
+            errprint(s"Warning, bad model, falling back to args '${params.fallback_vw_args}'")
+            create_classifier(params.fallback_vw_args)
+          }
         }
 
-        // Train classifier.
-        //
-        // Write the feature file before computing the number of labels
-        // because the process of writing the feature file iterates through
-        // the input data and memoizes all the labels; only after that is
-        // the number of labels correct in the featvec factory's mapper.
-        //
-        // FIXME: We could solve this simply by iterating through the
-        // non-empty cells and calling lookup_cell(), as we do anyway in the
-        // cost-sensitive version above.
-        val feats_filename = trainer.write_feature_file(training_data)
-        val num_labels = featvec_factory.featvec_factory.mapper.number_of_labels
-        trainer(feats_filename, vw_args, vw_extra_args(
-          params.vw_multiclass, num_labels, cost_sensitive))
-      }
+      (classifier, featvec_factory)
     }
-
-    val classifier =
-      try {
-        create_classifier(vw_args)
-      } catch {
-        case e:VowpalWabbitModelError => {
-          errprint(s"Warning, bad model, falling back to args '${params.fallback_vw_args}'")
-          create_classifier(params.fallback_vw_args)
-        }
-      }
-
-    (classifier, featvec_factory)
   }
 
   /**
    * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
    * treating each cell as a possible class.
    *
-   * @param xdocs_cells Training documents and corresponding correct cells.
-   *   If omitted or empty, read external training documents according to
-   *   '--input' and/or positional params.
+   * @param docs_cells Training documents and corresponding correct cells.
    */
   def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
-      docs_cells: Iterator[(GridDoc[Co], GridCell[Co])],
-      cost_sensitive: Boolean, nested: Boolean) = {
+      // IMPORTANT: Don't calculate docs_cells till necessary, to avoid
+      // reloading the training documents when we are loading a pre-saved
+      // model.
+      docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
+      load_vw_model: String, cost_sensitive: Boolean, nested: Boolean) = {
     val (classifier, featvec_factory) =
       create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
-        cost_sensitive, nested)
+        load_vw_model, cost_sensitive, nested)
     new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
       featvec_factory, cost_sensitive = cost_sensitive)
    }
@@ -2604,7 +2640,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       get_combined_raw_training_documents(
         "reading %s for hierarchical classifier training data",
         streams)
-    val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
+    // Make this lazy so we don't calculate it if not necessary, to avoid
+    // reloading the training documents when we're loading a pre-saved model.
+    lazy val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
       raw_training_docs).toIndexedSeq
     val coarse_ranker = create_classifier_ranker(ranker_name, coarse_grid,
       candidates, docs_cells)

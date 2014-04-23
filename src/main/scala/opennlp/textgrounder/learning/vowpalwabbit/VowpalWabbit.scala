@@ -123,7 +123,11 @@ case class VowpalWabbitModelError(
  * Common code to the various Vowpal Wabbit trainers and classifiers.
  */
 protected trait VowpalWabbitBase {
-  def train_vw_model(feats_filename: String,
+  // Train a model with the specified feature file and possibly a model
+  // filename specified to store the model in. If empty, create a temporary
+  // file to store the model in, and arrange for it to be deleted on exit
+  // unless we set '--debug preserve-tmp-files'.
+  def train_vw_model(feats_filename: String, maybe_model_filename: String,
       vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
     // We make the writing happen in a different step because the number of
@@ -135,7 +139,8 @@ protected trait VowpalWabbitBase {
     val cache_filename =
       File.createTempFile("textgrounder.vw.cache.train", null).toString
     val model_filename =
-      File.createTempFile("textgrounder.vw.model", null).toString
+      if (maybe_model_filename != "") maybe_model_filename
+      else File.createTempFile("textgrounder.vw.model", null).toString
     if (verbose != MsgQuiet) {
       errprint(s"Writing VW training cache to $cache_filename")
       errprint(s"Writing VW model to $model_filename")
@@ -161,7 +166,8 @@ protected trait VowpalWabbitBase {
     if (!debug("preserve-tmp-files")) {
       (new File(cache_filename)).delete
       (new File(feats_filename)).delete
-      (new File(model_filename)).deleteOnExit
+      if (maybe_model_filename == "")
+        (new File(model_filename)).deleteOnExit
     }
     val model_length = (new File(model_filename)).length
     if (model_length > 0 && model_length < 256)
@@ -589,10 +595,10 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
  * features first, then pass in the feature file name.
  */
 class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
-  def train_vw_batch(feats_filename: String,
-      vw_args: String, extra_args: Seq[String],
+  protected def train_vw_batch(feats_filename: String,
+      maybe_model_filename: String, vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
-    val model_filename = train_vw_model(feats_filename,
+    val model_filename = train_vw_model(feats_filename, maybe_model_filename,
       vw_args, extra_args, verbose)
     new VowpalWabbitBatchClassifier(model_filename)
   }
@@ -608,13 +614,19 @@ class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
    *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
    *   There is currently no programmatic way to specify that a given
    *   feature file should be preserved.
+   * @param maybe_model_filename Filename to store the model in. If empty,
+   *   create a temporary file, and arrange to delete it on exit unless
+   *   '--debug preserve-tmp-files'.
    * @return A `VowpalWabbitBatchClassifier` object, used to classify test
    *   instances.
    */
-  def apply(feats_filename: String, vw_args: String,
-      extra_args: Seq[String]) = {
-    train_vw_batch(feats_filename, vw_args, extra_args)
+  def apply(feats_filename: String, maybe_model_filename: String,
+      vw_args: String, extra_args: Seq[String]) = {
+    train_vw_batch(feats_filename, maybe_model_filename, vw_args, extra_args)
   }
+
+  def load_vw_model(load_model_filename: String) =
+    new VowpalWabbitBatchClassifier(load_model_filename)
 }
 
 /**
@@ -623,12 +635,8 @@ class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
  * features first, then pass in the feature file name.
  */
 class VowpalWabbitDaemonTrainer extends VowpalWabbitBase {
-  def train_vw_daemon(feats_filename: String,
-      vw_args: String, extra_args: Seq[String],
+  protected def create_vw_daemon(model_filename: String,
       verbose: MsgVerbosity = MsgNormal) = {
-    val model_filename = train_vw_model(feats_filename,
-      vw_args, extra_args, verbose)
-
     // We need four temporary files: one used by VW as a cache, one
     // where VW writes the raw predictions, and two to (very temporarily)
     // hold the process ID and port used for communication. In addition we
@@ -694,11 +702,21 @@ class VowpalWabbitDaemonTrainer extends VowpalWabbitBase {
    *   temporary file, unless the debug flag 'preserve-tmp-files' is set.
    *   There is currently no programmatic way to specify that a given
    *   feature file should be preserved.
+   * @param maybe_model_filename Filename to store the model in. If empty,
+   *   create a temporary file, and arrange to delete it on exit unless
+   *   '--debug preserve-tmp-files'.
    * @return A `VowpalWabbitDaemonClassifier` object, used to classify test
    *   instances.
    */
-  def apply(feats_filename: String, vw_args: String,
-      extra_args: Seq[String]) = {
-    train_vw_daemon(feats_filename, vw_args, extra_args)
+  def apply(feats_filename: String, maybe_model_filename: String,
+      vw_args: String, extra_args: Seq[String],
+      verbose: MsgVerbosity = MsgNormal) = {
+    val model_filename = train_vw_model(feats_filename, maybe_model_filename,
+      vw_args, extra_args, verbose)
+    create_vw_daemon(model_filename, verbose)
   }
+
+  def load_vw_model(load_model_filename: String,
+      verbose: MsgVerbosity = MsgNormal) =
+    create_vw_daemon(load_model_filename, verbose)
 }
