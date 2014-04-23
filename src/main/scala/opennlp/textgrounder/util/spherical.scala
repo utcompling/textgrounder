@@ -252,6 +252,13 @@ protected class SphericalPackage {
 
   implicit object SphereCoordHandler extends CoordHandler[SphereCoord] {
     def format_coord(coord: SphereCoord) = coord.format
+    def less_than_coord(c1: SphereCoord, c2: SphereCoord) = {
+      if (c1.lat == c2.lat)
+        c1.long < c2.long
+      else
+        c1.lat < c2.lat
+    }
+
     def distance_between_coords(c1: SphereCoord, c2: SphereCoord) =
       spheredist(c1, c2)
     def output_distance(dist: Double) = km_and_miles(dist)

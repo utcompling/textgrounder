@@ -28,6 +28,10 @@ trait CoordHandler[Co] {
    */
   def distance_between_coords(c1: Co, c2: Co): Double
   /**
+   * True if c1 &lt; c2.
+   */
+  def less_than_coord(c1: Co, c2: Co): Boolean
+  /**
    * Format a coordinate for human-readable display.
    */
   def format_coord(coord2: Co): String

@@ -324,6 +324,12 @@ abstract class Grid[Co](
     docfact.coord_handler.distance_between_coords(c1, c2)
 
   /**
+   * Return whether c1 &lt; c2.
+   */
+  def less_than_coord(c1: Co, c2: Co) =
+    docfact.coord_handler.less_than_coord(c1, c2)
+
+  /**
    * Format a coordinate for human-readable display.
    */
   def format_coord(coord2: Co) =
