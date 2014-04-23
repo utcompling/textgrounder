@@ -123,8 +123,8 @@ case class VowpalWabbitModelError(
  * Common code to the various Vowpal Wabbit trainers and classifiers.
  */
 protected trait VowpalWabbitBase {
-  def train_vw_model(feats_filename: String, gaussian: Double, lasso: Double,
-      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+  def train_vw_model(feats_filename: String,
+      vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
     // We make the writing happen in a different step because the number of
     // classes might not be known until we do so.
@@ -148,19 +148,10 @@ protected trait VowpalWabbitBase {
     // -f: Where to write computed model to
     // --oaa: Use one-against-all reduction for handling multiclass learning,
     //        with specified number of classes
-    // --loss_function: Use this loss function. Possibilities are "logistic"
-    //        (do logistic regression), "hinge" (implement an SVM),
-    //        "squared" (do least-squares linear regression), "quantile"
-    //        (do quantile regression, trying to predict the median or some
-    //        other quantile, rather than the mean as with least squares).
-    // --compressed: Compress the cache file.
     val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
           "-f", model_filename) ++
         extra_args ++
-        Seq("--loss_function", vw_loss_function) ++
-        (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
-        (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
         // Split on an empty string wrongly returns Array("")
         (if (vw_args == "") Seq() else vw_args.split("""\s+""").toSeq)
     errprint("Executing: %s", vw_cmd_line mkString " ")
@@ -597,16 +588,12 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
  * feature vectors, return a classifier object. You need to write out the
  * features first, then pass in the feature file name.
  */
-class VowpalWabbitBatchTrainer(
-  val gaussian: Double,
-  val lasso: Double,
-  val vw_loss_function: String = "logistic"
-) extends VowpalWabbitBase {
-  def train_vw_batch(feats_filename: String, gaussian: Double, lasso: Double,
-      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
+  def train_vw_batch(feats_filename: String,
+      vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
-    val model_filename = train_vw_model(feats_filename, gaussian, lasso,
-      vw_loss_function, vw_args, extra_args, verbose)
+    val model_filename = train_vw_model(feats_filename,
+      vw_args, extra_args, verbose)
     new VowpalWabbitBatchClassifier(model_filename)
   }
 
@@ -626,8 +613,7 @@ class VowpalWabbitBatchTrainer(
    */
   def apply(feats_filename: String, vw_args: String,
       extra_args: Seq[String]) = {
-    train_vw_batch(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      extra_args)
+    train_vw_batch(feats_filename, vw_args, extra_args)
   }
 }
 
@@ -636,16 +622,12 @@ class VowpalWabbitBatchTrainer(
  * of feature vectors, return a classifier object. You need to write out the
  * features first, then pass in the feature file name.
  */
-class VowpalWabbitDaemonTrainer(
-  val gaussian: Double,
-  val lasso: Double,
-  val vw_loss_function: String = "logistic"
-) extends VowpalWabbitBase {
-  def train_vw_daemon(feats_filename: String, gaussian: Double, lasso: Double,
-      vw_loss_function: String, vw_args: String, extra_args: Seq[String],
+class VowpalWabbitDaemonTrainer extends VowpalWabbitBase {
+  def train_vw_daemon(feats_filename: String,
+      vw_args: String, extra_args: Seq[String],
       verbose: MsgVerbosity = MsgNormal) = {
-    val model_filename = train_vw_model(feats_filename, gaussian, lasso,
-      vw_loss_function, vw_args, extra_args, verbose)
+    val model_filename = train_vw_model(feats_filename,
+      vw_args, extra_args, verbose)
 
     // We need four temporary files: one used by VW as a cache, one
     // where VW writes the raw predictions, and two to (very temporarily)
@@ -717,7 +699,6 @@ class VowpalWabbitDaemonTrainer(
    */
   def apply(feats_filename: String, vw_args: String,
       extra_args: Seq[String]) = {
-    train_vw_daemon(feats_filename, gaussian, lasso, vw_loss_function, vw_args,
-      extra_args)
+    train_vw_daemon(feats_filename, vw_args, extra_args)
   }
 }

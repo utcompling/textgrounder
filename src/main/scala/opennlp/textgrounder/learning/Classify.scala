@@ -493,18 +493,22 @@ object Classify extends ExperimentApp("Classify") {
           (training_instances, test_instances, factory, numlabs)
         }
 
+      val vw_extra_args =
+        (if (params.gaussian > 0) Seq("--l2", s"${params.gaussian}") else Seq()
+          ) ++
+        (if (params.lasso > 0) Seq("--l1", s"${params.lasso}") else Seq()) ++
+        Seq("--loss_function", "logistic") ++
+        Seq("--oaa", s"$numlabs")
+
       val insts_results_lines =
         if (daemon) {
           // Train a classifier
           errprint("Using Vowpal Wabbit daemon trainer")
-          val trainer = new VowpalWabbitDaemonTrainer(
-            gaussian = params.gaussian,
-            lasso = params.lasso)
+          val trainer = new VowpalWabbitDaemonTrainer
 
           val train_feats_filename =
             trainer.write_feature_file(training_instances.toIterator)
-          val classifier = trainer(train_feats_filename, "",
-            Seq("--oaa", s"$numlabs"))
+          val classifier = trainer(train_feats_filename, "", vw_extra_args)
 
           for ((inst, truelab) <- test_instances) yield {
             val extline = classifier.externalize_data_instance(inst, truelab)
@@ -515,14 +519,11 @@ object Classify extends ExperimentApp("Classify") {
         } else {
           // Train a classifier
           errprint("Using Vowpal Wabbit batch trainer")
-          val trainer = new VowpalWabbitBatchTrainer(
-            gaussian = params.gaussian,
-            lasso = params.lasso)
+          val trainer = new VowpalWabbitBatchTrainer
 
           val train_feats_filename =
             trainer.write_feature_file(training_instances.toIterator)
-          val classifier = trainer(train_feats_filename, "",
-            Seq("--oaa", s"$numlabs"))
+          val classifier = trainer(train_feats_filename, "", vw_extra_args)
 
           // Return insts_results_lines
           val test_feats_filename =

@@ -1116,8 +1116,11 @@ marginal calculation in TADM.""")
     ap.option[String]("vw-loss-function", "vlf",
       default = "logistic",
       choices = Seq("logistic", "hinge", "squared", "quantile"),
-      help = """Loss function for Vowpal Wabbit: One of 'logistic', 'hinge',
-'squared', 'quantile'.""")
+      help = """Loss function for Vowpal Wabbit: One of 'logistic'
+(do logistic regression), 'hinge' (use hinge loss, as for an SVM),
+'squared' (do least-squares linear regression), 'quantile'
+(do quantile regression, trying to predict the median or some
+other quantile, rather than the mean as with least squares).""")
 
   var vw_multiclass =
     ap.option[String]("vw-multiclass", "vm",
@@ -2036,10 +2039,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         include_doc_only = true, include_doc_cell = true)
 
     val vw_daemon_trainer =
-      new VowpalWabbitDaemonTrainer(
-        gaussian = params.gaussian_penalty,
-        lasso = params.lasso_penalty,
-        vw_loss_function = params.vw_loss_function)
+      new VowpalWabbitDaemonTrainer
     /* Object for training a reranker. */
     val reranker_trainer =
       new VowpalWabbitGridRerankerTrainer[Co](
@@ -2493,19 +2493,21 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     def create_classifier(vw_args: String) = {
       def vw_extra_args(vw_multiclass: String, num_classes: Int,
           cost_sensitive: Boolean) = {
-        if (cost_sensitive) {
+        val gaussian = params.gaussian_penalty
+        val lasso = params.lasso_penalty
+        (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
+        (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
+        Seq("--loss_function", params.vw_loss_function) ++
+        (if (cost_sensitive) {
           val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
           Seq("--" + multiclass_arg, s"$num_classes")
         } else {
           Seq("--" + vw_multiclass, s"$num_classes")
-        }
+        })
       }
 
       // Create classifier trainer.
-      val trainer = new VowpalWabbitBatchTrainer(
-        gaussian = params.gaussian_penalty,
-        lasso = params.lasso_penalty,
-        vw_loss_function = params.vw_loss_function)
+      val trainer = new VowpalWabbitBatchTrainer
 
       if (cost_sensitive) {
         val cells_labels =
