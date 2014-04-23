@@ -374,6 +374,10 @@ the average of all weights in the file, which treats them as if they
 have no special weight. It is possible to set this value to zero, in
 which case unspecified words will be ignored.""")
 
+  var weight_abs =
+    ap.flag("weight-abs", "wa",
+      help = """Take the absolute value of weights as we read them in.""")
+
   var output_training_cell_lang_models =
     ap.flag("output-training-cell-lang-models", "output-training-cells", "otc",
       help = """Output the training cell lang models after they've been trained.""")
@@ -1344,7 +1348,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       var numwords = 0
       for (row <- get_file_handler.openr(params.whitelist_weight_file)) {
         val Array(word, weightstr) = row.split("\t")
-        val weight = weightstr.toDouble
+        val weight_1 = weightstr.toDouble
+        val weight = if (params.weight_abs) weight_1.abs else weight_1
         if (word_weights contains word)
           warning("Word %s with weight %s already seen with weight %s",
             word, weight, word_weights(word))
@@ -1376,7 +1381,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       var numwords = 0
       for (row <- get_file_handler.openr(params.word_weight_file)) {
         val Array(word, weightstr) = row.split("\t")
-        val weight = weightstr.toDouble
+        val weight_1 = weightstr.toDouble
+        val weight = if (params.weight_abs) weight_1.abs else weight_1
         val wordint = Unigram.to_index(word)
         if (word_weights contains wordint)
           warning("Word %s with weight %s already seen with weight %s",
