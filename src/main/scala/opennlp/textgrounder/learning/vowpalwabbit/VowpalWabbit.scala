@@ -128,8 +128,7 @@ protected trait VowpalWabbitBase {
   // file to store the model in, and arrange for it to be deleted on exit
   // unless we set '--debug preserve-tmp-files'.
   def train_vw_model(feats_filename: String, maybe_model_filename: String,
-      vw_args: String, extra_args: Seq[String],
-      verbose: MsgVerbosity = MsgNormal) = {
+      vw_args: Iterable[String], verbose: MsgVerbosity = MsgNormal) = {
     // We make the writing happen in a different step because the number of
     // classes might not be known until we do so.
     //
@@ -155,10 +154,7 @@ protected trait VowpalWabbitBase {
     //        with specified number of classes
     val vw_cmd_line =
       Seq("vw", "-k", "--cache_file", cache_filename, "--data", feats_filename,
-          "-f", model_filename) ++
-        extra_args ++
-        // Split on an empty string wrongly returns Array("")
-        (if (vw_args == "") Seq() else vw_args.split("""\s+""").toSeq)
+          "-f", model_filename) ++ vw_args
     errprint("Executing: %s", vw_cmd_line mkString " ")
     time_action("running VowpalWabbit", verbose) {
       vw_cmd_line !
@@ -596,10 +592,10 @@ class VowpalWabbitDaemonClassifier private[vowpalwabbit] (model_filename: String
  */
 class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
   protected def train_vw_batch(feats_filename: String,
-      maybe_model_filename: String, vw_args: String, extra_args: Seq[String],
+      maybe_model_filename: String, vw_args: Iterable[String],
       verbose: MsgVerbosity = MsgNormal) = {
     val model_filename = train_vw_model(feats_filename, maybe_model_filename,
-      vw_args, extra_args, verbose)
+      vw_args, verbose)
     new VowpalWabbitBatchClassifier(model_filename)
   }
 
@@ -621,8 +617,8 @@ class VowpalWabbitBatchTrainer extends VowpalWabbitBase {
    *   instances.
    */
   def apply(feats_filename: String, maybe_model_filename: String,
-      vw_args: String, extra_args: Seq[String]) = {
-    train_vw_batch(feats_filename, maybe_model_filename, vw_args, extra_args)
+      vw_args: Iterable[String]) = {
+    train_vw_batch(feats_filename, maybe_model_filename, vw_args)
   }
 
   def load_vw_model(load_model_filename: String) =
@@ -709,10 +705,9 @@ class VowpalWabbitDaemonTrainer extends VowpalWabbitBase {
    *   instances.
    */
   def apply(feats_filename: String, maybe_model_filename: String,
-      vw_args: String, extra_args: Seq[String],
-      verbose: MsgVerbosity = MsgNormal) = {
+      vw_args: Iterable[String], verbose: MsgVerbosity = MsgNormal) = {
     val model_filename = train_vw_model(feats_filename, maybe_model_filename,
-      vw_args, extra_args, verbose)
+      vw_args, verbose)
     create_vw_daemon(model_filename, verbose)
   }
 

@@ -2037,6 +2037,18 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_classifier_reranker
   }
 
+  def vw_param_args = {
+    val gaussian = params.gaussian_penalty
+    val lasso = params.lasso_penalty
+    (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
+    (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
+    Seq("--loss_function", params.vw_loss_function)
+  }
+
+  def split_vw_args(vw_args: String) =
+    // Split on an empty string wrongly returns Array("")
+    (if (vw_args == "") Seq() else vw_args.split("""\s+""").toSeq)
+
   /**
    * Create a reranker that uses a classifier to do its work.
    */
@@ -2065,7 +2077,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     val reranker_trainer =
       new VowpalWabbitGridRerankerTrainer[Co](
         params.reranker, vw_daemon_trainer, params.save_vw_model,
-        params.vw_args
+        split_vw_args(params.vw_args) ++ vw_param_args
       ) {
         val top_n = params.rerank_top_n
         val number_of_splits = params.rerank_num_training_splits
@@ -2542,11 +2554,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       def create_classifier(vw_args: String) = {
         def vw_extra_args(vw_multiclass: String, num_classes: Int,
             cost_sensitive: Boolean) = {
-          val gaussian = params.gaussian_penalty
-          val lasso = params.lasso_penalty
-          (if (gaussian > 0) Seq("--l2", s"$gaussian") else Seq()) ++
-          (if (lasso > 0) Seq("--l1", s"$lasso") else Seq()) ++
-          Seq("--loss_function", params.vw_loss_function) ++
+          vw_param_args ++
           (if (cost_sensitive) {
             val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
             Seq("--" + multiclass_arg, s"$num_classes")
@@ -2590,8 +2598,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         val num_labels =
           featvec_factory.featvec_factory.mapper.number_of_labels
         trainer(feats_filename, if (nested) "" else params.save_vw_model,
-          vw_args, vw_extra_args(params.vw_multiclass, num_labels,
-            cost_sensitive))
+          split_vw_args(vw_args) ++
+            vw_extra_args(params.vw_multiclass, num_labels, cost_sensitive))
       }
 
       val classifier =

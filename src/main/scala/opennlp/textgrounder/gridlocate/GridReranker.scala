@@ -163,7 +163,7 @@ abstract class VowpalWabbitGridRerankerTrainer[Co](
   ranker_name: String,
   val trainer: VowpalWabbitDaemonTrainer,
   val save_vw_model: String,
-  val vw_args: String
+  val vw_args: Iterable[String]
 ) extends PointwiseClassifyingRerankerTrainer[
     GridDoc[Co], GridCell[Co], DocStatus[Row],
     RawAggregateFeatureVector,
@@ -202,8 +202,8 @@ abstract class VowpalWabbitGridRerankerTrainer[Co](
       trainer.write_label_dependent_feature_file(data.toIterator.map {
         case (rafv, correct) => (rafv.data, correct)
       })
-    val cfier = trainer(featsfile, save_vw_model, vw_args,
-      Seq("--csoaa_ldf", "mc"))
+    val cfier = trainer(featsfile, save_vw_model,
+      vw_args ++ Seq("--csoaa_ldf", "mc"))
     new VowpalWabbitLabelDependentScoringClassifier(cfier)
   }
 
