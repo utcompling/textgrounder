@@ -723,6 +723,7 @@ object GeolocateDocumentTag extends
     // Convert foo-bar-baz or foo_bar_baz to fooBarBaz
     def snake_to_camel_case(str: String) =
       "[-_]([a-z])".r.replaceAllIn(str, m => m.group(1).toUpperCase)
+
     /**
      * Output the value only. Typical for choice options.
      */
@@ -738,11 +739,28 @@ object GeolocateDocumentTag extends
     }
 
     /**
-     * Output the value only. Typical for choice options.
+     * Output the value only, converting to camel case. Typical for
+     * choice options.
+     */
+    def valonly_camel: Any => String = value =>
+      snake_to_camel_case(valonly(value))
+
+    /**
+     * Output the value only of a sequence. Typical for choice options.
      */
     def seqvalonly(sep: String = ",") = (value: Any) => value match {
       case null => ""
       case seq:Seq[_] => seq.map(valonly) mkString sep
+      case _ => ???
+    }
+
+    /**
+     * Output the value only of a sequence, converting to camel case.
+     * Typical for choice options.
+     */
+    def seqvalonly_camel(sep: String = ",") = (value: Any) => value match {
+      case null => ""
+      case seq:Seq[_] => seq.map(valonly_camel) mkString sep
       case _ => ???
     }
 
@@ -845,6 +863,8 @@ object GeolocateDocumentTag extends
       ("whitelist-file", full("whitelist", filetail)),
       ("whitelist-weight-file", full("whitelistWeight", filetail)),
       ("eval-file", full("evalFile", filetail_seq)),
+      ("eval-format", valonly_camel),
+      ("eval-set", valonly_camel),
       ("ranker", x => x match {
         case "full-kl-divergence" => "fullKL"
         case "partial-kl-divergence" => "KL"
@@ -880,6 +900,7 @@ object GeolocateDocumentTag extends
       ("naive-bayes-prior", full("nbprior")),
       ("naive-bayes-features", full("nbfeats")),
       ("num-levels", short("nlevels")),
+      ("subdivide-factor", short("subdivFac")),
       ("beam-size", short("beamsz")),
       ("reranker",
         x => "reranker=" + shorten_classifier(x.asInstanceOf[String])),
@@ -910,26 +931,25 @@ object GeolocateDocumentTag extends
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
       ("cell-offset-degrees", full("offsetdeg")),
-      ("kd-tree", default),
-      ("kd-split-method", valonly),
+      ("kd-tree", echo("Kd")),
+      ("kd-split-method", valonly_camel),
       ("kd-backoff", default),
-      ("kd-coarse-bucket-size", short("coarseBucketsz")),
+      ("kd-coarse-bucket-size", short("coarsesz")),
       ("kd-bucket-size", short("bucketsz")),
-      ("kd-interpolate-weight", short("kdInterpWeight")),
-      ("combined-kd-grid", default),
-      ("center-method", valonly),
+      ("kd-interpolate-weight", short("interpWeight")),
+      ("combined-kd-grid", echo("combinedGrid")),
+      ("center-method", valonly_camel),
       ("weight-cutoff-value", short("cutoffVal")),
       ("weight-cutoff-percent", short("cutoffPct")),
       ("missing-word-weight", short("missingWeight")),
       ("weight-abs", default),
-      ("coord-strategy", valonly),
+      ("coord-strategy", valonly_camel),
       ("k-best", short("kbest")),
-      ("mean-shift-window", short("msWindow")),
-      ("mean-shift-max-stddev", short("msMaxStddev")),
-      ("mean-shift-max-iterations", short("msMaxIter")),
+      ("mean-shift-window", short("window")),
+      ("mean-shift-max-stddev", short("maxStddev")),
+      ("mean-shift-max-iterations", short("maxIter")),
       ("language", full("lang")),
       ("num-nearest-neighbors", short("knn")),
-      ("eval-set", valonly),
       ("num-training-docs", short("ntrain")),
       ("num-test-docs", short("ntest")),
       ("num-top-cells-to-output", short("ncellout")),
