@@ -1146,16 +1146,35 @@ of the distance), 'log-dist' (use the log of the distance).""")
   var save_vw_model =
     ap.option[String]("save-vw-model", "svm",
       default = "",
-      help = """Save the created Vowpal Wabbit model the specified filename.
+      help = """Save the created Vowpal Wabbit model to the specified filename.
 If unspecified, a temporary file will be created to hold the model, and
 deleted upon exit unless '--debug preserve-tmp-files' is given. When
-doing hierarchical classification, only the top-level model is saved.""")
+doing hierarchical classification, only the top-level model is saved
+(see '--save-vw-submodels').""")
+
+  var save_vw_submodels =
+    ap.option[String]("save-vw-submodels", "svsm",
+      default = "",
+      help = """Save the created Vowpal Wabbit submodels to the specified
+filename during hierarchical classification. The filename should have %l
+and %i in it, which will be replaced by the level and classifier index,
+respectively.  If unspecified, temporary files will be created to hold
+the submodels, and deleted upon exit unless '--debug preserve-tmp-files'
+is given.""")
 
   var load_vw_model =
     ap.option[String]("load-vw-model", "lvm",
       default = "",
       help = """If specified, load a previously trained Vowpal Wabbit model
 from the given filename instead of training a new model.""")
+
+  var load_vw_submodels =
+    ap.option[String]("load-vw-submodels", "lvsm",
+      default = "",
+      help = """If specified, load previously trained Vowpal Wabbit submodels
+from the given filename during hierarchical classification, instead of
+training a new model. The filename should have %l and %i in it, which will
+be replaced by the level and classifier index, respectively.""")
 
   var vw_args =
     ap.option[String]("vw-args",
@@ -1771,7 +1790,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new NaiveBayesGridRanker[Co](ranker_name, grid, features)
       }
       case "classifier" => create_classifier_ranker(ranker_name, grid,
-        grid.iter_nonempty_cells, Iterable())
+        grid.iter_nonempty_cells, Iterable(), 1, 0)
       case "hierarchical-classifier" => ??? // Should have been handled above
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
@@ -2406,7 +2425,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // reloading the training documents when we are loading a pre-saved
       // model.
       xdocs_cells: => Iterable[(GridDoc[Co], GridCell[Co])],
-      nested: Boolean = false) = {
+      level: Int, cindex: Int) = {
     // FIXME: This doesn't apply for K-d trees under hierarchical
     // classification, where we have a copy of the grid that shares the
     // same cells.
@@ -2418,10 +2437,24 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       get_filtered_docs_cells(grid, candidates, xdocs_cells)
     if (params.classifier == "vowpal-wabbit" ||
         params.classifier == "cost-vowpal-wabbit") {
-      create_vowpal_wabbit_classifier_ranker(ranker_name, grid, candidates,
-        docs_cells, params.load_vw_model,
-        cost_sensitive = (params.classifier == "cost-vowpal-wabbit"),
-        nested = nested)
+      val vw_args =
+        if (level > 1 && params.nested_vw_args != null) params.nested_vw_args
+        else params.vw_args
+      val cost_sensitive = params.classifier == "cost-vowpal-wabbit"
+      def replace_level_index(str: String) =
+        str.replace("%l", level.toString).replace("%i", cindex.toString)
+      val save_vw_model =
+        if (level > 1) replace_level_index(params.save_vw_submodels)
+        else params.save_vw_model
+      val load_vw_model =
+        if (level > 1) replace_level_index(params.load_vw_submodels)
+        else params.load_vw_model
+      val (classifier, featvec_factory) =
+        create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
+          save_vw_model, load_vw_model, vw_args,
+          cost_sensitive = cost_sensitive)
+      new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
+        featvec_factory, cost_sensitive = cost_sensitive)
     } else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)
@@ -2521,7 +2554,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // reloading the training documents when we are loading a pre-saved
       // model.
       docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
-      load_vw_model: String, cost_sensitive: Boolean, nested: Boolean) = {
+      save_vw_model: String, load_vw_model: String, vw_args: String,
+      cost_sensitive: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
         output_skip_message = true)
@@ -2542,27 +2576,12 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // Create classifier trainer.
     val trainer = new VowpalWabbitBatchTrainer
 
-    if (!nested && load_vw_model != "")
+    if (load_vw_model != "")
       (trainer.load_vw_model(load_vw_model), featvec_factory)
     else {
       // val task = show_progress("processing features in", "document")
 
-      val vw_args =
-        if (nested && params.nested_vw_args != null) params.nested_vw_args
-        else params.vw_args
-
       def create_classifier(vw_args: String) = {
-        def vw_extra_args(vw_multiclass: String, num_classes: Int,
-            cost_sensitive: Boolean) = {
-          vw_param_args ++
-          (if (cost_sensitive) {
-            val multiclass_arg = if (vw_multiclass == "oaa") "csoaa" else "wap"
-            Seq("--" + multiclass_arg, s"$num_classes")
-          } else {
-            Seq("--" + vw_multiclass, s"$num_classes")
-          })
-        }
-
         val feats_filename = if (cost_sensitive) {
           val training_data =
             docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
@@ -2597,9 +2616,16 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         // Train classifier.
         val num_labels =
           featvec_factory.featvec_factory.mapper.number_of_labels
-        trainer(feats_filename, if (nested) "" else params.save_vw_model,
-          split_vw_args(vw_args) ++
-            vw_extra_args(params.vw_multiclass, num_labels, cost_sensitive))
+        val extra_args = vw_param_args ++
+          (if (cost_sensitive) {
+            val multiclass_arg =
+              if (params.vw_multiclass == "oaa") "csoaa" else "wap"
+            Seq("--" + multiclass_arg, s"$num_labels")
+          } else {
+            Seq("--" + params.vw_multiclass, s"$num_labels")
+          })
+        trainer(feats_filename, save_vw_model,
+          split_vw_args(vw_args) ++ extra_args)
       }
 
       val classifier =
@@ -2615,26 +2641,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       (classifier, featvec_factory)
     }
   }
-
-  /**
-   * Create a ranker that uses a Vowpal Wabbit classifier to do its work,
-   * treating each cell as a possible class.
-   *
-   * @param docs_cells Training documents and corresponding correct cells.
-   */
-  def create_vowpal_wabbit_classifier_ranker(ranker_name: String,
-      grid: Grid[Co], candidates: Iterable[GridCell[Co]],
-      // IMPORTANT: Don't calculate docs_cells till necessary, to avoid
-      // reloading the training documents when we are loading a pre-saved
-      // model.
-      docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
-      load_vw_model: String, cost_sensitive: Boolean, nested: Boolean) = {
-    val (classifier, featvec_factory) =
-      create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
-        load_vw_model, cost_sensitive, nested)
-    new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
-      featvec_factory, cost_sensitive = cost_sensitive)
-   }
 
   /**
    * Create a hierarchical classifier ranker, which classifies at multiple
@@ -2653,7 +2659,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     lazy val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
       raw_training_docs).toIndexedSeq
     val coarse_ranker = create_classifier_ranker(ranker_name, coarse_grid,
-      candidates, docs_cells)
+      candidates, docs_cells, 1, 0)
     val grids = mutable.Buffer[Grid[Co]]()
     grids += coarse_grid
     var lastgrid = coarse_grid
@@ -2668,8 +2674,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       val subgrid =
         create_grid_from_document_streams(Some(lastgrid), level, streams)
       // docs_cells contains cells from the coarsest grid; we need to redo
-      // it to contain cells from the subgrid we just created.
-      val finer_docs_cells =
+      // it to contain cells from the subgrid we just created. Make it lazy
+      // to avoid reloading the training documents when we're loading a
+      // pre-saved model.
+      lazy val finer_docs_cells =
         get_docs_cells_from_documents(subgrid, docs_cells.toIterator.map {
           case (doc, cell) => doc }
         ).toIndexedSeq
@@ -2688,7 +2696,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             }
           }
           val subranker = create_classifier_ranker(ranker_name,
-            subgrid, subcands, finer_docs_cells, nested = true)
+            subgrid, subcands, finer_docs_cells, level, index)
           (subcands, cand -> subranker)
         }.seq
       }
