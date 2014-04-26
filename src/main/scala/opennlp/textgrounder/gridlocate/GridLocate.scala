@@ -2384,7 +2384,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   // The document-cell pairs can either be passed in already (if they are
   // cached for speed) or read from external training data.
   def get_docs_cells(grid: Grid[Co],
-      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])]) = {
     if (xdocs_cells.size == 0) {
       val raw_training_docs = read_combined_raw_training_documents(
          "reading %s for generating classifier training data")
@@ -2400,7 +2400,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   // only documents whose correct cell is one of the specified candidates.
   def get_filtered_docs_cells(grid: Grid[Co],
       candidates: Iterable[GridCell[Co]],
-      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])] = Iterable()) = {
+      xdocs_cells: Iterable[(GridDoc[Co], GridCell[Co])]) = {
     val docs_cells = get_docs_cells(grid, xdocs_cells)
     val cand_set = candidates.toSet
     docs_cells.filter { case (doc, cell) =>
@@ -2413,17 +2413,28 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * cell as a possible class.
    *
    * @param ranker_name An identifying string, usually "classifier".
-   * @param candidates Candidates (aka classes, labels) that the classifier
-   *   chooses among.
-   * @param xdocs_cells Training documents and corresponding correct cells.
-   *   If empty, read external training documents according to
-   *   '--input' and/or positional params.
+   * @param grid Grid containing cells.
+   * @param candidates Candidate cells (aka classes, labels) that the
+   *   classifier chooses among. There may be fewer of them than total
+   *   cells in the grid. They should normally belong to the grid specified
+   *   above, but there may be exceptions (e.g. with K-d trees, where levels
+   *   &gt; 1 have grids that share the cells with the grid at level 1,
+   *   hence the cell's grid will identify the grid at level 1 not the
+   *   sub-level grid).
+   * @param xdocs_cells Training documents and corresponding correct cells,
+   *   for training the classifier. If empty, read external training documents
+   *   according to '--input' and/or positional params.
+   * @param level Level of this classifier. Normally 1, but may be &gt; 1
+   *   in hierarchical classification.
+   * @param cindex Index of this classifier. Normally 0, but may be &gt; 0
+   *   if level &gt; 1, where we have multiple classifiers, one per cell at
+   *   level 1.
    */
   def create_classifier_ranker(ranker_name: String,
       grid: Grid[Co], candidates: Iterable[GridCell[Co]],
       // IMPORTANT: Don't calculate xdocs_cells till necessary, to avoid
       // reloading the training documents when we are loading a pre-saved
-      // model.
+      // model. See comment in create_hierarchical_classifier_ranker.
       xdocs_cells: => Iterable[(GridDoc[Co], GridCell[Co])],
       level: Int, cindex: Int) = {
     // FIXME: This doesn't apply for K-d trees under hierarchical
@@ -2552,7 +2563,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       candidates: Iterable[GridCell[Co]],
       // IMPORTANT: Don't calculate docs_cells till necessary, to avoid
       // reloading the training documents when we are loading a pre-saved
-      // model.
+      // model. See comment in create_hierarchical_classifier_ranker.
       docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
       save_vw_model: String, load_vw_model: String, vw_args: String,
       cost_sensitive: Boolean) = {
@@ -2581,6 +2592,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     else {
       // val task = show_progress("processing features in", "document")
 
+      // Create the actual classifier, using the given user-supplied arguments
+      // (which may come from '--vw-args', '--nested-vw-args' or
+      // '--fallback-vw-args'.
       def create_classifier(vw_args: String) = {
         val feats_filename = if (cost_sensitive) {
           val training_data =
@@ -2656,6 +2670,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         streams)
     // Make this lazy so we don't calculate it if not necessary, to avoid
     // reloading the training documents when we're loading a pre-saved model.
+    // Because we pass this to a function, the function needs to declare
+    // the corresponding parameter to be "lazy" (aka pass by name, so it
+    // gets evaluated only on first use) and variables that make use of
+    // this parameter have to be lazy as well. This way, when loading a
+    // pre-saved model, where we never use this info, we never end up
+    // evaluating this lazy variable or any dependent lazy variable, and
+    // as a result we don't reload the whole set of training documents,
+    // which can take several minutes.
     lazy val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
       raw_training_docs).toIndexedSeq
     val coarse_ranker = create_classifier_ranker(ranker_name, coarse_grid,
