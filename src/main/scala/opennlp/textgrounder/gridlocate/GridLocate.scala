@@ -2584,6 +2584,22 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         (cell, featvec_factory.lookup_cell(cell))
       }
 
+    val cell_label_mapping_file = debugval("write-cell-label-mapping")
+    if (cell_label_mapping_file != "") {
+      val rows =
+        for ((cell, label) <- cells_labels) yield {
+          Seq("label" -> label,
+            "cell" -> cell.format_location,
+            "cell-centroid" -> cell.format_coord(cell.get_centroid),
+            "most-salient-document" ->
+              Encoder.string(cell.most_salient_point),
+            "most-salient-document-salience" ->
+              cell.most_salient_point_salience
+          )
+        }
+      TextDB.write_constructed_textdb(localfh, cell_label_mapping_file,
+        rows.iterator)
+    }
     // Create classifier trainer.
     val trainer = new VowpalWabbitBatchTrainer
 
