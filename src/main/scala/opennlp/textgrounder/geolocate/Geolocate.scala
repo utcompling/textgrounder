@@ -919,14 +919,6 @@ object GeolocateDocumentTag extends
         case "no" => "rbackoff"
         case _ => ""
       }),
-      ("iterations", short("iter")),
-      ("pa-cost-type", full("pacost")),
-      ("pa-variant", short("pavar")),
-      ("perceptron-aggressiveness", short("paggr")),
-      ("perceptron-error-threshold", short("perrthresh")),
-      ("perceptron-decay", short("pdecay")),
-      ("gaussian-penalty", full("l2")),
-      ("lasso-penalty", full("l1")),
       ("degrees-per-cell", short("deg")),
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
@@ -943,6 +935,19 @@ object GeolocateDocumentTag extends
       ("weight-cutoff-percent", short("cutoffPct")),
       ("missing-word-weight", short("missingWeight")),
       ("weight-abs", default),
+      ("iterations", short("iter")),
+      ("pa-cost-type", full("paCost")),
+      ("pa-variant", short("paVar")),
+      ("perceptron-aggressiveness", short("pAggr")),
+      ("perceptron-error-threshold", short("pErrThresh")),
+      ("perceptron-decay", short("pDecay")),
+      ("gaussian-penalty", full("l2")),
+      ("lasso-penalty", full("l1")),
+      ("vw-loss-function", full("vwLoss")),
+      ("vw-multiclass", full("vwMulti")),
+      ("vw-cost-function", full("vwCost")),
+      ("tadm-method", default),
+      ("tadm-uniform-marginal", default),
       ("coord-strategy", valonly_camel),
       ("k-best", short("kbest")),
       ("mean-shift-window", short("window")),
@@ -961,7 +966,11 @@ object GeolocateDocumentTag extends
       ("vw-args", full("VWargs")),
       ("nested-vw-args", full("nestVWargs")),
       ("fallback-vw-args", full("fbVWargs")),
-      ("debug", full("dbg"))
+      ("debug", full("dbg")),
+      ("save-vw-model", full("saveModel", filetail)),
+      ("load-vw-model", full("loadModel", filetail)),
+      ("save-vw-submodels", full("saveSubmodels", filetail)),
+      ("load-vw-submodels", full("saveSubmodels", filetail))
     )
 
     // Map listing how to handle params.
