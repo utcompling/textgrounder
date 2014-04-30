@@ -76,6 +76,7 @@ class SphereDocFactory(
   register_subfactory("wikipedia", new WikipediaDocSubfactory(this))
   register_subfactory("twitter-tweet", new TwitterTweetDocSubfactory(this))
   register_subfactory("twitter-user", new TwitterUserDocSubfactory(this))
+  register_subfactory("cophir", new CophirDocSubfactory(this))
   register_subfactory("generic", new GenericSphereDocSubfactory(this))
 
   def wikipedia_subfactory =

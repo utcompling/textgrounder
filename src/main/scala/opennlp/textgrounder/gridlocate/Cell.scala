@@ -23,6 +23,7 @@ package gridlocate
 import collection.mutable
 import scala.math.log
 
+import util.debug._
 import util.error.warning
 import util.experiment._
 import util.print.errprint
@@ -61,6 +62,8 @@ abstract class GridCell[Co](
   var salience = 0.0
   var most_salient_point: String = ""
   var most_salient_point_salience = 0.0
+
+  val term_user_model = new TermUserModel
 
   /**
    * True if the object is empty.  This means no documents have been
@@ -226,10 +229,37 @@ abstract class GridCell[Co](
       add_salient_point(doc.title, sal)
     }
 
-    /* Accumulate language model. `partial` is a scaling factor (between
-       0.0 and 1.0) used for interpolating multiple language models.
-       Not currently implemented completely. */
-    lang_model.add_language_model(doc.lang_model, partial = 1.0)
+    /* If this is a Cophir Doc, we need to ensure that our cells count
+       number of separate users with docs in the cell that use a given
+       term, rather than counting the total number of uses of a term or
+       even number of documents in the cell using the term. Note that
+       multiple documents may have the same user, and if we have
+       multiple documents in a given grid cell from a common user and
+       using the same term, we count that term only once. We do this
+       by keeping track of co-occurrences of term and user in the
+       cell (as a Set -- we're tracking existence, not counting), and
+       adding words to the cell's language model only when a word/user
+       pair hasn't yet been seen.
+
+       FIXME: This completely breaks the abstraction. We need a
+       document concept of "user" and "has_user", the latter being
+       available only for Cophir. Or maybe it should be count_once_per_user
+       or something.
+     */
+
+    if (doc.isInstanceOf[geolocate.CophirDoc] &&
+        !debug("no-cophir-bias-reduction")) {
+      val cophirdoc = doc.asInstanceOf[geolocate.CophirDoc]
+      for (word <- doc.lang_model.grid_lm.iter_keys) {
+        if (term_user_model.add_term_user(word, cophirdoc.user))
+          lang_model.add_gram(word, 1)
+      }
+    } else {
+      /* Accumulate language model. `partial` is a scaling factor (between
+         0.0 and 1.0) used for interpolating multiple language models.
+         Not currently implemented completely. */
+      lang_model.add_language_model(doc.lang_model, partial = 1.0)
+    }
     num_docs += 1
   }
 
@@ -252,6 +282,7 @@ abstract class GridCell[Co](
    */
   def finish() {
     assert(!finished)
+    term_user_model.clear()
     lang_model.finish_before_global()
     lang_model.finish_after_global()
   }

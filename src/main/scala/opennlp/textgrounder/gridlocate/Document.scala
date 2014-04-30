@@ -38,7 +38,7 @@ import util.serialize.TextSerializer
 import util.string.capfirst
 import util.textdb.Row
 
-import langmodel.{LangModel,LangModelFactory,LangModelCreationException}
+import langmodel._
 
 import util.debug._
 
@@ -345,6 +345,10 @@ class DocLangModel(
       case (thislm, otherlm) =>
         thislm.add_language_model(otherlm, partial)
     }
+  }
+
+  def add_gram(gram: Gram, count: GramCount) {
+    foreach(_.add_gram(gram, count))
   }
 
   def finished = forall(_.finished)
