@@ -91,11 +91,15 @@ case class RegularCellIndex private (latind: Int, longind: Int) {
 
 object RegularCellIndex {
   /**
-   * Construct a RegularCellIndex, checking that the given indices are
-   * valid for the specified grid.
+   * Construct a RegularCellIndex by coercing the given indices to be
+   * in bounds if they aren't already. Latitude indices are truncated to
+   * the maximum/minimum, and longitude indices are wrapped.
    */
   def apply(grid: MultiRegularGrid, latind: Int, longind: Int):
       RegularCellIndex = {
+    //require(valid(grid, latind, longind),
+    //  "Coordinate indices (%s,%s) invalid for grid %s"
+    //    format (latind, longind, grid))
   /* SCALABUG: Why do I need to specify RegularCellIndex as the return type
      here?  And why is this not required in the almost identical construction
      in SphereCoord?  I get this error (not here, but where the object is
@@ -105,11 +109,12 @@ object RegularCellIndex {
      [error]     RegularCellIndex(latind, longind)
      [error]     ^
      */
-    if (grid.initialized)
-      require(valid(grid, latind, longind),
-        "Coordinate indices (%s,%s) invalid for grid %s"
-          format (latind, longind, grid))
-    new RegularCellIndex(latind, longind)
+    if (!grid.initialized)
+      new RegularCellIndex(latind, longind)
+    else {
+      val (newlatind, newlongind) = coerce_indices(grid, latind, longind)
+      new RegularCellIndex(newlatind, newlongind)
+    }
   }
 
   def valid(grid: MultiRegularGrid, latind: Int, longind: Int) = (
@@ -132,16 +137,6 @@ object RegularCellIndex {
     while (newlongind < grid.minimum_longind)
       newlongind += (grid.maximum_longind - grid.minimum_longind + 1)
     (newlatind, newlongind)
-  }
-
-  /**
-   * Construct a RegularCellIndex by coercing the given indices to be
-   * in bounds if they aren't already. Latitude indices are truncated to
-   * the maximum/minimum, and longitude indices are wrapped.
-   */
-  def coerce(grid: MultiRegularGrid, latind: Int, longind: Int) = {
-    val (newlatind, newlongind) = coerce_indices(grid, latind, longind)
-    apply(grid, newlatind, newlongind)
   }
 }
 
@@ -179,7 +174,7 @@ class MultiRegularCell(
    */
   def iter_tiling_cells = {
     // Be careful around the edges -- we need to truncate the latitude and
-    // wrap the longitude.  The call to `coerce()` will automatically
+    // wrap the longitude.  The call to `RegularCellIndex()` will automatically
     // wrap the longitude, but we need to truncate the latitude ourselves,
     // or else we'll end up repeating cells.
     val max_offset = grid.width_of_multi_cell - 1
@@ -188,7 +183,7 @@ class MultiRegularCell(
     for (
       i <- index.latind to maxlatind;
       j <- index.longind to (index.longind + max_offset)
-    ) yield RegularCellIndex.coerce(grid, i, j)
+    ) yield RegularCellIndex(grid, i, j)
   }
 }
 
@@ -387,7 +382,7 @@ class MultiRegularGrid(
    */
   def multi_cell_index_to_nw_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
-      RegularCellIndex.coerce(this, index.latind + width_of_multi_cell,
+      RegularCellIndex(this, index.latind + width_of_multi_cell,
         index.longind))
   }
 
@@ -397,7 +392,7 @@ class MultiRegularGrid(
    */
   def multi_cell_index_to_se_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
-      RegularCellIndex.coerce(this, index.latind,
+      RegularCellIndex(this, index.latind,
         index.longind + width_of_multi_cell))
   }
 
@@ -440,7 +435,7 @@ class MultiRegularGrid(
         // Conceivably, the larger cell might wrap across 180 degrees,
         // meaning the NE longitude index will be less than the SW one.
         // We need to "unwrap" in that case so we are always iterating
-        // upwards; we will re-wrap when coerce() is called.
+        // upwards; we will re-wrap when RegularCellIndex() is called.
         var ne_index_longind = ne_index.longind
         while (ne_index_longind < sw_index.longind)
           ne_index_longind += (maximum_longind - minimum_longind + 1)
@@ -449,7 +444,7 @@ class MultiRegularGrid(
           for (
             i <- sw_index.latind to ne_index.latind;
             j <- sw_index.longind to ne_index_longind
-          ) yield RegularCellIndex.coerce(this, i, j)
+          ) yield RegularCellIndex(this, i, j)
         indices.flatMap { index =>
           find_cell_for_cell_index(index, create = false,
             record_created_cell = false)
@@ -471,15 +466,15 @@ class MultiRegularGrid(
     // except that the offset is negative.
     val index = coord_to_tiling_cell_index(coord)
     // In order to handle coordinates near the edges of the grid, we need to
-    // truncate the latitude ourselves, but coerce() handles the longitude
-    // wrapping.  See iter_tiling_cells().
+    // truncate the latitude ourselves, but RegularCellIndex() handles the
+    // longitude wrapping.  See iter_tiling_cells().
     val max_offset = width_of_multi_cell - 1
     val minlatind = minimum_latind max (index.latind - max_offset)
 
     for (
       i <- minlatind to index.latind;
       j <- (index.longind - max_offset) to index.longind
-    ) yield RegularCellIndex.coerce(this, i, j)
+    ) yield RegularCellIndex(this, i, j)
   }
 
   def find_best_cell_for_coord(coord: SphereCoord,
@@ -584,10 +579,10 @@ class MultiRegularGrid(
     errprint("Grid ranking, gridsize %sx%s", grsize, grsize)
     errprint("NW corner: %s",
       multi_cell_index_to_nw_corner_coord(
-        RegularCellIndex.coerce(this, max_latind, min_longind)))
+        RegularCellIndex(this, max_latind, min_longind)))
     errprint("SE corner: %s",
       multi_cell_index_to_se_corner_coord(
-        RegularCellIndex.coerce(this, min_latind, max_longind)))
+        RegularCellIndex(this, min_latind, max_longind)))
     for (doit <- Seq(0, 1)) {
       if (doit == 0)
         errprint("Grid for ranking:")
@@ -595,7 +590,7 @@ class MultiRegularGrid(
         errprint("Grid for goodness/distance:")
       for (lat <- max_latind to min_latind;
            long <- fromto(min_longind, max_longind)) {
-        grid.get(RegularCellIndex.coerce(this, lat, long)) match {
+        grid.get(RegularCellIndex(this, lat, long)) match {
           case None => errout(" %-8s", "empty")
           case Some((cell, value, rank)) => {
             val showit = if (doit == 0) rank else value
