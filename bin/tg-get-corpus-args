@@ -62,13 +62,13 @@ fi
 process_wikipedia() {
   case "$1" in
     # Only have stopwords files for these languages currently
-    enwiki-* ) lang=en ;;
-    ptwiki-* ) lang=pt ;;
-    dewiki-* ) lang=de ;;
+    wikipedia/enwiki-* ) lang=en ;;
+    wikipedia/ptwiki-* ) lang=pt ;;
+    wikipedia/dewiki-* ) lang=de ;;
     * ) lang=en ;;
   esac
   set_wp_version "$1"
-  echo --language $lang --input $TG_CORPUS_URL/wikipedia/$1
+  echo --language $lang --input $TG_CORPUS_URL/$1
 }
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
@@ -77,8 +77,8 @@ output_args() {
   case "$1" in
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      process_wikipedia $WP_VERSION ;;
-    *wiki-* )
+      process_wikipedia wikipedia/$WP_VERSION ;;
+    wikipedia/*wiki-* )
       process_wikipedia "$1" ;;
     geotext | twitter-geotext | twitter )
       echo --input $TG_CORPUS_URL/twitter-geotext/docthresh-5 ;;
