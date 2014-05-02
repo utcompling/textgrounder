@@ -26,9 +26,10 @@ import java.io._
 import util._
 import argparser._
 import collection._
+import error.warning
 import experiment._
 import io.FileHandler
-import error.warning
+import spherical._
 import textdb._
 
 import gridlocate.GridDoc
@@ -109,6 +110,24 @@ corpus.""")
       help = """If specified, convert the data in the 'text' field to
 unigram counts and add a new 'unigram-counts' field containing
 those counts.""")
+  val filter_bounding_box =
+    ap.option[String]("filter-bounding-box",
+      metavar = "COORDS",
+      help = """Filter based on the 'coord' field, only allowing those
+records whose value is within a specified bounding box. The format of the
+argument is four values separated by commas, i.e.
+
+  MINLAT,MINLONG,MAXLAT,MAXLONG
+
+For example, 25.0,-126.0,49.0,-60.0 for North America.""")
+
+  val bounding_box =
+    if (filter_bounding_box != null)
+      filter_bounding_box.split(",").map(_.toDouble)
+    else
+      Array()
+  if (bounding_box.size > 0)
+    require(bounding_box.size == 4)
 
   val frobbers = mutable.Buffer[RecordFrobber]()
 
@@ -332,31 +351,46 @@ class FrobTextDB(
       }
   }
 
-  def process_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) = {
-    val (new_fieldnames, new_fieldvals) = frob_row(schema, fieldvals).unzip
-    if (params.split_by_field != null) {
-      val (writer, outstream) =
-        get_split_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
-      if (writer == null) {
-        warning("Skipped row because can't find split field: %s",
-          new_fieldvals mkString "\t")
-      } else {
-        /* Remove the split field from the output, since it's constant
-           for all rows and is moved to the fixed fields */
-        val field_map = Schema.make_map(new_fieldnames, new_fieldvals)
-        field_map -= params.split_by_field
-        val (nosplit_fieldnames, nosplit_fieldvals) = Schema.unmake_map(field_map)
-        assert(nosplit_fieldnames == writer.schema.fieldnames,
-          "resulting fieldnames %s should be same as schema fieldnames %s"
-            format (nosplit_fieldnames, writer.schema.fieldnames))
-        outstream.println(writer.schema.make_line(nosplit_fieldvals))
+  def filter_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) = {
+    if (params.bounding_box.size == 0)
+      true
+    else {
+      val Array(minlat, minlong, maxlat, maxlong) = params.bounding_box
+      schema.get_value_if[SphereCoord](fieldvals, "coord") match {
+        case None => false
+        case Some(coord) =>
+          coord.lat >= minlat && coord.lat <= maxlat &&
+          coord.long >= minlong && coord.long <= maxlong
       }
-    } else {
-      val (writer, outstream) =
-        get_unsplit_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
-      outstream.println(writer.schema.make_line(new_fieldvals))
     }
-    Some(())
+  }
+
+  def process_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) {
+    val (new_fieldnames, new_fieldvals) = frob_row(schema, fieldvals).unzip
+    if (filter_row(schema, fieldvals)) {
+      if (params.split_by_field != null) {
+        val (writer, outstream) =
+          get_split_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
+        if (writer == null) {
+          warning("Skipped row because can't find split field: %s",
+            new_fieldvals mkString "\t")
+        } else {
+          /* Remove the split field from the output, since it's constant
+             for all rows and is moved to the fixed fields */
+          val field_map = Schema.make_map(new_fieldnames, new_fieldvals)
+          field_map -= params.split_by_field
+          val (nosplit_fieldnames, nosplit_fieldvals) = Schema.unmake_map(field_map)
+          assert(nosplit_fieldnames == writer.schema.fieldnames,
+            "resulting fieldnames %s should be same as schema fieldnames %s"
+              format (nosplit_fieldnames, writer.schema.fieldnames))
+          outstream.println(writer.schema.make_line(nosplit_fieldvals))
+        }
+      } else {
+        val (writer, outstream) =
+          get_unsplit_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
+        outstream.println(writer.schema.make_line(new_fieldvals))
+      }
+    }
   }
 
   def process_dir(filehand: FileHandler, dir: String) {
