@@ -20,6 +20,7 @@ package opennlp.textgrounder
 package preprocess
 
 import collection.mutable
+import scala.util.Random
 
 import java.io._
 
@@ -110,6 +111,9 @@ corpus.""")
       help = """If specified, convert the data in the 'text' field to
 unigram counts and add a new 'unigram-counts' field containing
 those counts.""")
+  val permute =
+    ap.flag("permute",
+      help = """Randomly permute rows of each input file.""")
   val filter_bounding_box =
     ap.option[String]("filter-bounding-box",
       metavar = "COORDS",
@@ -404,8 +408,13 @@ class FrobTextDB(
       val (_, prefix, _, _) = TextDB.split_data_file(
         filehand, file, params.input_suffix).get
       current_document_prefix = prefix
-      for (fieldvals <-
-          TextDB.read_textdb_file(filehand, file, schema))
+      val rows = TextDB.read_textdb_file(filehand, file, schema)
+      val permuted_rows =
+        if (params.permute)
+          (new Random()).shuffle(rows.toSeq).toIterator
+        else
+          rows
+      for (fieldvals <- permuted_rows)
         process_row(schema, fieldvals)
       /* Close the output stream(s), clearing the appropriate variable(s)
          so that the necessary stream(s) will be re-created again for the
