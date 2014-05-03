@@ -114,6 +114,11 @@ those counts.""")
   val permute =
     ap.flag("permute",
       help = """Randomly permute rows of each input file.""")
+  val max_rows =
+    ap.option[Int]("max-rows",
+      metavar = "COUNT",
+      must = be_>=(0),
+      help = """Write out at most COUNT rows per file.""")
   val filter_bounding_box =
     ap.option[String]("filter-bounding-box",
       metavar = "COORDS",
@@ -408,13 +413,14 @@ class FrobTextDB(
       val (_, prefix, _, _) = TextDB.split_data_file(
         filehand, file, params.input_suffix).get
       current_document_prefix = prefix
-      val rows = TextDB.read_textdb_file(filehand, file, schema)
-      val permuted_rows =
-        if (params.permute)
-          (new Random()).shuffle(rows.toSeq).toIterator
-        else
-          rows
-      for (fieldvals <- permuted_rows)
+      val rows1 = TextDB.read_textdb_file(filehand, file, schema)
+      val rows2 =
+        if (params.permute) (new Random()).shuffle(rows1.toSeq).toIterator
+        else rows1
+      val rows =
+        if (params.max_rows > 0) rows2.take(params.max_rows)
+        else rows2
+      for (fieldvals <- rows)
         process_row(schema, fieldvals)
       /* Close the output stream(s), clearing the appropriate variable(s)
          so that the necessary stream(s) will be re-created again for the
