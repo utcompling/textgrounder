@@ -198,7 +198,9 @@ abstract class PointwiseScoreGridRanker[Co](
           cell.format_indices, cell.format_location,
           cell.num_docs)
       }
-      (cell, score_cell(doc, cell))
+      val score = score_cell(doc, cell)
+      assert(!score.isNaN, s"Saw NaN for score of cell $cell, doc $doc")
+      (cell, score)
     }
   }
 
@@ -210,7 +212,11 @@ abstract class PointwiseScoreGridRanker[Co](
   def return_ranked_cells_parallel(doc: GridDoc[Co],
       correct: Option[GridCell[Co]], include_correct: Boolean) = {
     val cells = get_candidates(correct, include_correct)
-    cells.par.map(c => (c, score_cell(doc, c)))
+    cells.par.map(c => {
+      val score = score_cell(doc, c)
+      assert(!score.isNaN, s"Saw NaN for score of cell $c, doc $doc")
+      (c, score)
+    })
   }
 
   def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
