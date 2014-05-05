@@ -737,10 +737,14 @@ convert_ew_german = {'E':1, 'W':-1, 'O':1}
 
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
 # We need to handle the following as S latitude, E longitude:
-#   -- Infobox Australia
+#   -- Infobox Australia*
+#   -- Infobox South Africa*
 #   -- Info/Localidade de Angola
 #   -- Info/Município de Angola
 #   -- Info/Localidade de Moçambique
+
+# We need to handle the following as S latitude, W longitude:
+#   -- Infobox Chile*
 
 # We need to handle the following as N latitude, W longitude:
 #   -- Infobox Pittsburgh neighborhood
@@ -755,11 +759,16 @@ convert_ew_german = {'E':1, 'W':-1, 'O':1}
 # hemisphere directly, or use other methods of indicating hemisphere (e.g.
 # "German"-style "72/50/35/W").
 def get_hemisphere(temptype, is_lat):
-  for x in ('infobox australia', 'info/localidade de angola',
-      u'info/município de angola', u'info/localidade de moçambique'):
+  for x in ('infobox australia', 'infobox south africa',
+      'info/localidade de angola', u'info/município de angola',
+      u'info/localidade de moçambique'):
     if temptype.lower().startswith(x):
       if is_lat: return -1
       else: return 1
+  for x in ('infobox chile'):
+    if temptype.lower().startswith(x):
+      if is_lat: return -1
+      else: return -1
   for x in ('infobox pittsburgh neighborhood', 'info/assentamento/madeira',
       'info/assentamento/marrocos', 'info/localidade dos eua', 'info/pousadapc',
       'info/antigas freguesias de portugal'):
@@ -866,10 +875,10 @@ def get_built_in_lat_long_1(temptype, args, rawargs, latd, latm, lats, is_lat):
   s = getarg(lats, temptype, args, rawargs, warnifnot=False)
   return convert_dms(mult, d, m, s)
 
-built_in_latd_north_arguments = ('stopnin')
-built_in_latd_south_arguments = ('stopnis')
-built_in_longd_north_arguments = ('stopnie')
-built_in_longd_south_arguments = ('stopniw')
+built_in_latd_north_arguments = ('stopnin', 'degn')
+built_in_latd_south_arguments = ('stopnis', 'degs')
+built_in_longd_north_arguments = ('stopnie', 'dege')
+built_in_longd_south_arguments = ('stopniw', 'degw')
 
 def get_built_in_lat_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS (converted into
@@ -885,9 +894,9 @@ tuple of decimal (latitude, longitude) values.'''
     wikiwarning("Didn't see any appropriate stopniN/stopniS param")
     mult = 1 # Arbitrarily set to N, probably accurate in Poland
   lat = get_built_in_lat_long_1(temptype, args, rawargs,
-      ('stopnin', 'stopnis'),
-      ('minutn', 'minuts'),
-      ('sekundn', 'sekunds'),
+      ('stopnin', 'stopnis', 'degn', 'degs'),
+      ('minutn', 'minuts', 'minn', 'mins'),
+      ('sekundn', 'sekunds', 'secn', 'secs'),
       mult)
   if getarg(built_in_longd_north_arguments, temptype, args, rawargs) is not None:
     mult = 1
@@ -897,9 +906,9 @@ tuple of decimal (latitude, longitude) values.'''
     wikiwarning("Didn't see any appropriate stopniE/stopniW param")
     mult = 1 # Arbitrarily set to E, probably accurate in Poland
   long = get_built_in_lat_long_1(temptype, args, rawargs,
-      ('stopnie', 'stopniw'),
-      ('minute', 'minutw'),
-      ('sekunde', 'sekundw'),
+      ('stopnie', 'stopniw', 'dege', 'degw'),
+      ('minute', 'minutw', 'mine', 'minw'),
+      ('sekunde', 'sekundw', 'sece', 'secw'),
       mult)
   return (lat, long)
 
