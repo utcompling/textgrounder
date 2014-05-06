@@ -30,7 +30,7 @@ class CophirDoc(
   coord: SphereCoord,
   salience: Option[Double],
   val id: Long,
-  val user: Int
+  val user: Long
 ) extends RealSphereDoc(schema, lang_model, coord, salience) {
   def title = id.toString
 }
@@ -43,6 +43,6 @@ class CophirDocSubfactory(
     new CophirDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
       row.get_or_else[Long]("photo-id", 0L),
-      row.get_or_else[Int]("owner-id", 0))
+      row.get_or_else[Long]("owner-id", 0L))
   }
 }

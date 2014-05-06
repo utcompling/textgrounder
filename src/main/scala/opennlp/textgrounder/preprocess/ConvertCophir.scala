@@ -96,8 +96,8 @@ same user with the same tags.""")
  */
 case class CophirImage(
   rawtags: String,
-  owner_id: Int,
-  photo_id: Int,
+  owner_id: Long,
+  photo_id: Long,
   props: Iterable[(String, String)]
 )
 
@@ -188,9 +188,9 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
     }
   }
 
-  def safe_toInt(str: String) = {
+  def safe_toLong(str: String) = {
     try {
-      Some(str.toInt)
+      Some(str.toLong)
     } catch {
       case e: NumberFormatException =>
         problem("Unable to parse number", "'%s': %s" format (str, e))
@@ -222,12 +222,10 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
         problem("Can't find photo ID in XML", "file %s" format filename)
       else if (owner_idstr == "")
         problem("Can't find owner ID in XML", "file %s" format filename)
-      else if (!owner_idstr.endsWith("@N00"))
-        problem("Misformatted owner ID in XML, should end in @N00",
-          "'%s' in file %s" format (owner_idstr, filename))
       else {
-        val maybe_photo_id = safe_toInt(photo_idstr)
-        val maybe_owner_id = safe_toInt(owner_idstr.stripSuffix("@N00"))
+        val maybe_photo_id = safe_toLong(photo_idstr)
+        val maybe_owner_id =
+          safe_toLong(owner_idstr.replaceAll("@N[0-9]*", ""))
         val location = dom \\ "location"
         val lat = (location \ "@latitude").text
         val long = (location \ "@longitude").text
@@ -242,8 +240,8 @@ class ParseXml(opts: ConvertCophirParams) extends ConvertCophirAction {
           val photo_id = maybe_photo_id.get
           val owner_id = maybe_owner_id.get
           val idprops =
-            List(("photo-id", Encoder.int(photo_id)),
-                 ("owner-id", Encoder.int(owner_id)))
+            List(("photo-id", Encoder.long(photo_id)),
+                 ("owner-id", Encoder.long(owner_id)))
           val photoprops = extract_props(dom \\ "photo",
             List("dateuploaded"), "photo-")
           val dateprops = extract_props(dom \\ "dates",

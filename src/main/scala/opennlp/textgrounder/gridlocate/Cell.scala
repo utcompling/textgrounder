@@ -30,7 +30,7 @@ import util.print.errprint
 import util.numeric.pretty_double
 import util.textdb.{Encoder, Row}
 
-import langmodel.LangModelFactory
+import langmodel.{LangModelFactory, Gram}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
@@ -63,7 +63,8 @@ abstract class GridCell[Co](
   var most_salient_point: String = ""
   var most_salient_point_salience = 0.0
 
-  val term_user_model = new TermUserModel
+  // Used for Cophir bias reduction
+  val term_user_pairs = mutable.Set[(Gram, Long)]()
 
   /**
    * True if the object is empty.  This means no documents have been
@@ -251,8 +252,27 @@ abstract class GridCell[Co](
         !debug("no-cophir-bias-reduction")) {
       val cophirdoc = doc.asInstanceOf[geolocate.CophirDoc]
       for (word <- doc.lang_model.grid_lm.iter_keys) {
-        if (term_user_model.add_term_user(word, cophirdoc.user))
+        // The old way of doing it, when user ID's were Ints (insufficient):
+        //
+        // This is a bit tricky. We need to combine two ints into a long,
+        // but to do this properly we need to treat the int that goes into
+        // the lower 32 bits as unsigned. Java (hence Scala) doesn't provide
+        // unsigned integers, but an unsigned cast to long can be faked by
+        // anding the int with 0xFFFFFFFFL, which effectively converts the
+        // int to a long and then strips off the upper 32 bits, which get
+        // set if the int is negative. These issues don't arise with the int
+        // that goes into the higher portion of the long, nor do they arise
+        // converting back to ints. To convert back to ints, use ">> 32"
+        // to get the higher 32 bits and "& 0xFFFFFFFFL" to get the lower
+        // 32 bits.
+        //
+        // val entry = (word.toLong << 32L) + (cophirdoc.user & 0xFFFFFFFFL)
+
+        val entry = (word, cophirdoc.user)
+        if (!term_user_pairs.contains(entry)) {
+          term_user_pairs += entry
           lang_model.add_gram(word, 1)
+        }
       }
     } else {
       /* Accumulate language model. `partial` is a scaling factor (between
@@ -282,7 +302,7 @@ abstract class GridCell[Co](
    */
   def finish() {
     assert(!finished)
-    term_user_model.clear()
+    term_user_pairs.clear()
     lang_model.finish_before_global()
     lang_model.finish_after_global()
   }
