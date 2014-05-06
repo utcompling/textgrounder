@@ -701,18 +701,18 @@ deg/min/sec/DIR indicators like 45/32/30/E.'''
       if offind:
         offind = offind.upper()
         if offind in convert_ns:
-          off = convert_ns[offind]
+          mult = convert_ns[offind]
         else:
-          off = convert_ew_german[offind]
+          mult = convert_ew_german[offind]
       else:
-        off = 1
-      return convert_dms(off, deg, min, sec)
+        mult = 1
+      return convert_dms(mult, deg, min, sec)
     wikiwarning("Unrecognized DEG/MIN/SEC/HEMIS-style indicator: %s" % arg)
     return None
   else:
     return safe_float(arg)
 
-def convert_dms(nsew, d, m, s, decimal = False):
+def convert_dms(mult, d, m, s, decimal = False):
   '''Convert a multiplier (1 or N or E, -1 for S or W) and degree/min/sec
 values into a decimal +/- latitude or longitude.'''
   lat = get_german_style_coord(d)
@@ -728,7 +728,7 @@ values into a decimal +/- latitude or longitude.'''
   if sec > 60:
     wikiwarning("Out-of-bounds seconds %s" % sec)
     return None
-  return nsew*(lat + min/60. + sec/3600.)
+  return mult*(lat + min/60. + sec/3600.)
 
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
@@ -869,7 +869,7 @@ longd/lon_deg/etc., extract out and return a tuple of decimal
       is_lat=False)
   return (lat, long)
 
-def get_built_in_lat_long_1(temptype, args, rawargs, latd, latm, lats, is_lat):
+def get_built_in_lat_long_1(temptype, args, rawargs, latd, latm, lats, mult):
   d = getarg(latd, temptype, args, rawargs)
   m = getarg(latm, temptype, args, rawargs, warnifnot=False) 
   s = getarg(lats, temptype, args, rawargs, warnifnot=False)
