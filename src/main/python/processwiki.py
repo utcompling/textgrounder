@@ -507,7 +507,8 @@ modes).'''
     uniprint(text)
 
 def wikiwarning(foo):
-  warning("Article %s: %s" % (debug_cur_title, foo))
+  if Opts.show_warnings:
+    warning("Article %s: %s" % (debug_cur_title, foo))
 
 # Output a string of maximum length, adding ... if too long
 def bound_string_length(str, maxlen=60):
@@ -2412,6 +2413,9 @@ disambiguation pages.""",
   op.add_option("--max-time-per-stage", "--mts", type='int', default=0,
                 help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
+  op.add_option("--show-warnings",
+                help="Show warnings indicating parse errors.",
+                action="store_true")
   op.add_option("--debug", metavar="FLAGS",
                 help="Output debug info of the given types (separated by spaces or commas)")
 
