@@ -427,8 +427,11 @@ class NaiveBayesGridRanker[Co](
     }
 
     val features_logprob = features.map(_.get_logprob(doc, cell)).sum
+    assert(!features_logprob.isNaN, s"features_logprob: Saw NaN for score of cell $cell, doc $doc")
     // FIXME: Is the normalization necessary?
     val prior_logprob = log(cell.prior_weighting / grid.total_prior_weighting)
+    assert(!prior_logprob.isNaN, s"prior_logprob: Saw NaN for score of cell $cell, doc $doc\n" +
+      s"cell prior weighting ${cell.prior_weighting}, total prior weighting ${grid.total_prior_weighting}")
     val logprob = (word_weight * features_logprob + prior_weight * prior_logprob)
     logprob
   }
