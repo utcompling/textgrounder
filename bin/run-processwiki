@@ -168,7 +168,7 @@ if [ "$step" = article-data ]; then
 disambig_arg=
 
 action="Generating article data"
-args="$disambig_arg --split-training-dev-test foobar --generate-article-data"
+args="$disambig_arg --generate-article-data"
 outfile="$OUT_ORIG_DOCUMENT_DATA_FILE"
 # Don't split because there is a prolog line.
 cansplit=no

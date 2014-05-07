@@ -313,47 +313,13 @@ def read_disambig_id_file(filename):
 #    not a generator, i.e. has no "yield" statement in it.
 
 #######################################################################
-#                         Splitting the output                        #
+#                                Output                               #
 #######################################################################
-
-# Files to output to, when splitting output
-split_output_files = None
-
-# List of split suffixes
-split_suffixes = None
 
 # Current file to output to
 cur_output_file = sys.stdout
 debug_to_stderr = False
 
-# Name of current split (training, dev, test)
-cur_split_name = ''
-
-# Generator of files to output to
-split_file_gen = None
-
-# Initialize the split output files, using PREFIX as the prefix
-def init_output_files(prefix, split_fractions, the_split_suffixes):
-  assert len(split_fractions) == len(the_split_suffixes)
-  global split_output_files
-  split_output_files = [None]*len(the_split_suffixes)
-  global split_suffixes
-  split_suffixes = the_split_suffixes
-  for i in range(len(the_split_suffixes)):
-    split_output_files[i] = open("%s.%s" % (prefix, the_split_suffixes[i]), "w")
-  global split_file_gen
-  split_file_gen = next_split_set(split_fractions)
-
-# Find the next split file to output to and set CUR_OUTPUT_FILE appropriately;
-# don't do anything if the user hasn't called for splitting.
-def set_next_split_file():
-  global cur_output_file
-  global cur_split_name
-  if split_file_gen:
-    nextid = split_file_gen.next()
-    cur_output_file = split_output_files[nextid]
-    cur_split_name = split_suffixes[nextid]
-  
 #######################################################################
 #                  Chunk text into balanced sections                  #
 #######################################################################
@@ -1824,7 +1790,7 @@ class ArticleHandlerForUsefulText(ArticleHandler):
   #    text.  Join together and then split into words.  Pass the generator
   #    of words to self.process_text_for_words().
 
-  def process_text_for_text(self, text):  
+  def process_text_for_text(self, text):
     # Now process the text in various ways in preparation for extracting
     # the words from the text
     text = format_text_second_pass(text)
@@ -2112,7 +2078,7 @@ class GenerateArticleData(ArticleHandler):
     nskey = article_namespace_aliases.get(namespace, namespace)
     list = listof or disambig or nskey in (14, 108) # ('Category', 'Book')
     outprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
-             (self.id, self.title, cur_split_name, redirtitle, namespace,
+             (self.id, self.title, 'unknown', redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
 
   def process_redirect(self, redirtitle):
@@ -2257,7 +2223,6 @@ combined chunks.'''
     elif name == 'text':
       # If we saw the end of the article text, join all the text chunks
       # together and call process_article_text() on it.
-      set_next_split_file()
       if debug['lots']:
         max_text_len = 150
         endslice = min(max_text_len, len(eltext))
@@ -2330,8 +2295,7 @@ maps to.""",
                 action="store_true")
   op.add_option("--generate-article-data",
                 help="""Generate file listing all articles and info about them.
-If using this option, the --disambig-id-file and --split-training-dev-test
-options should also be used.
+If using this option, consider using --disambig-id-file as well.
 
 The format is
 
@@ -2370,26 +2334,6 @@ LIST = 'yes' if article is a list of some sort, else no.  This includes
        'List of' articles, disambiguation pages, and articles in the 'Category'
        and 'Book' namespaces.""",
                 action="store_true")
-  op.add_option("--split-training-dev-test",
-                help="""Split output into training, dev and test files.
-Use the specified value as the file prefix, suffixed with '.train', '.dev'
-and '.test' respectively.""",
-                metavar="FILE")
-  op.add_option("--training-fraction", type='float', default=80,
-                help="""Fraction of total articles to use for training.
-The absolute amount doesn't matter, only the value relative to the test
-and dev fractions, as the values are normalized.  Default %default.""",
-                metavar="FRACTION")
-  op.add_option("--dev-fraction", type='float', default=10,
-                help="""Fraction of total articles to use for dev set.
-The absolute amount doesn't matter, only the value relative to the training
-and test fractions, as the values are normalized.  Default %default.""",
-                metavar="FRACTION")
-  op.add_option("--test-fraction", type='float', default=10,
-                help="""Fraction of total articles to use for test set.
-The absolute amount doesn't matter, only the value relative to the training
-and dev fractions, as the values are normalized.  Default %default.""",
-                metavar="FRACTION")
   op.add_option("--coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
@@ -2434,12 +2378,6 @@ Used for testing purposes.  Default %default.""")
   if debug['err'] or debug['some'] or debug['lots'] or debug['sax']:
     cur_output_file = sys.stderr
     debug_to_stderr = True
-
-  if opts.split_training_dev_test:
-    init_output_files(opts.split_training_dev_test,
-                      [opts.training_fraction, opts.dev_fraction,
-                       opts.test_fraction],
-                      ['training', 'dev', 'test'])
 
   if opts.coords_file:
     read_coordinates_file(opts.coords_file)    

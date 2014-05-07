@@ -583,11 +583,19 @@ class StatusMessage(object):
 # For example, if all values are equal, it will cycle successively through
 # the different split files; if the values are [1, 1.5, 1], the output
 # will be [1, 2, 3, 2, 1, 2, 3, ...]; etc.
+#
+# If MAX_SPLIT_SIZE is specified, it should be a list of the same length
+# as SPLIT_FRACTIONS, giving the maximum number of values in a given split.
+# A value of 0 means no limit, and the default is no maximum split size for
+# any of the splits.
 
-def next_split_set(split_fractions):
+def next_split_set(split_fractions, max_split_size=None):
+  if max_split_size is None:
+    max_split_size = [0]*len(split_fractions)
 
   num_splits = len(split_fractions)
   cumulative_articles = [0]*num_splits
+  total_articles = [0]*num_splits
 
   # Normalize so that the smallest value is 1.
 
@@ -608,9 +616,11 @@ def next_split_set(split_fractions):
     this_output = False
     for j in xrange(num_splits):
       #print "j=%s, this_output=%s" % (j, this_output)
-      if cumulative_articles[j] < split_fractions[j]:
+      if (cumulative_articles[j] < split_fractions[j] and
+          (max_split_size[j] == 0 or total_articles[j] < max_split_size[j])):
         yield j
         cumulative_articles[j] += 1
+        total_articles[j] += 1
         this_output = True
     if not this_output:
       for j in xrange(num_splits):

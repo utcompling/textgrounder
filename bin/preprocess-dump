@@ -105,7 +105,6 @@ done
 
 echo "Removing remaining split files ..."
 rm -rf $dumppref-split*
-rm -rf foobar.*
 echo "Removing remaining split files ... done."
 
 # mv -i *.bz2 *.txt $TG_CORPUS_DIR/wikipedia/$WP_VERSION

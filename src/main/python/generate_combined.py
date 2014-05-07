@@ -70,7 +70,8 @@ def read_coordinates_file(filename):
 # over the dump file), produce a new article metadata file incorporating
 # the coordinates and incoming-link count, limited to those articles with
 # coordinates.
-def output_combined_article_data(filename, coords_file, links_file):
+def output_combined_article_data(filename, coords_file, links_file,
+    split_fractions, max_split_size, split_names):
   coords_hash = read_coordinates_file(coords_file)
   # Mapping from non-redir article titles to Article objects
   articles_hash = {}
@@ -92,6 +93,10 @@ def output_combined_article_data(filename, coords_file, links_file):
   read_article_data_file(filename, process, maxtime=Opts.max_time_per_stage)
 
   read_incoming_link_info(links_file, articles_hash, redir_articles_hash)
+
+  split_gen = next_split_set(split_fractions, max_split_size)
+  for art in articles_seen:
+    art.split = split_names[split_gen.next()]
 
   errprint("Writing combined data to stdout ...")
   write_article_data_file(sys.stdout,
@@ -117,6 +122,33 @@ Wikipedia articles. Output by processwiki.py --find-links.""",
 --coords-counts or --only-coords, listing all the articles with associated
 coordinates.  May be filtered only for articles and coordinates.""",
                   metavar="FILE")
+    op.add_option("--training-fraction", type='float', default=80,
+                  help="""Fraction of total articles to use for training.
+  The absolute amount doesn't matter, only the value relative to the test
+  and dev fractions, as the values are normalized.  Default %default.""",
+                  metavar="FRACTION")
+    op.add_option("--dev-fraction", type='float', default=10,
+                  help="""Fraction of total articles to use for dev set.
+  The absolute amount doesn't matter, only the value relative to the training
+  and test fractions, as the values are normalized.  Default %default.""",
+                  metavar="FRACTION")
+    op.add_option("--test-fraction", type='float', default=10,
+                  help="""Fraction of total articles to use for test set.
+  The absolute amount doesn't matter, only the value relative to the training
+  and dev fractions, as the values are normalized.  Default %default.""",
+                  metavar="FRACTION")
+    op.add_option("--max-training-size", type='int', default=0,
+                  help="""Maximum number of articles to use for training.
+  A value of 0 means no maximum. Default %default.""",
+                  metavar="SIZE")
+    op.add_option("--max-dev-size", type='int', default=10000,
+                  help="""Maximum number of articles to use for dev set.
+  A value of 0 means no maximum. Default %default.""",
+                  metavar="SIZE")
+    op.add_option("--max-test-size", type='int', default=10000,
+                  help="""Maximum number of articles to use for test set.
+  A value of 0 means no maximum. Default %default.""",
+                  metavar="SIZE")
 
   def handle_arguments(self, opts, op, args):
     global Opts
@@ -127,6 +159,11 @@ coordinates.  May be filtered only for articles and coordinates.""",
 
   def implement_main(self, opts, params, args):
     output_combined_article_data(opts.article_data_file, opts.coords_file,
-                                 opts.links_file)
-    
+                                 opts.links_file,
+                                 [opts.training_fraction, opts.dev_fraction,
+                                   opts.test_fraction],
+                                 [opts.max_training_size, opts.max_dev_size,
+                                   opts.max_test_size],
+                                 ['training', 'dev', 'test'])
+
 GenerateCombinedProgram()
