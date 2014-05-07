@@ -51,6 +51,16 @@ produces some additional files useful for some applications but not the
 primary TextGrounder application, and takes a lot of extra time; for this
 reason, these extra steps aren't normally run.
 
+The STEPS value 'combined-article-data' consists of four individual actions,
+and it's possible to specify them separately:
+
+  article-data: Generate basic permuted article data file
+  coords: Generate article coordinates
+  coord-links: Generate article incoming links, only for articles with
+               coordinates or redirects to such articles
+  combine-article-data: Combine the previous three outputs into a permuted
+                        combined article data file
+
 See README.preprocess and the comments in the source file for more details.
 
 FOO
