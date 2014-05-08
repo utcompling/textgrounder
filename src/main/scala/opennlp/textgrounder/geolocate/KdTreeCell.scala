@@ -86,11 +86,11 @@ object KdTreeGrid {
  * used to create the actual K-d grid. The cells returned by
  * `iter_nonempty_cells` are determined by only dividing nodes with at least
  * the specified bucket size. For hierarchical classification at level &gt; 1,
- * `existingGrid` should be one of the grids at a higher-up level and
- * `existingGridNewLeaves` should be the list of leaves to be returned by
- * `iter_nonempty_cells` at this level. Note that the list of cells returned
- * by `iter_nonempty_cells`, which comes from the `leaf_node` field, is also
- * used by `find_best_cell_for_coord`.
+ * `cutoffBucketSize` should be as for level 1, `existingGrid` should be one
+ * of the grids at a higher-up level and `existingGridNewLeaves` should be the
+ * list of leaves to be returned by `iter_nonempty_cells` at this level.
+ * Note that the list of cells returned by `iter_nonempty_cells`, which comes
+ * from the `leaf_node` field, is also used by `find_best_cell_for_coord`.
  */
 class KdTreeGrid(
   docfact: SphereDocFactory,
@@ -108,9 +108,20 @@ class KdTreeGrid(
   if (useBackoff && cutoffBucketSize > 0)
     warning("--kd-use-backoff probably incompatible with hierarchical classification")
   assert((existingGrid == None) == (existingGridNewLeaves.size == 0))
-  if (cutoffBucketSize > 0) {
-    assert(cutoffBucketSize > bucketSize)
-    assert(existingGrid == None)
+  if (existingGrid != None)
+    assert(cutoffBucketSize > 0)
+  if (cutoffBucketSize > 0)
+    assert(cutoffBucketSize >= bucketSize)
+  if (debug("kd-tree-grid")) {
+    errprint("Created K-d tree grid with id %s", id)
+    errprint("  bucket size %s, cutoffBucketSize %s", bucketSize, cutoffBucketSize)
+    errprint("  has existing grid: %s", if (existingGrid == None) "no" else "yes")
+    val sizes = existingGridNewLeaves.map(_.size)
+    if (existingGridNewLeaves.size == 0)
+      errprint("  existingGridNewLeaves: len 0")
+    else
+      errprint("  existingGridNewLeaves: len %s, min #docs %s, max #docs %s",
+        existingGridNewLeaves.size, sizes.min, sizes.max)
   }
 
   /**
@@ -147,12 +158,13 @@ class KdTreeGrid(
   }
 
   // Fetch the nodes down to the cutoff given by `cutoffBucketSize`
-  def get_nodes_to_cutoff(nodes: Iterable[KdTree]): Iterable[KdTree] = {
+  def get_nodes_to_cutoff(nodes: Iterable[KdTree], cutoff: Int
+      ): Iterable[KdTree] = {
     // Do breadth-wise descent of tree, dividing nodes at or above the cutoff
     // and repeating till we divide no nodes
     def get_next_cutoff_level(nodes: Iterable[KdTree]) = {
       nodes.flatMap { node =>
-        if (node.size >= cutoffBucketSize)
+        if (node.size >= cutoff)
           get_node_children(node)
         else
           Seq(node)
@@ -162,22 +174,23 @@ class KdTreeGrid(
     // This is tail-recursive
     if (next_level.size == nodes.size)
       nodes
-    else get_nodes_to_cutoff(next_level)
+    else get_nodes_to_cutoff(next_level, cutoff)
   }
 
-  // Fetch the nodes down to a specified depth, doing breadth-wise descent
-  def get_nodes_to_depth(nodes: Iterable[KdTree], depth: Int
-      ): Iterable[KdTree] = {
-    // This is tail-recursive
-    if (depth == 0) nodes
-    else get_nodes_to_depth(nodes.flatMap(get_node_children), depth - 1)
-  }
+  // // Fetch the nodes down to a specified depth, doing breadth-wise descent
+  // def get_nodes_to_depth(nodes: Iterable[KdTree], depth: Int
+  //     ): Iterable[KdTree] = {
+  //   // This is tail-recursive
+  //   if (depth == 0) nodes
+  //   else get_nodes_to_depth(nodes.flatMap(get_node_children), depth - 1)
+  // }
 
-  // Fetch the nodes down to the "subdivide depth" that divides one level
-  // from the next
-  def get_nodes_to_subdivide_depth(nodes: Iterable[KdTree]) =
-    get_nodes_to_depth(nodes,
-      driver.asInstanceOf[GeolocateDriver].params.subdivide_factor)
+  def get_nodes_to_subdivide_depth(nodes: Iterable[KdTree]) = {
+    val new_cutoff_size = cutoffBucketSize /
+      driver.asInstanceOf[GeolocateDriver].params.subdivide_factor
+    val new_nodes = get_nodes_to_cutoff(nodes, new_cutoff_size)
+    (new_nodes, new_cutoff_size)
+  }
 
   // In MultiRegularGrid, we need to create and populate a new grid at a
   // finer scale, and then map a cell in the coarser grid to the overlapping
@@ -193,14 +206,17 @@ class KdTreeGrid(
   // hierarchical classification?
   def create_subdivided_grid(create_docfact: => GridDocFactory[SphereCoord],
       id: String) = {
+    // Fetch the nodes down to the new cutoff size
+    val (new_nodes, new_cutoff_size) = get_nodes_to_subdivide_depth(leaf_nodes)
     new KdTreeGrid(docfact, id, bucketSize, splitMethod, useBackoff,
-      interpolateWeight, Some(this), get_nodes_to_subdivide_depth(leaf_nodes),
-      0)
+      interpolateWeight, Some(this), new_nodes, new_cutoff_size)
   }
 
   def get_subdivided_cells(cell: SphereCell) = {
     val kdcell = cell.asInstanceOf[KdTreeCell]
-    get_nodes_to_subdivide_depth(Seq(kdcell.kdnode)).map(nodes_to_cell(_))
+    val (new_nodes, _) =
+      get_nodes_to_subdivide_depth(Seq(kdcell.kdnode))
+    new_nodes.map(nodes_to_cell(_))
   }
 
   def describe_kd_tree() {
@@ -300,7 +316,7 @@ class KdTreeGrid(
       else if (existingGridNewLeaves.size > 0)
         existingGridNewLeaves.toSet
       else if (cutoffBucketSize == 0) kdtree.getLeaves.toSet
-      else get_nodes_to_cutoff(Seq(kdtree)).toSet
+      else get_nodes_to_cutoff(Seq(kdtree), cutoffBucketSize).toSet
 
     total_num_cells = leaf_nodes.size
 

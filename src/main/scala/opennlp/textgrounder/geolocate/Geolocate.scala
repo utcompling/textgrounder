@@ -254,9 +254,10 @@ is used.""")
       default = 2,
       must = be_>=(2),
       help = """Factor to use when subdividing grid cells in hierarchical
-classification. Must be an integer >= 2. This represents the factor in each
-dimension, e.g. if the factor is 3 then each cell will be divided into 9
-smaller cells. Default %default.""")
+classification. Must be an integer >= 2. For regular grids, this represents
+the factor in each dimension, e.g. if the factor is 3 then each cell will be
+divided into 9 smaller cells. For K-d tree grids, the bucket size is divided
+by this amount at each subsequent level. Default %default.""")
 
   // Handle different ways of specifying grid size
 
@@ -326,27 +327,12 @@ tiling cell to compute each multi cell.  If the value is more than
       help = """Specifies we should use a KD tree rather than uniform
 grid cell.""")
 
-  var kd_coarse_bucket_size =
-    ap.option[Int]("kd-coarse-bucket-size", "kdcbs", "coarse-bucket-size",
-      default = 0,
-      metavar = "INT",
-      must = be_>=(0),
-      help = """Bucket size used to create the coarsest level when doing
-hierarchical classification using K-d trees. Must be greater than the value
-specified using '--kd-bucket-size'. If 0 (the default), set to twice the
-value of '--kd-bucket-size'.""")
-
   var kd_bucket_size =
     ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default = 200,
       metavar = "INT",
       must = be_>(0),
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
-
-  if (kd_coarse_bucket_size == 0)
-    kd_coarse_bucket_size = kd_bucket_size * 2
-  else if (kd_coarse_bucket_size <= kd_bucket_size)
-    ap.error(s"Coarse bucket size $kd_coarse_bucket_size must be greater than fine bucket size $kd_bucket_size")
 
   var kd_split_method =
     ap.option[String]("kd-split-method", "kdsm", metavar = "SPLIT_METHOD",
@@ -505,11 +491,14 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
         params.width_of_multi_cell, create_sphere_docfact, id)
     }
     def create_kd_tree_grid = {
-      val cutoff_bucket_size =
-        if (params.ranker == "hierarchical-classifier")
-          params.kd_coarse_bucket_size
-        else 0
-      new KdTreeGrid(create_sphere_docfact, id, params.kd_bucket_size,
+      var finest_bucket_size = params.kd_bucket_size
+      var cutoff_bucket_size = 0
+      if (params.ranker == "hierarchical-classifier") {
+        cutoff_bucket_size = params.kd_bucket_size
+        for (i <- 1 until params.num_levels)
+          finest_bucket_size /= params.subdivide_factor
+      }
+      new KdTreeGrid(create_sphere_docfact, id, finest_bucket_size,
         KdTreeGrid.kd_split_method_to_enum(params.kd_split_method),
         params.kd_use_backoff, params.kd_interpolate_weight,
         cutoffBucketSize = cutoff_bucket_size)
@@ -926,7 +915,6 @@ object GeolocateDocumentTag extends
       ("kd-tree", echo("Kd")),
       ("kd-split-method", valonly_camel),
       ("kd-backoff", default),
-      ("kd-coarse-bucket-size", short("coarsesz")),
       ("kd-bucket-size", short("bucketsz")),
       ("kd-interpolate-weight", short("interpWeight")),
       ("combined-kd-grid", echo("combinedGrid")),
