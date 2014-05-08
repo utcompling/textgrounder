@@ -2679,7 +2679,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_hierarchical_classifier_ranker(ranker_name: String,
       streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) = {
     val coarse_grid = create_grid_from_document_streams(None, 1, streams)
-    val candidates = coarse_grid.iter_nonempty_cells
+    // Calling toSeq ensures we get the "Creating classifier %s/%s"
+    // messages in numeric order in the case of K-d trees, where the
+    // underlying type is a Set.
+    val candidates = coarse_grid.iter_nonempty_cells.toSeq
     val raw_training_docs =
       get_combined_raw_training_documents(
         "reading %s for hierarchical classifier training data",
