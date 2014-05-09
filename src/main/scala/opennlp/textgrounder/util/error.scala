@@ -141,8 +141,16 @@ protected class ErrorPackage {
   def unsupported(message: String = "") =
     throw new UnsupportedOperationException(message)
 
-  def assert_relation[T](x: T, y: T, expr: Boolean, op: String,
-      valuedesc: => String = "", suffix: => String = "") {
+  // Not strictly necessary but avoids creating two extra function objects
+  // in the common case where neither extra arg is given
+  def assert_relation[@specialized(Int,Long,Double) T](x: T, y: T,
+      expr: Boolean, op: String) {
+    assert(expr, s"Expected $x $op $y")
+  }
+
+  def assert_relation[@specialized(Int,Long,Double) T](x: T, y: T,
+      expr: Boolean, op: String, valuedesc: => String,
+      suffix: => String = "") {
     assert(expr, {
       val valstr = if (valuedesc == "") "" else s"$valuedesc "
       val suffstr = if (suffix == "") "" else s": $suffix"
@@ -150,30 +158,149 @@ protected class ErrorPackage {
     })
   }
 
-  def assert_==[T](x: T, y: T, valuedesc: => String = "",
-      suffix: => String = "") {
+  def assert_==[@specialized(Int,Long,Double) T](x: T, y: T,
+      valuedesc: => String = "", suffix: => String = "") {
     assert_relation(x, y, x == y, "==", valuedesc, suffix)
   }
 
-  def assert_>=[T: Ordering](x: T, y: T, valuedesc: => String = "",
+  // Manually specialize for Int, Long, Double because @specialized()
+  // won't do what we want, since Ordering isn't specialized. Also need
+  // to expand optional arguments into polymorphism since Scala won't
+  // let the two mix.
+
+  def assert_>=(x: Int, y: Int) {
+    assert_relation(x, y, x >= y, ">=")
+  }
+  def assert_>=(x: Int, y: Int, valuedesc: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc)
+  }
+  def assert_>=(x: Int, y: Int, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc, suffix)
+  }
+  def assert_>=(x: Long, y: Long) {
+    assert_relation(x, y, x >= y, ">=")
+  }
+  def assert_>=(x: Long, y: Long, valuedesc: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc)
+  }
+  def assert_>=(x: Long, y: Long, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc, suffix)
+  }
+  def assert_>=(x: Double, y: Double) {
+    assert_relation(x, y, x >= y, ">=")
+  }
+  def assert_>=(x: Double, y: Double, valuedesc: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc)
+  }
+  def assert_>=(x: Double, y: Double, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x >= y, ">=", valuedesc, suffix)
+  }
+
+  def assert_>(x: Int, y: Int) {
+    assert_relation(x, y, x > y, ">")
+  }
+  def assert_>(x: Int, y: Int, valuedesc: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc)
+  }
+  def assert_>(x: Int, y: Int, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc, suffix)
+  }
+  def assert_>(x: Long, y: Long) {
+    assert_relation(x, y, x > y, ">")
+  }
+  def assert_>(x: Long, y: Long, valuedesc: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc)
+  }
+  def assert_>(x: Long, y: Long, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc, suffix)
+  }
+  def assert_>(x: Double, y: Double) {
+    assert_relation(x, y, x > y, ">")
+  }
+  def assert_>(x: Double, y: Double, valuedesc: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc)
+  }
+  def assert_>(x: Double, y: Double, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x > y, ">", valuedesc, suffix)
+  }
+
+  def assert_<=(x: Int, y: Int) {
+    assert_relation(x, y, x <= y, "<=")
+  }
+  def assert_<=(x: Int, y: Int, valuedesc: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc)
+  }
+  def assert_<=(x: Int, y: Int, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc, suffix)
+  }
+  def assert_<=(x: Long, y: Long) {
+    assert_relation(x, y, x <= y, "<=")
+  }
+  def assert_<=(x: Long, y: Long, valuedesc: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc)
+  }
+  def assert_<=(x: Long, y: Long, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc, suffix)
+  }
+  def assert_<=(x: Double, y: Double) {
+    assert_relation(x, y, x <= y, "<=")
+  }
+  def assert_<=(x: Double, y: Double, valuedesc: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc)
+  }
+  def assert_<=(x: Double, y: Double, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x <= y, "<=", valuedesc, suffix)
+  }
+
+  def assert_<(x: Int, y: Int) {
+    assert_relation(x, y, x < y, "<")
+  }
+  def assert_<(x: Int, y: Int, valuedesc: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc)
+  }
+  def assert_<(x: Int, y: Int, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc, suffix)
+  }
+  def assert_<(x: Long, y: Long) {
+    assert_relation(x, y, x < y, "<")
+  }
+  def assert_<(x: Long, y: Long, valuedesc: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc)
+  }
+  def assert_<(x: Long, y: Long, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc, suffix)
+  }
+  def assert_<(x: Double, y: Double) {
+    assert_relation(x, y, x < y, "<")
+  }
+  def assert_<(x: Double, y: Double, valuedesc: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc)
+  }
+  def assert_<(x: Double, y: Double, valuedesc: => String, suffix: => String) {
+    assert_relation(x, y, x < y, "<", valuedesc, suffix)
+  }
+
+  // Generic versions. Formerly called assert_>=, assert_>, etc. but now
+  // need to avoid name clash with the specialized versions above.
+  def assert_gteq[T: Ordering](x: T, y: T, valuedesc: => String = "",
       suffix: => String = "") {
     val expr = implicitly[Ordering[T]].gteq(x, y)
     assert_relation(x, y, expr, ">=", valuedesc, suffix)
   }
 
-  def assert_>[T: Ordering](x: T, y: T, valuedesc: => String = "",
+  def assert_gt[T: Ordering](x: T, y: T, valuedesc: => String = "",
       suffix: => String = "") {
     val expr = implicitly[Ordering[T]].gt(x, y)
     assert_relation(x, y, expr, ">", valuedesc, suffix)
   }
 
-  def assert_<=[T: Ordering](x: T, y: T, valuedesc: => String = "",
+  def assert_lteq[T: Ordering](x: T, y: T, valuedesc: => String = "",
       suffix: => String = "") {
     val expr = implicitly[Ordering[T]].lteq(x, y)
     assert_relation(x, y, expr, "<=", valuedesc, suffix)
   }
 
-  def assert_<[T: Ordering](x: T, y: T, valuedesc: => String = "",
+  def assert_lt[T: Ordering](x: T, y: T, valuedesc: => String = "",
       suffix: => String = "") {
     val expr = implicitly[Ordering[T]].lt(x, y)
     assert_relation(x, y, expr, "<", valuedesc, suffix)
