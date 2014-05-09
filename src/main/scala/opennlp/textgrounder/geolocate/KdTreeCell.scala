@@ -161,11 +161,13 @@ class KdTreeGrid(
   // Fetch the nodes down to the cutoff given by `cutoffBucketSize`
   def get_nodes_to_cutoff(nodes: Iterable[KdTree], cutoff: Int
       ): Iterable[KdTree] = {
-    // Do breadth-wise descent of tree, dividing nodes at or above the cutoff
+    // Do breadth-wise descent of tree, dividing nodes above the cutoff
     // and repeating till we divide no nodes
     def get_next_cutoff_level(nodes: Iterable[KdTree]) = {
       nodes.flatMap { node =>
-        if (node.size >= cutoff)
+        // We do > not >= because the underlying K-d code uses > to
+        // decide when to split a node
+        if (node.size > cutoff)
           get_node_children(node)
         else
           Seq(node)
