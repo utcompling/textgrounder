@@ -21,6 +21,7 @@ package learning.perceptron
 import learning._
 
 import util.debug._
+import util.error._
 
 /**
  * A perceptron for statistical classification.
@@ -197,8 +198,8 @@ trait PerceptronTrainer {
   val averaged: Boolean
   val error_threshold: Double
   val max_iterations: Int
-  assert(error_threshold >= 0)
-  assert(max_iterations > 0)
+  assert_>=(error_threshold, 0)
+  assert_>(max_iterations, 0)
 
   def end_iteration()
 }
@@ -354,9 +355,9 @@ trait PassiveAggressivePerceptronTrainer {
   val decay: Double
   var aggressiveness = aggressiveness_param
 
-  assert(variant >= 0 && variant <= 2)
-  assert(aggressiveness_param > 0)
-  assert(decay >= 0.0 && decay <= 1.0)
+  assert(variant >= 0 && variant <= 2, s"Variant $variant not within [0,2]")
+  assert_>(aggressiveness_param, 0)
+  assert(decay >= 0.0 && decay <= 1.0, s"Decay $decay not within [0,1]")
 
   def end_iteration() {
     aggressiveness *= 1.0 - decay

@@ -50,7 +50,7 @@ import com.nicta.scoobi.Scoobi._
 import util.Twokenize
 import util.argparser._
 import util.collection._
-import util.error.{internal_error,stack_trace_as_string}
+import util.error._
 import util.textdb._
 import util.io.FileHandler
 import util.hadoop.HadoopFileHandler
@@ -866,7 +866,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def time_compare(tw: Tweet, op: String, time: Timestamp): Boolean = {
-      assert(tw.min_timestamp == tw.max_timestamp)
+      assert_==(tw.min_timestamp, tw.max_timestamp)
       long_compare(tw.min_timestamp, op, time)
     }
 
@@ -877,7 +877,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     case class TweetIndexCompare(op: String, index: Long) extends Expr {
       def matches(tweet: Tweet, text: Iterable[String]) = {
-        assert(tweet.index > 0) // No merged tweets!
+        assert_>(tweet.index, 0L) // No merged tweets!
         long_compare(tweet.index, op, index)
       }
     }
@@ -1704,7 +1704,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * ("earliest" by timestamp and "provided" meaning not missing).
      */
     private def merge_records(tw1: Record, tw2: Record): Record = {
-      assert(tw1.output_key == tw2.output_key)
+      assert_==(tw1.output_key, tw2.output_key)
       val t1 = tw1.tweet
       val t2 = tw2.tweet
       val id = if (t1.id != t2.id) -1L else t1.id
@@ -2096,9 +2096,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def merge_stats(x1: PropertyValueStats, x2: PropertyValueStats) = {
-      assert(x1.ty == x2.ty)
-      assert(x1.key2 == x2.key2)
-      assert(x1.value == x2.value)
+      assert_==(x1.ty, x2.ty)
+      assert_==(x1.key2, x2.key2)
+      assert_==(x1.value, x2.value)
       PropertyValueStats(x1.ty, x1.key2, x1.value,
         x1.num_tweets + x2.num_tweets,
         math.min(x1.min_timestamp, x2.min_timestamp),
@@ -2193,8 +2193,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       vs.value, vs.num_tweets, 1, vs.num_tweets)
 
     def merge_stats(x1: PropertyStats, x2: PropertyStats) = {
-      assert(x1.ty == x2.ty)
-      assert(x1.key2 == x2.key2)
+      assert_==(x1.ty, x2.ty)
+      assert_==(x1.key2, x2.key2)
       val (most_common_value, most_common_count) =
         if (x1.most_common_count > x2.most_common_count)
           (x1.most_common_value, x1.most_common_count)

@@ -19,6 +19,8 @@
 package opennlp.textgrounder
 package util
 
+import error._
+
 import java.io.PrintStream
 
 ////////////////////////////////////////////////////////////////////////////
@@ -40,7 +42,7 @@ package object table {
       maxcolsize: Int = 40) = {
     val ncols = lines.head.size
     // Make sure all lines have same number of columns
-    lines foreach { line => assert(line.size == ncols) }
+    lines foreach { line => assert_==(line.size, ncols) }
     val maxsize = lines.transpose.map { line =>
       line.map { _.length}.max min maxcolsize
     }

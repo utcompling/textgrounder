@@ -26,12 +26,12 @@ import collection.mutable
 import scala.util.control.Breaks._
 
 import util.collection.{DoubleTableByRange,bufferToIndexedSeq}
-import util.spherical._
+import util.error._
 import util.experiment.ExperimentDriverStats
 import util.math.{mean, median}
 import util.io.{FileHandler}
 import util.print.errprint
-import util.error.{warning, internal_error}
+import util.spherical._
 import util.string.split_text_into_words
 
 import gridlocate._
@@ -272,7 +272,7 @@ class RankedSphereDocEvalResult(
   override def print_result(doctag: String) {
     wrapped.print_result(doctag)
 
-    assert(doctag(0) == '#')
+    assert_==(doctag(0), '#')
     if (debug("gridrank") ||
         (debuglist("gridrank") contains doctag.drop(1))) {
       val grsize = debugint("gridranksize", GeolocateConstants.gridranksize)

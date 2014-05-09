@@ -140,6 +140,44 @@ protected class ErrorPackage {
    */
   def unsupported(message: String = "") =
     throw new UnsupportedOperationException(message)
+
+  def assert_relation[T](x: T, y: T, expr: Boolean, op: String,
+      valuedesc: => String = "", suffix: => String = "") {
+    assert(expr, {
+      val valstr = if (valuedesc == "") "" else s"$valuedesc "
+      val suffstr = if (suffix == "") "" else s": $suffix"
+      s"Expected $valstr$x $op $y$suffstr"
+    })
+  }
+
+  def assert_==[T](x: T, y: T, valuedesc: => String = "",
+      suffix: => String = "") {
+    assert_relation(x, y, x == y, "==", valuedesc, suffix)
+  }
+
+  def assert_>=[T: Ordering](x: T, y: T, valuedesc: => String = "",
+      suffix: => String = "") {
+    val expr = implicitly[Ordering[T]].gteq(x, y)
+    assert_relation(x, y, expr, ">=", valuedesc, suffix)
+  }
+
+  def assert_>[T: Ordering](x: T, y: T, valuedesc: => String = "",
+      suffix: => String = "") {
+    val expr = implicitly[Ordering[T]].gt(x, y)
+    assert_relation(x, y, expr, ">", valuedesc, suffix)
+  }
+
+  def assert_<=[T: Ordering](x: T, y: T, valuedesc: => String = "",
+      suffix: => String = "") {
+    val expr = implicitly[Ordering[T]].lteq(x, y)
+    assert_relation(x, y, expr, "<=", valuedesc, suffix)
+  }
+
+  def assert_<[T: Ordering](x: T, y: T, valuedesc: => String = "",
+      suffix: => String = "") {
+    val expr = implicitly[Ordering[T]].lt(x, y)
+    assert_relation(x, y, expr, "<", valuedesc, suffix)
+  }
 }
 
 package object error extends ErrorPackage { }

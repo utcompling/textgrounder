@@ -25,6 +25,7 @@ import scala.collection.mutable
 import com.codahale.trove.{mutable => trovescala}
 
 import collection._
+import error._
 import print.errprint
 
 // We comment this out and don't use it to avoid the possibility that
@@ -128,7 +129,7 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
           index
         }
       }
-    assert(super.to_raw(retval) == value)
+    assert_==(super.to_raw(retval), value)
     retval
   }
 
@@ -147,7 +148,7 @@ trait TestStringIntMemoizer extends ToIntMemoizer[String] {
       // if (debug("memoize"))
         errprint("Unmemoizing existing ID %s to string %s", value, string)
 
-      assert(super.to_index(string) == value)
+      assert_==(super.to_index(string), value)
       string
     }
   }

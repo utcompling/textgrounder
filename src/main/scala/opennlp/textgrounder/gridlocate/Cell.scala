@@ -24,7 +24,7 @@ import collection.mutable
 import scala.math.log
 
 import util.debug._
-import util.error.warning
+import util.error.{warning, assert_==}
 import util.experiment._
 import util.print.errprint
 import util.numeric.pretty_double
@@ -223,7 +223,7 @@ abstract class GridCell[Co](
        grids in ways that are not easily predictable -- a significantly
        greater effect than simply changing the salience.  So (for the
        moment at least) we don't do this any more. */
-    assert (doc.split == "training")
+    assert_==(doc.split, "training", "split")
 
     /* Add salience of document to cell. */
     doc.salience.foreach { sal =>

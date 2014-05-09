@@ -22,14 +22,13 @@ package geolocate
 import collection.mutable
 
 import util.collection._
-import util.spherical._
-import util.textdb.Schema
-import util.error.warning
+import util.debug._
+import util.error._
 import util.print.errprint
 import util.serialize.TextSerializer._
+import util.spherical._
 import util.string.capfirst
-import util.textdb.Row
-import util.debug._
+import util.textdb.{Schema, Row}
 
 import gridlocate._
 
@@ -81,7 +80,8 @@ class WikipediaDocSubfactory(
       coord: SphereCoord) = {
     val namespace = row.gets_or_else("namepace", "")
     // docs with namespace != Main should be filtered during preproc
-    assert(namespace == "" || namespace == "Main")
+    assert(namespace == "" || namespace == "Main",
+      s"Namespace $namespace not empty or Main")
     new WikipediaDoc(row.schema, lang_model, coord,
       id = row.get_or_else[Long]("id", 0L),
       title = row.get_or_else[String]("title", ""),
@@ -126,8 +126,8 @@ class WikipediaDocSubfactory(
     //   println("capfirst(0)=0x%x" format capfirst(name)(0).toInt)
     // }
     assert(name != null)
-    assert(name.length > 0)
-    assert(name == capfirst(name))
+    assert_>(name.length, 0)
+    assert_==(name, capfirst(name))
     val loname = name.toLowerCase
     val (short, div) = compute_short_form(loname)
     if (!(lower_toponym_to_document(loname) contains doc))

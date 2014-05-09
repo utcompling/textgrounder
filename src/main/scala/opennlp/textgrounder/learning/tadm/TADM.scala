@@ -154,7 +154,8 @@ class TADMTrainer[DI <: DataInstance](
       if (weights.size < F) {
         // Make sure all missing features were actually removed.
         for (ind <- weights.size until F)
-          assert(training_data.removed_features contains ind)
+          assert(training_data.removed_features contains ind,
+            s"${training_data.removed_features} does not contain $ind")
         weights ++ Seq.fill(F - weights.size)(0.0)
       } else
         weights

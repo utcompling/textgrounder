@@ -28,12 +28,13 @@ import collection.mutable
 
 import util.argparser._
 import util.collection._
-import util.spherical._
+import util.error._
 import util.experiment._
 import util.io.{FileHandler, LocalFileHandler}
+import util.numeric.format_double
 import util.os._
 import util.print.{errprint, outprint}
-import util.numeric.format_double
+import util.spherical._
 import util.textdb.Encoder
 import util.time.format_minutes_seconds
 
@@ -262,7 +263,7 @@ by this amount at each subsequent level. Default %default.""")
   // Handle different ways of specifying grid size
 
   def check_set(value: Double) = {
-    assert (value >= 0)
+    assert_>=(value, 0)
     if (value > 0) 1 else 0
   }
   val num_set =

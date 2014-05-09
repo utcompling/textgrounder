@@ -27,12 +27,11 @@ import scala.util.control.Breaks._
 import java.io._
 
 import util.collection.DynamicArray
-import util.textdb
-import util.io.{FileHandler, FileFormatException}
-import util.error.warning
-import util.print.errprint
-
 import util.debug._
+import util.error._
+import util.io.{FileHandler, FileFormatException}
+import util.print.errprint
+import util.textdb
 
 /**
  * Object describing how "words" are memoized. Memoization means mapping
@@ -380,8 +379,8 @@ class DefaultUnigramLangModelBuilder(
       keys: Array[String], values: Array[Int], num_words: Int) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
-    assert(keys.length >= num_words)
-    assert(values.length >= num_words)
+    assert_>=(keys.length, num_words)
+    assert_>=(values.length, num_words)
     imp_add_keys_values(lm, keys, values, num_words)
   }
 
@@ -402,7 +401,7 @@ class DefaultUnigramLangModelBuilder(
     if (word_weights.size > 0)
       for ((word, count) <- lm.iter_grams_for_modify) {
         val weight = word_weights.getOrElse(word, missing_word_weight)
-        assert(weight >= 0)
+        assert_>=(weight, 0)
         if (weight == 0)
           lm.remove_gram(word)
         else

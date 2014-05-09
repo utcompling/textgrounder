@@ -23,7 +23,7 @@ import collection.mutable
 
 import util.argparser._
 import util.debug._
-import util.error.warning
+import util.error._
 import util.experiment._
 import util.io.{FileHandler,localfh}
 import util.metering._
@@ -1444,7 +1444,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // Scale the word weights to have an average of 1.
       val values = chopped_word_weights.values
       val avg = values.sum / values.size
-      assert(avg > 0, "Must have at least one non-ignored non-zero weight")
+      assert_>(avg, 0, "",
+        "Must have at least one non-ignored non-zero weight")
       val scaled_word_weights = chopped_word_weights map {
         case (word, weight) => (word, weight / avg)
       }
@@ -2103,7 +2104,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
         val mapper =
           candidate_featvec_factory.featvec_factory.mapper
-        assert(mapper.number_of_labels == 0)
+        assert_==(mapper.number_of_labels, 0, "#labels")
         for (i <- 0 until params.rerank_top_n) {
           mapper.label_to_index(s"#${i + 1}")
         }
@@ -2232,7 +2233,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
         val mapper =
           candidate_featvec_factory.featvec_factory.mapper
-        assert(mapper.number_of_labels == 0)
+        assert_==(mapper.number_of_labels, 0, "#labels")
         for (i <- 0 until params.rerank_top_n) {
           mapper.label_to_index(s"#${i + 1}")
         }
@@ -2440,8 +2441,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     // FIXME: This doesn't apply for K-d trees under hierarchical
     // classification, where we have a copy of the grid that shares the
     // same cells.
-    // candidates.foreach { cand => assert(cand.grid == grid) }
-    // xdocs_cells.foreach { case (doc, cell) => assert(cell.grid == grid) }
+    // candidates.foreach { cand => assert_==(cand.grid, grid, "grid") }
+    // xdocs_cells.foreach { case (doc, cell) =>
+    //   assert_==(cell.grid, grid, "grid") }
     // Make this lazy so we don't calculate it if not necessary; see comment
     // above.
     lazy val docs_cells =
@@ -2630,8 +2632,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           // Train classifier.
           val feats_filename =
             trainer.write_cost_sensitive_feature_file(training_data)
-          assert(cells_labels.size ==
-            featvec_factory.featvec_factory.mapper.number_of_labels)
+          assert_==(cells_labels.size,
+            featvec_factory.featvec_factory.mapper.number_of_labels,
+            "#labels")
           feats_filename
         } else {
           val training_data =

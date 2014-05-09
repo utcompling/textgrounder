@@ -83,7 +83,8 @@ trait FeatVecFactory[Co] {
 
   /** Convert label index to cell. Must be valid. */
   def index_to_cell(label: LabelIndex) = {
-    assert(label >= 0 && label < featvec_factory.mapper.number_of_labels)
+    assert(label >= 0 && label < featvec_factory.mapper.number_of_labels,
+      s"Label $label not within [0, ${featvec_factory.mapper.number_of_labels})")
     index_to_cell_map(label)
   }
 
@@ -94,8 +95,7 @@ trait FeatVecFactory[Co] {
   def check_not_disallowed(feats: Iterable[(FeatureValue, String, Double)]) = {
     feats.foreach { case (fvtype, feat, value) =>
       assert(!disallowed_value(value),
-        "feature %s (%s) has disallowed value %s"
-          format (feat, fvtype, value))
+        s"feature $feat ($fvtype) has disallowed value $value")
     }
     feats
   }
@@ -158,7 +158,8 @@ trait FeatVecFactory[Co] {
   val fractional_increment = 0.1
 
   protected def bin_fractionally(feat: String, value: Double) = {
-    assert(value >= 0 && value <= 1)
+    assert(value >= 0 && value <= 1,
+      s"Value $value not within [0,1]")
     val incr = (value / fractional_increment).toInt
     (FeatBinary, "%s!%s" format (feat, incr), 1.0)
   }

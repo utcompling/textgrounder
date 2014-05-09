@@ -21,6 +21,7 @@ package learning
 
 import java.io.PrintStream
 
+import util.error._
 import util.io.localfh
 import util.metering._
 import util.print.errprint
@@ -213,7 +214,7 @@ object TrainingData {
   def apply[DI <: DataInstance](data: Iterable[(DI, LabelIndex)],
       remove_non_choice_specific_columns: Boolean = true
   ): TrainingData[DI] = {
-    assert(data.size > 0)
+    assert_>(data.size, 0)
     data.head._1.feature_vector match {
       case agg: AggregateFeatureVector if remove_non_choice_specific_columns =>
         val removed_features =
@@ -254,7 +255,7 @@ object TrainingData {
       val indiv = index + 1
       val labelstr = inst.mapper.label_to_string(label)
       val choice = label == correct_label
-      assert(fv.length == inst.mapper.feature_vector_length)
+      assert_==(fv.length, inst.mapper.feature_vector_length)
       val nums =
         for (i <- 0 until fv.length if !(removed_features contains i)) yield
           fv(i, label)

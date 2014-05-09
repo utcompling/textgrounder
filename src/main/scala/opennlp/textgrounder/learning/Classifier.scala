@@ -26,7 +26,7 @@ package learning
  */
 
 import util.debug._
-import util.error.warning
+import util.error._
 import util.io.localfh
 import util.math.argmax
 import util.metering._
@@ -473,7 +473,7 @@ trait LinearClassifierTrainer[DI <: DataInstance]
         val agg = AggregateFeatureVector.check_aggregate(inst)
         stats.accumulate_doc_level(agg, do_abssum = true)
       }
-      assert(weights.depth == 1)
+      assert_==(weights.depth, 1)
       val rawvec = weights(0)
 
       val mapper =

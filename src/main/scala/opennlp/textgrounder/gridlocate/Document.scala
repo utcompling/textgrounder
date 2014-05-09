@@ -340,7 +340,7 @@ class DocLangModel(
       Iterator(grid_lm)
 
   def add_language_model(other: DocLangModel, partial: Double = 1.0) {
-    assert(this.size == other.size)
+    assert_==(this.size, other.size, "model size")
     (this zip other).map {
       case (thislm, otherlm) =>
         thislm.add_language_model(otherlm, partial)
@@ -554,11 +554,11 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         }
         // if (doc == None) // used to mean skipped
         // num_non_error_skipped_records_by_split(split) += 1
-        assert(doc.split == split)
+        assert_==(doc.split, split, "split")
         val double_tokens = doc.grid_lm.num_tokens
         val tokens = double_tokens.toInt
         // Partial counts should not occur in training documents.
-        assert(double_tokens == tokens)
+        assert_==(double_tokens, tokens, "#tokens")
         num_documents_by_split(split) += 1
         word_tokens_of_documents_by_split(split) += tokens
         if (!doc.has_coord) {
@@ -624,7 +624,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
       val double_tokens = doc.lang_model.grid_lm.num_tokens
       val tokens = double_tokens.toInt
       // Partial counts should not occur in training documents.
-      // assert(double_tokens == tokens)
+      // assert_==(double_tokens, tokens, "#tokens")
       if (status == "skipped") {
         assert(!doc.has_coord)
         num_would_be_training_documents_skipped_because_lacking_coordinates_by_split(split) += 1

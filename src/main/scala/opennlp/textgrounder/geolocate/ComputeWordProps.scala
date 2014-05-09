@@ -23,6 +23,7 @@ import math.log
 
 import util.argparser._
 import util.collection.combine_maps
+import util.error._
 import util.experiment._
 import util.print.errprint
 import util.textdb._
@@ -157,8 +158,8 @@ class ComputeWordPropsDriver extends
     // various ways.
     val props = for ((word, wordcount) <- words_counts) yield {
       val cellcount = words_cellcounts(word)
-      assert(cellcount > 0)
-      assert(wordcount > 0)
+      assert_>(cellcount, 0)
+      assert_>(wordcount, 0.0)
       val entropy_props = if (params.entropy) {
         // Compute unnormalized version of p(cell|word) for each cell.
         // If pcell_word_by_count = true, compute this by normalizing the

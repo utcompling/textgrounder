@@ -27,7 +27,7 @@ import scala.collection.mutable
 
 import util.debug._
 import util.collection._
-import util.error.{warning, internal_error}
+import util.error._
 import util.experiment._
 import util.io.FileHandler
 import util.math._
@@ -964,8 +964,7 @@ class FullRankedDocEvalResult[Co](
             (c, min_format_double(s), s"$rank")
           } else {
             // This may be a faked cell, when the correct cell is empty
-            assert(rank == corr_rank.get,
-              s"Expected ${corr_rank.get} but saw $rank")
+            assert_==(rank, corr_rank.get, "rank")
             (correct.get.correct_cell, "--", "--")
           }
         val index =
@@ -1166,7 +1165,7 @@ class RankedDocEvalStats[Co](
     // Code formerly in EvalStatsWithRank.
     {
       val corrank = rankres.correct_rank.get
-      assert(corrank >= 1)
+      assert_>=(corrank, 1)
       val correct = corrank == 1
       super.record_result(correct, reason = null)
       var within_max_rank = false

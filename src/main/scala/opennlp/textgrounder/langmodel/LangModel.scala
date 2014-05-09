@@ -119,7 +119,7 @@ trait FastSlowKLDivergence {
     val fast_kldiv = fast_kl_divergence(other, partial, cache)
     if (abs(fast_kldiv - slow_kldiv) > 1e-8) {
       errprint("Fast KL-div=%s but slow KL-div=%s", fast_kldiv, slow_kldiv)
-      assert(fast_kldiv == slow_kldiv)
+      assert_==(fast_kldiv, slow_kldiv)
     }
     fast_kldiv
   }
@@ -194,7 +194,8 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
       partial: GramCount = 1.0) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
-    assert(partial >= 0.0 && partial <= 1.0)
+    assert(partial >= 0.0 && partial <= 1.0,
+      s"Partial $partial not within [0.0,1.0]")
     imp_add_language_model(lm, other, partial)
   }
 
@@ -670,7 +671,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    */
   def gram_logprob(word: Gram) = {
     val value = gram_prob(word)
-    assert(value >= 0)
+    assert_>=(value, 0)
     // The probability returned will be 0 for words never seen in the
     // training data at all, i.e. we don't even have any global values to
     // back off to. General practice is to ignore such words.
@@ -683,7 +684,7 @@ abstract class LangModel(val factory: LangModelFactory) {
     assert(finished)
     // Write this way so we're not tripped up by empty lang model
     if (contains(gram)) {
-      assert(num_tokens > 0)
+      assert_>(num_tokens, 0.0)
       get_gram(gram).toDouble/num_tokens
     } else 0.0
   }

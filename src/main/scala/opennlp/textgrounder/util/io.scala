@@ -331,7 +331,7 @@ package io {
         case "bzip2" => BZip2Utils.getUncompressedFilename(filename)
         case _ => {
           assert(comtype == "none",
-            "wrap_input_stream_with_compression should have verified value")
+            s"wrap_input_stream_with_compression should have verified value, but saw $comtype")
           filename
         }
       }

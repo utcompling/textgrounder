@@ -147,7 +147,8 @@ trait TwitterInfochimpsFileProcessor extends TwitterInfochimps {
           // Go ahead and leave it encoded, just to make sure no TAB chars;
           // we don't really use it much anyway.
           val raw_anchor = anchor
-          assert(!(raw_anchor contains '\t'))
+          assert(!(raw_anchor contains '\t'),
+            s"$raw_anchor should not have a tab in it")
           val metadata =
             Seq("corpus-name"->"twitter-infochimps",
                 "id"->id, "title"->id, "split"->"training",

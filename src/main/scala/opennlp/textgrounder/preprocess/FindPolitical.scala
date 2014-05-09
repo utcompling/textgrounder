@@ -28,12 +28,13 @@ import org.apache.commons.logging
 import com.nicta.scoobi.Scoobi._
 
 import util.argparser._
-import util.textdb._
+import util.collection._
+import util.error._
 import util.hadoop._
 import util.io
-import util.collection._
 import util.os._
 import util.print._
+import util.textdb._
 
 class FindPoliticalParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
@@ -381,7 +382,7 @@ object FindPolitical extends
      * Add up the references and combine the set of spellings.
      */
     def merge_political_features(u1: PoliticalFeature, u2: PoliticalFeature) = {
-      assert(u1.value == u2.value)
+      assert_==(u1.value, u2.value)
       PoliticalFeature(u1.value, combine_maps(u1.spellings, u2.spellings),
         u1.num_accounts + u2.num_accounts,
         u1.num_refs + u2.num_refs,

@@ -24,6 +24,7 @@ import org.ddahl.jvmr.RInScala
 
 import util.argparser._
 import util.collection._
+import util.error._
 import util.experiment._
 import util.io
 import util.json._
@@ -91,7 +92,7 @@ object LocationVarianceParams {
   // width/height of a table of plots.
   val bin_histogram_width = 3
   val bin_histogram_height = 2
-  assert(bin_histogram_width * bin_histogram_height >= num_histogram_bins)
+  assert_>=(bin_histogram_width * bin_histogram_height, num_histogram_bins)
 
   val bin_plot_base = 2.0
   val num_plot_bins = 1000000 // Doesn't really matter
@@ -220,7 +221,7 @@ object AnalyzeLocationVariance extends ExperimentApp("AnalyzeLocationVariance") 
     val tabular_width = 3
     val tabular_height = 3
 
-    assert(tabular_width * tabular_height >= run_fns.size)
+    assert_>=(tabular_width * tabular_height, run_fns.size)
 
     /** Create location stats object for a given user. */
     def apply(user: User): LocationStats = {
@@ -286,7 +287,7 @@ object AnalyzeLocationVariance extends ExperimentApp("AnalyzeLocationVariance") 
   def compute_histogram(file: String,
       runs: Iterable[(String, Iterable[Double])],
       width: Int, height: Int) {
-    assert(width * height >= runs.size)
+    assert_>=(width * height, runs.size)
     val R = RInScala()
     for (((label, run), index) <- runs.zipWithIndex) {
       R.update("data%s" format index, run.toArray)

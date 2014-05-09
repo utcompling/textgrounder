@@ -207,7 +207,7 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   * Ensure that we will be able to store an N-gram for a given N.
 //   */
 //  def ensure_ngram_fits(n: Int) {
-//    assert(counts.length == num_tokens.length)
+//    assert_==(counts.length, num_tokens.length)
 //    while (n > max_ngram_size) {
 //      counts :+= create_gram_double_map
 //      num_tokens :+= 0.0

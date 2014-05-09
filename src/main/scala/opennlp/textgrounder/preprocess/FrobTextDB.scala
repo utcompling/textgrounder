@@ -27,7 +27,7 @@ import java.io._
 import util._
 import argparser._
 import collection._
-import error.warning
+import error._
 import experiment._
 import io.FileHandler
 import spherical._
@@ -389,9 +389,7 @@ class FrobTextDB(
           val field_map = Schema.make_map(new_fieldnames, new_fieldvals)
           field_map -= params.split_by_field
           val (nosplit_fieldnames, nosplit_fieldvals) = Schema.unmake_map(field_map)
-          assert(nosplit_fieldnames == writer.schema.fieldnames,
-            "resulting fieldnames %s should be same as schema fieldnames %s"
-              format (nosplit_fieldnames, writer.schema.fieldnames))
+          assert_==(nosplit_fieldnames, writer.schema.fieldnames)
           outstream.println(writer.schema.make_line(nosplit_fieldvals))
         }
       } else {

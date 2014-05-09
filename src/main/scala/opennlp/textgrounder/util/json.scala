@@ -110,7 +110,7 @@ package object json {
 //      // ("string" -> x) pair as its first element but other things as
 //      // other elements.
 //      case x: Traversable[_] => {
-//        assert(x.size >= 0)
+//        assert_>=(x.size, 0)
 //        val head = x.head
 //        head match {
 //          case (_:String, _) =>

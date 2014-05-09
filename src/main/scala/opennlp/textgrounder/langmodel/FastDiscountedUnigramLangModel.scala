@@ -23,6 +23,7 @@ import scala.collection.mutable
 import math.{log, sqrt}
 
 import util.collection.DynamicArray
+import util.error._
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
@@ -76,8 +77,8 @@ object FastDiscountedUnigramLangModel {
         get_kl_divergence_cache(self)
       else
         cache
-    assert(the_cache.langmodel == self)
-    assert(the_cache.self_size == self.num_types)
+    assert_==(the_cache.langmodel, self)
+    assert_==(the_cache.self_size, self.num_types)
     val pkeys = the_cache.self_keys
     val pvalues = the_cache.self_values
     val pfact = (1.0 - self.unseen_mass)/self.num_tokens

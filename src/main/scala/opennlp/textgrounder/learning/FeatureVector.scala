@@ -28,7 +28,7 @@ package learning
 import collection.mutable
 
 import util.collection.{doublemap, intmap}
-import util.error.internal_error
+import util.error._
 import util.memoizer._
 import util.print.errprint
 
@@ -178,7 +178,7 @@ class LabelAttachedFeatureLabelMapper extends FeatureLabelMapper {
   private def combined_to_long(prop_index: FeatIndex, label: LabelIndex) = {
     // If label could be negative, we need to and it with 0xFFFFFFFFL to
     // convert it to an unsigned value, but that should never happen.
-    assert(label >= 0)
+    assert_>=(label, 0)
     (prop_index.toLong << 32) + label
   }
 
@@ -296,7 +296,7 @@ object FeatureVector {
   def check_same_mappers(fvs: Iterable[FeatureVector]) {
     val mapper = fvs.head.mapper
     for (fv <- fvs) {
-      assert(fv.mapper == mapper)
+      assert_==(fv.mapper, mapper)
     }
   }
 }
@@ -322,7 +322,7 @@ trait SimpleFeatureVector extends FeatureVector {
 object BasicFeatureVectorImpl {
   def diff_squared_magnitude_2(fv1: FeatureVector, label1: LabelIndex,
       fv2: FeatureVector, label2: LabelIndex) = {
-    assert(fv1.length == fv2.length)
+    assert_==(fv1.length, fv2.length)
     (for (i <- 0 until fv1.length; va = fv1(i, label1) - fv2(i, label2))
        yield va*va).sum
   }
@@ -360,7 +360,7 @@ case class ArrayFeatureVector(
   values: SimpleVector,
   mapper: FeatureLabelMapper
 ) extends BasicFeatureVectorImpl with SimpleFeatureVector {
-  assert(values.length == length)
+  assert_==(values.length, length)
 
   def stored_entries = length
 

@@ -23,11 +23,12 @@ import math._
 import collection.mutable
 
 import util.collection._
-import util.spherical._
-import util.print.{errout, errprint}
-import util.experiment._
-import util.textdb.Row
 import util.debug._
+import util.error._
+import util.experiment._
+import util.print.{errout, errprint}
+import util.spherical._
+import util.textdb.Row
 
 import gridlocate.{DocStatus, GridDocFactory}
 
@@ -439,7 +440,7 @@ class MultiRegularGrid(
         var ne_index_longind = ne_index.longind
         while (ne_index_longind < sw_index.longind)
           ne_index_longind += (maximum_longind - minimum_longind + 1)
-        assert(sw_index.latind <= ne_index.latind)
+        assert_<=(sw_index.latind, ne_index.latind)
         val indices =
           for (
             i <- sw_index.latind to ne_index.latind;

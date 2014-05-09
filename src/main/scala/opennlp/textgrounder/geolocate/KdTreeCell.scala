@@ -29,7 +29,7 @@ import KdTree.SplitMethod
 
 import util.debug._
 import util.experiment._
-import util.error.warning
+import util.error._
 import util.print.errprint
 import util.spherical.SphereCoord
 import util.textdb.Row
@@ -56,7 +56,7 @@ class KdTreeCell(
     var node = kdnode
     while (node.parent != null) {
       val childindic = if (node.parent.getLeft == node) "<" else {
-        assert(node.parent.getRight == node)
+        assert_==(node.parent.getRight, node, "node")
         ">"
       }
       path = "%s%s".format(childindic, describe_node(node)) :: path
@@ -107,11 +107,12 @@ class KdTreeGrid(
 
   if (useBackoff && cutoffBucketSize > 0)
     warning("--kd-use-backoff probably incompatible with hierarchical classification")
-  assert((existingGrid == None) == (existingGridNewLeaves.size == 0))
+  assert((existingGrid == None) == (existingGridNewLeaves.size == 0),
+    s"existingGrid: $existingGrid, existingGridNewLeaves: $existingGridNewLeaves")
   if (existingGrid != None)
-    assert(cutoffBucketSize > 0)
+    assert_>(cutoffBucketSize, 0)
   if (cutoffBucketSize > 0)
-    assert(cutoffBucketSize >= bucketSize)
+    assert_>=(cutoffBucketSize, bucketSize)
   if (debug("kd-tree-grid")) {
     errprint("Created K-d tree grid with id %s", id)
     errprint("  bucket size %s, cutoffBucketSize %s", bucketSize, cutoffBucketSize)
@@ -368,7 +369,7 @@ class KdTreeGrid(
    */
   def iter_nonempty_cells: Iterable[SphereCell] = {
     for (leaf <- leaf_nodes) yield {
-      assert(leaf.size > 0)
+      assert_>(leaf.size, 0)
       nodes_to_cell(leaf)
     }
   }

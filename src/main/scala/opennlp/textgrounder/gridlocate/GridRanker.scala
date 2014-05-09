@@ -25,6 +25,7 @@ import math._
 
 import util.print.errprint
 import util.debug._
+import util.error._
 import util.textdb.Row
 import util.verbose._
 
@@ -341,9 +342,9 @@ class CosineSimilarityGridRanker[Co](
     val cossim =
       doc.grid_lm.cosine_similarity(cell.grid_lm,
         partial = partial, smoothed = smoothed)
-    assert(cossim >= 0.0)
+    assert_>=(cossim, 0.0)
     // Just in case of round-off problems
-    assert(cossim <= 1.002)
+    assert_<=(cossim, 1.002)
     cossim
   }
 }
@@ -575,12 +576,13 @@ class VowpalWabbitGridRanker[Co](
             }
           }
         val scores = label_scores.sortWith(_._1 < _._1).map(_._2)
-        assert(scores.size ==
-          featvec_factory.featvec_factory.mapper.number_of_labels)
+        assert_==(scores.size,
+          featvec_factory.featvec_factory.mapper.number_of_labels, "#labels",
+          s"For model ${classifier.model_filename}")
         scores
       }
-    assert(titles.size == list_of_scores.size,
-      s"Something wrong with model: ${classifier.model_filename}")
+    assert_==(titles.size, list_of_scores.size, "#docs",
+      s"For model ${classifier.model_filename}")
     titles zip list_of_scores
   }
 
@@ -612,7 +614,7 @@ class VowpalWabbitGridRanker[Co](
     val scores = score_test_docs(Iterator(doc),
       verbose = grid.driver.params.verbose).head._2
     val cands = get_candidates(None, include_correct = false)
-    assert(scores.size == cands.size)
+    assert_==(scores.size, cands.size, "#candidates")
     cands zip scores
   }
 }

@@ -28,6 +28,7 @@ package learning
  * @author Ben Wing
  */
 
+import util.error._
 import util.memoizer._
 
 // This indirection is necessary so VECTY gets properly expanded
@@ -45,8 +46,7 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   var keys: Array[FeatIndex], var values: Array[VECTY],
   val mapper: FeatureLabelMapper
 ) extends SparseFeatureVector {
-  assert(keys.length == values.length,
-    s"keys.length ${keys.length} should = values.length ${values.length}")
+  assert_==(keys.length, values.length)
 
   def stored_entries = keys.length
 
@@ -68,8 +68,7 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   }
 
   def dot_product(weights: SimpleVector, label: LabelIndex) = {
-    assert(length == weights.length,
-      s"length $length should = weights length ${weights.length}")
+    assert_==(length, weights.length)
     var i = 0
     var res = 0.0
     while (i < keys.length) {
@@ -80,8 +79,7 @@ class makespec(CompressedSparseFeatureVector) private[learning] (
   }
 
   def update_weights(weights: SimpleVector, scale: Double, label: LabelIndex) {
-    assert(length == weights.length,
-      s"length $length should = weights length ${weights.length}")
+    assert_==(length, weights.length)
     var i = 0
     while (i < keys.length) {
       weights(keys(i)) += scale * values(i)

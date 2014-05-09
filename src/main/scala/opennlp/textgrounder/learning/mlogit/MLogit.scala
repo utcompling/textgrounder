@@ -21,6 +21,7 @@ package learning.mlogit
 
 import learning._
 import util.debug._
+import util.error._
 import util.io.localfh
 import util.metering._
 import util.print.errprint
@@ -121,7 +122,7 @@ class MLogitConditionalLogitTrainer[DI <: DataInstance](
     file.println(rheaders mkString sep)
     val task = new Meter("writing", "line")
     rows.foreachMetered(task) { case ((indiv, labelstr, choice), datarow) =>
-      assert(headers.size == datarow.size)
+      assert_==(headers.size, datarow.size)
       val indivstr = indiv.toString
       val choicestr = if (choice) "TRUE" else "FALSE"
       val datastr = datarow.map(_.toString).toArray
@@ -162,15 +163,13 @@ class MLogitConditionalLogitTrainer[DI <: DataInstance](
       R.eval(s"""m.$frame = mlogit(choice ~ ${rheaders mkString " + "} | -1, $frame)""")
     }
     val weights = R.toVector[Double](s"as.vector(m.$frame$$coefficients)")
-    assert(weights.size == headers.size,
-      "Weights size %s should = headers size %s" format (weights.size,
-        headers.size))
+    assert_==(weights.size, headers.size)
     // Retrieve total number of features = proper size of weight vector
     val head = training_data.data.head._1.feature_vector
     val F = head.mapper.feature_vector_length
-    assert(weights.size + removed_features.size == F,
-      "Weights size %s + #removed-features %s should = #features %s" format (
-        weights.size, removed_features.size, F))
+    assert_==(weights.size + removed_features.size, F, "",
+      "Weights size %s + #removed-features %s" format (
+        weights.size, removed_features.size))
     // Expand the weights by inserting the removed features in the right
     // places, with weight 0.
     val expanded_buffer = mutable.Buffer.fill(F)(0.0)

@@ -29,6 +29,7 @@ import collection.mutable
 
 import util.collection.GroupByIterator
 import util.debug.{debug, debugval}
+import util.error._
 import util.print.{errprint, errfmt}
 
 /**
@@ -471,7 +472,7 @@ class MLogitDenseLabelSpecificDataInstanceFactory(attach_label: Boolean,
 
     // Order by increasing label so that all aggregates have the labels in
     // the same order.
-    assert(fvs.size == labels_seen.size)
+    assert_==(fvs.size, labels_seen.size)
     val sorted_fvs = (fvs zip labels_seen).toSeq.sortBy(_._2).map(_._1)
 
     // Aggregate feature vectors, return aggregate with label

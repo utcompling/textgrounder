@@ -25,6 +25,8 @@ package learning
  * @author Ben Wing
  */
 
+import util.error._
+
 /**
  * Simple definition of a vector.  Supports only a few operations.
  */
@@ -61,7 +63,7 @@ trait SimpleVectorFactory {
 trait BasicSimpleVectorImpl extends SimpleVector {
   def +=(addto: SimpleVector) {
     val l = length
-    assert(addto.length == l)
+    assert_==(addto.length, l)
     var i = 0
     while (i < l) {
       this(i) += addto(i)
@@ -71,7 +73,7 @@ trait BasicSimpleVectorImpl extends SimpleVector {
 
   def add_scaled(scale: Double, addto: SimpleVector) {
     val l = length
-    assert(addto.length == l)
+    assert_==(addto.length, l)
     var i = 0
     while (i < l) {
       this(i) += scale * addto(i)
@@ -133,14 +135,14 @@ trait VectorAggregate {
   }
 
   def +=(addto: VectorAggregate) {
-    assert(addto.depth == depth)
+    assert_==(addto.depth, depth)
     for (i <- 0 until depth) {
       this(i) += addto(i)
     }
   }
 
   def add_scaled(scale: Double, addto: VectorAggregate) {
-    assert(addto.depth == depth)
+    assert_==(addto.depth, depth)
     for (i <- 0 until depth) {
       this(i).add_scaled(scale, addto(i))
     }
