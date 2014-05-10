@@ -428,10 +428,16 @@ class MultiRegularGrid(
       case rec: RectangularCell => {
         val jitter = 0.0001
         val sw = rec.get_southwest_coord
-        val jitter_sw = SphereCoord(sw.lat + jitter, sw.long + jitter)
+        val jitter_sw =
+          SphereCoord(sw.lat + jitter, sw.long + jitter, "coerce")
         val sw_index = coord_to_multi_cell_index(jitter_sw)
         val ne = rec.get_northeast_coord
-        val jitter_ne = SphereCoord(ne.lat - jitter, ne.long - jitter)
+        // Need to coerce at least here or we will get errors when
+        // the east edge is at 180 degrees because it shows up as
+        // -180 and will get jittered to -180.0001, which is out of
+        // bounds.
+        val jitter_ne =
+          SphereCoord(ne.lat - jitter, ne.long - jitter, "coerce")
         val ne_index = coord_to_multi_cell_index(jitter_ne)
         // Conceivably, the larger cell might wrap across 180 degrees,
         // meaning the NE longitude index will be less than the SW one.
