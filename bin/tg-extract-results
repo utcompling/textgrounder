@@ -17,6 +17,7 @@ numevalsort=
 numtrainsort=
 filesort=
 runtimesort=
+cputimesort=
 verbose=
 debug=
 omit_average=
@@ -29,6 +30,7 @@ omit_numtrain=
 omit_file=
 omit_rss=
 omit_runtime=
+omit_cputime=
 
 while true; do
   case "$1" in
@@ -42,6 +44,7 @@ while true; do
     --sort-numtrain ) sort=yes ; numtrainsort=yes; shift ;;
     --sort-file | --sort-name ) sort=yes ; filesort=yes; shift ;;
     --sort-runtime ) sort=yes ; runtimesort=yes; shift ;;
+    --sort-cputime ) sort=yes ; cputimesort=yes; shift ;;
     #Unimplemented because it's tricky to sort the way we output it; need
     #to sort on raw number and then convert to human-readable
     #--sort-rss ) sort=yes ; rsssort=yes; shift ;;
@@ -54,6 +57,7 @@ while true; do
     --omit-numtrain ) omit_numtrain=yes; shift ;;
     --omit-file | --omit-name ) omit_file=yes; shift ;;
     --omit-runtime ) omit_runtime=yes; shift ;;
+    --omit-cputime ) omit_cputime=yes; shift ;;
     --omit-rss ) omit_rss=yes; shift ;;
     --verbose ) verbose=yes ; shift ;;
     --debug ) debug=yes ; shift ;;
@@ -101,6 +105,10 @@ runtimecol=$curcol
 if [ -z "$omit_runtime" ]; then
   let curcol=$curcol+1
 fi
+cputimecol=$curcol
+if [ -z "$omit_cputime" ]; then
+  let curcol=$curcol+1
+fi
 rsscol=$curcol
 if [ -z "$omit_rss" ]; then
   let curcol=$curcol+1
@@ -111,7 +119,7 @@ if [ -z "$omit_file" ]; then
 fi
 
 if [ "$verbose" != yes ]; then
-  #echo "  #Eval   #Train  %Acc. Acc@161 Mean   Median  Average  Runtime    RSS    File"
+  #echo "  #Eval   #Train  %Acc. Acc@161 Mean   Median  Average  Runtime Cputime   RSS    File"
   if [ -z "$omit_numeval" ]; then
     echo -n "  #Eval "
   fi
@@ -131,10 +139,13 @@ if [ "$verbose" != yes ]; then
     echo -n " Median "
   fi
   if [ -z "$omit_average" ]; then
-    echo -n "Average  "
+    echo -n "Average "
   fi
   if [ -z "$omit_runtime" ]; then
     echo -n " Runtime "
+  fi
+  if [ -z "$omit_cputime" ]; then
+    echo -n " Cputime "
   fi
   if [ -z "$omit_rss" ]; then
     echo -n "   RSS    "
@@ -144,6 +155,52 @@ if [ "$verbose" != yes ]; then
   fi
   echo ""
 fi
+
+function formattime() {
+  local time0
+  local time0prompt
+  local time1
+  time0="$1"
+  time0prompt="$2"
+  # Convert time from "24 minutes 5 seconds" or "0 minutes 6 seconds"
+  # (old style) or "24 min 5 sec" or "6 sec" (new style) to a raw version
+  # of HH:MM:SS.
+  time0=$(echo "$time0" | perl -pe 's/ (hour|hr)s? /:/;' -e 's/ min(ute)?s? /:/;' -e 's/ sec(ond)s?//;')
+  if [ -n "$debug" ]; then
+    echo "$time0prompt: [$time0]"
+  fi
+  # Reformat to proper HH:MM:SS, making sure to have two digits for the
+  # minutes.
+  if [ -z "$time0" ]; then
+    time1="NA"
+  else
+    time1=$(echo "$time0" | perl -ne '
+      my ($hrs, $mins, $secs) = /^(?:(.*?):)?(?:(.*?):)?(.*?)$/;
+      # We may have only a number of seconds; check for this.
+      if (!defined($hrs)) { $hrs = 0; }
+      if (!defined($mins)) { $mins = $hrs; $hrs = 0; }
+      if ($hrs == 0 && $mins == 0) {
+        $secs = sprintf("%04.1f", $secs);
+      } else {
+        $secs += 0.5;
+        while ($secs >= 60) {
+          $secs -= 60;
+          $mins += 1;
+        }
+        while ($mins >= 60) {
+          $mins -= 60;
+          $hrs += 1;
+        }
+        $secs = sprintf("%02d", $secs);
+      }
+      $mins = sprintf("%02d", $mins);
+      # $secs = sprintf("%04.1f", $secs);
+      if ($hrs == 0) { $hrs = ""; } else { $hrs = "${hrs}:"; }
+      print("$hrs$mins:$secs");
+    ')
+  fi
+  echo "$time1"
+}
 
 function output() {
 for x in ${1+"$@"}; do
@@ -175,25 +232,12 @@ for x in ${1+"$@"}; do
   numeval=$(echo "$results" | egrep 'instances.total' | perl -pe 's/.*= (.*?) *$/$1/')
   numtrain=$(echo "$results" | egrep 'bytask.*num_training_documents_by_split\.training =' | head -n 1 | perl -pe 's/.*= (.*?) *$/$1/')
   finalstats=$(sed -n '/^Ending final results/,/^Program running time/p' "$x")
-  # Convert runtime from "24 minutes 5 seconds" or "0 minutes 6 seconds"
-  # (old style) or "24 min 5 sec" or "6 sec" (new style) to a raw version
-  # of HH:MM:SS.
-  runtime0=$(echo "$finalstats" | egrep 'Program running time:' | perl -pe 's/.*: //;' -e 's/ (hour|hr)s? /:/;' -e 's/ min(ute)?s? /:/;' -e 's/ sec(ond)s?//;')
-  if [ -n "$debug" ]; then
-    echo "Runtime0: [$runtime0]"
-  fi
-  # Reformat to proper HH:MM:SS, making sure to have two digits for the
-  # minutes.
-  runtime=$(echo "$runtime0" | perl -ne '
-    my ($hrs, $mins, $secs) = /^(?:(.*?):)?(?:(.*?):)?(.*?)$/;
-    # We may have only a number of seconds; check for this.
-    if (!defined($hrs)) { $hrs = 0; }
-    if (!defined($mins)) { $mins = $hrs; $hrs = 0; }
-    $mins = sprintf("%02d", $mins);
-    $secs = sprintf("%04.1f", $secs);
-    if ($hrs == 0) { $hrs = ""; } else { $hrs = "${hrs}:"; }
-    print("$hrs$mins:$secs");
-  ')
+  # Note: This used to grep for 'Program running time:'; the elapsed time below is
+  # similar but doesn't include time spent determing memory usage, etc.
+  runtimeraw=$(echo "$finalstats" | egrep 'Total elapsed time since program start:' | perl -pe 's/.*: //;')
+  runtime=$(formattime "$runtimeraw" "Runtime0")
+  cputimeraw=$(echo "$finalstats" | egrep 'Total CPU time since program start:' | perl -pe 's/.*: //;')
+  cputime=$(formattime "$cputimeraw" "Cputime0")
   # Check for the old way of outputting and convert to new-style (618.63 MB).
   # The old style had various lines beginning "Memory usage" for different
   # usage stats, and had the resident size given as something like
@@ -243,9 +287,6 @@ for x in ${1+"$@"}; do
   if [ -z "$avg" ]; then
     avg="NA"
   fi
-  if [ -z "$runtime" ]; then
-    runtime="NA"
-  fi
   if [ -z "$rss" ]; then
     rss="NA"
   fi
@@ -256,7 +297,8 @@ for x in ${1+"$@"}; do
   mean=$(printf '%7s' "$mean")
   median=$(printf '%7s' "$median")
   avg=$(printf '%7s' "$avg")
-  runtime=$(printf '%9s' "$runtime")
+  runtime=$(printf '%8s' "$runtime")
+  cputime=$(printf '%8s' "$cputime")
   rss=$(printf '%9s' "$rss")
   if [ -n "$debug" ]; then
     echo "Args: [$args]"
@@ -268,6 +310,7 @@ for x in ${1+"$@"}; do
     echo "#Eval: [$numeval]"
     echo "#Train: [$numtrain]"
     echo "Runtime: [$runtime]"
+    echo "Cputime: [$cputime]"
     echo "RSS: [$rss]"
   fi
   if [ "$verbose" = yes ]; then
@@ -276,7 +319,7 @@ for x in ${1+"$@"}; do
       echo "$args   Avg-mean-median true error distance = $avg km"
     fi
   elif [ "$skip" = no ]; then
-    #echo "$numeval $numtrain $acc $mean $median $avg $runtime $rss $args"
+    #echo "$numeval $numtrain $acc $mean $median $avg $runtime $cputime $rss $args"
     if [ -z "$omit_numeval" ]; then
       echo -n "$numeval "
     fi
@@ -301,6 +344,9 @@ for x in ${1+"$@"}; do
     if [ -z "$omit_runtime" ]; then
       echo -n "$runtime "
     fi
+    if [ -z "$omit_cputime" ]; then
+      echo -n "$cputime "
+    fi
     if [ -z "$omit_rss" ]; then
       echo -n "$rss "
     fi
@@ -316,6 +362,8 @@ if [ "$filesort" = yes ]; then
   output ${1+"$@"} | sort -k $filecol
 elif [ "$runtimesort" = yes ]; then
   output ${1+"$@"} | sort -nr -k $runtimecol
+elif [ "$cputimesort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k $cputimecol
 elif [ "$averagesort" = yes ]; then
   output ${1+"$@"} | sort -n -k $averagecol
 elif [ "$meansort" = yes ]; then
