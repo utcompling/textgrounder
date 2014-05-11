@@ -18,5 +18,9 @@
 
 package opennlp.textgrounder
 
+import util.spherical._
+
 package object gridlocate {
+  // This is needed so that GridCells can be sorted
+  implicit def cellOrdering[Co] = new CellOrdering[Co]
 }

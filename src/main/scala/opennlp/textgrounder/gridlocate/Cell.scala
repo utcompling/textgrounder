@@ -308,6 +308,21 @@ abstract class GridCell[Co](
   }
 }
 
+// Needed so that cells can be sorted. There's a corresponding implicit in
+// package.scala.
+class CellOrdering[Co] extends Ordering[GridCell[Co]] {
+  def compare(c1: GridCell[Co], c2: GridCell[Co]) = {
+    // Perhaps we should just use format_location and dispense with using the
+    // center. But previously we only used the center and this maintains
+    // compatibility with existing saved models.
+    val center1 = c1.get_true_center
+    val center2 = c2.get_true_center
+    if (center1 == center2)
+      c1.format_location.compare(c2.format_location)
+    else if (c1.grid.less_than_coord(center1, center2)) -1 else 1
+  }
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                               Grid of cells                             //
 /////////////////////////////////////////////////////////////////////////////

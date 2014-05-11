@@ -22,6 +22,7 @@ package gridlocate
 import collection.mutable
 
 import util.argparser._
+import util.collection.is_sorted
 import util.debug._
 import util.error._
 import util.experiment._
@@ -1791,7 +1792,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         new NaiveBayesGridRanker[Co](ranker_name, grid, features)
       }
       case "classifier" => create_classifier_ranker(ranker_name, grid,
-        grid.iter_nonempty_cells, Iterable(), 1, 0)
+        sort_grid_cells(grid.iter_nonempty_cells), Iterable(), 1, "0")
       case "hierarchical-classifier" => ??? // Should have been handled above
       case "partial-cosine-similarity" =>
         new CosineSimilarityGridRanker[Co](ranker_name, grid, smoothed = false,
@@ -2409,6 +2410,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
+  // Sort grid cells in a consistent fashion.
+  def sort_grid_cells(cells: Iterable[GridCell[Co]]) = cells.toIndexedSeq.sorted
+
   /**
    * Create a ranker that uses a classifier to do its work, treating each
    * cell as a possible class.
@@ -2416,28 +2420,29 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @param ranker_name An identifying string, usually "classifier".
    * @param grid Grid containing cells.
    * @param candidates Candidate cells (aka classes, labels) that the
-   *   classifier chooses among. There may be fewer of them than total
-   *   cells in the grid. They should normally belong to the grid specified
-   *   above, but there may be exceptions (e.g. with K-d trees, where levels
-   *   &gt; 1 have grids that share the cells with the grid at level 1,
-   *   hence the cell's grid will identify the grid at level 1 not the
-   *   sub-level grid).
+   *   classifier chooses among. MUST BE SORTED. There may be fewer of them
+   *   than total cells in the grid. They should normally belong to the grid
+   *   specified above, but there may be exceptions (e.g. with K-d trees,
+   *   where levels &gt; 1 have grids that share the cells with the grid at
+   *   level 1, hence the cell's grid will identify the grid at level 1 not
+   *   the sub-level grid).
    * @param xdocs_cells Training documents and corresponding correct cells,
    *   for training the classifier. If empty, read external training documents
    *   according to '--input' and/or positional params.
    * @param level Level of this classifier. Normally 1, but may be &gt; 1
    *   in hierarchical classification.
-   * @param cindex Index of this classifier. Normally 0, but may be &gt; 0
-   *   if level &gt; 1, where we have multiple classifiers, one per cell at
-   *   level 1.
+   * @param cindex Index of this classifier, a combination of a number and
+   *   possibly a cell-coordinate identifier (the center). Will be "0" if
+   *   if level == 1.
    */
   def create_classifier_ranker(ranker_name: String,
-      grid: Grid[Co], candidates: Iterable[GridCell[Co]],
+      grid: Grid[Co], candidates: IndexedSeq[GridCell[Co]],
       // IMPORTANT: Don't calculate xdocs_cells till necessary, to avoid
       // reloading the training documents when we are loading a pre-saved
       // model. See comment in create_hierarchical_classifier_ranker.
       xdocs_cells: => Iterable[(GridDoc[Co], GridCell[Co])],
-      level: Int, cindex: Int) = {
+      level: Int, cindex: String) = {
+    assert(is_sorted(candidates))
     // FIXME: This doesn't apply for K-d trees under hierarchical
     // classification, where we have a copy of the grid that shares the
     // same cells.
@@ -2455,7 +2460,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         else params.vw_args
       val cost_sensitive = params.classifier == "cost-vowpal-wabbit"
       def replace_level_index(str: String) =
-        str.replace("%l", level.toString).replace("%i", cindex.toString)
+        str.replace("%l", level.toString).replace("%i", cindex)
       val save_vw_model =
         if (level > 1) replace_level_index(params.save_vw_submodels)
         else params.save_vw_model
@@ -2562,7 +2567,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * treating each cell in the candidate list as a possible class.
    */
   def create_vowpal_wabbit_classifier(grid: Grid[Co],
-      candidates: Iterable[GridCell[Co]],
+      candidates: IndexedSeq[GridCell[Co]], // MUST BE SORTED
       // IMPORTANT: Don't calculate docs_cells till necessary, to avoid
       // reloading the training documents when we are loading a pre-saved
       // model. See comment in create_hierarchical_classifier_ranker.
@@ -2573,16 +2578,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       create_classify_doc_featvec_factory(attach_label = false,
         output_skip_message = true)
 
-    // Sort the candidates by coordinate so we get a more predictable and
+    // Candidate must be sorted so we get a more predictable and
     // consistent mapping between cells and labels.
-    val sorted_candidates =
-      candidates.toSeq.sortWith((c1, c2) =>
-        grid.less_than_coord(c1.get_true_center, c2.get_true_center))
+    assert(is_sorted(candidates))
 
     // Do this first so there's an entry in the featvec_factory for each
     // non-empty cell, even when loading a model.
     val cells_labels =
-      sorted_candidates.map { cell =>
+      candidates.map { cell =>
         (cell, featvec_factory.lookup_cell(cell))
       }
 
@@ -2682,10 +2685,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_hierarchical_classifier_ranker(ranker_name: String,
       streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) = {
     val coarse_grid = create_grid_from_document_streams(None, 1, streams)
-    // Calling toSeq ensures we get the "Creating classifier %s/%s"
-    // messages in numeric order in the case of K-d trees, where the
-    // underlying type is a Set.
-    val candidates = coarse_grid.iter_nonempty_cells.toSeq
+    // Sort the grid cells so the numbered cells corresponding to different
+    // classifiers have a consistent order to make loading/saving of submodels
+    // possible, and numbered labels for a given classifier have a consistent
+    // order to make loading/saving of a given model possible. (Note that the
+    // underlying type of `iter_nonempty_cells` in K-d trees is a Set, which
+    // would cause all sorts of order-related problems.)
+    val candidates = sort_grid_cells(coarse_grid.iter_nonempty_cells)
     val raw_training_docs =
       get_combined_raw_training_documents(
         "reading %s for hierarchical classifier training data",
@@ -2703,7 +2709,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     lazy val docs_cells = get_docs_cells_from_raw_documents(coarse_grid,
       raw_training_docs).toIndexedSeq
     val coarse_ranker = create_classifier_ranker(ranker_name, coarse_grid,
-      candidates, docs_cells, 1, 0)
+      candidates, docs_cells, 1, "0")
     val grids = mutable.Buffer[Grid[Co]]()
     grids += coarse_grid
     var lastgrid = coarse_grid
@@ -2725,6 +2731,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         get_docs_cells_from_documents(subgrid, docs_cells.toIterator.map {
           case (doc, cell) => doc }
         ).toIndexedSeq
+      // Retrieve a list, for each candidate cell, of a tuple
+      // (SUBCANDS, CAND -> SUBRANKER), i.e. list of candidate sub-cells to
+      // choose among and a mapping from the candidate to a ranker object to
+      // do the choosing.
       val subcands_lists_ranker_entries = {
         val lastcands2 =
           if (debug("parallel-hier-classifier")) lastcands.par
@@ -2732,7 +2742,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         lastcands2.zipWithIndex.map { case (cand, index) =>
           errprint("Level %s: Creating classifier %s/%s", level,
             index + 1, num_cands)
-          val subcands = subgrid.get_subdivided_cells(cand)
+          // Need to sort, see above.
+          val subcands = sort_grid_cells(subgrid.get_subdivided_cells(cand))
           if (debug("hier-classifier")) {
             errprint("#Subdivided cells: %s", subcands.size)
             for ((subcand, index) <- subcands.zipWithIndex) {
@@ -2740,13 +2751,19 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             }
           }
           val subranker = create_classifier_ranker(ranker_name,
-            subgrid, subcands, finer_docs_cells, level, index)
+            subgrid, subcands, finer_docs_cells, level,
+            s"$index${cand.format_coord(cand.get_true_center)}")
           (subcands, cand -> subranker)
         }.seq
       }
       val (subcands_lists, ranker_entries) =
         subcands_lists_ranker_entries.unzip
-      val subcands = subcands_lists.flatten
+      // Get the whole list of candidate cells at the next level, remove
+      // any duplicates and sort (see comments above for why we need to do
+      // this). FIXME: This list should probably be the same as the list
+      // returned by iter_nonempty_cells for the appropriate grid, and we
+      // should perhaps add an assertion to check this.
+      val subcands = sort_grid_cells(subcands_lists.flatten.toSet)
       val rankers = ranker_entries.toMap
       grids += subgrid
       lastgrid = subgrid
