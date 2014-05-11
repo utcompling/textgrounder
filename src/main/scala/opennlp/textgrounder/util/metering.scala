@@ -57,7 +57,7 @@ protected class MeteringPackage {
       errprint("Elapsed time: %s (since start: %s)",
                format_minutes_seconds(total_elapsed_secs,
                  include_hours = false),
-               format_minutes_seconds(get_program_real_time_usage))
+               format_minutes_seconds(get_program_elapsed_time))
     }
 
     def finish() {
@@ -189,7 +189,7 @@ protected class MeteringPackage {
       val (tes, ips, spi) = tes_ips_spi
       val attime = if (!include_timestamp) "" else
         "At %s: " format humandate_time(curtime)
-      val since_start = format_minutes_seconds(get_program_real_time_usage)
+      val since_start = format_minutes_seconds(get_program_elapsed_time)
       if (verbose == MsgVerbose) {
         errprint("%sElapsed time: %s (since start: %s)",
                  attime,

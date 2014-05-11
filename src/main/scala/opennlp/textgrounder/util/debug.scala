@@ -51,6 +51,14 @@ protected class DebugPackage {
   }
 
   /**
+   * Retrieve a long-valued debug param.
+   */
+  def debuglong(param: String, default: Long) = {
+    val v = debugval(param)
+    if (v != "") v.toLong else default
+  }
+
+  /**
    * Retrieve a double-valued debug param.
    */
   def debugdouble(param: String, default: Double) = {

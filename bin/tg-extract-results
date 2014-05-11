@@ -236,7 +236,7 @@ for x in ${1+"$@"}; do
   # similar but doesn't include time spent determing memory usage, etc.
   runtimeraw=$(echo "$finalstats" | egrep 'Total elapsed time since program start:' | perl -pe 's/.*: //;')
   runtime=$(formattime "$runtimeraw" "Runtime0")
-  cputimeraw=$(echo "$finalstats" | egrep 'Total CPU time since program start:' | perl -pe 's/.*: //;')
+  cputimeraw=$(echo "$finalstats" | egrep 'Total CPU time since program start with children:' | perl -pe 's/.*: //;')
   cputime=$(formattime "$cputimeraw" "Cputime0")
   # Check for the old way of outputting and convert to new-style (618.63 MB).
   # The old style had various lines beginning "Memory usage" for different
