@@ -90,7 +90,7 @@ class EvalStats(
       warning("Something wrong: Fractional quantity %s greater than total %s",
         amount, total)
     }
-    var percent =
+    val percent =
       if (total == 0) "indeterminate percent"
       else "%5.2f%%" format (100 * amount.toDouble / total)
     errprint(s"$header = $amount/$total = $percent")
@@ -448,7 +448,6 @@ abstract class CorpusEvaluator[Co](
   type TEvalDoc
   /** Type of result of evaluating a document. */
   type TEvalRes
-  var documents_processed = 0
   var skip_initial = driver.params.skip_initial_test_docs
   var skip_n = 0
 
@@ -487,8 +486,41 @@ abstract class CorpusEvaluator[Co](
   val task = driver.show_progress("evaluating", "document",
     maxtime = driver.params.max_time_per_stage,
     maxitems = driver.params.num_test_docs)
-  var last_elapsed = 0.0
-  var last_processed = 0
+
+  class PeriodicStatus {
+    var last_elapsed = 0.0
+    var last_processed = 0
+
+    def check_status() {
+      val new_elapsed = task.elapsed_time
+      val new_processed = task.num_processed
+      // If enough time and documents have gone by, print out results
+      if ((new_elapsed - last_elapsed >=
+          GridLocateConstants.time_between_status &&
+        new_processed - last_processed >=
+          GridLocateConstants.docs_between_status)) {
+        errprint("Results after %s documents (ranker %s):",
+          task.num_processed, ranker_name)
+        output_results(isfinal = false)
+        errprint("End of results after %s documents (ranker %s):",
+          task.num_processed, ranker_name)
+        last_elapsed = new_elapsed
+        last_processed = new_processed
+      }
+    }
+
+    def final_results() {
+      errprint("")
+      errprint("Final results for ranker %s: All %s documents processed:",
+        ranker_name, task.num_processed)
+      errprint(s"Ending operation at $curtimehuman")
+      output_results(isfinal = true)
+      errprint(s"Ending final results for ranker $ranker_name")
+      output_resource_usage()
+    }
+  }
+
+  val periodic_status = new PeriodicStatus
 
   def process_document_statuses(docstats: Iterator[DocStatus[TEvalRes]]
   ) = {
@@ -513,28 +545,36 @@ abstract class CorpusEvaluator[Co](
    * @param process Function to process raw documents.
    * @return Iterator over evaluation results.
    */
-  def process_documents(docstats: Iterator[DocStatus[(Row, TEvalDoc)]])(
-      process: TEvalDoc => Either[String, TEvalRes]) = {
-    var statnum = 0
-    val result_stats =
-      for (stat <- docstats) yield {
-        // errprint(s"Processing document: $stat")
-        statnum += 1
-        stat.map_result { case (row, doc) =>
-          val doctag = s"#$statnum"
-          val (skip, reason) = would_skip_by_parameters()
-          if (skip)
-            (None, "skipped", reason, doctag)
-          else process(doc) match {
-            case Left(skipped_reason) =>
-              (None, "skipped", skipped_reason, doctag)
-            case Right(res) =>
-              (Some(res), "processed", "", doctag)
-          }
-        }
+  def process_documents_for_skipping(
+      docstats: Iterator[DocStatus[(Row, TEvalDoc)]]) = {
+    for ((stat, index) <- docstats.zipWithIndex) yield {
+      val statnum = index + 1
+      val doctag = s"#$statnum"
+      // errprint(s"Processing document $doctag: $stat")
+      stat.map_result { case (row, doc) =>
+        val (skip, reason) = would_skip_by_parameters()
+        if (skip)
+          (None, "skipped", reason, doctag)
+        else
+          (Some(doc), "processed", "", doctag)
       }
+    }
+  }
 
-    process_document_statuses(result_stats)
+  /**
+   * Process the documents, or some subset of them.  This may skip
+   * some of the documents (e.g. based on the parameter
+   * `--every-nth-test-doc`) and may stop early (e.g. based on
+   * `--num-test-docs`).
+   *
+   * @param get_docstats Iterator over document statuses of raw documents.
+   * @param process Function to process raw documents.
+   * @return Iterator over evaluation results.
+   */
+  def process_documents(
+      docstats: Iterator[DocStatus[TEvalDoc]]
+    )(process: TEvalDoc => Either[String, TEvalRes]) = {
+
   }
 
   /**
@@ -554,35 +594,49 @@ abstract class CorpusEvaluator[Co](
 
     initialize(get_docstats)
 
-    val results =
-      task.iterate(process_documents(get_docstats())(evaluate_document))
+    val skip_filtered_docs = process_documents_for_skipping(get_docstats())
 
-    results.map { res =>
-      val new_elapsed = task.elapsed_time
-      val new_processed = task.num_processed
-      // If enough time and documents have gone by, print out results
-      if ((new_elapsed - last_elapsed >=
-          GridLocateConstants.time_between_status &&
-        new_processed - last_processed >=
-          GridLocateConstants.docs_between_status)) {
-        errprint("Results after %s documents (ranker %s):",
-          task.num_processed, ranker_name)
-        output_results(isfinal = false)
-        errprint("End of results after %s documents (ranker %s):",
-          task.num_processed, ranker_name)
-        last_elapsed = new_elapsed
-        last_processed = new_processed
+    def process_document(stat: DocStatus[TEvalDoc]) = {
+      stat.map_result { doc =>
+        evaluate_document(doc) match {
+          case Left(skipped_reason) =>
+            (None, "skipped", skipped_reason, stat.docdesc)
+          case Right(res) =>
+            (Some(res), "processed", "", stat.docdesc)
+        }
       }
-      res
-    } ++ new SideEffectIterator( {
-      errprint("")
-      errprint("Final results for ranker %s: All %s documents processed:",
-        ranker_name, task.num_processed)
-      errprint(s"Ending operation at $curtimehuman")
-      output_results(isfinal = true)
-      errprint(s"Ending final results for ranker $ranker_name")
-      output_resource_usage()
-    } )
+    }
+
+    val results_iter =
+      if (debug("parallel-evaluation")) {
+        val results =
+          skip_filtered_docs.toIndexedSeq.par.map { stat =>
+            val res = process_document(stat)
+            task.synchronized {
+              // FIXME! Unclear if you can just break out of a parallel
+              // mapping operation like this and have it terminate all
+              // of them.
+              //
+              // if (task.item_processed()) break
+              task.item_processed()
+              periodic_status.check_status()
+            }
+            res
+          }.seq
+        process_document_statuses(results.toIterator)
+      } else {
+        val results =
+          task.iterate {
+            val result_stats = skip_filtered_docs.map(process_document)
+            process_document_statuses(result_stats)
+          }
+
+        results.map { res =>
+          periodic_status.check_status()
+          res
+        }
+      }
+    results_iter ++ new SideEffectIterator(periodic_status.final_results())
   }
 }
 
@@ -769,7 +823,7 @@ abstract class GridEvaluator[Co](
     }
     val result = imp_evaluate_document(document, correct_cell)
     result.right.map { res =>
-      if (res.correct != None) {
+      if (res.correct != None) evalstats.synchronized {
         evalstats.record_result(res)
         if (res.correct.get.num_docs_in_correct_cell == 0) {
           evalstats.increment_counter("documents.no_training_documents_in_cell")
