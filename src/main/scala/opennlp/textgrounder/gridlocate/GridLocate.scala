@@ -2471,10 +2471,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
           save_vw_model, load_vw_model, vw_args,
           cost_sensitive = cost_sensitive)
-      val normalize = debug("vw-normalize")
       new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
-        featvec_factory, cost_sensitive = cost_sensitive,
-        normalize = normalize)
+        featvec_factory, cost_sensitive = cost_sensitive)
     } else {
       val featvec_factory = create_classify_featvec_factory(attach_label = true,
         include_doc_only = true, include_doc_cell = true)

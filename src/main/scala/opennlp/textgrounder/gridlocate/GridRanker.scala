@@ -497,8 +497,7 @@ class VowpalWabbitGridRanker[Co](
   grid: Grid[Co],
   classifier: VowpalWabbitBatchClassifier,
   featvec_factory: DocFeatVecFactory[Co],
-  cost_sensitive: Boolean,
-  normalize: Boolean = false
+  cost_sensitive: Boolean
 ) extends ClassifierGridRanker[Co](ranker_name, grid, featvec_factory) {
 
   var doc_scores: Map[String, Array[Double]] = _
@@ -525,6 +524,10 @@ class VowpalWabbitGridRanker[Co](
   // the labels match the test document very well, but one matches much
   // better than the others, it will have a very high probability, although
   // this may not mean much.).
+  //
+  // Experiments show that normalization works significantly better than not
+  // normalizing, so do it by default.
+  val normalize = !debug("vw-unnormalized")
   //
   // If `verbose` is true, output messages from Vowpal Wabbit as it runs.
   def score_test_docs(docs: Iterator[GridDoc[Co]], verbose: Boolean = true
