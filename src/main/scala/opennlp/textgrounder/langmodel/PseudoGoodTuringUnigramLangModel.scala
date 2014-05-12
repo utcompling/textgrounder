@@ -69,7 +69,7 @@ class PseudoGoodTuringUnigramLangModelFactory(
     // A very rough estimate, perhaps totally wrong
     total_num_unseen_word_types =
       total_num_types_seen_once max (total_num_word_types/20)
-    if (debug("tons"))
+    if (debug("global-backoff-stats"))
       errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %stotal mass = %s",
                total_num_word_types, total_num_word_tokens,
                total_num_types_seen_once,

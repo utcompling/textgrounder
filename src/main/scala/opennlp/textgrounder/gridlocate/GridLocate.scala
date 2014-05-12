@@ -1216,50 +1216,123 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
   // the `debug` in package `debug`.
   var debug_specs =
     ap.multiOption[String]("d", "debug", metavar = "FLAGS",
-      help = """Output debug info of the given types.  Multiple debug
-parameters can be specified, indicating different types of info to output.
-Separate parameters by spaces, commas or semicolons.  Params can be boolean,
-if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
-list-valued; multiple values are specified by including the parameter
-multiple times, or by separating values by a colon.
+      help = """Output debug info, or control operation of certain parts of
+the program. The parameter value consists of one or more debug parameters,
+indicating different actions to take. Separate parameters by spaces, commas
+or semicolons.  Params can be boolean, if given alone, or valueful, if given
+as PARAM=VALUE.  Certain params are list-valued; multiple values are specified
+by including the parameter multiple times, or by separating values by a colon.
 
 Multiple occurrences of `--debug` can also occur, and the debug specs from
 all occurrences of the command line argument are combined together.
 
+Note that debug parameters that change the operation of the program should
+probably be made regular parameters. Sometimes they are debug parameters
+because they are (or were) provisional.
+
 The best way to figure out the possible parameters is by reading the
 source code. (Look for references to debug("foo") for boolean params,
-debugval("foo")/debugint("foo")/debugdouble("foo") for valueful params,
-or debuglist("foo") for list-valued params.) Some known debug flags:
+debugval("foo")/debugint("foo")/debuglong("foo")/debugdouble("foo") for
+valueful params, or debuglist("foo") for list-valued params.)
+
+Some known debug flags:
+
+--------------------- classifier-related ---------------------
+
+parallel-hier-classifier: Train hierarchical classifiers at level >= 2 in
+  parallel.
+
+hier-classifier: Output debug info about the operation of the hierarchical
+  classifier when training.
+
+features: Output document features for classifier trainers.
+
+weights: Output weights learned by non-VowpalWabbit classifier trainers.
+
+vw-normalize: Normalize the raw predictions coming from a VW classifier.
+  Mostly affects the hierarchical classifier with beam size > 1.
+
+vw-daemon: Document me.
+
+preserve-tmp-files: Don't delete the temporary files created for VW upon
+  program exit.
+
+preserve-vw-daemon: Don't kill the VW daemon used in daemon mode upon
+  progrma exit.
+
+warn-on-bad-model:
+
+export-instances:
+
+perceptron:
+weights-each-iteration:
+training-data:
+feature-relevance:
+multilabel:
+
+--------------------- ranker-related ---------------------
 
 gridrank: For the given test document number (starting at 1), output
-a grid of the predicted rank for cells around the correct cell.
-Multiple documents can have the rank output, e.g. --debug 'gridrank=45:58'
-(This will output info for documents 45 and 58.) This output can be
-postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
+  a grid of the predicted rank for cells around the correct cell.
+  Multiple documents can have the rank output, e.g. --debug 'gridrank=45:58'
+  (This will output info for documents 45 and 58.) This output can be
+  postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
 
 gridranksize: Size of the grid, in numbers of documents on a side.
-This is a single number, and the grid will be a square centered on the
-correct cell. (Default currently 11.)
+  This is a single number, and the grid will be a square centered on the
+  correct cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
 relcontribgrams: Print out words contributing most to the choice of the
-top-ranked cell vs. other cells. This is computed as if the Naive Bayes
-algorithm were being used. We compare cell at rank 1 vs. cell at rank 2,
-and cell at rank 1 vs. other cells, individually for each word.
-
-wordcountdocs: Regenerate document file, filtering out documents not
-seen in any counts file.
-
-some, lots, tons: General info of various sorts. (Document me.)
-
-cell: Print out info on each cell of the Earth as it's generated.  Also
-triggers some additional info during toponym resolution. (Document me.)
+  top-ranked cell vs. other cells. This is computed as if the Naive Bayes
+  algorithm were being used. We compare cell at rank 1 vs. cell at rank 2,
+  and cell at rank 1 vs. other cells, individually for each word.
 
 commontop: Extra info for debugging
- --baseline-ranker=salience-most-common-toponym.
+  --baseline-ranker=salience-most-common-toponym.
+
+rescale-scores:
+negate-scores:
+rerank-problems:
+rescale-features:
+rerank-training:
+
+--------------------- language model related ---------------------
+
+pretend-words-seen-once:
+global-backoff-stats:
+test-kl:
+dunning:
+
+--------------------- cell/grid-related ---------------------
+
+cell: Print out info on each cell of the Earth as it's generated.  Also
+  triggers some additional info during toponym resolution. (Document me.)
+
+kd-tree-grid: Document me.
+
+describe-kd-tree: Document me.
+
+--------------------- os-related ---------------------
+
+compare-cpu-time-methods:
+compare-memory-usage-methods:
+
+--------------------- exception-related ---------------------
+
+no-catch:
+stack-trace, stacktrace:
+
+--------------------- misc ---------------------
+
+wordcountdocs: Regenerate document file, filtering out documents not
+  seen in any counts file.
 
 pcl-travel: Extra info for debugging --eval-format=pcl-travel.
+
+no-evaluation:
+
 """)
 
   if (debug_specs != null)
