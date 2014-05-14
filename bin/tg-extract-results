@@ -250,16 +250,16 @@ for x in ${1+"$@"}; do
       my ($rss) = /^(.*)$/;
       $rss =~ s/,//g;
       $rss = $rss + 0; # Make sure string interpreted as number, maybe not nec
-      if ($rss >= 1_000_000_000) { printf("%.2f GB", $rss/1_000_000_000.0); }
-      elsif ($rss >= 1_000_000) { printf("%.2f MB", $rss/1_000_000.0); }
-      else { printf("%.2f KB", $rss/1_000.0); }
+      if ($rss >= 1_000_000_000) { printf("%.2fGB", $rss/1_000_000_000.0); }
+      elsif ($rss >= 1_000_000) { printf("%.2fMB", $rss/1_000_000.0); }
+      else { printf("%.2fKB", $rss/1_000.0); }
     ')
   else
     # The new way, which lines like
     #
     # Memory usage: virtual: 13.51 GB, resident: 1.49 GB, Java heap: 59.61 MB
     #
-    rss=$(echo "$finalstats" | egrep 'Memory usage:' | perl -pe 's/.*resident: (.*?B).*$/$1/')
+    rss=$(echo "$finalstats" | egrep 'Memory usage:' | perl -pe 's/.*resident: (.*?) (.B).*$/$1$2/')
   fi
   if [ -n "$mean" -o -n "$median" -o -n "$avg" -o -n "$acc" ]; then
     skip=no
