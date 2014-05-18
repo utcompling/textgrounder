@@ -40,6 +40,18 @@ class ConvertToTableParameters(ap: ArgParser) {
     must = be_specified,
     help="""Field name to use for data along the Y axis.""")
 
+  var x_default = ap.option[String]("x-default",
+    metavar = "DEFAULT",
+    default = "",
+    help="""Default value to use if X axis regexp not found.
+No default; an error is signaled.""")
+
+  var y_default = ap.option[String]("y-default",
+    metavar = "DEFAULT",
+    default = "",
+    help="""Default value to use if Y axis regexp not found.
+No default; an error is signaled.""")
+
   var x_regexp = ap.option[String]("x-regexp",
     metavar = "REGEXP",
     default = "(.*)",
@@ -102,9 +114,19 @@ object ConvertToTable extends ExperimentApp("ConvertToTable") {
       val fields = line.trim.split("""\s+""")
       val x = fields(x_field) match {
         case x_regexp(d) => d.toDouble
+        case _ => {
+          require(params.x_default != "",
+            s"X field not found and no default specified: ${fields(x_field)}")
+          params.x_default.toDouble
+        }
       }
       val y = fields(y_field) match {
         case y_regexp(d) => d.toDouble
+        case _ => {
+          require(params.y_default != "",
+            s"Y field not found and no default specified: ${fields(y_field)}")
+          params.y_default.toDouble
+        }
       }
       val z = fields(data_field)
       values((x, y)) = z
