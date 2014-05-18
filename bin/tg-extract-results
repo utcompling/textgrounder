@@ -18,6 +18,7 @@ numtrainsort=
 filesort=
 runtimesort=
 cputimesort=
+rsssort=
 verbose=
 debug=
 omit_average=
@@ -45,9 +46,10 @@ while true; do
     --sort-file | --sort-name ) sort=yes ; filesort=yes; shift ;;
     --sort-runtime ) sort=yes ; runtimesort=yes; shift ;;
     --sort-cputime ) sort=yes ; cputimesort=yes; shift ;;
-    #Unimplemented because it's tricky to sort the way we output it; need
-    #to sort on raw number and then convert to human-readable
-    #--sort-rss ) sort=yes ; rsssort=yes; shift ;;
+    #It's tricky to sort the way we output it; need to sort on raw number
+    #and then convert to human-readable, but just sorting on the "cooked"
+    #number works if everything is in the same units e.g. GB.
+    --sort-rss ) sort=yes ; rsssort=yes; shift ;;
     --omit-average | --omit-avg ) omit_average=yes; shift ;;
     --omit-mean ) omit_mean=yes; shift ;;
     --omit-median ) omit_median=yes; shift ;;
@@ -364,6 +366,8 @@ elif [ "$runtimesort" = yes ]; then
   output ${1+"$@"} | sort -nr -k $runtimecol
 elif [ "$cputimesort" = yes ]; then
   output ${1+"$@"} | sort -nr -k $cputimecol
+elif [ "$rsssort" = yes ]; then
+  output ${1+"$@"} | sort -nr -k $rsscol
 elif [ "$averagesort" = yes ]; then
   output ${1+"$@"} | sort -n -k $averagecol
 elif [ "$meansort" = yes ]; then
