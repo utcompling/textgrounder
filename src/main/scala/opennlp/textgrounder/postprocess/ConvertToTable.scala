@@ -118,7 +118,7 @@ object ConvertToTable extends ExperimentApp("ConvertToTable") {
         }
       }
     val labeled_table =
-      ("x/y" +: x_values.map(pretty_double(_))) +: {
+      ("  " +: x_values.map(pretty_double(_))) +: {
         for ((y, row) <- y_values zip table) yield pretty_double(y) +: row
       }
 
