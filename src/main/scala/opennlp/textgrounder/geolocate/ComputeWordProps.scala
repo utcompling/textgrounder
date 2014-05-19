@@ -52,6 +52,14 @@ as tab-separated fields and the latter naming the fields.""")
       help = """Filter words whose total count is less than the specified
 amount. Default %default.""")
 
+  var filter_below_length =
+    ap.option[Int]("filter-below-length", "fbl",
+      metavar = "INT",
+      default = 3,
+      must = be_>(0),
+      help = """Filter words whose total length is less than the specified
+amount. Default %default.""")
+
   var filter_non_alpha =
     ap.flag("filter-non-alpha",
       help = """Filter out words containing non-alphabetic characters.""")
@@ -120,8 +128,11 @@ class ComputeWordPropsDriver extends
     }.reduce[Map[Gram,GramCount]](combine_maps _)
     errprint(s"Total number of words before filtering: ${words_counts_1.size}")
     val words_counts_2 =
-      words_counts_1.filter { _._2 >= params.filter_below_count }
-    errprint(s"Total number of words after filtering by count: ${words_counts_2.size}")
+      words_counts_1
+      .filter { _._2 >= params.filter_below_count }
+      .filter { case (word, count) =>
+        first_lm.gram_to_string(word).size >= params.filter_below_length }
+    errprint(s"Total number of words after filtering by count and length: ${words_counts_2.size}")
     val words_counts = if (!params.filter_non_alpha) words_counts_2 else
       words_counts_2.filter { case (word, count) =>
         first_lm.gram_to_string(word) match {
