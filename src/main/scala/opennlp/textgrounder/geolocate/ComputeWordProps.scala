@@ -262,11 +262,11 @@ class ComputeWordPropsDriver extends
       case "cellcount" => seqent sortBy { -_._3 }
       case "inf-gain" => seqent sortBy { -_._4(0) }
       case "gain-ratio" => seqent sortBy { -_._4(1) }
-      case "entropy" => seqent sortBy { _._4(2) }
-      case "normed-log-wordcount" => seqent sortBy { _._4(3) }
-      case "normed-log-cellcount" => seqent sortBy { _._4(4) }
-      case "normed-wordcount" => seqent sortBy { _._4(5) }
-      case "normed-cellcount" => seqent sortBy { _._4(6) }
+      case "entropy" => seqent sortBy { -_._4(2) }
+      case "normed-log-wordcount" => seqent sortBy { -_._4(3) }
+      case "normed-log-cellcount" => seqent sortBy { -_._4(4) }
+      case "normed-wordcount" => seqent sortBy { -_._4(5) }
+      case "normed-cellcount" => seqent sortBy { -_._4(6) }
     }
     val row_props = sorted_props map {
       case (word, wordcount, cellcount, entropy_props) =>
