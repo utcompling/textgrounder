@@ -144,6 +144,25 @@ class ComputeWordPropsDriver extends
     errprint(s"Total number of non-empty cells: ${cells.size}")
     val total_wordcount = words_counts.values.sum
     errprint(s"Total count of all words: $total_wordcount")
+    val word_set = words_counts.keys.toSet
+
+    // Compute the total cell entropy.
+
+    // 1. Compute the count of all tokens in each cell.
+    val cells_counts = cells.map { cell =>
+      val total =
+        cell.grid_lm.iter_grams.filter(word_set contains _._1).map(_._2).sum
+      (cell, total)
+    }.toMap
+    val total_wordcount_2 = cells_counts.map(_._2).sum
+    assert_==(total_wordcount, total_wordcount_2)
+    // 2. Normalize to get a distribution over cells.
+    val cells_probs = cells_counts.map { case (cell, count) =>
+      (cell, count.toDouble / total_wordcount)
+    }
+    // 3. Compute cell entropy.
+    val cell_entropy = - (cells_probs.map(_._2).filter(_ != 0.0).
+      map { p => p * log(p) }.sum)
 
     // Compute the number of cells each word occurs in.
     val words_cellcounts = cells.map { cell =>
@@ -198,7 +217,7 @@ class ComputeWordPropsDriver extends
         val raw_pcell_word_bar = cells.map { cell =>
           val lm = cell.grid_lm
           if (pcell_word_by_count)
-            lm.num_tokens.toDouble - lm.get_gram(word)
+            cells_counts(cell) - lm.get_gram(word)
           else if (params.smoothed)
             1.0 - lm.gram_prob(word)
           else
@@ -216,9 +235,14 @@ class ComputeWordPropsDriver extends
         // (see Han Cook Baldwin 2014).
         val igw = pcell_word.filter(_ != 0.0).map { p => p * log(p) }.sum
         val igwbar = pcell_word_bar.filter(_ != 0.0).map { p => p * log(p) }.sum
-        // Compute conditional entropy H(c|w) across all cities -- the portion
-        // of information gain that changes from one word to the next.
-        val ig = pword * igw + pword_bar * igwbar
+        // Compute information gain from IG = H(c) - H(c|w) for
+        // H(c) = cell entropy
+        // H(c|w) = conditional cell entropy given a word
+        val conditional_cell_entropy = - pword * igw - pword_bar * igwbar
+        val ig = cell_entropy - conditional_cell_entropy
+        //errprint("For word %s: H(c) = %s, H(c|w) = %s, IG = %s",
+        //  first_lm.gram_to_string(word), cell_entropy,
+        //  conditional_cell_entropy, ig)
         // Compute intrinsic entropy
         val iv = - pword * log(pword) - pword_bar * log(pword_bar)
         // Compute information gain ratio
