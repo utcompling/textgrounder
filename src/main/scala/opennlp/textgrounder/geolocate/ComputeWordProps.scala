@@ -128,7 +128,7 @@ class ComputeWordPropsDriver extends
     }.reduce[Map[Gram,GramCount]](combine_maps _)
     errprint(s"Total number of words before filtering: ${words_counts_1.size}")
     val words_counts_2 =
-      words_counts_1
+      words_counts_1.par
       .filter { _._2 >= params.filter_below_count }
       .filter { case (word, count) =>
         first_lm.gram_to_string(word).size >= params.filter_below_length }
@@ -174,7 +174,7 @@ class ComputeWordPropsDriver extends
 
     // Maybe print word and cell counts.
     if (params.output_counts) {
-      for ((word, count) <- words_counts)
+      for ((word, count) <- words_counts.seq)
         errprint("Gram: %s (%s) = %s / %s", word, first_lm.gram_to_string(word),
           count, words_cellcounts(word))
     }
@@ -186,7 +186,7 @@ class ComputeWordPropsDriver extends
     // (word, wordcount, cellcount, entropy-props) where entropy-props is an
     // IndexedSeq of inf-gain, gain-ratio, entropy, and entropy normed
     // various ways.
-    val props = for ((word, wordcount) <- words_counts) yield {
+    val props = words_counts.map { case (word, wordcount) =>
       val cellcount = words_cellcounts(word)
       assert_>(cellcount, 0)
       assert_>(wordcount, 0.0)
@@ -279,7 +279,7 @@ class ComputeWordPropsDriver extends
     }
     if (params.entropy)
       errprint("Computing entropies ... done.")
-    val seqent = props.toSeq
+    val seqent = props.seq.toSeq
     val sorted_props = params.sort match {
       case "word" => seqent sortBy { _._1 }
       case "wordcount" => seqent sortBy { -_._2 }
