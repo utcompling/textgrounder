@@ -146,6 +146,16 @@ class ComputeWordPropsDriver extends
     errprint(s"Total count of all words: $total_wordcount")
     val word_set = words_counts.keys.toSet
 
+    val words_counts_redone =
+      word_set.toSeq.map { word =>
+        (word, cells.map { cell => cell.grid_lm.get_gram(word) }.sum) }.toMap
+    assert_==(words_counts_redone.size, words_counts.size)
+    assert_==(words_counts_redone.values.sum, words_counts.values.sum)
+    assert_==(words_counts_redone.map(_._2).sum, words_counts.values.sum)
+    for ((word, count) <- words_counts_redone) {
+      assert_==(words_counts(word), count)
+    }
+
     // Compute the total cell entropy.
 
     // 1. Compute the count of all tokens in each cell.
