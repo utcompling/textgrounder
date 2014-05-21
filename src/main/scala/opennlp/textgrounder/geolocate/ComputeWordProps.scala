@@ -123,6 +123,10 @@ class ComputeWordPropsDriver extends
     // Compute the total word count across all cells for each word.
     // Filter words with too small word count, and maybe filter
     // non-alphabetic words.
+    //
+    // NOTE: This seems to be buggy in some circumstances.
+    // It seems to fail when run on Cophir with K-d trees at bucket sizes
+    // <= 100. Unclear why no failure in other circumstances.
     val words_counts_1 = cells.map { cell =>
       cell.grid_lm.iter_grams.toMap
     }.reduce[Map[Gram,GramCount]](combine_maps _)
@@ -146,15 +150,18 @@ class ComputeWordPropsDriver extends
     errprint(s"Total count of all words: $total_wordcount")
     val word_set = words_counts.keys.toSet
 
+    val parallel_cells = cells.par
     val words_counts_redone =
       word_set.toSeq.map { word =>
-        (word, cells.map { cell => cell.grid_lm.get_gram(word) }.sum) }.toMap
-    assert_==(words_counts_redone.size, words_counts.size)
-    assert_==(words_counts_redone.values.sum, words_counts.values.sum)
-    assert_==(words_counts_redone.map(_._2).sum, words_counts.values.sum)
-    for ((word, count) <- words_counts_redone) {
-      assert_==(words_counts(word), count)
-    }
+        val count = parallel_cells.map { cell => cell.grid_lm.get_gram(word) }.sum
+        if (words_counts(word) != count)
+          errprint("For word %s (%s), %s should == %s",
+            word, first_lm.gram_to_string(word), words_counts(word), count)
+        (word, count)
+      }.toMap
+    errprint(s"${words_counts_redone.size} should == ${words_counts.size}")
+    errprint(s"${words_counts_redone.values.sum} should == ${words_counts.values.sum}")
+    errprint(s"${words_counts_redone.map(_._2).sum} should == ${words_counts.values.sum}")
 
     // Compute the total cell entropy.
 
