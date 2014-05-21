@@ -653,7 +653,7 @@ class HierarchicalClassifierGridRanker[Co](
   grids: Iterable[Grid[Co]],
   coarse_ranker: ClassifierGridRanker[Co],
   finer_rankers: Iterable[Map[GridCell[Co], ClassifierGridRanker[Co]]],
-  training_docs_cells: Iterable[(GridDoc[Co], GridCell[Co])],
+  // training_docs_cells: Iterable[(GridDoc[Co], GridCell[Co])],
   beam_size: Int
 ) extends SimpleGridRanker[Co](ranker_name, grids.last) {
 

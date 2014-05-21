@@ -2847,7 +2847,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
 
     new HierarchicalClassifierGridRanker[Co](ranker_name, grids,
-      coarse_ranker, finer_rankers, docs_cells, params.beam_size)
+      coarse_ranker, finer_rankers, // docs_cells,
+      params.beam_size)
   }
 
   /**
