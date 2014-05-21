@@ -2817,6 +2817,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             index + 1, num_cands)
           // Need to sort, see above.
           val subcands = sort_grid_cells(subgrid.get_subdivided_cells(cand))
+          assert(subcands.size > 0,
+            s"Saw zero-length subcells for cell $cand (index ${index + 1}) at centroid ${cand.get_centroid}")
           if (debug("hier-classifier")) {
             errprint("#Subdivided cells: %s", subcands.size)
             for ((subcand, index) <- subcands.zipWithIndex) {

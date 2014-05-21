@@ -269,8 +269,21 @@ class MultiRegularGrid(
    * corresponding tiling cell.
    */
   def coord_to_tiling_cell_index(coord: SphereCoord) = {
-    val latind = floor((coord.lat - modded_cod.lat) / degrees_per_cell).toInt
-    val longind = floor((coord.long - modded_cod.long) / degrees_per_cell).toInt
+    val jitter = 1e-8
+    // Multiplying by the reciprocal seems to be more accurate than dividing.
+    // For example, 175.0 / .14 = 1249.9999999999998 where the correct
+    // answer is exactly 1250.0. If we directly call floor() we get 1249
+    // instead of 1250, which screws up calculations in get_subdivided_cells(),
+    // so that it may return 0 subcells in the case where the larger cell
+    // being subdivided has only one document in it and that document's
+    // coordinate falls exactly on the lower latitude or longitude boundary
+    // of the cell. However, 175.0 * (1 / .14) = 1250.0, which works better.
+    // Even if this doesn't always work and introduces floating-point errors
+    // in some circumstances, we try to get around by adding a slight jitter
+    // value.
+    val recip = 1.0 / degrees_per_cell
+    val latind = floor((coord.lat - modded_cod.lat) * recip + jitter).toInt
+    val longind = floor((coord.long - modded_cod.long) * recip + jitter).toInt
     RegularCellIndex(this, latind, longind)
   }
 
@@ -452,10 +465,29 @@ class MultiRegularGrid(
             i <- sw_index.latind to ne_index.latind;
             j <- sw_index.longind to ne_index_longind
           ) yield RegularCellIndex(this, i, j)
-        indices.flatMap { index =>
+        // The southwest corner of the larger cell should map to one of
+        // the subcells. Otherwise, if the larger cell contains only a
+        // document whose coord lies on either the south or west border,
+        // we will return no subcells, which is bad.
+        assert(indices contains coord_to_multi_cell_index(sw),
+          "Southwest coord %s with index %s not found in indices with range %s to %s" format (
+            sw, coord_to_multi_cell_index(sw), sw_index, ne_index))
+        val retval = indices.flatMap { index =>
           find_cell_for_cell_index(index, create = false,
             record_created_cell = false)
         }
+        if (retval.size == 0) {
+          errprint("Attempt to return no subcells")
+          val centroid = cell.get_centroid
+          errprint(s"For cell $cell at centroid $centroid")
+          errprint("Indices are %s to %s", sw_index, ne_index)
+          errprint(s"Centroid index ${coord_to_multi_cell_index(centroid)}")
+          errprint(s"Centroid tiling index ${coord_to_tiling_cell_index(centroid)}")
+          errprint("Centroid in cell %s",
+            find_best_cell_for_coord(centroid, create_non_recorded = false))
+          assert_>(retval.size, 0)
+        }
+        retval
       }
       case _ => ???
     }
