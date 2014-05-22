@@ -93,13 +93,13 @@ class UnigramStorage extends GramStorage {
   // Copy grams iterating over to avoid a ConcurrentModificationException
   def iter_grams_for_modify = iter_grams.toSeq
 
-  // NOTE NOTE NOTE! Possible SCALABUG!! The toSeq needs to be added for some
-  // reason; if not, the accuracy of computations that loop over the keys drops
-  // dramatically. (On the order of 10-15% when computing smoothing in
-  // DiscountedUnigramLangModelFactory.imp_finish_after_global, a factor of
-  // 2 when computing a model probability in `model_logprob`.) I have no idea
-  // why; I suspect a Scala bug. (SCALABUG) This bug was present back in Scala
-  // 2.8 and 2.9 as well.
+  // The toSeq needs to be added so we don't return a set. Mapping over a set
+  // returns another set, which is bad if we're trying to generate a sequence
+  // of numbers or other items for which there may be duplicate entries.
+  // Not eliminating the set makes the accuracy of computations that loop over
+  // the keys drop dramatically. (On the order of 10-15% when computing smoothing
+  // in DiscountedUnigramLangModelFactory.imp_finish_after_global, a factor of
+  // 2 when computing a model probability in `model_logprob`.)
   def iter_keys = counts.keys.toSeq
 
   def num_tokens = {

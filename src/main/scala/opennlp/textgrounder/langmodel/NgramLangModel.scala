@@ -138,7 +138,7 @@ class OpenNLPNgramStorer extends NgramStorage {
     // but it doesn't appear to work right -- it generates the entire
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
-    for (x <- model.iterator.toIterable)
+    for (x <- model.iterator.toSeq)
       yield Ngram.to_index(x.iterator.toArray)
   }
 

@@ -345,7 +345,7 @@ trait GramStorage {
   /**
    * Iterate over all keys that are stored.
    */
-  def iter_keys: Iterable[Gram]
+  def iter_keys: Seq[Gram]
 
   /**
    * Total number of tokens stored.
@@ -426,7 +426,7 @@ abstract class LangModel(val factory: LangModelFactory) {
   /**
    * Iterate over all keys that are stored.
    */
-  def iter_keys: Iterable[Gram] = model.iter_keys
+  def iter_keys: Seq[Gram] = model.iter_keys
 
   /**
    * Total number of tokens stored.
