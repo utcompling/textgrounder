@@ -370,10 +370,16 @@ class KdTreeGrid(
    * Iterate over all non-empty cells.
    */
   def iter_nonempty_cells: Iterable[SphereCell] = {
-    for (leaf <- leaf_nodes) yield {
+    // Converting to IndexedSeq is very important because otherwise it's
+    // a set and all sorts of unexpected things result from mapping a
+    // set to something else with duplicate items. Since mapping a set
+    // to something else yields a set, the duplicate items are erased,
+    // which is almost never what's desired. So we should never return
+    // a Set when an Iterable is called for.
+    (for (leaf <- leaf_nodes) yield {
       assert_>(leaf.size, 0)
       nodes_to_cell(leaf)
-    }
+    }).toIndexedSeq
   }
 }
 
