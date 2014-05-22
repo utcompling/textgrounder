@@ -88,6 +88,22 @@ import gridlocate.{DocStatus, GridDocFactory}
  */
 case class RegularCellIndex private (latind: Int, longind: Int) {
   def toFractional = FractionalRegularCellIndex(latind, longind)
+
+  /**
+   * True if this index is within a bounding box. Bounding box is treated
+   * as closed on both ends, i.e. the ranges are inclusive-inclusive.
+   * Needs to handle case of bounding box wrapping across the +180/-180 line
+   * (in such a case, the west index will be greater than the east index).
+   */
+  def within(sw: RegularCellIndex, ne: RegularCellIndex) = {
+    assert_<=(sw.latind, ne.latind)
+    sw.latind <= latind && latind <= ne.latind && (
+      if (sw.longind <= ne.longind)
+        sw.longind <= longind && longind <= ne.longind
+      else
+        sw.longind <= longind || longind <= ne.longind
+    )
+  }
 }
 
 object RegularCellIndex {
@@ -605,38 +621,35 @@ class MultiRegularGrid(
     val max_latind = min_latind + grsize - 1
     val min_longind = true_longind - grsize / 2
     val max_longind = min_longind + grsize - 1
+    val sw_index = RegularCellIndex(this, min_latind, min_longind)
+    val ne_index = RegularCellIndex(this, max_latind, max_longind)
     val grid = mutable.Map[RegularCellIndex, (MultiRegularCell, Double, Int)]()
     for (((cell, score), rank) <- pred_cells zip (1 to pred_cells.size)) {
-      val (la, lo) = (cell.index.latind, cell.index.longind)
-      if (la >= min_latind && la <= max_latind &&
-        lo >= min_longind && lo <= max_longind)
+      if (cell.index.within(sw_index, ne_index))
         // FIXME: This assumes KL-divergence or similar scores, which have
         // been negated to make larger scores better.
         grid(cell.index) = (cell, -score, rank)
     }
 
     errprint("Grid ranking, gridsize %sx%s", grsize, grsize)
-    errprint("NW corner: %s",
-      multi_cell_index_to_nw_corner_coord(
-        RegularCellIndex(this, max_latind, min_longind)))
-    errprint("SE corner: %s",
-      multi_cell_index_to_se_corner_coord(
-        RegularCellIndex(this, min_latind, max_longind)))
+    errprint("SW corner: %s", multi_cell_index_to_sw_corner_coord(sw_index))
+    errprint("NE corner: %s", multi_cell_index_to_ne_corner_coord(ne_index))
     for (doit <- Seq(0, 1)) {
       if (doit == 0)
         errprint("Grid for ranking:")
       else
         errprint("Grid for goodness/distance:")
-      for (lat <- max_latind to min_latind;
-           long <- fromto(min_longind, max_longind)) {
-        grid.get(RegularCellIndex(this, lat, long)) match {
-          case None => errout(" %-8s", "empty")
-          case Some((cell, value, rank)) => {
-            val showit = if (doit == 0) rank else value
-            if (lat == true_latind && long == true_longind)
-              errout("!%-8.6s", showit)
-            else
-              errout(" %-8.6s", showit)
+      for (lat <- min_latind to max_latind) {
+        for (long <- min_longind to max_longind) {
+          grid.get(RegularCellIndex(this, lat, long)) match {
+            case None => errout(" %-8s", "NA")
+            case Some((cell, value, rank)) => {
+              val showit = if (doit == 0) rank else value
+              if (lat == true_latind && long == true_longind)
+                errout(" !%-8.6f", showit)
+              else
+                errout(" %-8.6f", showit)
+            }
           }
         }
         errout("\n")
