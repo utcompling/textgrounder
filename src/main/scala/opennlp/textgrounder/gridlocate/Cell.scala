@@ -494,7 +494,7 @@ abstract class Grid[Co](
   /**
    * Iterate over all non-empty cells.
    */
-  def iter_nonempty_cells: Iterable[GridCell[Co]]
+  def iter_nonempty_cells: IndexedSeq[GridCell[Co]]
 
   /*********************** Not meant to be overridden *********************/
 
@@ -509,7 +509,7 @@ abstract class Grid[Co](
    * Iterate over all non-empty cells, making sure to include the given cells
    *  even if empty.
    */
-  def iter_nonempty_cells_including(include: Iterable[GridCell[Co]]
+  def iter_nonempty_cells_including(include: IndexedSeq[GridCell[Co]]
   ) = {
     val cells = iter_nonempty_cells
     if (include.size == 0)
@@ -526,8 +526,8 @@ abstract class Grid[Co](
    */
   def iter_nonempty_cells_including(maybeinc: Option[GridCell[Co]],
     doinc: Boolean
-  ): Iterable[GridCell[Co]] = {
-    val include = if (doinc) Seq(maybeinc.get) else Seq()
+  ): IndexedSeq[GridCell[Co]] = {
+    val include = if (doinc) IndexedSeq(maybeinc.get) else IndexedSeq()
     iter_nonempty_cells_including(include)
   }
 

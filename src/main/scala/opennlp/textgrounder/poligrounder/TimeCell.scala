@@ -105,7 +105,7 @@ class TimeCellPair(
 class TimeGrid(
   before_chunk: (Long, Long),
   after_chunk: (Long, Long),
-  categories: Seq[String],
+  categories: IndexedSeq[String],
   category_of_doc: TimeDoc => String,
   override val docfact: TimeDocFactory,
   id: String

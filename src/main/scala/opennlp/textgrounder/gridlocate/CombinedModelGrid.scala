@@ -62,7 +62,7 @@ abstract class CombinedGrid[Co](
 
   protected def initialize_cells() { }
 
-  def iter_nonempty_cells = grids.flatMap(_.iter_nonempty_cells)
+  def iter_nonempty_cells = grids.toIndexedSeq.flatMap(_.iter_nonempty_cells)
 }
 
 /**

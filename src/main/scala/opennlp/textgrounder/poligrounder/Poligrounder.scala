@@ -189,9 +189,9 @@ class PoligrounderDriver extends
   ) = {
     val time_docfact = create_docfact.asInstanceOf[TimeDocFactory]
     if (params.ideological_user_corpus == null)
-      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", time_docfact, id)
+      new TimeGrid(from_chunk, to_chunk, IndexedSeq("all"), x => "all", time_docfact, id)
     else
-      new TimeGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
+      new TimeGrid(from_chunk, to_chunk, IndexedSeq("liberal", "conservative"),
         x => {
           if (params.ideological_users_liberal contains x.user)
             "liberal"

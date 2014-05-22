@@ -369,7 +369,7 @@ class KdTreeGrid(
   /**
    * Iterate over all non-empty cells.
    */
-  def iter_nonempty_cells: Iterable[SphereCell] = {
+  def iter_nonempty_cells = {
     // Converting to IndexedSeq is very important because otherwise it's
     // a set and all sorts of unexpected things result from mapping a
     // set to something else with duplicate items. Since mapping a set
