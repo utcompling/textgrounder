@@ -23,6 +23,7 @@ import math.log
 
 import util.argparser._
 import util.collection.combine_maps
+import util.debug._
 import util.error._
 import util.experiment._
 import util.print.errprint
@@ -150,18 +151,20 @@ class ComputeWordPropsDriver extends
     errprint(s"Total count of all words: $total_wordcount")
     val word_set = words_counts.keys.toSet
 
-    val parallel_cells = cells.par
-    val words_counts_redone =
-      word_set.toSeq.map { word =>
-        val count = parallel_cells.map { cell => cell.grid_lm.get_gram(word) }.sum
-        if (words_counts(word) != count)
-          errprint("For word %s (%s), %s should == %s",
-            word, first_lm.gram_to_string(word), words_counts(word), count)
-        (word, count)
-      }.toMap
-    errprint(s"${words_counts_redone.size} should == ${words_counts.size}")
-    errprint(s"${words_counts_redone.values.sum} should == ${words_counts.values.sum}")
-    errprint(s"${words_counts_redone.map(_._2).sum} should == ${words_counts.values.sum}")
+    if (debug("compute-word-props")) {
+      val parallel_cells = cells.par
+      val words_counts_redone =
+        word_set.toSeq.map { word =>
+          val count = parallel_cells.map { cell => cell.grid_lm.get_gram(word) }.sum
+          if (words_counts(word) != count)
+            errprint("For word %s (%s), %s should == %s",
+              word, first_lm.gram_to_string(word), words_counts(word), count)
+          (word, count)
+        }.toMap
+      errprint(s"${words_counts_redone.size} should == ${words_counts.size}")
+      errprint(s"${words_counts_redone.values.sum} should == ${words_counts.values.sum}")
+      errprint(s"${words_counts_redone.map(_._2).sum} should == ${words_counts.values.sum}")
+    }
 
     // Compute the total cell entropy.
 
