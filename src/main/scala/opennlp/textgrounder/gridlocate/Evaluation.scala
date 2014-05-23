@@ -1251,8 +1251,6 @@ class RankedDocEvalStats[Co](
     val num_pred_cells = rankres.pred_cells.size
     for (rank <- top_n_for_oracle_dists; if rank < num_pred_cells)
       oracle_true_dists_at(rank) :+= min_errors(rank)
-    true_dists += res.correct.get.pred_truedist
-    oracle_true_dists += res.correct.get.correct_truedist
   }
 
   override def output_correct_results() {
