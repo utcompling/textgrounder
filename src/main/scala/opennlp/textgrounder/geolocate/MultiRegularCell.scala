@@ -641,18 +641,34 @@ class MultiRegularGrid(
         errprint("Grid for goodness/distance:")
       for (lat <- min_latind to max_latind) {
         for (long <- min_longind to max_longind) {
-          grid.get(RegularCellIndex(this, lat, long)) match {
-            case None => errout(" %-8s", "NA")
-            case Some((cell, value, rank)) => {
-              val showit = if (doit == 0) rank else value
-              if (lat == true_latind && long == true_longind)
-                errout(" !%-8.6f", showit)
-              else
-                errout(" %-8.6f", showit)
+          val index = RegularCellIndex(this, lat, long)
+          if (debug("gridrank-grant")) {
+            // In the format that Grant requested
+            errprint("%s\t%s\t%s",
+              multi_cell_index_to_sw_corner_coord(index),
+              multi_cell_index_to_ne_corner_coord(index),
+              grid.get(index) match {
+                case None => "NA"
+                case Some((cell, value, rank)) => {
+                  (if (doit == 0) rank else value).toString
+                }
+              }
+            )
+          } else {
+            grid.get(index) match {
+              case None => errout(" %-8s", "NA")
+              case Some((cell, value, rank)) => {
+                val showit = if (doit == 0) rank else value
+                //if (lat == true_latind && long == true_longind)
+                //  errout(" !%-8.6f", showit)
+                //else
+                  errout(" %-8.6f", showit)
+              }
             }
           }
         }
-        errout("\n")
+        if (!debug("gridrank-grant"))
+          errout("\n")
       }
     }
   }
