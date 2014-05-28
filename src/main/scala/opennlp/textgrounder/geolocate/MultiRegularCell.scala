@@ -250,9 +250,15 @@ class MultiRegularGrid(
   // Bootstrapping to avoid problems creating a RegularCellIndex when
   // min/max indices not yet initialized
   var initialized = false
+  // Due to floating point errors during division, we round indices to the
+  // nearest integer if they are within a certain jitter, rather than
+  // truncating as we'd normally do.
+  val floating_point_jitter = 1e-8
   val maximum_index =
-    coord_to_tiling_cell_index(SphereCoord(maximum_latitude - 1e-10,
-      maximum_longitude - 1e-10))
+    coord_to_tiling_cell_index(
+      SphereCoord(maximum_latitude - 10 * floating_point_jitter,
+        maximum_longitude - 10 * floating_point_jitter))
+  errprint("Maximum index: %s", maximum_index)
   val maximum_latind = maximum_index.latind
   val maximum_longind = maximum_index.longind
   val minimum_index =
@@ -285,7 +291,7 @@ class MultiRegularGrid(
    * corresponding tiling cell.
    */
   def coord_to_tiling_cell_index(coord: SphereCoord) = {
-    val jitter = 1e-8
+    val jitter = floating_point_jitter
     // Multiplying by the reciprocal seems to be more accurate than dividing.
     // For example, 175.0 / .14 = 1249.9999999999998 where the correct
     // answer is exactly 1250.0. If we directly call floor() we get 1249
