@@ -74,8 +74,16 @@ protected class DebugPackage {
     if (value == "")
       Seq[String]()
     else
-     ":".split(value).toSeq
+     value.split(":").toSeq
   }
+
+  def matches_alphanum(x: String, y: String) = {
+    x.toLowerCase.replaceAll("[^a-z0-9]","") ==
+      y.toLowerCase.replaceAll("[^a-z0-9]","")
+  }
+
+  def debuglist_matches_alphanum(param: String, str: String) =
+    debuglist(param).exists(entry => matches_alphanum(entry, str))
 }
 
 package object debug extends DebugPackage { }

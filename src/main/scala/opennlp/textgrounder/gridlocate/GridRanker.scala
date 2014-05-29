@@ -668,6 +668,9 @@ class HierarchicalClassifierGridRanker[Co](
 
   def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean): Iterable[(GridCell[Co], Double)] = {
+    val do_gridrank =
+      debug("hier-gridrank") ||
+      debuglist_matches_alphanum("hier-gridrank", doc.title)
     // First, we rank each cell at the coarsest level.
     val raw_prev_scores =
       for (cell <- coarsest_grid.iter_nonempty_cells) yield {
@@ -676,17 +679,27 @@ class HierarchicalClassifierGridRanker[Co](
       }
     var prev_scores =
       raw_prev_scores.toIndexedSeq.sortWith(_._2 > _._2)
+    if (do_gridrank)
+      coarsest_grid.output_ranking_data(s"${doc.title} (level 1)", prev_scores,
+        correct)
     // Then, for each grid at the next finer level ...
-    for ((finer, rankers) <- grids.tail zip finer_rankers) {
+    for (((finer, rankers), level) <-
+         grids.tail zip finer_rankers zip Stream.from(2)) {
       // First, reduce the cells at previous level that will be propagated to
       // new level by the beam size
       val beamed_prev_scores = prev_scores.take(beam_size)
       // For each cell being considered ...
-      val new_scores = for ((old_cell, old_score) <- beamed_prev_scores) yield {
+      val new_scores = for (((old_cell, old_score), index) <-
+          beamed_prev_scores zip Stream.from(1)) yield {
         // Find the corresponding ranker and run it
         val ranker = rankers(old_cell)
         val doc_ranked_scores =
           ranker.score_doc_directly(doc).toIndexedSeq.sortWith(_._2 > _._2)
+        if (do_gridrank) {
+          val docid = "%s (level %s, index %s, cell %s)" format (
+            doc.title, level, index, old_cell.format_location)
+          finer.output_ranking_data(docid, doc_ranked_scores, correct)
+        }
         // Fetch the top cell and corresponding log-probability
         val (top_cell, top_score) = doc_ranked_scores.head
         if (debug("hier-classifier")) {

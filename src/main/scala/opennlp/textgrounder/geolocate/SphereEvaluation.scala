@@ -274,18 +274,11 @@ class RankedSphereDocEvalResult(
 
     assert_==(doctag(0), '#')
     if (debug("gridrank") ||
-        (debuglist("gridrank") contains doctag.drop(1))) {
-      val grsize = debugint("gridranksize", GeolocateConstants.gridranksize)
-      wrapped.correct.get.correct_cell match {
-        case multireg: MultiRegularCell =>
-          multireg.grid.
-            output_ranking_grid(
-              wrapped.pred_cells.
-                asInstanceOf[Iterable[(MultiRegularCell, Double)]],
-              multireg, grsize)
-        case _ =>
-          warning("Can't output ranking grid, cell not of right type")
-      }
+        (debuglist("gridrank") contains doctag.drop(1)) ||
+        debuglist_matches_alphanum("gridrank", wrapped.document.title)) {
+      val docid = "%s (%s)" format (wrapped.document.title, doctag)
+      val correct = wrapped.correct.get.correct_cell
+      correct.grid.output_ranking_data(docid, wrapped.pred_cells, Some(correct))
     }
   }
 }

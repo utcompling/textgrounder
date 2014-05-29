@@ -247,7 +247,6 @@ protected class SphericalPackage {
      */
     def bounding_box_ne(points: Iterable[SphereCoord]) =
       SphereCoord(points.map(_.lat).max, points.map(_.long).max)
-
   }
 
   implicit object SphereCoordHandler extends CoordHandler[SphereCoord] {
@@ -262,6 +261,41 @@ protected class SphericalPackage {
     def distance_between_coords(c1: SphereCoord, c2: SphereCoord) =
       spheredist(c1, c2)
     def output_distance(dist: Double) = km_and_miles(dist)
+  }
+
+  case class BoundingBox(sw: SphereCoord, ne: SphereCoord) {
+    require(sw.lat <= ne.lat)
+    override def toString = BoundingBox.serialize(this)
+
+    /** True if this bounding box overlaps the specified bounding box
+      * other than just at a point or line.
+      * FIXME: Doesn't handle bounding boxes that cross +-180 longitude. */
+    def overlaps(x: BoundingBox) = {
+      val outside_ne = sw.lat >= x.ne.lat || sw.long >= x.ne.long
+      val outside_sw = ne.lat <= x.sw.lat || ne.long <= x.sw.long
+      val outside = outside_ne || outside_sw
+      !outside
+    }
+
+    /** True if this bounding box overlaps the specified bounding box
+      * or touches at a point or line.
+      * FIXME: Doesn't handle bounding boxes that cross +-180 longitude. */
+    def overlaps_or_touches(x: BoundingBox) = {
+      val outside_ne = sw.lat > x.ne.lat || sw.long > x.ne.long
+      val outside_sw = ne.lat < x.sw.lat || ne.long < x.sw.long
+      val outside = outside_ne || outside_sw
+      !outside
+    }
+  }
+
+  implicit object BoundingBox extends TextSerializer[BoundingBox] {
+    def deserialize(foo: String) = {
+      val Array(sw, ne) = foo.split(":", -1)
+      BoundingBox(SphereCoord.deserialize(sw), SphereCoord.deserialize(ne))
+    }
+
+    def serialize(foo: BoundingBox) =
+      "%s:%s".format(SphereCoord.serialize(foo.sw), SphereCoord.serialize(foo.ne))
   }
 
   // Compute spherical distance in km (along a great circle) between two

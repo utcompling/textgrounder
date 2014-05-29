@@ -228,7 +228,7 @@ class MultiRegularGrid(
   val width_of_multi_cell: Int,
   docfact: SphereDocFactory,
   id: String
-) extends RealSphereGrid(docfact, id) {
+) extends RectangularGrid(docfact, id) {
   def short_type = "mreg"
 
   /**
@@ -609,20 +609,29 @@ class MultiRegularGrid(
   }
 
   /**
-   * Output a "ranking grid" of information so that a nice 3-D graph
+   * Output a "ranking grid" of information so that a nice graph
    * can be created showing the ranks of cells surrounding the true
    * cell, out to a certain distance.
    *
+   * @param docid Text identifying current document.
    * @param pred_cells List of predicted cells, along with their scores.
    * @param correct_cell Correct cell.
-   * @param grsize Total size of the ranking grid. (For example, a total size
-   *   of 21 will result in a ranking grid with the correct cell and 10
-   *   cells on each side shown.)
    */
-  def output_ranking_grid(pred_cells: Iterable[(MultiRegularCell, Double)],
-    correct_cell: MultiRegularCell, grsize: Int) {
-    val (true_latind, true_longind) =
-      (correct_cell.index.latind, correct_cell.index.longind)
+  override def output_ranking_data(docid: String,
+      xpred_cells: Iterable[(SphereCell, Double)],
+      xcorrect_cell: Option[SphereCell]) {
+    if (xcorrect_cell == None || debug("gridrank-general")) {
+      super.output_ranking_data(docid, xpred_cells, xcorrect_cell)
+      return
+    }
+    val correct_cell = xcorrect_cell.get.asInstanceOf[MultiRegularCell]
+    val pred_cells = xpred_cells.asInstanceOf[Iterable[(MultiRegularCell, Double)]]
+    // Total size of the ranking grid. (For example, a total size
+    // of 21 will result in a ranking grid with the correct cell and 10
+    // cells on each side shown.)
+    val grsize = debugint("gridranksize", GeolocateConstants.gridranksize)
+    val true_latind = correct_cell.index.latind
+    val true_longind = correct_cell.index.longind
     val min_latind = true_latind - grsize / 2
     val max_latind = min_latind + grsize - 1
     val min_longind = true_longind - grsize / 2
@@ -637,10 +646,12 @@ class MultiRegularGrid(
         grid(cell.index) = (cell, -score, rank)
     }
 
-    errprint("Grid ranking, gridsize %sx%s", grsize, grsize)
-    errprint("SW corner: %s", multi_cell_index_to_sw_corner_coord(sw_index))
-    errprint("NE corner: %s", multi_cell_index_to_ne_corner_coord(ne_index))
-    for (doit <- Seq(0, 1)) {
+    errprint("%s: Grid ranking, gridsize %sx%s", docid, grsize, grsize)
+    errprint("%s: SW corner: %s",
+      docid, multi_cell_index_to_sw_corner_coord(sw_index))
+    errprint("%s: NE corner: %s",
+      docid, multi_cell_index_to_ne_corner_coord(ne_index))
+    for (doit <- if (debug("gridrank-score")) Seq(0, 1) else Seq(0)) {
       if (doit == 0)
         errprint("Grid for ranking:")
       else
@@ -655,20 +666,22 @@ class MultiRegularGrid(
               multi_cell_index_to_ne_corner_coord(index),
               grid.get(index) match {
                 case None => "NA"
-                case Some((cell, value, rank)) => {
-                  (if (doit == 0) rank else value).toString
-                }
+                case Some((cell, value, rank)) =>
+                  if (doit == 0) s"$rank" else "$value"
               }
             )
           } else {
             grid.get(index) match {
               case None => errout(" %-8s", "NA")
               case Some((cell, value, rank)) => {
-                val showit = if (doit == 0) rank else value
-                //if (lat == true_latind && long == true_longind)
-                //  errout(" !%-8.6f", showit)
-                //else
-                  errout(" %-8.6f", showit)
+                val showit =
+                  if (doit == 0) "%-8s" format rank
+                  else "%-8.6f" format value
+                if (debug("gridrank-show-correct") && lat == true_latind &&
+                    long == true_longind)
+                  errout(" !%s", showit)
+                else
+                  errout(" %s", showit)
               }
             }
           }

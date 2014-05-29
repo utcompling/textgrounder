@@ -102,7 +102,7 @@ class KdTreeGrid(
   existingGrid: Option[KdTreeGrid] = None,
   existingGridNewLeaves: Iterable[KdTree] = Iterable(),
   cutoffBucketSize: Int = 0
-) extends RealSphereGrid(docfact, id) {
+) extends RectangularGrid(docfact, id) {
   def short_type = "kd"
 
   if (useBackoff && cutoffBucketSize > 0)

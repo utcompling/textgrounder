@@ -496,6 +496,10 @@ abstract class Grid[Co](
    */
   def iter_nonempty_cells: IndexedSeq[GridCell[Co]]
 
+  def output_ranking_data(title: String,
+      pred_cells: Iterable[(GridCell[Co], Double)],
+      correct_cell: Option[GridCell[Co]]) { }
+
   /*********************** Not meant to be overridden *********************/
 
   /* Sum of prior weighting for each cell. */
