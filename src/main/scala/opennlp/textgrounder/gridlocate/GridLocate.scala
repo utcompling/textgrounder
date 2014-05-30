@@ -1794,6 +1794,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       }
     }
 
+    if (debug("output-grid"))
+      grid.output_cells(s"$id (level $level)", grid.iter_nonempty_cells)
+
     grid
   }
 

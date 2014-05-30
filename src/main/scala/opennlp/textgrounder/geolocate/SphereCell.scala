@@ -253,10 +253,35 @@ abstract class RectangularGrid(
   docfact: GridDocFactory[SphereCoord],
   id: String
 ) extends RealSphereGrid(docfact, id) {
+
+  def get_bbox(bboxstr: String) = {
+    if (bboxstr != "") {
+      val Array(swlat, swlong, nelat, nelong) = bboxstr.split(":")
+      Some(BoundingBox(SphereCoord(swlat.toDouble, swlong.toDouble),
+             SphereCoord(nelat.toDouble, nelong.toDouble)))
+    } else None
+  }
+
+  def cell_matches_bbox(cell: RectangularCell, bbox: Option[BoundingBox]) = {
+    bbox == None || {
+      val cell_box =
+        BoundingBox(cell.get_southwest_coord, cell.get_northeast_coord)
+      cell_box.overlaps(bbox.get)
+    }
+  }
+
+  def bbox_english(bbox: Option[BoundingBox]) = {
+    bbox match {
+      case None => "no bounding box"
+      case Some(b) => s"bounding box $b"
+    }
+  }
+
   /**
    * Output data so that a nice graph can be created showing the ranks of
    * cells surrounding the true cell, out to a certain distance.
    *
+   * @param docid Prefix for headers, identifying the document in question
    * @param pred_cells List of predicted cells, along with their scores.
    * @param correct_cell Correct cell.
    */
@@ -265,37 +290,40 @@ abstract class RectangularGrid(
       xcorrect_cell: Option[SphereCell]) {
     val pred_cells =
       xpred_cells.asInstanceOf[Iterable[(RectangularCell, Double)]]
-    val bboxstr = debugval("gridrank-bbox")
-    val bbox =
-      if (bboxstr != "") {
-        val Array(swlat, swlong, nelat, nelong) = bboxstr.split(":")
-        Some(BoundingBox(SphereCoord(swlat.toDouble, swlong.toDouble),
-               SphereCoord(nelat.toDouble, nelong.toDouble)))
-      } else None
+    val bbox = get_bbox(debugval("gridrank-bbox"))
     val pred_cell_rank = pred_cells zip (1 to pred_cells.size)
     val filtered_pred_cells =
       pred_cell_rank.filter { case ((cell, score), rank) =>
-        bbox == None || {
-          val cell_box =
-            BoundingBox(cell.get_southwest_coord, cell.get_northeast_coord)
-          cell_box.overlaps(bbox.get)
-        }
+        cell_matches_bbox(cell, bbox)
       }
-    val bbox_english = bbox match {
-      case None => "no bounding box"
-      case Some(b) => s"bounding box $b"
-    }
-    errprint("%s: Grid for ranking, %s:", docid, bbox_english)
+    errprint("%s: Grid for ranking, %s:", docid, bbox_english(bbox))
     for (((cell, score), rank) <- filtered_pred_cells) {
       errprint("%s\t%s\t%s", cell.get_southwest_coord,
         cell.get_northeast_coord, rank)
     }
     if (debug("gridrank-score")) {
-      errprint("%s: Grid for score, %s:", docid, bbox_english)
+      errprint("%s: Grid for score, %s:", docid, bbox_english(bbox))
       for (((cell, score), rank) <- filtered_pred_cells) {
         errprint("%s\t%s\t%s", cell.get_southwest_coord,
           cell.get_northeast_coord, score)
       }
+    }
+  }
+
+  /**
+   * Output a grid so that a nice graph can be created showing the grid.
+   *
+   * @param gridid Prefix for headers, identifying the grid in question
+   * @param cells List of grid cells.
+   */
+  override def output_cells(gridid: String, xcells: Iterable[SphereCell]) {
+    val cells =
+      xcells.asInstanceOf[Iterable[RectangularCell]]
+    val bbox = get_bbox(debugval("gridrank-bbox"))
+    val filtered_cells = cells.filter { cell => cell_matches_bbox(cell, bbox) }
+    errprint("%s: Grid, %s:", gridid, bbox_english(bbox))
+    for (cell <- filtered_cells) {
+      errprint("%s\t%s", cell.get_southwest_coord, cell.get_northeast_coord)
     }
   }
 }

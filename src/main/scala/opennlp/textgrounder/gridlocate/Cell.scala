@@ -496,9 +496,11 @@ abstract class Grid[Co](
    */
   def iter_nonempty_cells: IndexedSeq[GridCell[Co]]
 
-  def output_ranking_data(title: String,
+  def output_ranking_data(docid: String,
       pred_cells: Iterable[(GridCell[Co], Double)],
       correct_cell: Option[GridCell[Co]]) { }
+
+  def output_cells(gridid: String, cells: Iterable[GridCell[Co]]) { }
 
   /*********************** Not meant to be overridden *********************/
 
