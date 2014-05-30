@@ -30,7 +30,7 @@ import java.util.LinkedList;
 /**
  * An efficient well-optimized kd-tree
  *
- * @author Rednaxela
+ * @author Originally, Rednaxela. Improved by Stephen Roller and Ben Wing.
  */
 public class KdTree {
     // split method enum
@@ -52,7 +52,16 @@ public class KdTree {
     private double                     splitValue;
 
     // Bounds
+    // //
+    // minLimit and maxLimit are determined by the points in the
+    // node. minBoundary and maxBoundary are the same as minLimit
+    // and maxLimit for the root, and otherwise are determined by
+    // the boundaries of the parent node and the split location.
+    // The idea is that the rectangles as returned by the boundaries
+    // should tile the space delimited by the root node, whereas the
+    // limits may not do so.
     public double[]                    minLimit, maxLimit;
+    public double[]                    minBoundary, maxBoundary;
     private boolean                    singularity;
 
     /**
@@ -127,6 +136,14 @@ public class KdTree {
         locations[locationCount] = location;
         locationCount++;
         extendBounds(location);
+        // We are the root node, so set the boundaries to be the same
+        // as the limits.
+        if (minBoundary == null) {
+            minBoundary = new double[dimensions];
+            maxBoundary = new double[dimensions];
+        }
+        System.arraycopy(minLimit, 0, minBoundary, 0, dimensions);
+        System.arraycopy(maxLimit, 0, maxBoundary, 0, dimensions);
     }
 
     /**
@@ -303,6 +320,18 @@ public class KdTree {
             KdTree left = new ChildNode(cursor, false);
             KdTree right = new ChildNode(cursor, true);
 
+            // Set child leaf boundaries
+            left.minBoundary = new double[dimensions];
+            left.maxBoundary = new double[dimensions];
+            right.minBoundary = new double[dimensions];
+            right.maxBoundary = new double[dimensions];
+            System.arraycopy(cursor.minBoundary, 0, left.minBoundary, 0, dimensions);
+            System.arraycopy(cursor.maxBoundary, 0, left.maxBoundary, 0, dimensions);
+            System.arraycopy(cursor.minBoundary, 0, right.minBoundary, 0, dimensions);
+            System.arraycopy(cursor.maxBoundary, 0, right.maxBoundary, 0, dimensions);
+            left.maxBoundary[cursor.splitDimension] = cursor.splitValue;
+            right.minBoundary[cursor.splitDimension] = cursor.splitValue;
+
             // Move locations into children
             for (int i = 0; i < cursor.locationCount; i++) {
                double[] oldLocation = cursor.locations[i];
@@ -381,6 +410,11 @@ public class KdTree {
         }
 
         protected double pointRegionDist(double[] point, double[] min, double[] max) {
+            throw new IllegalStateException();
+        }
+
+        // Points should always be added to the root node
+        public void addPoint(double[] location) {
             throw new IllegalStateException();
         }
     }

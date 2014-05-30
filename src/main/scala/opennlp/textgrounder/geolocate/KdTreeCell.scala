@@ -44,10 +44,10 @@ class KdTreeCell(
 ) extends RectangularCell(cellgrid) {
 
   def get_southwest_coord =
-    new SphereCoord(kdnode.minLimit(0), kdnode.minLimit(1))
+    new SphereCoord(kdnode.minBoundary(0), kdnode.minBoundary(1))
 
   def get_northeast_coord =
-    new SphereCoord(kdnode.maxLimit(0), kdnode.maxLimit(1))
+    new SphereCoord(kdnode.maxBoundary(0), kdnode.maxBoundary(1))
 
   // FIXME! Describe path down to this node.
   def format_indices = {
@@ -227,8 +227,8 @@ class KdTreeGrid(
       errprint("%s%s#: (%s,%s) - (%s,%s): %s",
         "  " * depth,
         node.size,
-        node.minLimit(0), node.minLimit(1),
-        node.maxLimit(0), node.maxLimit(1),
+        node.minBoundary(0), node.minBoundary(1),
+        node.maxBoundary(0), node.maxBoundary(1),
         nodes_to_cell(node))
       val left = node.getLeft
       if (left != null)
