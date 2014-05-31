@@ -165,6 +165,24 @@ abstract class RectangularCell(
    */
   def get_northeast_coord: SphereCoord
 
+  /**
+   * Return the coordinate of the true southwest point of the rectangle.
+   * This is a total hack because the definition of `get_southwest_coord`
+   * and `get_northeast_coord` for K-d cells uses the min/max limits not
+   * the actual boundary of the cell, but various existing saved models
+   * for the hierarchical classifier depend on this. Fix this when we
+   * get rid of or rebuild these saved K-d models (both the *.model and
+   * *.submodel, since the saved model sorts by the center, which changes),
+   * by changing the definition of `get_southwest_coord`
+   * and `get_northeast_coord` to refer to the boundary not the limits.
+   */
+  def get_southwest_farthest_extent = get_southwest_coord
+  /**
+   * Return the coordinate of the true northeast point of the rectangle.
+   * This is a total hack, see `get_southwest_farthest_extent`.
+   */
+  def get_northeast_farthest_extent = get_northeast_coord
+
   def format_location = {
     "%s:%s" format (get_southwest_coord, get_northeast_coord)
   }
@@ -265,7 +283,8 @@ abstract class RectangularGrid(
   def cell_matches_bbox(cell: RectangularCell, bbox: Option[BoundingBox]) = {
     bbox == None || {
       val cell_box =
-        BoundingBox(cell.get_southwest_coord, cell.get_northeast_coord)
+        BoundingBox(cell.get_southwest_farthest_extent,
+          cell.get_northeast_farthest_extent)
       cell_box.overlaps(bbox.get)
     }
   }
@@ -298,14 +317,14 @@ abstract class RectangularGrid(
       }
     errprint("%s: Grid for ranking, %s:", docid, bbox_english(bbox))
     for (((cell, score), rank) <- filtered_pred_cells) {
-      errprint("%s\t%s\t%s", cell.get_southwest_coord,
-        cell.get_northeast_coord, rank)
+      errprint("%s\t%s\t%s", cell.get_southwest_farthest_extent,
+        cell.get_northeast_farthest_extent, rank)
     }
     if (debug("gridrank-score")) {
       errprint("%s: Grid for score, %s:", docid, bbox_english(bbox))
       for (((cell, score), rank) <- filtered_pred_cells) {
-        errprint("%s\t%s\t%s", cell.get_southwest_coord,
-          cell.get_northeast_coord, score)
+        errprint("%s\t%s\t%s", cell.get_southwest_farthest_extent,
+          cell.get_northeast_farthest_extent, score)
       }
     }
   }
@@ -323,7 +342,8 @@ abstract class RectangularGrid(
     val filtered_cells = cells.filter { cell => cell_matches_bbox(cell, bbox) }
     errprint("%s: Grid, %s:", gridid, bbox_english(bbox))
     for (cell <- filtered_cells) {
-      errprint("%s\t%s", cell.get_southwest_coord, cell.get_northeast_coord)
+      errprint("%s\t%s", cell.get_southwest_farthest_extent,
+        cell.get_northeast_farthest_extent)
     }
   }
 }
