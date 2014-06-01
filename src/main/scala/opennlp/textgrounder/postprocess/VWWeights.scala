@@ -41,12 +41,18 @@ class VWWeightsParameters(ap: ArgParser) {
     metavar = "FILE",
     help="""File output using --invert_hash argument in Vowpal Wabbit.""")
 
-  var highest_weight = ap.option[String]("highest-weight",
-    "hw",
+  var output_highest_weights = ap.option[String]("output-highest-weights",
+    "ohw",
     metavar = "FILE",
-    help="""File to output highest seen weight for given feature.
+    help="""File to output highest seen weight for each feature to.
 There is a separate weight for each combination of feature and cell.
 This outputs the highest weight seen for any cell.""")
+
+  var output_weights = ap.option[String]("output-weights",
+    "ow",
+    metavar = "FILE",
+    help="""File to output weights to.
+There is a separate weight for each combination of feature and cell.""")
 
   var debug =
     ap.option[String]("d", "debug", metavar = "FLAGS",
@@ -120,7 +126,7 @@ object VWWeights extends ExperimentApp("VWWeights") {
       ((name, cell), weight)
     }
     val sorted_weights = named_weights.toSeq.sortWith(_._2 > _._2)
-    if (params.highest_weight != null) {
+    if (params.output_highest_weights != null) {
       val highest_weight = doublemap[String]()
       sorted_weights.foreach { case ((name, cell), weight) =>
         // Under normal circumstances, the first weight we see will
@@ -129,10 +135,13 @@ object VWWeights extends ExperimentApp("VWWeights") {
           highest_weight(name) = weight
       }
       output_reverse_sorted_table(highest_weight,
-        outfile = localfh.openw(params.highest_weight))
+        outfile = localfh.openw(params.output_highest_weights))
     }
-    sorted_weights.foreach { case ((name, cell), weight) =>
-      println(s"$name:$cell = $weight")
+    if (params.output_weights != null) {
+      val weight_file = localfh.openw(params.output_weights)
+      sorted_weights.foreach { case ((name, cell), weight) =>
+        weight_file.println(s"$name:$cell = $weight")
+      }
     }
     0
   }
