@@ -249,7 +249,7 @@ abstract class GridCell[Co](
      */
 
     if (doc.isInstanceOf[geolocate.CophirDoc] &&
-        !debug("no-cophir-bias-reduction")) {
+        debug("cophir-bias-reduction")) {
       val cophirdoc = doc.asInstanceOf[geolocate.CophirDoc]
       for (word <- doc.lang_model.grid_lm.iter_keys) {
         // The old way of doing it, when user ID's were Ints (insufficient):
