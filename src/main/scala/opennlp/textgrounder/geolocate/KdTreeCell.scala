@@ -164,6 +164,19 @@ class KdTreeGrid(
     }
   }
 
+  // Fetch the leaf nodes underneath the given node.
+  def get_leaf_nodes(node: KdTree): Seq[KdTree] = {
+    val left = node.getLeft
+    val right = node.getRight
+    if (left == null && right == null)
+      Seq(node)
+    else {
+      assert(left != null)
+      assert(right != null)
+      get_leaf_nodes(left) ++ get_leaf_nodes(right)
+    }
+  }
+
   // Fetch the nodes down to the cutoff given by `cutoffBucketSize`
   def get_nodes_to_cutoff(nodes: Iterable[KdTree], cutoff: Int
       ): Iterable[KdTree] = {
@@ -225,24 +238,36 @@ class KdTreeGrid(
     val kdcell = cell.asInstanceOf[KdTreeCell]
     val (new_nodes, _) =
       get_nodes_to_subdivide_depth(Seq(kdcell.kdnode))
+    if (debug("assert-leaf")) {
+      errprint("Asserting leaf")
+      for (node <- new_nodes)
+        assert(node.getLeft == null && node.getRight == null, {
+          errprint("Saw non-leaf node:")
+          describe_node(node, 1)
+          s"Saw non-leaf node $node"
+        })
+      val leaf_nodes = get_leaf_nodes(kdcell.kdnode)
+      assert_==(new_nodes.size, leaf_nodes.size)
+    }
     new_nodes.map(nodes_to_cell(_))
   }
 
+  def describe_node(node: KdTree, depth: Int) {
+    errprint("%s%s#: (%s,%s) - (%s,%s): %s",
+      "  " * depth,
+      node.size,
+      node.minBoundary(0), node.minBoundary(1),
+      node.maxBoundary(0), node.maxBoundary(1),
+      nodes_to_cell(node))
+    val left = node.getLeft
+    if (left != null)
+      describe_node(left, depth + 1)
+    val right = node.getRight
+    if (right != null)
+      describe_node(right, depth + 1)
+  }
+
   def describe_kd_tree() {
-    def describe_node(node: KdTree, depth: Int) {
-      errprint("%s%s#: (%s,%s) - (%s,%s): %s",
-        "  " * depth,
-        node.size,
-        node.minBoundary(0), node.minBoundary(1),
-        node.maxBoundary(0), node.maxBoundary(1),
-        nodes_to_cell(node))
-      val left = node.getLeft
-      if (left != null)
-        describe_node(left, depth + 1)
-      val right = node.getRight
-      if (right != null)
-        describe_node(right, depth + 1)
-    }
     describe_node(kdtree, 0)
   }
 
