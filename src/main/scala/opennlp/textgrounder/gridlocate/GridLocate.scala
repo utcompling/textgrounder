@@ -2664,6 +2664,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       candidates.map { cell =>
         (cell, featvec_factory.lookup_cell(cell))
       }
+    assert_==(cells_labels.size,
+      featvec_factory.featvec_factory.mapper.number_of_labels)
 
     val cell_label_mapping_file = debugval("write-cell-label-mapping")
     if (cell_label_mapping_file != "") {
@@ -2711,9 +2713,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           // Train classifier.
           val feats_filename =
             trainer.write_cost_sensitive_feature_file(training_data)
-          assert_==(cells_labels.size,
-            featvec_factory.featvec_factory.mapper.number_of_labels,
-            "#labels")
           feats_filename
         } else {
           val training_data =
@@ -2728,6 +2727,10 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         // Train classifier.
         val num_labels =
           featvec_factory.featvec_factory.mapper.number_of_labels
+        assert_==(cells_labels.size, num_labels,
+          "#labels")
+        assert_==(candidates.size, num_labels,
+          "#labels")
         val extra_args = vw_param_args ++
           (if (cost_sensitive) {
             val multiclass_arg =
@@ -2823,6 +2826,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           assert(subcands.size > 0,
             s"Saw zero-length subcells for cell $cand (index ${index + 1}) at centroid ${cand.get_centroid}")
           if (debug("hier-classifier")) {
+            errprint("For candidate %s:", cand)
             errprint("#Subdivided cells: %s", subcands.size)
             for ((subcand, index) <- subcands.zipWithIndex) {
               errprint(s"#${index + 1}: ${subcand.format_coord(subcand.get_central_point)}, numdocs = ${subcand.num_docs}")

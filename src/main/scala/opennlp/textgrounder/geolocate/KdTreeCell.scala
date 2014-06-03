@@ -248,6 +248,7 @@ class KdTreeGrid(
         })
       val leaf_nodes = get_leaf_nodes(kdcell.kdnode)
       assert_==(new_nodes.size, leaf_nodes.size)
+      errprint("For cell %s, %s subdividing cells", cell, new_nodes.size)
     }
     new_nodes.map(nodes_to_cell(_))
   }
