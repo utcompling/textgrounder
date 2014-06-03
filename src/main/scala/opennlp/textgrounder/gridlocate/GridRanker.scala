@@ -691,8 +691,8 @@ class HierarchicalClassifierGridRanker[Co](
     var prev_scores =
       raw_prev_scores.toIndexedSeq.sortWith(_._2 > _._2)
     if (do_gridrank)
-      coarsest_grid.output_ranking_data(s"${doc.title} (level 1)", prev_scores,
-        correct)
+      coarsest_grid.output_ranking_data(s"${doc.title} (level 1)",
+        prev_scores, None, correct)
     // Then, for each grid at the next finer level ...
     for (((finer, rankers), level) <-
          grids.tail zip finer_rankers zip Stream.from(2)) {
@@ -709,7 +709,8 @@ class HierarchicalClassifierGridRanker[Co](
         if (do_gridrank) {
           val docid = "%s (level %s, index %s, cell %s)" format (
             doc.title, level, index, old_cell.format_location)
-          finer.output_ranking_data(docid, doc_ranked_scores, correct)
+          finer.output_ranking_data(docid, doc_ranked_scores, Some(old_cell),
+            correct)
         }
         // Fetch the top cell and corresponding log-probability
         val (top_cell, top_score) = doc_ranked_scores.head

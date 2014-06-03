@@ -503,10 +503,28 @@ abstract class Grid[Co](
    */
   def iter_nonempty_cells: IndexedSeq[GridCell[Co]]
 
+  /**
+   * Output a "ranking grid" of information so that a nice graph
+   * can be created showing the ranks of cells surrounding the true
+   * cell, out to a certain distance.
+   *
+   * @param docid Text identifying current document.
+   * @param pred_cells List of predicted cells, along with their scores.
+   * @param parent_cell Parent cell of the predicted cells, in
+   *   hierarchical classification.
+   * @param correct_cell Correct cell.
+   */
   def output_ranking_data(docid: String,
       pred_cells: Iterable[(GridCell[Co], Double)],
+      parent_cell: Option[GridCell[Co]],
       correct_cell: Option[GridCell[Co]]) { }
 
+  /**
+   * Output a grid so that a nice graph can be created showing the grid.
+   *
+   * @param gridid Prefix for headers, identifying the grid in question
+   * @param cells List of grid cells.
+   */
   def output_cells(gridid: String, cells: Iterable[GridCell[Co]]) { }
 
   /*********************** Not meant to be overridden *********************/

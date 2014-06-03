@@ -296,16 +296,9 @@ abstract class RectangularGrid(
     }
   }
 
-  /**
-   * Output data so that a nice graph can be created showing the ranks of
-   * cells surrounding the true cell, out to a certain distance.
-   *
-   * @param docid Prefix for headers, identifying the document in question
-   * @param pred_cells List of predicted cells, along with their scores.
-   * @param correct_cell Correct cell.
-   */
   override def output_ranking_data(docid: String,
       xpred_cells: Iterable[(SphereCell, Double)],
+      xparent_cell: Option[SphereCell],
       xcorrect_cell: Option[SphereCell]) {
     val pred_cells =
       xpred_cells.asInstanceOf[Iterable[(RectangularCell, Double)]]
@@ -329,12 +322,6 @@ abstract class RectangularGrid(
     }
   }
 
-  /**
-   * Output a grid so that a nice graph can be created showing the grid.
-   *
-   * @param gridid Prefix for headers, identifying the grid in question
-   * @param cells List of grid cells.
-   */
   override def output_cells(gridid: String, xcells: Iterable[SphereCell]) {
     val cells =
       xcells.asInstanceOf[Iterable[RectangularCell]]

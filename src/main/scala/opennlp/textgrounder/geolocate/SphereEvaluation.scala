@@ -278,7 +278,8 @@ class RankedSphereDocEvalResult(
         debuglist_matches_alphanum("gridrank", wrapped.document.title)) {
       val docid = "%s (%s)" format (wrapped.document.title, doctag)
       val correct = wrapped.correct.get.correct_cell
-      correct.grid.output_ranking_data(docid, wrapped.pred_cells, Some(correct))
+      correct.grid.output_ranking_data(docid, wrapped.pred_cells,
+        None, Some(correct))
     }
   }
 }

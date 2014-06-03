@@ -239,7 +239,7 @@ class KdTreeGrid(
     val (new_nodes, _) =
       get_nodes_to_subdivide_depth(Seq(kdcell.kdnode))
     if (debug("assert-leaf")) {
-      errprint("Asserting leaf")
+      errprint("Asserting leaf in get_subdivided_cells")
       for (node <- new_nodes)
         assert(node.getLeft == null && node.getRight == null, {
           errprint("Saw non-leaf node:")
@@ -252,19 +252,24 @@ class KdTreeGrid(
     new_nodes.map(nodes_to_cell(_))
   }
 
-  def describe_node(node: KdTree, depth: Int) {
-    errprint("%s%s#: (%s,%s) - (%s,%s): %s",
+  def describe_node(node: KdTree, depth: Int,
+      fn: KdTree => String = x => "") {
+    errprint("%s%s#: (%s,%s) - (%s,%s): %s%s",
       "  " * depth,
       node.size,
       node.minBoundary(0), node.minBoundary(1),
       node.maxBoundary(0), node.maxBoundary(1),
-      nodes_to_cell(node))
+      nodes_to_cell(node), {
+        val str = fn(node)
+        if (str == "") ""
+        else s": $str"
+      })
     val left = node.getLeft
     if (left != null)
-      describe_node(left, depth + 1)
+      describe_node(left, depth + 1, fn)
     val right = node.getRight
     if (right != null)
-      describe_node(right, depth + 1)
+      describe_node(right, depth + 1, fn)
   }
 
   def describe_kd_tree() {
@@ -411,6 +416,47 @@ class KdTreeGrid(
       assert_>(leaf.size, 0)
       nodes_to_cell(leaf)
     }).toIndexedSeq
+  }
+
+  override def output_ranking_data(docid: String,
+      xpred_cells: Iterable[(SphereCell, Double)],
+      xparent_cell: Option[SphereCell],
+      xcorrect_cell: Option[SphereCell]) {
+    super.output_ranking_data(docid, xpred_cells, xparent_cell, xcorrect_cell)
+    if (xparent_cell == None || !debug("assert-leaf"))
+      return
+    val parent_cell = xparent_cell.get.asInstanceOf[KdTreeCell]
+    val pred_cells = xpred_cells.asInstanceOf[Iterable[(KdTreeCell, Double)]]
+    errprint("Asserting leaf in output_ranking_data")
+    errprint(s"cutoffBucketSize is $cutoffBucketSize")
+    for ((cell, score) <- pred_cells) {
+      val node = cell.kdnode
+      assert(node.getLeft == null && node.getRight == null, {
+        errprint("Saw non-leaf node:")
+        describe_node(node, 1)
+        s"Saw non-leaf node $node"
+      })
+    }
+    val parent_node = parent_cell.kdnode
+    val pred_score_rank_map =
+      pred_cells.zip(Stream.from(1)).map {
+        case ((cell, score), rank) => (cell.kdnode, (score, rank))
+      }.toMap
+    describe_node(parent_node, 0, node => {
+      if (pred_score_rank_map contains node) {
+        val (score, rank) = pred_score_rank_map(node)
+        val str = s"rank: $rank, score: $score"
+        if (node.getLeft == null && node.getRight == null) str
+        else s"WARNING: NON-LEAF NODE IN PRED_CELLS: $str"
+      } else if (node.getLeft == null && node.getRight == null)
+        "WARNING: LEAF NODE NOT IN PRED_CELLS"
+        else
+        "(non-leaf node)"
+    })
+    val leaf_nodes = get_leaf_nodes(parent_node)
+    assert_==(pred_cells.size, leaf_nodes.size)
+    val pred_nodes = pred_cells.map { case (cell, score) => cell.kdnode }
+    assert_==(pred_nodes.toSet, leaf_nodes.toSet)
   }
 }
 

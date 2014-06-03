@@ -608,20 +608,12 @@ class MultiRegularGrid(
     } yield v).toIndexedSeq
   }
 
-  /**
-   * Output a "ranking grid" of information so that a nice graph
-   * can be created showing the ranks of cells surrounding the true
-   * cell, out to a certain distance.
-   *
-   * @param docid Text identifying current document.
-   * @param pred_cells List of predicted cells, along with their scores.
-   * @param correct_cell Correct cell.
-   */
   override def output_ranking_data(docid: String,
       xpred_cells: Iterable[(SphereCell, Double)],
+      xparent_cell: Option[SphereCell],
       xcorrect_cell: Option[SphereCell]) {
     if (xcorrect_cell == None || debug("gridrank-general")) {
-      super.output_ranking_data(docid, xpred_cells, xcorrect_cell)
+      super.output_ranking_data(docid, xpred_cells, xparent_cell, xcorrect_cell)
       return
     }
     val correct_cell = xcorrect_cell.get.asInstanceOf[MultiRegularCell]
