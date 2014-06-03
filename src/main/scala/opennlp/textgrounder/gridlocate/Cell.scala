@@ -36,6 +36,14 @@ import langmodel.{LangModelFactory, Gram}
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
+object GridCell {
+  private var next_cell_no = 0
+  def get_next_cell_no = synchronized {
+    next_cell_no += 1
+    next_cell_no
+  }
+}
+
 /**
  * Abstract class for a general cell in a cell grid.
  *
@@ -52,6 +60,8 @@ abstract class GridCell[Co](
 ) {
   /**************************** Basic properties ******************************/
 
+  /** Unique identifier for each cell */
+  val cell_no = GridCell.get_next_cell_no
   /** The combined language model. */
   val lang_model = grid.docfact.lang_model_factory.create_lang_model
   /** Number of documents used to create language model. */
@@ -150,8 +160,8 @@ abstract class GridCell[Co](
           most_salient_point, most_salient_point_salience)
       else ""
 
-    "GridCell(%s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
-      format_location, unfinished, contains,
+    "GridCell(#%s, %s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
+      cell_no, format_location, unfinished, contains,
       num_docs,
       grid_lm.num_types,
       grid_lm.num_tokens,
