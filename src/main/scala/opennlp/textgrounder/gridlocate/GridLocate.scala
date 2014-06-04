@@ -2611,8 +2611,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val agg_fv = AggregateFeatureVector(fvs.toArray)
           // Generate data instance.
           val data_inst = GridRankingClassifierInst(doc, agg_fv, featvec_factory)
-          // Return it, along with correct cell's label.
-          (data_inst, featvec_factory.lookup_cell(correct_cell))
+          // Return it, along with correct cell's label. The correct cell
+          // should always have been seen already, since we filtered the
+          // instances we process to be those that have the correct cell
+          // among the candidates and we already indexed all the candidates
+          // using 'lookup_cell'. So make sure we don't accidentally create
+          // a new cell index by using 'lookup_cell_if'.
+          (data_inst, featvec_factory.lookup_cell_if(correct_cell).get)
         }
 
       // Create classifier trainer.
@@ -2718,7 +2723,13 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           val training_data =
             docs_cells.map/*Metered(task)*/ { case (doc, correct_cell) =>
             val feats = featvec_factory.get_features(doc)
-            (feats, featvec_factory.lookup_cell(correct_cell))
+            // The correct cell should always have been seen already,
+            // since we filtered the instances we process to be those that
+            // have the correct cell among the candidates and we already
+            // indexed all the candidates using 'lookup_cell'. So make sure
+            // we don't accidentally create a new cell index by using
+            // 'lookup_cell_if'.
+            (feats, featvec_factory.lookup_cell_if(correct_cell).get)
           }
 
           trainer.write_feature_file(training_data)

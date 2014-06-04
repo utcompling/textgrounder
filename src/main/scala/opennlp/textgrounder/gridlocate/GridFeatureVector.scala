@@ -68,8 +68,13 @@ trait FeatVecFactory[Co] {
     cell_to_index_map.get(cell) match {
       case Some(index) => index
       case None => {
-        val center = cell.format_coord(cell.get_true_center)
-        val label = featvec_factory.mapper.label_to_index(center)
+        // Formerly we used the cell center formatted using 'format_coord'.
+        // Unfortunately that formatted only to two decimal places, and
+        // in fine-grid K-d trees two different cells could have the
+        // same apparent center and be mapped to the same ID. Use a unique ID
+        // instead.
+        val cell_id = "%s" format cell.cell_no
+        val label = featvec_factory.mapper.label_to_index(cell_id)
         cell_to_index_map += cell -> label
         index_to_cell_map += label -> cell
         label
