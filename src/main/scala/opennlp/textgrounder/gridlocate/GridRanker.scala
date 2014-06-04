@@ -41,6 +41,10 @@ suitability of the cells of the grid for a given document.
 
 */
 
+object GridRanker {
+  private val next_ranker_no = new java.util.concurrent.atomic.AtomicInteger
+}
+
 /**
  * A ranker for ranking cells in a grid as possible matches for a given
  * document (aka "grid-locating a document").
@@ -54,11 +58,18 @@ abstract class GridRanker[Co](
   val ranker_name: String,
   val grid: Grid[Co]
 ) extends Ranker[GridDoc[Co], GridCell[Co]] {
+  /** Unique identifier for each ranker */
+  val ranker_no = GridRanker.next_ranker_no.incrementAndGet
+
   /** Optional initialization stage passing one or more times over the
    * test data. */
   def initialize(
     get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
   ) { }
+
+  override def toString = {
+    "%s(#%s)" format (getClass.getSimpleName, ranker_no)
+  }
 }
 
 /**

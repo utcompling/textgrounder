@@ -37,11 +37,7 @@ import langmodel.{LangModelFactory, Gram}
 /////////////////////////////////////////////////////////////////////////////
 
 object GridCell {
-  private var next_cell_no = 0
-  def get_next_cell_no = synchronized {
-    next_cell_no += 1
-    next_cell_no
-  }
+  private val next_cell_no = new java.util.concurrent.atomic.AtomicInteger
 }
 
 /**
@@ -61,7 +57,7 @@ abstract class GridCell[Co](
   /**************************** Basic properties ******************************/
 
   /** Unique identifier for each cell */
-  val cell_no = GridCell.get_next_cell_no
+  val cell_no = GridCell.next_cell_no.incrementAndGet
   /** The combined language model. */
   val lang_model = grid.docfact.lang_model_factory.create_lang_model
   /** Number of documents used to create language model. */
@@ -160,7 +156,8 @@ abstract class GridCell[Co](
           most_salient_point, most_salient_point_salience)
       else ""
 
-    "GridCell(#%s, %s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
+    "%s(#%s, %s%s%s, %s documents, %s grid types, %s grid tokens, %s rerank types, %s rerank tokens, %s salience)" format (
+      getClass.getSimpleName,
       cell_no, format_location, unfinished, contains,
       num_docs,
       grid_lm.num_types,
