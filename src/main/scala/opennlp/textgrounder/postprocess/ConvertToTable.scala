@@ -69,6 +69,10 @@ have one group in it to pick out the value.""")
     must = be_specified,
     help="""Field name to use for data in the cells.""")
 
+  var no_duplicates = ap.flag("no-duplicates", "no-dups", "nd",
+    help = """Disallow duplicate values for the same x/y cell, unless
+both values are the same.""")
+
   var debug =
     ap.option[String]("debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
@@ -129,6 +133,12 @@ object ConvertToTable extends ExperimentApp("ConvertToTable") {
         }
       }
       val z = fields(data_field)
+      if (values.contains((x, y)) && values((x, y)) != z) {
+        val mess = s"Duplicate value for entry x=$x, y=$y, old=${values((x, y))}, new=$z"
+        if (params.no_duplicates)
+          throw new IllegalStateException(mess)
+        errprint("Warning: %s", mess)
+      }
       values((x, y)) = z
     }
     val x_values = values.keys.map(_._1).toSet.toSeq.sorted
