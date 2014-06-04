@@ -44,15 +44,9 @@ class KdTreeCell(
 ) extends RectangularCell(cellgrid) {
 
   def get_southwest_coord =
-    new SphereCoord(kdnode.minLimit(0), kdnode.minLimit(1))
-
-  def get_northeast_coord =
-    new SphereCoord(kdnode.maxLimit(0), kdnode.maxLimit(1))
-
-  override def get_southwest_farthest_extent =
     new SphereCoord(kdnode.minBoundary(0), kdnode.minBoundary(1))
 
-  override def get_northeast_farthest_extent =
+  def get_northeast_coord =
     new SphereCoord(kdnode.maxBoundary(0), kdnode.maxBoundary(1))
 
   // FIXME! Describe path down to this node.
