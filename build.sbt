@@ -9,7 +9,7 @@ version := "0.1.0"
 organization := "OpenNLP"
 
 // If you change this, you also have to change bin/textgrounder (SCALA_LIB)
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
 crossPaths := false
 
@@ -40,9 +40,9 @@ resolvers += "snapshots" at "http://oss.sonatype.org/content/repositories/snapsh
 libraryDependencies ++= Seq(
   // "com.google.guava" % "guava" % "15.0",
   // "org.jdom" % "jdom" % "2.0.5",
-  "org.apache.commons" % "commons-lang3" % "3.1",
-  "org.apache.commons" % "commons-compress" % "1.5",
-  "net.liftweb" %% "lift-json" % "2.6-M1",
+  "org.apache.commons" % "commons-lang3" % "3.3.2",
+  "org.apache.commons" % "commons-compress" % "1.8.1",
+  "net.liftweb" %% "lift-json" % "3.0-M1",
   // The following don't appear to be used currently.
   // "com.google.inject" % "guice" % "3.0",
   // "commons-cli" % "commons-cli" % "1.2",
@@ -59,7 +59,7 @@ libraryDependencies ++= Seq(
   // remove this!)
   // "org.clapper" %% "argot" % "1.0.1",
   // If we remove Argot we need to include Argot's dependencies.
-  "org.clapper" %% "grizzled-scala" % "1.1.2",
+  "org.clapper" %% "grizzled-scala" % "1.2",
   // 
   // The following is the old way we got Hadoop added.  Out of date, has lots
   // of problems.  Now it's included as a dependency of Scoobi. 
@@ -96,13 +96,13 @@ libraryDependencies ++= Seq(
   // "com.nicta" % "scoobi_2.9.2" % "0.4.0" % "provided",
   // Scoobi's dependencies.
   "javassist" % "javassist" % "3.12.1.GA",
-  "org.apache.avro" % "avro-mapred" % "1.7.2",
-  "org.apache.avro" % "avro" % "1.7.2",
+  "org.apache.avro" % "avro-mapred" % "1.7.6",
+  "org.apache.avro" % "avro" % "1.7.6",
   "org.apache.hadoop" % "hadoop-core" % "0.20.2-cdh3u1",
-  "com.thoughtworks.xstream" % "xstream" % "1.4.3" intransitive(),
-  "org.scalaz" %% "scalaz-core" % "7.1.0-M3",
-  // "org.scalaz" %% "scalaz-core" % "7.0.3",
-  "org.specs2" %% "specs2" % "1.12.3" % "optional",
+  "com.thoughtworks.xstream" % "xstream" % "1.4.7" intransitive(),
+  "org.scalaz" %% "scalaz-core" % "7.1.0-M7",
+  // "org.scalaz" %% "scalaz-core" % "7.0.6",
+  "org.specs2" %% "specs2" % "1.14" % "optional",
   "com.chuusai" %% "shapeless" % "1.2.4",
   //
   // Additional dependency related to Scoobi; not in Scoobi's build.sbt.
