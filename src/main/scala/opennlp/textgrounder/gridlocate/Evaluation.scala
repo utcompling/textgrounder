@@ -202,16 +202,7 @@ class DocEvalResult[Co](
       document.grid_lm.num_tokens)
   }
 
-  /**
-   * Print out the evaluation result, possibly along with some of the
-   * top-ranked cells.
-   *
-   * @param doctag A short string identifying the document (e.g. '#25'),
-   *   to be printed out at the beginning of diagnostic lines describing
-   *   the document and its evaluation results.
-   */
-  def print_result(doctag: String) {
-    print_document(doctag)
+  protected def main_print_result(doctag: String) {
     if (correct == None) {
       errprint("%s:  Predicted cell central point at %s",
         doctag, document.format_coord(pred_coord))
@@ -227,6 +218,19 @@ class DocEvalResult[Co](
           doctag, cinfo.correct_cell)
       }
     }
+  }
+
+  /**
+   * Print out the evaluation result, possibly along with some of the
+   * top-ranked cells.
+   *
+   * @param doctag A short string identifying the document (e.g. '#25'),
+   *   to be printed out at the beginning of diagnostic lines describing
+   *   the document and its evaluation results.
+   */
+  def print_result(doctag: String) {
+    print_document(doctag)
+    main_print_result(doctag)
   }
 
   def to_row = {
@@ -906,8 +910,8 @@ class RankedDocEvalResult[Co](
   document, pred_cell.grid,
   pred_cell.get_central_point
 ) {
-  override def print_result(doctag: String) {
-    super.print_result(doctag)
+  override def main_print_result(doctag: String) {
+    super.main_print_result(doctag)
     correct_rank.foreach { crank =>
       errprint(s"$doctag:  correct cell at rank: $crank")
     }
@@ -1054,6 +1058,20 @@ class FullRankedDocEvalResult[Co](
     print_top_cell_table(pred_cells, doctag, correct_rank, "rank")
   }
 
+  protected def print_predicted_cells_as_list(doctag: String) {
+    val num_cells_to_output =
+      if (grid.driver.params.num_top_cells_to_output >= 0)
+         math.min(grid.driver.params.num_top_cells_to_output, pred_cells.size)
+      else pred_cells.size
+    for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex
+) {
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        doctag, i + 1, -score, cell)
+    }
+  }
+
   protected def print_knn_result(doctag: String) {
     if (grid.driver.params.print_knn_results && document.has_coord) {
       val num_nearest_neighbors = grid.driver.params.num_nearest_neighbors
@@ -1120,7 +1138,13 @@ class FullRankedDocEvalResult[Co](
   override def print_result(doctag: String) {
     print_all_scores(doctag)
     print_document(doctag)
-    print_predicted_cell_table(doctag)
+    if (grid.driver.params.print_results_as_list) {
+      // Print extra information from the superclass print method because
+      // Fieldspring makes use of it.
+      super.main_print_result(doctag)
+      print_predicted_cells_as_list(doctag)
+    } else
+      print_predicted_cell_table(doctag)
     print_knn_result(doctag)
     print_relcontribgrams(doctag)
   }
