@@ -72,18 +72,10 @@ package io {
    * @param errors How to handle conversion errors. (FIXME: Not implemented.)
    */
   class FileIterator(
-      stream: InputStream,
-      encoding: String = "UTF-8",
+      var reader: BufferedReader,
       chomp: Boolean = true,
-      close: Boolean = true,
-      errors: String = "strict"
+      close: Boolean = true
   ) extends Iterator[String] {
-    var ireader = new InputStreamReader(stream, encoding)
-    var reader =
-      // Wrapping in a BufferedReader is necessary because readLine() doesn't
-      // exist on plain InputStreamReaders
-      /* if (bufsize > 0) new BufferedReader(ireader, bufsize) else */
-      new BufferedReader(ireader)
     var nextline: String = null
     var hit_eof: Boolean = false
     protected def getNextLine() = {
@@ -156,6 +148,28 @@ package io {
     }
 
     /**
+     * Return a BufferedReader that reads from the given InputStream.
+     *
+     * @param stream InputStream to read from.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.
+     *
+     * @return BufferedReader to read from
+     */
+    def get_buffered_reader(stream: InputStream, encoding: String = "UTF-8",
+        errors: String = "strict", bufsize: Int = 0) = {
+      var ireader = new InputStreamReader(stream, encoding)
+      var reader =
+        // Wrapping in a BufferedReader is necessary because readLine() doesn't
+        // exist on plain InputStreamReaders
+        if (bufsize > 0) new BufferedReader(ireader, bufsize)
+        else new BufferedReader(ireader)
+      reader
+    }
+
+    /**
      * Return an OutputStream that writes to the given file, usually with
      * buffering.
      *
@@ -194,8 +208,7 @@ package io {
      *   EOF is reached.
      * @param errors How to handle conversion errors. (FIXME: Not implemented.)
      * @param bufsize Buffering size.  If 0 (the default), the default
-     *   buffer size is used.  If &gt; 0, the specified size is used.  If
-     *   &lt; 0, there is no buffering.
+     *   buffer size is used.  If &gt; 0, the specified size is used.
      *
      * @return A tuple `(iterator, compression_type, uncompressed_filename)`
      *   where `iterator` is the iterator over lines, `compression_type` is
@@ -205,17 +218,16 @@ package io {
      *   that indicates compression).
      *
      * @see `FileIterator`, `get_input_stream`,
-     *   `get_input_stream_handling_compression`
+     *   `open_input_stream`, `open_buffered_reader`
      */
     def openr_with_compression_info(filename: String,
         encoding: String = "UTF-8", compression: String = "byname",
         chomp: Boolean = true, close: Boolean = true,
         errors: String = "strict", bufsize: Int = 0) = {
-      val (stream, comtype, realname) =
-        get_input_stream_handling_compression(filename,
-          compression=compression, bufsize=bufsize)
-      (new FileIterator(stream, encoding=encoding, chomp=chomp, close=close,
-         errors=errors), comtype, realname)
+      val (reader, comtype, realname) =
+        open_buffered_reader_with_compression_info(filename,
+          encoding, compression, errors, bufsize)
+      (new FileIterator(reader, chomp=chomp, close=close), comtype, realname)
     }
 
     /**
@@ -237,8 +249,7 @@ package io {
      *   EOF is reached.
      * @param errors How to handle conversion errors. (FIXME: Not implemented.)
      * @param bufsize Buffering size.  If 0 (the default), the default
-     *   buffer size is used.  If &gt; 0, the specified size is used.  If
-     *   &lt; 0, there is no buffering.
+     *   buffer size is used.  If &gt; 0, the specified size is used.
      *
      * @return An iterator over lines.  Use `openr_with_compression_info` to
      *   also get the actual type of compression and the uncompressed name
@@ -248,7 +259,7 @@ package io {
      *   using the `close()` method on the iterator.
      *
      * @see `FileIterator`, `openr_with_compression_info`, `get_input_stream`,
-     *   `get_input_stream_handling_compression`
+     *   `open_input_stream`, `open_buffered_reader`
      */
     def openr(filename: String, encoding: String = "UTF-8",
         compression: String = "byname", chomp: Boolean = true,
@@ -316,7 +327,7 @@ package io {
      *   uncompressed file would have (typically by removing the extension
      *   that indicates compression).
      */
-    def get_input_stream_handling_compression(filename: String,
+    def open_input_stream_with_compression_info(filename: String,
         compression: String = "byname", bufsize: Int = 0) = {
       val raw_in = get_input_stream(filename, bufsize)
       val comtype =
@@ -336,6 +347,96 @@ package io {
         }
       }
       (in, comtype, realname)
+    }
+
+    /**
+     * Create an InputStream that reads from the given file, usually with
+     * buffering and automatic decompression.  Either the decompression
+     * format can be given explicitly (including "none"), or the function can
+     * be instructed to use the extension of the filename to determine the
+     * compression format (e.g. ".gz" for gzip).
+     *
+     * @param filename Name of the file.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     *
+     * @return An InputStream, the stream to read from
+     */
+    def open_input_stream(filename: String,
+        compression: String = "byname", bufsize: Int = 0) = {
+      val (stream, _, _) =
+        open_input_stream_with_compression_info(filename, compression,
+          bufsize)
+      stream
+    }
+
+    /**
+     * Create a BufferedReader that reads from the given file, usually with
+     * automatic decompression.  Either the decompression format can be given
+     * explicitly (including "none"), or the function can be instructed to
+     * use the extension of the filename to determine the compression format
+     * (e.g. ".gz" for gzip).
+     *
+     * @param filename Name of the file.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.
+     *
+     * @return A tuple `(reader, compression_type, uncompressed_filename)`
+     *   where `reader` is the reader to read from, `compression_type` is
+     *   a string indicating the actual compression of the file ("none",
+     *   "gzip" or "bzip2") and `uncompressed_filename` is the name the
+     *   uncompressed file would have (typically by removing the extension
+     *   that indicates compression).
+     */
+    def open_buffered_reader_with_compression_info(filename: String,
+        encoding: String = "UTF-8", compression: String = "byname",
+        errors: String = "strict", bufsize: Int = 0) = {
+      val (is, comtype, realname) =
+        open_input_stream_with_compression_info(filename, compression,
+          // DO NOT set this to -1. The lack of buffering leads to 100x
+          // slowdown in bzip2 decompression.
+          bufsize = bufsize)
+      val reader = get_buffered_reader(is, encoding, errors, bufsize)
+      (reader, comtype, realname)
+    }
+
+    /**
+     * Create a BufferedReader that reads from the given file, usually with
+     * automatic decompression.  Either the decompression format can be given
+     * explicitly (including "none"), or the function can be instructed to
+     * use the extension of the filename to determine the compression format
+     * (e.g. ".gz" for gzip).
+     *
+     * @param filename Name of the file.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.
+     *
+     * @return BufferedReader to read from
+     */
+    def open_buffered_reader(filename: String,
+        encoding: String = "UTF-8", compression: String = "byname",
+        errors: String = "strict", bufsize: Int = 0) = {
+      val (reader, _, _) =
+        open_buffered_reader_with_compression_info(filename, encoding,
+          compression, errors, bufsize)
+      reader
     }
 
     /**
