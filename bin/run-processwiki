@@ -39,12 +39,12 @@ combine-article-data = Combine the previous three outputs into a combined
 split-dump = Split the dump into pieces
 coord-counts = Generate counts file, articles with coordinates only
 all-counts = Generate counts file, all articles
-coord-woords = Generate words file (i.e. raw text of articles), articles
-               with coordinates only
+coord-words = Generate words file (i.e. raw text of articles), articles
+              with coordinates only
 all-words = Generate words file, all articles
-coord-woords-untok = Same as 'coord-words' but split only on whitespace;
-                     don't attempt further tokenization (e.g. separating out
-                     periods that are likely to be end-of-sentence markers).
+coord-words-untok = Same as 'coord-words' but split only on whitespace;
+                    don't attempt further tokenization (e.g. separating out
+                    periods that are likely to be end-of-sentence markers).
 all-words-untok = Same as 'all-words' but without further tokenization, as in
                   'coord-words-untok'.
 toponym-eval = Generate data file for use in toponym evaluation.  The file
