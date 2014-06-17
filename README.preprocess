@@ -336,7 +336,7 @@ higher-level scripts to keep track of the various files.
    dump file. It has three modes:
 
    -- 'permute' generates a permutation of the article metadata file.
-   -- 'split' splits the raw dump file into separate splits (usually 8),
+   -- 'split' splits the raw dump file into separate splits (usually 20),
       dividing the articles according to the corresponding split of the
       permuted article metadata file but otherwise preserving the original
       ordering. This mode is also used on the permuted dump file, to
@@ -380,8 +380,10 @@ USE_PERMUTED     If set to "no", uses the non-permuted version of the dump
                  file.  If set to "yes", always try to use the permuted
                  version.  If blank or unset, use permuted version if it
                  appears to exist, non-permuted otherwise.
+MAX_DEV_TEST_SIZE If set to a number, the dev and test sets will have at most
+                 this many instances, with the remainder in the training set.
 
-These two variables can be set on the command line used to execute
+These variables can be set on the command line used to execute
 'run-processwiki'.
 
 
@@ -416,16 +418,16 @@ USE_PERMUTED=no run-processwiki article-data
 3. A permuted dump file 'enwiki-20111007-permuted-pages-articles.xml.bz2' is
    generated.  This uses the article data file from the previous step to
    specify the list of articles.  Basically, this list is permuted randomly,
-   then divided into 8 parts according to the new order.  Then, the dump file
+   then divided into 20 parts according to the new order.  Then, the dump file
    is processed serially article-by-article, outputting the article into one
-   of the 8 split files, according to the part it belongs in.  Then, each
+   of the 20 split files, according to the part it belongs in.  Then, each
    split file is sorted in memory and written out again, and finally the
    parts are concatenated and compressed.  This avoids having to read the
    entire dump file into memory and sort it, which may not be possible.
 
 run-permute all
 
-4. Split the permuted dump into 8 parts, for faster processing.  This could
+4. Split the permuted dump into 20 parts, for faster processing.  This could
    probably re-use the parts from the previous step, but currently it is
    written to be an independent operation.
 
@@ -440,9 +442,9 @@ run-processwiki split-dump
 
 run-processwiki combined-article-data
 
-Note that from here on out, we set NUM_SIMULTANEOUS to 8 to indicate that
-we should do parallel operation on the 8 split parts.  This will spawn off
-8 processes to handle the separate parts, except in certain cases where
+Note that from here on out, we set NUM_SIMULTANEOUS to 20 to indicate that
+we should do parallel operation on the 20 split parts.  This will spawn off
+20 processes to handle the separate parts, except in certain cases where
 the parts cannot be processed separately.
 
 This step actually has a number of subparts:
@@ -592,7 +594,7 @@ WP_VERSION=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwiki
 
 WP_VERSION=enwiki-20111007 run-processwiki split-dump
 
-   This takes maybe 45 mins and splits the whole dump file into 8 pieces.
+   This takes maybe 45 mins and splits the whole dump file into 20 pieces.
    (Controllable through NUM_SPLITS.)
 
    Then, each operation you want to do in divide-and-conquer mode, run it

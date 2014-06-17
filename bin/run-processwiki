@@ -83,6 +83,8 @@ USE_PERMUTED     If set to "no", uses the non-permuted version of the dump
                  file.  If set to "yes", always try to use the permuted
                  version.  If blank, use permuted version if it appears to
                  exist, non-permuted otherwise.
+MAX_DEV_TEST_SIZE If set to a number, the dev and test sets will have at most
+                 this many instances, with the remainder in the training set.
 
 To generate the necessary data files from scratch, see README.preprocess.
 
@@ -203,6 +205,11 @@ echo "Combining article data ..."
 args="--links-file $OUT_COORD_LINKS_FILE \
   --coords-file $OUT_COORDS_FILE \
   --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE"
+if [ -n "$MAX_DEV_TEST_SIZE" ]; then
+  args="$args \
+    --max-dev-size $MAX_DEV_TEST_SIZE \
+    --max-test-size $MAX_DEV_TEST_SIZE"
+fi
 outfile="$OUT_COMBINED_DOCUMENT_DATA_FILE"
 cmd="$GENERATE_COMBINED $args > $outfile"
 echo "Executing at `date`: $cmd"

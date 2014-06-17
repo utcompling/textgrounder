@@ -6,10 +6,10 @@
 
 # Process options. (No current options.)
 
-#DONT_PERMUTE=no
 while true; do
   case "$1" in
-    #--no-permute ) DONT_PERMUTE=yes; shift ;;
+    --max-dev-test-size )
+      export MAX_DEV_TEST_SIZE="$2"; shift 2 ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
@@ -60,6 +60,11 @@ and it's possible to specify them separately:
                coordinates or redirects to such articles
   combine-article-data: Combine the previous three outputs into a permuted
                         combined article data file
+
+When splitting articles into training, dev and test sets, the split is
+normally 80/10/10 respectively. If '--max-dev-test-size' is given, this
+additionally limits the number of articles placed in the dev and test sets
+to the specified number. If not given or set to 0, there is no limit.
 
 See README.preprocess and the comments in the source file for more details.
 

@@ -141,11 +141,11 @@ coordinates.  May be filtered only for articles and coordinates.""",
                   help="""Maximum number of articles to use for training.
   A value of 0 means no maximum. Default %default.""",
                   metavar="SIZE")
-    op.add_option("--max-dev-size", type='int', default=10000,
+    op.add_option("--max-dev-size", type='int', default=0,
                   help="""Maximum number of articles to use for dev set.
   A value of 0 means no maximum. Default %default.""",
                   metavar="SIZE")
-    op.add_option("--max-test-size", type='int', default=10000,
+    op.add_option("--max-test-size", type='int', default=0,
                   help="""Maximum number of articles to use for test set.
   A value of 0 means no maximum. Default %default.""",
                   metavar="SIZE")
