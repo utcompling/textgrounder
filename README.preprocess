@@ -612,42 +612,85 @@ WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=20 run-processwiki all-bigram-counts
 
 ------ Input files, intermediate files, output files ------
 
-These are specified from the point of view of a dump named "enwiki-20111007",
-in approximate order of generation.
+The following are the files in a directory, from the perspective of a dump
+named `enwiki-20131104`, meaning it's a dump of the English Wikipedia made
+approximately November 4, 2013.
 
-enwiki-20111007-pages-articles.xml.bz2
+1. `enwiki-20131104-pages-articles.xml.bz2`
+
   Raw dump of article text, downloaded from
-  http://download.wikimedia.org/enwiki/20111007/
-  , specifying coordinates (geotags) of articles in the dump file,
+  http://download.wikimedia.org/enwiki/20131104/
+  , specifying coordinates (geotags) of article in the dump file,
   when such information can be extracted.  Extracting the information
   involves a large amount of tricky and tedious parsing of the articles.
+  Parsing is done using `preprocess-dump`, its subscript `run-processwiki`,
+  and the actual script `processwiki.py` that does the work, along with
+  various ancillary scripts.
 
-enwiki-20111007-coords-counts.txt
-  -- Output from passing raw dump through processwiki.py --coords-counts
-  -- For all articles with attached coordinates, lists the article name,
-     coordinates, and counts of all words seen as part of the "useful text"
-     (filtering out directives and such; see processwiki.py for more info)
+2. `enwiki-20131104-permuted-pages-articles.xml.bz2`
 
-enwiki-20111007-just-titles-coords.txt
-  -- Result of filtering output of --coords-counts for only the article
-     title and coordinates, with word counts omitted.
+  Permuted dump. This was created by scanning the raw dump, extracting
+  a list of articles, randomly permuting the list, and sorting the whole
+  dump according to that order. This is actually done by splitting the
+  dump file into pieces (20 pieces when run on Maverick, with 20 cores),
+  loading each piece into memory and writing out according to the
+  permuted order, and then doing a disk merge of the resulting sorted pieces.
+  Note that this essentially does a merge sort on disk, and as a result
+  can be run on a system where the uncompressed dump file cannot fit into
+  main memory. See `run-permute` and `permute_wiki.py`.
 
-enwiki-20111007-links-only-coord-articles.txt
-  -- Result of running the following:
+3. `enwiki-20131104-permuted-combined-document-info.txt`
 
-     processwiki.py --find-links \
-       --coords-file enwiki-20111007-just-titles-coords.out
+  Flat-file database giving information on each article, such as its name,
+  ID, whether it's a redirect, the namespace it's in, whether it's a
+  disambiguation page, the split (training/dev/test) it's in, the
+  latitude/longitude coordinate, and the number of incoming links.
+  It is generated from three files using the analog of an SQL JOIN operation:
 
-  -- For each article with coordinates, lists the number of incoming links
-     to that article.  In addition, a set of tables listing surface forms of
-     links and the corresponding articles linked to, with counts, is output.
-     The surface form of a link is the text that the user sees.  Basically,
-     the entire set of links pointing to articles with coordinates is grouped
-     according to the surface form of the link, and for each different surface
-     form, a table is output listing all articles linked to and the
-     corresponding counts.  This data might be useful in constructing a
-     disambiguator for mapping surface forms to canonical forms for geographic
-     entities (i.e. mapping toponyms to locations).
+  1. `enwiki-20131104-permuted-document-info.txt`
+
+     This file is generated from the permuted dump and has all info except
+     the latitude/longitude coordinates and the internal links.
+
+  2. `enwiki-20131104-permuted-coords.txt`
+
+     Lists articles and their extracted coordinates.
+
+  3. `enwiki-20131104-permuted-links-only-coord-documents.txt`
+
+     This file lists, for each article, how many incoming links point to that
+     article. It also lists, for each article, the different anchor texts
+     used to link to that article and counts of how often they are used.
+     (This info isn't currently used elsewhere but could be.  For example,
+     it might be useful in constructing a disambiguator for mapping surface
+     forms to canonical forms for geographic entities -- i.e. mapping
+     toponyms to locations. This is actually used in the LISTR resolver
+     in FieldSpring, I think.)
+
+4. `enwiki-20131104-permuted-counts-only-coord-documents.txt`
+
+  For each article with a coordinate, this gives unigram counts for all words
+  in the text of the article, one word per line. The preprocessing scripts
+  have an elaborate mechanism to try and sort out "useful" text from
+  directives. When in doubt, they err on the side of inclusion rather than
+  exclusion, and thus may include some directives by mistake.
+
+5. `enwiki-20131104-permuted-training.data.txt`
+   `enwiki-20131104-permuted-dev.data.txt`
+   `enwiki-20131104-permuted-test.data.txt`
+
+  Combination of the info in `enwiki-20131104-permuted-document-info.txt` and
+  `enwiki-20131104-permuted-counts-only-coord-documents.txt`, with one
+  line per article, split into training/dev/test files according to the
+  splits given in `enwiki-20131104-permuted-document-info.txt`.
+
+6. `enwiki-20131104-permuted-training.schema.txt`
+   `enwiki-20131104-permuted-dev.schema.txt`
+   `enwiki-20131104-permuted-test.schema.txt`
+
+  Corresponding schema files for the `.data.txt` files described just above.
+  The combination of a schema and data file makes a TextDB database, a type
+  of flat-file database used in TextGrounder.
 
 
 Other data that could be useful:
