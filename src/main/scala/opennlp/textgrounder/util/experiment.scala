@@ -611,7 +611,6 @@ protected class ExperimentPackage {
      *   positive for error.
      */
     def implement_main(args: Array[String]) = {
-      initialize_osutil()
       set_stdout_stderr_utf_8()
       val shadow_fields = create_param_object(arg_parser)
       arg_parser.parse(args)

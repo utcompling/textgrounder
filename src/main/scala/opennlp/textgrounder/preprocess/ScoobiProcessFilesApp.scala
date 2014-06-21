@@ -207,7 +207,6 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
   }
 
   def init_scoobi_app() = {
-    initialize_osutil()
     val ap = new ArgParser(progname)
     // This first call is necessary, even though it doesn't appear to do
     // anything.  In particular, this ensures that all arguments have been

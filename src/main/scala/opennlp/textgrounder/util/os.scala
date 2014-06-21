@@ -38,7 +38,7 @@ package object os {
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs = System.currentTimeMillis/1000.0
+  def curtimesecs = System.currentTimeMillis / 1000.0
 
   def curtimehuman = (new Date) toString
 
@@ -49,29 +49,11 @@ package object os {
 
   import java.lang.management.ManagementFactory
   def getpid_str = ManagementFactory.getRuntimeMXBean.getName.split("@")(0)
-  private var initialized = false
-  private def check_initialized() {
-    if (!initialized)
-      throw new IllegalStateException("""You must call initialize_osutil()
-at the beginning of your program, in order to use get_program_elapsed_time""")
-  }
-  /**
-   * Call this if you use `get_program_elapsed_time` or `output_resource_usage`.
-   * This is necessary in order to record the time at the beginning of the
-   * program.
-   */
-  def initialize_osutil() {
-    // Simply calling this function is enough, because it will trigger the
-    // loading of the class associated with package object os, which
-    // will cause `beginning_prog_time` to get set.  We set a flag to verify
-    // that this is done.
-    initialized = true
-  }
-  val beginning_prog_time = curtimesecs
+  val beginning_prog_time =
+    ManagementFactory.getRuntimeMXBean.getStartTime / 1000.0
 
   /** Return the amount of elapsed real time since start of program. */
   def get_program_elapsed_time = {
-    check_initialized()
     curtimesecs - beginning_prog_time
   }
 
