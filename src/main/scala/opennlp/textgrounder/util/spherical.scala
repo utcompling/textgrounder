@@ -118,7 +118,7 @@ protected class SphericalPackage {
 
   implicit object SphereCoord extends TextSerializer[SphereCoord] {
     def format_lat_long(lat: Double, long: Double) =
-      "(%.2f,%.2f)".format(lat, long)
+      "(%.5f,%.5f)".format(lat, long)
 
     /** Look up a lat/long coord and return the nearest "place" to the
       * coord, using MapQuest. E.g. -37.8,122.0 maps to
