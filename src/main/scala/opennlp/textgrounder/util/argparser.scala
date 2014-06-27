@@ -382,6 +382,50 @@ package object argparser {
    */
   def be_!=[T](value: T) =
     Must[T]( { x => x != value}, s"value %s must not be = $value")
+
+  /**
+   * Check that the size of a string or iterable is &gt; a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_>[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size > num},
+      s"size of value %s must be > $num")
+  /**
+   * Check that the size of a string or iterable is &gt;= a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_>=[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size >= num},
+      s"size of value %s must be >= $num")
+  /**
+   * Check that the size of a string or iterable is &lt; a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_<[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size < num},
+      s"size of value %s must be < $num")
+  /**
+   * Check that the size of a string or iterable is &lt;= a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_<=[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size <= num},
+      s"size of value %s must be <= $num")
+  /**
+   * Check that the size of a string or iterable is a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_==[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size == num},
+      s"size of value %s must be == $num")
+  /**
+   * Check that the size of a string or iterable is not a given value.
+   * Used with argument `must`. Also allows for the argument to be null, i.e.
+   * unspecified. */
+  def be_size_!=[T <% Iterable[_]](num: Int) =
+    Must[T]( { x => x == null || x.size != num},
+      s"size of value %s must be != $num")
+
   /**
    * Check that the value is within a given integer range. Used with
    * argument `must`.
