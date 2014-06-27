@@ -1065,9 +1065,11 @@ class FullRankedDocEvalResult[Co](
       else pred_cells.size
     for (((cell, score), i) <- pred_cells.take(num_cells_to_output).zipWithIndex
 ) {
-      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
-        // FIXME: This assumes KL-divergence or similar scores, which have
-        // been negated to make larger scores better.
+      // FIXME: For historical reasons we output the negated score. This
+      // is because originally we computed the score using KL-divergence and
+      // negated it to make larger scores better, so we negated again to
+      // get the proper KL-divergence.
+      errprint("%s:  Predicted cell (at rank %s, neg-score %s): %s",
         doctag, i + 1, -score, cell)
     }
   }
