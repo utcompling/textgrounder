@@ -336,72 +336,73 @@ package object argparser {
    * Check that the value is &lt; a given integer. Used with argument `must`.
    */
   def be_<(num: Int) =
-    Must[Int]( { x => x < num }, "value %%s must be < %s" format num)
+    Must[Int]( { x => x < num }, s"value %s must be < $num")
   /**
    * Check that the value is &lt; a given double. Used with argument `must`.
    */
   def be_<(num: Double) =
-    Must[Double]( { x => x < num }, "value %%s must be < %s" format num)
+    Must[Double]( { x => x < num }, s"value %s must be < $num")
   /**
    * Check that the value is &gt; a given integer. Used with argument `must`.
    */
   def be_>(num: Int) =
-    Must[Int]( { x => x > num }, "value %%s must be > %s" format num)
+    Must[Int]( { x => x > num }, s"value %s must be > $num")
   /**
    * Check that the value is &gt; a given double. Used with argument `must`.
    */
   def be_>(num: Double) =
-    Must[Double]( { x => x > num }, "value %%s must be > %s" format num)
+    Must[Double]( { x => x > num }, s"value %s must be > $num")
   /**
    * Check that the value is &lt;= a given integer. Used with argument `must`.
    */
   def be_<=(num: Int) =
-    Must[Int]( { x => x <= num }, "value %%s must be <= %s" format num)
+    Must[Int]( { x => x <= num }, s"value %s must be <= $num")
   /**
    * Check that the value is &lt;= a given double. Used with argument `must`.
    */
   def be_<=(num: Double) =
-    Must[Double]( { x => x <= num }, "value %%s must be <= %s" format num)
+    Must[Double]( { x => x <= num }, s"value %s must be <= $num")
   /**
    * Check that the value is &gt;= a given integer. Used with argument `must`.
    */
   def be_>=(num: Int) =
-    Must[Int]( { x => x >= num }, "value %%s must be >= %s" format num)
+    Must[Int]( { x => x >= num }, s"value %s must be >= $num")
   /**
    * Check that the value is &gt;= a given double. Used with argument `must`.
    */
   def be_>=(num: Double) =
-    Must[Double]( { x => x >= num }, "value %%s must be >= %s" format num)
+    Must[Double]( { x => x >= num }, s"value %s must be >= $num")
   /**
    * Check that the value is a given value. Used with argument `must`.
    */
   def be_==[T](value: T) =
-    Must[T]( { x => x == value}, "value %%s must be = %s" format value)
+    Must[T]( { x => x == value}, s"value %s must be = $value")
   /**
    * Check that the value is not a given value. Used with argument `must`.
    */
   def be_!=[T](value: T) =
-    Must[T]( { x => x != value}, "value %%s must not be = %s" format value)
+    Must[T]( { x => x != value}, s"value %s must not be = $value")
   /**
    * Check that the value is within a given integer range. Used with
    * argument `must`.
    */
   def be_within(lower: Int, upper: Int) =
     Must[Int]( { x => x >= lower && x <= upper },
-      "value %%s must be within range [%s, %s]" format (lower, upper))
+      s"value %s must be within range [$lower, $upper]")
   /**
    * Check that the value is within a given double range. Used with
    * argument `must`.
    */
   def be_within(lower: Double, upper: Double) =
     Must[Double]( { x => x >= lower && x <= upper },
-      "value %%s must be within range [%s, %s]" format (lower, upper))
+      s"value %s must be within range [$lower, $upper]")
   /**
    * Check that the value is specified. Used with argument `must`.
    */
   def be_specified[T] =
     Must[T]( { x => x != null.asInstanceOf[T] },
       "value must be specified")
+
   /**
    * Check that the value satisfies all of the given restrictions.
    * Used with argument `must`.
@@ -413,6 +414,7 @@ package object argparser {
         if (errmess == null) "unknown restriction"
         else errmess
       }.mkString(" and "))
+
   /**
    * Check that the value satisfies at least one of the given restrictions.
    * Used with argument `must`.
