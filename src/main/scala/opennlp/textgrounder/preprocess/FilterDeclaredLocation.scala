@@ -108,6 +108,30 @@ object FilterDeclaredLocation extends ExperimentApp("FilterDeclaredLocation") {
     "WY" -> "Wyoming"
   ).map { case (abbrev, full) => (abbrev.toLowerCase, full.toLowerCase) }
 
+  /**
+   * Retrieve a string along a path, checking to make sure the path
+   * exists.
+   */
+  def force_string(value: liftweb.json.JValue, fields: String*): String = {
+    var fieldval = value
+    var path = List[String]()
+    for (field <- fields) {
+      path :+= field
+      fieldval \= field
+      if (fieldval == liftweb.json.JNothing) {
+        val fieldpath = path mkString "."
+        errprint("Can't find field path %s in tweet", fieldpath)
+        return ""
+      }
+    }
+    val values = fieldval.values
+    if (values == null) {
+      errprint("Null value from path %s", fields mkString ".")
+      ""
+    } else
+      fieldval.values.toString
+  }
+
   def run_program(args: Array[String]) = {
     // Map from users to cities seen for that user
     val users_cities = intmapmap[String, String]()
@@ -119,7 +143,7 @@ object FilterDeclaredLocation extends ExperimentApp("FilterDeclaredLocation") {
       for (line <- localfh.openr(file)) {
         val parsed = liftweb.json.parse(line)
         val user = (parsed \ "user" \ "screen_name" values).toString
-        val location = (parsed \ "user" \ "location" values).toString
+        val location = force_string(parsed, "user", "location")
         val loc1 = location.toLowerCase.replaceAll("""[^a-z]""", " ").trim
         val locwords = loc1.split("""\s+""")
         if (locwords.size >= 2 && (cities contains locwords(0))) {
