@@ -352,6 +352,17 @@ Look for any tweets containing the word "clinton" as well as either the words
     following within [5, 1000].  This is an attempt to filter out
     "spammers", i.e. accounts not associated with normal users.""")
 
+  var override_coord = ap.option[String]("override-coord",
+    default = "",
+    help="""Override the latitude/longitude coordinates with the specified
+    values, which should be separated by a comma.""")
+  val (override_lat, override_long) =
+    if (override_coord == "") (0.0, 0.0)
+    else {
+      val Array(lat, long) = override_coord.split(",")
+      (lat.toDouble, long.toDouble)
+    }
+
   /* Whether we are doing tweet-level filtering.  To check whether doing
      group-level filtering, check whether filter_grouping == "none". */
   val has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
@@ -664,7 +675,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def row_fields(opts: ParseTweetsParams) = opts.included_fields
 
     def from_row(schema: Schema, fields: IndexedSeq[String],
-        index: TweetCount) = {
+        index: TweetCount, opts: ParseTweetsParams) = {
       var json = ""
       var path = ""
       var ty = ""
@@ -744,6 +755,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           }
         }
       }
+
+      if (opts.override_coord != "") {
+        lat = opts.override_lat
+        long = opts.override_long
+      }
+
       /* Synthesize missing timestamps and position list from other
        * properties.
        */
@@ -763,9 +780,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         numtweets, positions, user_mentions, retweets, hashtags, urls)
     }
 
-    def from_raw_text(path: String, text: String, index: TweetCount) = {
+    def from_raw_text(path: String, text: String, index: TweetCount,
+        opts: ParseTweetsParams) = {
+      val (lat, long) =
+        if (opts.override_coord != "") (opts.override_lat, opts.override_long)
+        else (NaN, NaN)
       Tweet("", path, index, "tweet", 0, Seq(text), "", 0L, 0L, 0L, 0L,
-        NaN, NaN, 0, 0, "", 1, Map[Timestamp, SphereCoord](),
+        lat, long, 0, 0, "", 1, Map[Timestamp, SphereCoord](),
         empty_map, empty_map, empty_map, empty_map)
     }
   }
@@ -1340,7 +1361,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           val tweet_id = force_string(parsed, "id_str").toLong
           val lang = force_string(parsed, "user", "lang")
           val (lat, long) =
-            if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
+            if (opts.override_coord != "")
+              (opts.override_lat, opts.override_long)
+            else if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
               (NaN, NaN)
             } else {
               val latlong: List[Number] =
@@ -1491,11 +1514,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         bump_counter("total tweets parsed")
         val tweet = opts.input_format match {
           case "raw-lines" =>
-            Tweet.from_raw_text(path, line, lineno)
+            Tweet.from_raw_text(path, line, lineno, opts)
           case "json" => parse_json_lift(path, line, lineno)
           case "textdb" =>
             error_wrap(line, null: Tweet) { line =>
-              Tweet.from_row(opts.input_schema, line.split("\t", -1), lineno)
+              Tweet.from_row(opts.input_schema, line.split("\t", -1), lineno,
+                opts)
             }
         }
         if (tweet == null) {
