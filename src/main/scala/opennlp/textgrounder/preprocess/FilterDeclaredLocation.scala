@@ -37,7 +37,8 @@ Multiple cities should be separated by commas. NOTE: Currently only supports
 single-word city names.""")
   var filtered_tweet_file = ap.option[String]("filtered-tweet-file", "ftf",
     must = be_size_>[String](0), // Allows for unspecified file.
-    help = """File to which filtered tweets are written to.""")
+    help = """Prefix of files to which filtered tweets are written to.
+A separate file is created for each city.""")
   var input = ap.multiPositional[String]("input",
     must = be_specified,
     help = """Tweet file(s) to analyze.""")
@@ -159,34 +160,44 @@ object FilterDeclaredLocation extends ExperimentApp("FilterDeclaredLocation") {
     val states_abbrev = states.keySet
     // Set of full names for states
     val states_full = states.values.toSet
+
+    def parse_line(line: String, print_unrecognized: Boolean = false) = {
+      val parsed = liftweb.json.parse(line)
+      val user = (parsed \ "user" \ "screen_name" values).toString
+      val location = force_string(parsed, "user", "location")
+      val loc1 = location.toLowerCase.replaceAll("""[^a-z]""", " ").trim
+      val locwords = loc1.split("""\s+""")
+      var state = ""
+      if (locwords.size >= 2 && (toponyms contains locwords(0))) {
+        if (states contains locwords(1))
+          state = states(locwords(1))
+        else if (states_full contains locwords(1))
+          state = locwords(1)
+        else if (locwords.size >= 3) {
+          val two_word_state = locwords.slice(1, 3).mkString(" ")
+          if (states_full contains two_word_state)
+            state = two_word_state
+        } else if (locwords.size >= 4) {
+          val three_word_state = locwords.slice(1, 4).mkString(" ")
+          if (states_full contains three_word_state)
+            state = three_word_state
+        }
+        if (print_unrecognized && state.size == 0)
+          errprint("Unrecognized state: %s", location)
+      }
+      if (state.size > 0) {
+        val city = s"${locwords(0)}, $state"
+        (user, city)
+      } else
+        (user, "")
+    }
+
     for (file <- params.input) {
       for (line <- localfh.openr(file)) {
-        val parsed = liftweb.json.parse(line)
-        val user = (parsed \ "user" \ "screen_name" values).toString
-        val location = force_string(parsed, "user", "location")
-        val loc1 = location.toLowerCase.replaceAll("""[^a-z]""", " ").trim
-        val locwords = loc1.split("""\s+""")
-        if (locwords.size >= 2 && (toponyms contains locwords(0))) {
-          var state = ""
-          if (states contains locwords(1))
-            state = states(locwords(1))
-          else if (states_full contains locwords(1))
-            state = locwords(1)
-          else if (locwords.size >= 3) {
-            val two_word_state = locwords.slice(1, 3).mkString(" ")
-            if (states_full contains two_word_state)
-              state = two_word_state
-          } else if (locwords.size >= 4) {
-            val three_word_state = locwords.slice(1, 4).mkString(" ")
-            if (states_full contains three_word_state)
-              state = three_word_state
-          }
-          if (state.length > 0) {
-            val city_state = s"${locwords(0)}, $state"
-            users_cities_tweetcounts_map(user)(city_state) += 1
-            cities_tweetcounts(city_state) += 1
-          } else
-            errprint("Unrecognized state: %s", location)
+        val (user, city) = parse_line(line, print_unrecognized = true)
+        if (city.size > 0) {
+          users_cities_tweetcounts_map(user)(city) += 1
+          cities_tweetcounts(city) += 1
         }
       }
     }
@@ -264,15 +275,20 @@ object FilterDeclaredLocation extends ExperimentApp("FilterDeclaredLocation") {
 
     // Now go through the tweets again and select only those users we want
     if (params.filtered_tweet_file != null) {
-      val outfile = localfh.openw(params.filtered_tweet_file)
+      val files = mutable.Map[String, java.io.PrintStream]()
       for (file <- params.input) {
         for (line <- localfh.openr(file)) {
-          val parsed = liftweb.json.parse(line)
-          val user = (parsed \ "user" \ "screen_name" values).toString
-          if (selected_users contains user)
-            outfile.println(line)
+          val (user, city) = parse_line(line)
+          if (city != "" && (selected_users contains user)) {
+            if (!(files contains city))
+              files(city) = localfh.openw("%s.%s.txt" format (
+                params.filtered_tweet_file, city.replace(" ", "")))
+            files(city).println(line)
+          }
         }
       }
+      for ((city, file) <- files)
+        file.close()
     }
     0
   }
