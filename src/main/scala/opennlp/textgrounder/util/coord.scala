@@ -36,6 +36,10 @@ trait CoordHandler[Co] {
    */
   def format_coord(coord2: Co): String
   /**
+   * Deserialize a coordinate from a string.
+   */
+  def deserialize_coord(str: String): Co
+  /**
    * Output a distance with attached units
    */
   def output_distance(dist: Double): String

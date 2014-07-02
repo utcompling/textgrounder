@@ -313,6 +313,8 @@ abstract class GridCell[Co](
     lang_model.finish_before_global()
     lang_model.finish_after_global()
   }
+
+  def contains(c: Co): Boolean
 }
 
 // Needed so that cells can be sorted. There's a corresponding implicit in
@@ -407,6 +409,12 @@ abstract class Grid[Co](
    */
   def format_coord(coord2: Co) =
     docfact.coord_handler.format_coord(coord2)
+
+  /**
+   * Deserialize a coordinate from a string.
+   */
+  def deserialize_coord(str: String) =
+    docfact.coord_handler.deserialize_coord(str)
 
   /**
    * Output a distance with attached units

@@ -251,6 +251,8 @@ protected class TimePackage {
     def distance_between_coords(c1: TimeCoord, c2: TimeCoord) =
       (coord_as_double(c2) - coord_as_double(c1)).abs
 
+    def deserialize_coord(str: String) = TimeCoord.deserialize(str)
+
     def output_distance(dist: Double) = "%s seconds" format dist
   }
 }

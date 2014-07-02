@@ -419,6 +419,14 @@ them, provided there is only one textdb in the directory.
 The file should be in textdb format, with `name`, `coord` and `salience`
 fields. If omitted, cells will be identified by the most salient document
 in the cell, if documents have their own salience values.""")
+
+  var restrict_coord =
+    ap.option[String]("restrict-coord",
+      metavar = "COORD",
+      default = "",
+      help = """If specified, restrict the possible cells to consider to
+those containing the specified coordinates. Coordinates should be separated
+by semicolons or colons.""")
 }
 
 //// Options indicating which documents to train on or evaluate

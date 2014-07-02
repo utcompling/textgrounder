@@ -261,6 +261,7 @@ protected class SphericalPackage {
     def distance_between_coords(c1: SphereCoord, c2: SphereCoord) =
       spheredist(c1, c2)
     def output_distance(dist: Double) = km_and_miles(dist)
+    def deserialize_coord(str: String) = SphereCoord.deserialize(str)
   }
 
   case class BoundingBox(sw: SphereCoord, ne: SphereCoord) {

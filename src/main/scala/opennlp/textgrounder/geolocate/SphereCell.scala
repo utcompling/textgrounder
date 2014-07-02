@@ -247,6 +247,17 @@ abstract class RectangularCell(
     </Placemark>
     // !!PY2SCALA: END_PASSTHRU
   }
+
+  def contains(c: SphereCoord) = {
+    val sw = get_southwest_coord
+    val ne = get_northeast_coord
+    if (!(c.lat >= sw.lat && c.lat <= ne.lat))
+      false
+    else if (sw.long <= ne.long)
+      c.long >= sw.long && c.long <= ne.long
+    else
+      c.long >= ne.long || c.long <= sw.long
+  }
 }
 
 abstract class RectangularGrid(

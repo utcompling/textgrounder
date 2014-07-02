@@ -741,26 +741,42 @@ abstract class GridEvaluator[Co](
     if (correct_cell != None && driver.params.oracle_results)
       (Iterable((correct_cell.get, 0.0)), Some(1))
     else {
-      ranker match {
-        case reranker: Reranker[GridDoc[Co], GridCell[Co]]
-            if debug("reranker") => {
-          val (initial_ranking, reranking) =
-            reranker.evaluate_with_initial_ranking(document, correct_cell,
+      val result =
+        ranker match {
+          case reranker: Reranker[GridDoc[Co], GridCell[Co]]
+              if debug("reranker") => {
+            val (initial_ranking, reranking) =
+              reranker.evaluate_with_initial_ranking(document, correct_cell,
+                include_correct = false)
+            errprint("Correct cell initial rank: %s",
+              format_correct_rank(get_correct_rank(initial_ranking,
+                correct_cell)))
+            val correct_rank = get_correct_rank(reranking, correct_cell)
+            errprint("Correct cell new rank: %s",
+              format_correct_rank(correct_rank))
+            (reranking, correct_rank)
+          }
+          case _ => {
+            val cells = ranker.evaluate(document, correct_cell,
               include_correct = false)
-          errprint("Correct cell initial rank: %s",
-            format_correct_rank(get_correct_rank(initial_ranking,
-              correct_cell)))
-          val correct_rank = get_correct_rank(reranking, correct_cell)
-          errprint("Correct cell new rank: %s",
-            format_correct_rank(correct_rank))
-          (reranking, correct_rank)
+            (cells, get_correct_rank(cells, correct_cell))
+          }
         }
-        case _ => {
-          val cells = ranker.evaluate(document, correct_cell,
-            include_correct = false)
-          (cells, get_correct_rank(cells, correct_cell))
+      if (driver.params.restrict_coord != "") {
+        val restricted_coords = driver.params.restrict_coord.split("[;:]").
+          map(ranker.grid.deserialize_coord)
+        val (cell_scores, corrank) = result
+        // FIXME! We need to change the corrank value.
+        // Need to find the correct cell if it exists and include it
+        // among the filtered cells
+        val filtered_result = cell_scores filter { case (cell, score) =>
+          restricted_coords.exists(cell contains _)
         }
-      }
+        if (filtered_result.size > 0)
+          (filtered_result, None) // FIXME: Wrong!
+        else
+          (Iterable(cell_scores.head), None) // FIXME: Wrong!
+      } else result
     }
   }
 
