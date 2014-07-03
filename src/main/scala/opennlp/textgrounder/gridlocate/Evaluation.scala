@@ -1008,13 +1008,13 @@ class FullRankedDocEvalResult[Co](
       else topranks ++ Seq(corr_rank.get)
     val other_rank_heading =
       if (other_rank_header != "") Seq(other_rank_header) else Seq()
-    val predicted_headings =
+    val predicted_headings_0 =
       Seq(rank_header) ++
       other_rank_heading ++
       Seq("score") ++
       (if (document.has_coord) Seq("dist(km)") else Seq()) ++
-      Seq("central-pt", "grid", "#doc", /*"#type", "#token",*/ "sal.")
-    val predicted_cell_data =
+      Seq("central-pt", "grid", "#doc" /*"#type", "#token",*/)
+    val cells_predicted_cell_data_0 =
       (for (rank <- ranks) yield {
         val (cell, score, rankstr) =
           if (rank <= cells.size) {
@@ -1031,19 +1031,31 @@ class FullRankedDocEvalResult[Co](
         val other_rank_column = if (other_rank.isEmpty) Seq()
           else if (other_rank contains cell) Seq(s"${other_rank(cell)}")
           else Seq("--")
-        Seq(index) ++ other_rank_column ++ Seq(score) ++
+        (cell, Seq(index) ++ other_rank_column ++ Seq(score) ++
           (if (document.has_coord)
             Seq(min_format_double(document.distance_to_cell(cell)))
            else Seq()) ++
           Seq(
             cell.format_coord(cell.get_central_point),
             cell.grid.id_str,
-            pretty_long(cell.num_docs),
+            pretty_long(cell.num_docs)
             //pretty_long(cell.grid_lm.num_types),
-            //pretty_double(cell.grid_lm.num_tokens),
-            pretty_double(cell.salience)
+            //pretty_double(cell.grid_lm.num_tokens)
           )
+        )
       }).toSeq
+    val (cells_printed, _) = cells_predicted_cell_data_0.unzip
+    val need_salience = cells_printed.exists { _.salience != 0.0 }
+    val need_most_sal = cells_printed.exists { _.most_salient_point != "" }
+    val predicted_headings = predicted_headings_0 ++
+      (if (need_salience) Seq("sal.") else Seq()) ++
+      (if (need_most_sal) Seq("most-sal") else Seq())
+    val predicted_cell_data = cells_predicted_cell_data_0.map {
+      case (cell, predicted_data) =>
+        predicted_data ++
+        (if (need_salience) Seq(pretty_double(cell.salience)) else Seq()) ++
+        (if (need_most_sal) Seq(cell.most_salient_point) else Seq())
+    }
     val fmt = table_column_format(predicted_headings +: predicted_cell_data)
 
     errprint(s"$doctag: " + fmt.format(predicted_headings: _*))
