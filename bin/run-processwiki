@@ -104,7 +104,12 @@ GENERATE_COMBINED="$TG_PYTHON_DIR/generate_combined.py"
 
 LOGFILE="generate-all-data.log"
 
-OTHEROPTS="$MAXTIME $DEBUG"
+# Convert e.g. 'dewiki-20140702' to 'de'. Needed to disambiguate O = Ost
+# (East) in German vs. O = Oeste (West) in Spanish and Portuguese.
+WPLANG=`echo $WP_VERSION | sed 's/wiki.*//'`
+
+OTHEROPTS_AUX="$MAXTIME $DEBUG" # For programs other than processwiki.py
+OTHEROPTS_PW="$MAXTIME $DEBUG --lang $WPLANG" # For processwiki.py
 
 if [ -z "$NUM_SPLITS" ]; then
   NUM_SPLITS=20
@@ -224,7 +229,7 @@ PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 echo "Splitting dump file ..."
 args="--mode=split --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
-  --number-of-splits $NUM_SPLITS $OTHEROPTS"
+  --number-of-splits $NUM_SPLITS $OTHEROPTS_AUX"
 cmd="bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args"
 echo "Executing at `date`: $cmd"
 bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args
@@ -286,14 +291,14 @@ elif [ "$NUM_SIMULTANEOUS" -eq 1 -o -z "$outfile" -o "$cansplit" = "no" ]; then
   # Operate in non-split mode
   echo "$action ..."
   if [ -n "$outfile" ]; then
-    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile"
+    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS_PW > $outfile"
     echo "Executing at `date`: $cmd"
-    bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile
+    bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS_PW > $outfile
     echo "Ended at `date`: $cmd"
   else
-    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS"
+    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS_PW"
     echo "Executing at `date`: $cmd"
-    bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS
+    bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS_PW
     echo "Ended at `date`: $cmd"
   fi
   echo "$action ... done."
@@ -327,9 +332,9 @@ else
       splits="$splits $split_outfile"
       splits_removable="$splits_removable $split_outfile"
       cat_args="$SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog"
-      cmd="cat $cat_args | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &"
+      cmd="cat $cat_args | $PROCESSWIKI $args $OTHEROPTS_PW > $split_outfile &"
       echo "Executing at `date`: $cmd"
-      cat $cat_args | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &
+      cat $cat_args | $PROCESSWIKI $args $OTHEROPTS_PW > $split_outfile &
       echo "Ended at at `date`: $cmd"
       numleft=`expr $numleft - 1`
       numrun=`expr $numrun + 1`

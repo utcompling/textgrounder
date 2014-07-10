@@ -669,8 +669,10 @@ deg/min/sec/DIR indicators like 45/32/30/E.'''
         offind = offind.upper()
         if offind in convert_ns:
           mult = convert_ns[offind]
-        else:
+        elif Opts.lang == 'de':
           mult = convert_ew_german[offind]
+        else:
+          mult = convert_ew[offind]
       else:
         mult = 1
       return convert_dms(mult, deg, min, sec)
@@ -698,8 +700,10 @@ values into a decimal +/- latitude or longitude.'''
   return mult*(lat + min/60. + sec/3600.)
 
 convert_ns = {'N':1, 'S':-1}
+# L = Leste "East" in Portuguese, O = Oeste "West" in Spanish/Portuguese,
+# similarly O = Ouest "West" in French
 convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
-# Blah!! O=Ost="east" in German but O=Oeste="west" in Spanish/Portuguese
+# Blah!! O = Ost "East" in German but opposite in Spanish/Portuguese/French
 convert_ew_german = {'E':1, 'W':-1, 'O':1}
 
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
@@ -782,6 +786,8 @@ def get_lat_long_1(temptype, args, rawargs, latd, latm, lats, offparam, is_lat):
   else:
     if is_lat:
       convert = convert_ns
+    elif Opts.lang == 'de':
+      convert = convert_ew_german
     else:
       convert = convert_ew
     hemismult = convert.get(hemis, None)
@@ -792,48 +798,58 @@ def get_lat_long_1(temptype, args, rawargs, latd, latm, lats, offparam, is_lat):
   return convert_dms(hemismult, d, m, s)
 
 latd_arguments = ('latd', 'latg', 'latdeg', 'latdegrees', 'latitudedegrees',
+  'mouthlatd', # Mouth of rivers, used as coordinate
   'latitudinegradi', 'latgradi', 'latitudined', 'latitudegraden',
-  'breitengrad', 'breddegrad', 'breddegrad')
+  'breitengrad', 'koordinatebreitengrad', 'breddegrad', 'breddegrad')
 def get_latd_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS (converted into
 a hash table; also available in raw form as RAWARGS), assumed to have
 a latitude/longitude specification in it using latd/lat_deg/etc. and
 longd/lon_deg/etc., extract out and return a tuple of decimal
 (latitude, longitude) values.'''
+  # Note that these already have spaces and underscores removed, so should
+  # not be present.
   lat = get_lat_long_1(temptype, args, rawargs,
       latd_arguments,
       ('latm', 'latmin', 'latminutes', 'latitudeminutes',
+         'mouthlatm',
          'latitudineprimi', 'latprimi',
          'latitudineminuti', 'latminuti', 'latitudinem', 'latitudeminuten',
-         'breitenminute', 'breddemin'),
+         'breitenminute', 'koordinatebreitenminute', 'breddemin'),
       ('lats', 'latsec', 'latseconds', 'latitudeseconds',
          'latitudinesecondi', 'latsecondi', 'latitudines', 'latitudeseconden',
-         'breitensekunde'),
-      ('latns', 'latp', 'lap', 'latdir', 'latdirection', 'latitudinens'),
+         'breitensekunde', 'koordinatebreitensekunde'),
+      ('latns', 'mouthlatns', 'latp', 'lap', 'latdir', 'latdirection', 'latitudinens',
+        'koordinatebreite'),
       is_lat=True)
   long = get_lat_long_1(temptype, args, rawargs,
       # Typos like Longtitude do occur in the Spanish Wikipedia at least
       ('longd', 'lond', 'longg', 'long', 'longdeg', 'londeg',
          'longdegrees', 'londegrees',
+         'mouthlats',
          'longitudinegradi', 'longgradi', 'longitudined',
          'longitudedegrees', 'longtitudedegrees',
          'longitudegraden',
-         u'längengrad', 'laengengrad', 'lengdegrad', u'længdegrad'),
+         u'längengrad', u'koordinatelängengrad',
+         'laengengrad', 'lengdegrad', u'længdegrad'),
       ('longm', 'lonm', 'longmin', 'lonmin',
          'longminutes', 'lonminutes',
+         'mouthlatm',
          'longitudineprimi', 'longprimi',
          'longitudineminuti', 'longminuti', 'longitudinem',
          'longitudeminutes', 'longtitudeminutes',
          'longitudeminuten',
-         u'längenminute', u'længdemin'),
+         u'längenminute', u'koordinatelängenminute', u'længdemin'),
       ('longs', 'lons', 'longsec', 'lonsec',
          'longseconds', 'lonseconds',
+         'mouthlats',
          'longitudinesecondi', 'longsecondi', 'longitudines',
          'longitudeseconds', 'longtitudeseconds',
          'longitudeseconden',
-         u'längensekunde'),
-      ('longew', 'lonew', 'longp', 'lonp', 'longdir', 'londir',
-         'longdirection', 'londirection', 'longitudineew'),
+         u'längensekunde', u'koordinatelängensekunde'),
+      ('longew', 'mouthlongew', 'lonew', 'longp', 'lonp', 'longdir', 'londir',
+         'longdirection', 'londirection', 'longitudineew',
+         u'koordinatelänge'),
       is_lat=False)
   return (lat, long)
 
@@ -882,12 +898,14 @@ tuple of decimal (latitude, longitude) values.'''
 
 latitude_arguments = ('latitude', 'latitud', 'latitudine',
     'breitengrad',
+    u'mündunglatgrad', # Mouth of rivers in German Wikipedia
     # 'breite', Sometimes used for latitudes but also for other types of width
     #'lat' # Appears in non-article coordinates
     #'latdec' # Appears to be associated with non-Earth coordinates
     )
 longitude_arguments = ('longitude', 'longitud', 'longitudine',
     u'längengrad', u'laengengrad',
+    u'mündunglonggrad', # Mouth of rivers in German Wikipedia
     # u'länge', u'laenge', Sometimes used for longitudes but also for other lengths
     #'long' # Appears in non-article coordinates
     #'longdec' # Appears to be associated with non-Earth coordinates
@@ -2361,6 +2379,9 @@ Used for testing purposes.  Default %default.""")
   op.add_option("--show-warnings",
                 help="Show warnings indicating parse errors.",
                 action="store_true")
+  op.add_option("--lang",
+                help="""Language of dump file. Used for disambiguating
+O = Ost (East) in German vs. O = Oeste (West) in Spanish and Portuguese.""")
   op.add_option("--debug", metavar="FLAGS",
                 help="Output debug info of the given types (separated by spaces or commas)")
 
