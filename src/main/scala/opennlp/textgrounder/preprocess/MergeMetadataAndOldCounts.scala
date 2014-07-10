@@ -106,7 +106,7 @@ trait SimpleUnigramLangModelBuilder {
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: ")) {
         } else {
-          val linere = "(.*) = ([0-9]+)$".r
+          val linere = "([^ ]*) = ([0-9]+)$".r
           line match {
             case linere(word, count) => {
               // errprint("Saw1 %s,%s", word, count)
