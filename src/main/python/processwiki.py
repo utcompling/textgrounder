@@ -737,6 +737,7 @@ def get_hemisphere(temptype, is_lat):
       if is_lat: return -1
       else: return -1
   for x in ('infobox pittsburgh neighborhood', 'info/assentamento/madeira',
+      'info/localidade da madeira',
       'info/assentamento/marrocos', 'info/localidade dos eua', 'info/pousadapc',
       'info/antigas freguesias de portugal'):
     if temptype.lower().startswith(x):
