@@ -131,13 +131,16 @@ class ComputeWordPropsDriver extends
     val words_counts_1 = cells.map { cell =>
       cell.grid_lm.iter_grams.toMap
     }.reduce[Map[Gram,GramCount]](combine_maps _)
-    errprint(s"Total number of words before filtering: ${words_counts_1.size}")
+    errprint(s"Total number of non-empty cells: ${cells.size}")
+    errprint(s"Total number of words (types) before filtering: ${words_counts_1.size}")
+    val total_wordcount_before_filtering = words_counts_1.values.sum
+    errprint(s"Total count of all words (tokens) before filtering: $total_wordcount_before_filtering")
     val words_counts_2 =
       words_counts_1
       .filter { _._2 >= params.filter_below_count }
       .filter { case (word, count) =>
         first_lm.gram_to_string(word).size >= params.filter_below_length }
-    errprint(s"Total number of words after filtering by count and length: ${words_counts_2.size}")
+    errprint(s"Total number of words (types) after filtering by count and length: ${words_counts_2.size}")
     val words_counts = if (!params.filter_non_alpha) words_counts_2 else
       words_counts_2.filter { case (word, count) =>
         first_lm.gram_to_string(word) match {
@@ -145,10 +148,9 @@ class ComputeWordPropsDriver extends
           case _ => false
         }
       }
-    errprint(s"Total number of words after filtering by alpha: ${words_counts.size}")
-    errprint(s"Total number of non-empty cells: ${cells.size}")
+    errprint(s"Total number of words (types) after filtering by alpha: ${words_counts.size}")
     val total_wordcount = words_counts.values.sum
-    errprint(s"Total count of all words: $total_wordcount")
+    errprint(s"Total count of all words (tokens) after filtering: $total_wordcount")
     val word_set = words_counts.keys.toSet
 
     if (debug("compute-word-props")) {
