@@ -146,7 +146,7 @@ class MMCUnigramLangModelHandler(
 
   def handle_document(title: String, keys: Array[String], values: Array[Int],
       num_words: Int) = {
-    errprint("Handling document: %s", title)
+    // errprint("Handling document: %s", title)
     val params = document_fieldvals.getOrElse(title, null)
     if (params == null)
       warning("Strange, can't find document %s in document file", title)
