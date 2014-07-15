@@ -22,7 +22,7 @@ package util
 import scala.util.control.Breaks._
 import scala.collection.mutable
 
-import org.clapper.argot._
+import com.benwing.argot._
 
 /**
   This module implements an argument parser for Scala, which handles
