@@ -1825,7 +1825,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     } else {
       // FIXME! We need to retrieve the component grids from the combined
       // supergrid and create a subgrid from each.
-      assert(false, "Don't yet know how to handle hierarchical classifier w/multiple grids")
+      if (supergrid != None)
+        assert(false, "Don't yet know how to handle hierarchical classifier w/multiple grids")
       val grids = streams.map { case (id, get_rawdocs) =>
         create_grid_from_documents(supergrid, level, id, get_rawdocs)
       }
