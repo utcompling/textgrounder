@@ -474,13 +474,18 @@ See also '--print-results' for outputting human-readable results to stderr.""")
     ap.flag("print-results-as-list", "pral",
       help = """Also print individual results for each test document in a
 list format that may be easier to parse. Use '--num-top-cells-to-output'
-to control size of outputted list.  Only works in '--print-results' is
-also given.""")
+to control size of outputted list.  Implies '--print-results'.""")
+
+  if (print_results_as_list)
+    print_results = true
 
   var print_knn_results =
     ap.flag("print-knn-results", "show-knn-results", "pkr", "skr",
       help = """Also print kNN-related results for each test document.
-Only works in '--print-results' is also given.""")
+Implies '--print-results'.""")
+
+  if (print_knn_results)
+    print_results = true
 
   var results_by_range =
     ap.flag("results-by-range", "rbr",
