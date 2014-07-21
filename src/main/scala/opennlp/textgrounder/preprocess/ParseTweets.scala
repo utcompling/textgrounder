@@ -285,6 +285,12 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'lang': Language used
 
+    'location': Declared location
+
+    'timezone': Declared timezone
+
+    'utc-offset': Timezone offset from UTC, in seconds
+
     'numtweets': Number of tweets merged
 
     'positions': List of all lat/long positions of users, along with
@@ -492,6 +498,25 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   }
 
   /**
+   * Additional tweet fields that would go into Tweet except that there's
+   * a 22-field limit in case classes. (Technically, this isn't the case
+   * any more with Scala 2.10, but case classes with more than 22 fields
+   * are crippled in certain ways and so we can't use them.)
+   *
+   * @param lang Language used
+   * @param location Declared location in profile
+   * @param timezone Declared timezone
+   * @param utc_offset Timezone offset from UTC, in seconds. Treated as a
+   *   string so we can handle null (blank) and multiple.
+   */
+  case class TweetA(
+    lang: String,
+    location: String,
+    timezone: String,
+    utc_offset: String
+  )
+
+  /**
    * Data for a tweet or grouping of tweets.
    *
    * @param json Raw JSON for tweet; only stored when --output-format=json
@@ -510,13 +535,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    * @param long Best longitude (corresponding to the earliest tweet)
    * @param followers Max followers
    * @param following Max following
-   * @param lang Language used
    * @param numtweets Number of tweets merged
    * @param positions Map of timestamps and positions
    * @param user_mentions Item-count map of all @-mentions
    * @param retweets Like `user_mentions` but only for retweet mentions
    * @param hashtags Item-count map of hashtags
    * @param urls Item-count map of URL's
+   * @param a Extra data
    */
   case class Tweet(
     json: String,
@@ -542,18 +567,19 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     long: Double,
     followers: Int,
     following: Int,
-    lang: String,
     numtweets: TweetCount,
     positions: Map[Timestamp, SphereCoord],
     user_mentions: Map[String, Int],
     retweets: Map[String, Int],
     hashtags: Map[String, Int],
-    urls: Map[String, Int]
+    urls: Map[String, Int],
+    a: TweetA
     /* NOTE: If you add a field here, you need to update a bunch of places,
        including (of course) wherever a Tweet is created, but also
        some less obvious places. (HOWEVER, there are currently 22 fields,
        and adding another one will cause problems at least with WireFormat.
-       In such a case some fields need to be moved into a substructure.)
+       As a result, fields should be added to the TweetA substructure. If
+       that ever fills up with 22 values, TweetB should be created, etc.)
        
        In all:
 
@@ -611,7 +637,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           }
           case "followers" => int(followers)
           case "following" => int(following)
-          case "lang" => string(lang)
+          case "lang" => string(a.lang)
+          case "location" => string(a.location)
+          case "timezone" => string(a.timezone)
+          case "utc-offset" => string(a.utc_offset)
           case "numtweets" => elong(numtweets)
           case "positions" => {
             val strmap =
@@ -646,7 +675,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val small_fields =
       Seq("user", "id", "type", "offset", "path", "index", "min-timestamp",
         "max-timestamp", "geo-timestamp", "coord", "followers", "following",
-        "lang", "numtweets", "num-positions")
+        "lang", "location", "timezone", "utc-offset", "numtweets",
+        "num-positions")
 
     val big_fields =
       Seq("positions", "user-mentions", "retweets", "hashtags", "urls",
@@ -691,6 +721,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var followers = 0
       var following = 0
       var lang = ""
+      var location = ""
+      var timezone = ""
+      var utc_offset = ""
       var numtweets = 1L
       var positions = Map[Timestamp, SphereCoord]()
       var user_mentions = empty_map
@@ -729,6 +762,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           case "followers"     => followers = int(x)
           case "following"     => following = int(x)
           case "lang"          => lang = string(x)
+          case "location"      => location = string(x)
+          case "timezone"      => timezone = string(x)
+          case "utc-offset"    => utc_offset = string(x)
           case "numtweets"     => numtweets = dlong(x)
           case "positions"     => {
             val strmap = string_map(x)
@@ -776,8 +812,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         positions = Map(geo_timestamp -> SphereCoord(lat, long))
 
       Tweet(json, path, index, ty, offset, text, user, id, min_timestamp,
-        max_timestamp, geo_timestamp, lat, long, followers, following, lang,
-        numtweets, positions, user_mentions, retweets, hashtags, urls)
+        max_timestamp, geo_timestamp, lat, long, followers, following,
+        numtweets, positions, user_mentions, retweets, hashtags, urls,
+        TweetA(lang, location, timezone, utc_offset))
     }
 
     def from_raw_text(path: String, text: String, index: TweetCount,
@@ -786,10 +823,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         if (opts.override_coord != "") (opts.override_lat, opts.override_long)
         else (NaN, NaN)
       Tweet("", path, index, "tweet", 0, Seq(text), "", 0L, 0L, 0L, 0L,
-        lat, long, 0, 0, "", 1, Map[Timestamp, SphereCoord](),
-        empty_map, empty_map, empty_map, empty_map)
+        lat, long, 0, 0, 1, Map[Timestamp, SphereCoord](),
+        empty_map, empty_map, empty_map, empty_map, TweetA("", "", "", ""))
     }
   }
+  implicit val tweetAWire = mkCaseWireFormat(TweetA.apply _, TweetA.unapply _)
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 
   /**
@@ -1147,9 +1185,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
       val tweet =
         Tweet("", "", 1, "tweet", 0, Seq(text), "user", 0, timestamp,
-          timestamp, timestamp, NaN, NaN, 0, 0, "unknown", 1,
+          timestamp, timestamp, NaN, NaN, 0, 0, 1,
           Map[Timestamp, SphereCoord](), empty_map, empty_map,
-          empty_map, empty_map)
+          empty_map, empty_map, TweetA("", "", "", ""))
       test(args(0), tweet)
     }
   }
@@ -1215,7 +1253,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
             throw new ParseJSonExit
           }
         }
-        fieldval.values.toString
+        if (fieldval.values == null)
+          ""
+        else
+          fieldval.values.toString
       }
 
       /**
@@ -1340,16 +1381,18 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           bump_counter("tweet deletion notices")
           tweet_offset += 1
           Tweet(json, path, index, "delete", tweet_offset, Seq(), "",
-            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, 1,
             Map[Timestamp, SphereCoord](),
-            empty_map, empty_map, empty_map, empty_map)
+            empty_map, empty_map, empty_map, empty_map,
+            TweetA("", "", "", ""))
         } else if ((parsed \ "limit" values) != None) {
           bump_counter("tweet limit notices")
           tweet_offset += 1
           Tweet(json, path, index, "limit", tweet_offset, Seq(), "",
-            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "", 1,
+            0L, 0L, 0L, 0L, NaN, NaN, 0, 0, 1,
             Map[Timestamp, SphereCoord](),
-            empty_map, empty_map, empty_map, empty_map)
+            empty_map, empty_map, empty_map, empty_map,
+            TweetA("", "", "", ""))
         } else {
           tweet_offset = 0
           val user = force_string(parsed, "user", "screen_name")
@@ -1360,6 +1403,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           val following = force_string(parsed, "user", "friends_count").toInt
           val tweet_id = force_string(parsed, "id_str").toLong
           val lang = force_string(parsed, "user", "lang")
+          val location = force_string(parsed, "user", "location")
+          val timezone = force_string(parsed, "user", "time_zone")
+          val utc_offset = force_string(parsed, "user", "utc_offset")
           val (lat, long) =
             if (opts.override_coord != "")
               (opts.override_lat, opts.override_long)
@@ -1461,8 +1507,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
           Tweet(json, path, index, "tweet", 0, Seq(text), user, tweet_id,
             timestamp, timestamp, timestamp, lat, long, followers,
-            following, lang, 1, positions, user_mentions, retweets, hashtags,
-            urls)
+            following, 1, positions, user_mentions, retweets, hashtags,
+            urls, TweetA(lang, location, timezone, utc_offset))
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -1720,6 +1766,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
              tweet)
     }
 
+    // Do something sensible when merging two strings that are normally the
+    // same for both tweets. FIXME: Perhaps we should keep a set of all
+    // values.
+    def combine_strings(a: String, b: String) = {
+      if (a == "") b
+      else if (b == "") a
+      else if (a != b) "[multiple]"
+      else a
+    }
+
     /**
      * Merge the data associated with two tweets or tweet combinations
      * into a single tweet combination.  Concatenate text.  Find maximum
@@ -1732,9 +1788,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val t1 = tw1.tweet
       val t2 = tw2.tweet
       val id = if (t1.id != t2.id) -1L else t1.id
-      val ty = if (t1.ty != t2.ty) "[multiple]" else t1.ty
-      val lang = if (t1.lang != t2.lang) "[multiple]" else t1.lang
-      val path = if (t1.path != t2.path) "[multiple]" else t1.path
+      val ty = combine_strings(t1.ty, t2.ty)
+      val lang = combine_strings(t1.a.lang, t2.a.lang)
+      val location = combine_strings(t1.a.location, t2.a.location)
+      val timezone = combine_strings(t1.a.timezone, t2.a.timezone)
+      val utc_offset = combine_strings(t1.a.utc_offset, t2.a.utc_offset)
+      val path = combine_strings(t1.path, t2.path)
       val (followers, following) =
         (math.max(t1.followers, t2.followers),
          math.max(t1.following, t2.following))
@@ -1784,7 +1843,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val tweet =
         Tweet("", path, 0, ty, 0, text, t1.user, id, min_timestamp,
           max_timestamp, geo_timestamp, lat, long, followers, following,
-          lang, numtweets, positions, user_mentions, retweets, hashtags, urls)
+          numtweets, positions, user_mentions, retweets, hashtags, urls,
+          TweetA(lang, location, timezone, utc_offset))
       Record(tw1.output_key, "", tw1.matches || tw2.matches, tweet)
     }
 
@@ -2319,8 +2379,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def stats_for_tweet(tweet: Tweet) = {
       Seq(PropertyValueStats.from_tweet(tweet, "user", "user", tweet.user),
           // Get a summary for all languages plus a summary for each lang
-          PropertyValueStats.from_tweet(tweet, "lang", tweet.lang, ""),
-          PropertyValueStats.from_tweet(tweet, "lang", "lang", tweet.lang)) ++
+          PropertyValueStats.from_tweet(tweet, "lang", tweet.a.lang, ""),
+          PropertyValueStats.from_tweet(tweet, "lang", "lang", tweet.a.lang)) ++
         sdfs.map { case (engl, fmt) =>
           PropertyValueStats.from_tweet(
             tweet, engl, format_date(tweet.min_timestamp, fmt), "") }
