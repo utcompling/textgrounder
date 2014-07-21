@@ -36,30 +36,32 @@ STEPS specifies which steps of the process to run. The following is the
 list of possible steps that can be given, in the order they are normally
 executed:
 
-   combined-article-data: Generate permuted combined article-data file
+   article-data: Generate basic permuted article data file
+   split-dump: Split the dump into parts, required by 'coords', 'coord-counts',
+     'all-counts', 'coord-words' and 'all-words'; must be run after
+     'article-data' and before the steps requiring a split dump
+   coords: Generate article coordinates
+   coord-links: Generate article incoming links, only for articles with
+                coordinates or redirects to such articles
+   combine-article-data: Combine the results of 'article-data', 'coords'
+     and 'coord-links' into a permuted combined article data file
    coord-counts: Generate word-count values for articles with coordinates
    all-counts: Generate word-count values for all articles
    coord-words: Generate actual words for articles with coordinates
    all-words: Generate actual words for all articles
 
-If STEPS is omitted or given as 'wiki', the first two steps given above
-will be executed. This is what 'download-preprocess-wiki' does, and runs
-the steps necessary to generate the final TextGrounder corpus.
+If STEPS is omitted or given as 'wiki', the steps given above up through
+'coord-counts' will be executed. This is what 'download-preprocess-wiki' does,
+and runs the steps necessary to generate the final TextGrounder corpus.
 
 If STEPS is given as 'all', all of the above steps are executed. This
 produces some additional files useful for some applications but not the
 primary TextGrounder application, and takes a lot of extra time; for this
 reason, these extra steps aren't normally run.
 
-The STEPS value 'combined-article-data' consists of four individual actions,
-and it's possible to specify them separately:
-
-  article-data: Generate basic permuted article data file
-  coords: Generate article coordinates
-  coord-links: Generate article incoming links, only for articles with
-               coordinates or redirects to such articles
-  combine-article-data: Combine the previous three outputs into a permuted
-                        combined article data file
+If you want to run some of the steps yourself, keep in mind that you need
+to run 'split-dump' before a number of the above steps (see description
+above of 'split-dump').
 
 When splitting articles into training, dev and test sets, the split is
 normally 80/10/10 respectively. If '--max-dev-test-size' is given, this
@@ -82,10 +84,15 @@ if [ "$steps" = "" ]; then
   steps="wiki"
 fi
 
+# Now make everything be simultaneous if possible. This requires that
+# we split the dump below after generating the article-data file.
+export NUM_SIMULTANEOUS=20
+
+wikisteps="article-data split-dump coords coord-links combine-article-data coord-counts"
 if [ "$steps" = "all" ]; then
-  steps="combined-article-data coord-counts all-counts coord-words all-words"
+  steps="$wikisteps all-counts coord-words all-words"
 elif [ "$steps" = "wiki" ]; then
-  steps="combined-article-data coord-counts"
+  steps="$wikisteps"
 fi
 
 # Ensure that all future commands will operate on the permuted dump file
@@ -96,11 +103,6 @@ fi
 # everything is run from start to finish (probably something to do with
 # NFS delays in reporting changes). So forcibly set it to yes.
 export USE_PERMUTED=yes
-# Split the dump so we can faster afterwards
-run-processwiki split-dump
-
-# Now make everything be simultaneous if possible
-export NUM_SIMULTANEOUS=20
 
 for step in $steps; do
   echo "Beginning at `date`: run-processwiki $step"

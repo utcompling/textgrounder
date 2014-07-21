@@ -37,6 +37,11 @@ steps followed by 'all':
    convert: Convert into a textdb corpus
    set-permissions: Set permissions appropriately
 
+It is possible to run only some of the steps. In particular,
+'download' downloads the dump file and 'permute' requires only this file
+to be present. Similarly, 'permute' generates a permuted dump file, and
+'preprocess' requires only this file to be present.
+
 See README.preprocess and the comments in the source file for more details.
 
 FOO
