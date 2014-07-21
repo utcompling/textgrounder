@@ -391,9 +391,9 @@ IMPLEMENTED.)
 //file as a document to evaluate.""")
 
   override protected def ranker_choices = super.ranker_choices ++ Seq(
-        Seq("salience-most-common-toponym"),
+        Seq("salience-most-common-toponym", "salience-commontop"),
         Seq("cell-distribution-most-common-toponym",
-            "celldist-most-common-toponym"))
+            "celldist-most-common-toponym", "celldist-commontop"))
 
   override protected def ranker_baseline_help =
     super.ranker_baseline_help +
