@@ -859,6 +859,7 @@ def get_built_in_lat_long_1(temptype, args, rawargs, latd, latm, lats, mult):
   s = getarg(lats, temptype, args, rawargs, warnifnot=False)
   return convert_dms(mult, d, m, s)
 
+# stopniN, stopniS, stopniE, stopniW occur in the Polish Wikipedia
 built_in_latd_north_arguments = ('stopnin', 'degn')
 built_in_latd_south_arguments = ('stopnis', 'degs')
 built_in_longd_north_arguments = ('stopnie', 'dege')
@@ -927,8 +928,12 @@ def get_infobox_ort_coord(temptype, args, rawargs):
   '''Given a template 'Infobox Ort' with arguments ARGS, assumed to have
 a latitude/longitude specification in it, extract out and return a tuple of
 decimal (latitude, longitude) values.'''
-  # German-style (e.g. 72/53/15/E) also occurs with 'latitude' and such,
-  # so just check for it everywhere.
+  # We handle this template specially rather than just looking for the
+  # template's arguments anywhere because 'breite' ("width") and
+  # 'länge/laenge' ("length") occur in many contexts in many templates where
+  # they don't refer to latitude/longitude.
+  #
+  # Check for German-style (e.g. 72/53/15/E), as in get_latitude_coord().
   lat = get_german_style_coord(getarg((u'breite',),
     temptype, args, rawargs))
   long = get_german_style_coord(getarg((u'länge', u'laenge'),
@@ -1066,9 +1071,6 @@ is:
 {{geocoordenadas|39_15_34_N_24_57_9_E_type:waterbody|39° 15′ 34&quot; N, 24° 57′ 9&quot; O}}
 '''
   if debug['some']: errprint("Passed in args %s" % args)
-  # Filter out optional "template arguments", add a bunch of blank arguments
-  # at the end to make sure we don't get out-of-bounds errors in
-  # get_coord_1()
   if len(args) == 0:
     wikiwarning("No arguments to template 'geocoordenadas'")
     return (None, None)
@@ -1087,6 +1089,47 @@ is:
           m.groups()
       return (convert_dms(convert_ns[latns], latd, latm, lats),
               convert_dms(convert_ew[longew], longd, longm, longs))
+
+def get_koordinaty_coord(arg):
+  u'''Parse the value of a Координаты arg in the Russian Wikipedia. Return
+a tuple (lat,long) for latitude and longitude. Typical example is:
+
+{{Озеро
+ |Название                = Аральское море
+ ...
+ |Координаты              = 44/48/47/N/59/36/55/E
+ ...
+}}
+
+There are also cases like
+
+{{Река
+ |Название               = Красная Вольта
+ ...
+ |Координаты устья       = 10.55933/-0.520223
+ ...
+}}
+'''
+  if debug['some']: errprint("Passed in arg %s" % arg)
+  # Handle extra spaces, commas used instead of periods, lowercase nsew.
+  arg = arg.upper().strip().replace(',','.')
+  # Handle the second type of case above, signed lat/long
+  m = re.match(r'([0-9.-]+)/([0-9.-]+)$', arg)
+  if m:
+    (lat, long) = m.groups()
+    lat = safe_float(lat)
+    long = safe_float(long)
+    return (lat, long)
+  # Handle the first type, with deg/min/sec/hemis
+  m = re.match(r'([0-9.]+)(?:/([0-9.]+))?(?:/([0-9.]+))?/([NS])/([0-9.]+)(?:/([0-9.]+))?(?:/([0-9.]+))?/([EW])$', arg)
+  if not m:
+    wikiwarning(u"Unrecognized value %s to Координаты template arg" % arg)
+    return (None, None)
+  else:
+    (latd, latm, lats, latns, longd, longm, longs, longew) = \
+        m.groups()
+    return (convert_dms(convert_ns[latns], latd, latm, lats),
+            convert_dms(convert_ew[longew], longd, longm, longs))
 
 class ExtractCoordinatesFromSource(RecursiveSourceTextHandler):
   '''Given the article text TEXT of an article (in general, after first-
@@ -1112,6 +1155,8 @@ applied to the text before being sent here.'''
     if debug['some']: errprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
     rawargs = tempargs[1:]
+
+    # Reject non-earth templates that may have coordinate params in them
     if (lowertemp.startswith('info/crater') or
         lowertemp.endswith(' crater data') or
         lowertemp.startswith('marsgeo') or
@@ -1126,42 +1171,64 @@ applied to the text before being sent here.'''
         self.notearth = True
         wikiwarning("Rejecting as not on Earth because saw template %s" % temptype)
         return []
-    # Look for a coordinate template
-    if lowertemp in ('coord', 'coordp', 'coords',
+
+    # 1. Look for some sort of coordinate template.
+    # 1a. Look for {{coord|...}} or other templates that work the same.
+    if (lowertemp in ('coord', 'coordp', 'coords',
                      'koord', #Norwegian
                      'coor', 'coor d', 'coor dm', 'coor dms',
                      'coor title d', 'coor title dm', 'coor title dms',
-                     'coor dec', 'coorheader') \
-        or lowertemp.startswith('geolinks') \
-        or lowertemp.startswith('mapit') \
-        or lowertemp.startswith('koordynaty'): # Coordinates in Polish:
+                     'coor dec', 'coorheader')
+        or lowertemp.startswith('geolinks')
+        or lowertemp.startswith('mapit')
+        or lowertemp.startswith('koordynaty') # Polish
+        or lowertemp.startswith(u'координаты')): # Russian
       (lat, long) = get_coord(temptype, rawargs)
       coord_params = get_coord_params(temptype, tempargs[1:])
       if check_for_bad_globe(coord_params):
         self.notearth = True
         return []
+    # 1b. Look for {{coordinate|...}}.
     elif lowertemp == 'coordinate':
       (lat, long) = get_coordinate_coord(self, temptype, rawargs)
+    # 1c. Look for {{geocoordenadas|...}} or other templates that work the same.
     elif lowertemp in ('geocoordenadas', u'coördinaten'):
       # geocoordenadas is Portuguese, coördinaten is Dutch, and they work
       # the same way
       (lat, long) = get_geocoordenadas_coord(temptype, rawargs)
     else:
-      # Look for any other template with a 'latd' or 'latitude' parameter.
-      # Usually these will be Infobox-type templates.  Possibly we should only
-      # look at templates whose lowercased name begins with "infobox".
+      # 2. Look for any other template with a latitude/longitude parameter,
+      # such as 'latd' or 'latitude'. Usually these will be Infobox-type
+      # templates.  Possibly we should only look at templates whose lowercased
+      # name begins with "infobox" (although in fact there are lots of
+      # templates containing these params that don't begin with "infobox", esp.
+      # in the non-English Wikipedias).
       (paramshash, _) = find_template_params(rawargs, True)
+      # 2a. Look for 'latd/latm/lats/latns' or similar, where the
+      # degree/minute/second/hemisphere values are given with separate
+      # parameters.
       if getarg(latd_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latd_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         (lat, long) = get_latd_coord(temptype, paramshash, rawargs)
+      # 2b. Look for 'latitude', 'longitude' or similar, where a single
+      # parameter holds a signed decimal value for latitude or longitude,
+      # or where the degree/minute/second/hemisphere values are combined
+      # "German-style" (e.g. '45/32/30/E').
+      #
       # NOTE: DO NOT CHANGE ORDER.  We want to check latd first and check
       # latitude afterwards for various reasons (e.g. so that cases where
-      # breitengrad and breitenminute occur get found).  FIXME: Maybe we
+      # 'breitengrad' and 'breitenminute' occur get found -- 'breitengrad'
+      # ("latitude") can occur either by itself with a decimal or German-style
+      # value, or with the minutes/seconds given wtih separate params,
+      # 'breitenminute', 'breitensekunde').  FIXME: Maybe we
       # don't need get_latitude_coord at all, but get_latd_coord will
       # suffice.
       elif getarg(latitude_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latitude_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         (lat, long) = get_latitude_coord(temptype, paramshash, rawargs)
+      # 2c. Look for params like 'degn/degs/dege/degw' where the hemisphere
+      # (N/S/E/W) is built into the name of the param. These work similarly
+      # to 'latd/latm/lats' except for the hemisphere encoding.
       elif (getarg(built_in_latd_north_arguments, temptype, paramshash,
                    rawargs, warnifnot=False) is not None or
             getarg(built_in_latd_south_arguments, temptype, paramshash,
@@ -1169,8 +1236,19 @@ applied to the text before being sent here.'''
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_north_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_south_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         (lat, long) = get_built_in_lat_coord(temptype, paramshash, rawargs)
+      # 2d. Look for templates where the 'width/height' params (or equivalent
+      # in German) refer to latitude/longitude.
       elif lowertemp in ('infobox ort', 'infobox verwaltungseinheit'):
         (lat, long) = get_infobox_ort_coord(temptype, paramshash, rawargs)
+      # 2e. Look for Russian координаты param, which has its own format.
+      else:
+        # Handle normal coordinates, or river-mouth coordinates
+        koordinaty_arg = getarg((u'координаты', u'координаты устья'),
+            temptype, paramshash, rawargs, warnifnot=False)
+        if koordinaty_arg is not None:
+          (lat, long) = get_koordinaty_coord(koordinaty_arg)
+        # 2f. FIXME: Here we should handle the 'coordinates' param, which
+        # has a value that is a {{coord|...}} template call.
 
     if debug['some']: wikiwarning("Saw coordinate %s,%s in template type %s" %
               (lat, long, temptype))
