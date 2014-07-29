@@ -787,7 +787,7 @@ For the perceptron classifiers, see also `--pa-variant`,
     features_simple_doc_cell_gram_choices ++
     features_matching_gram_choices
 
-  val allowed_features =
+  def allowed_features =
     Seq("misc", "types-in-common", "model-compare", "trivial") ++
     features_all_gram_choices
 
@@ -796,7 +796,12 @@ For the perceptron classifiers, see also `--pa-variant`,
       default = "misc",
       help = """Which features to use when using a linear classifier to rank
 the cells for a document. Possibilities are:
+""" + classify_features_help + """
+Multiple feature types can be specified, separated by spaces or commas.
 
+Default %default.""")
+
+  def classify_features_help = """
 'trivial' (no features, for testing purposes);
 
 'gram-binary' (when a gram -- i.e. word or ngram according to the type of
@@ -849,10 +854,7 @@ the cells for a document. Possibilities are:
 'misc' (other non-word-specific features, e.g. number of documents in a cell,
   number of word types/tokens in a cell, etc.; should be fairly fast
   to compute)
-
-Multiple feature types can be specified, separated by spaces or commas.
-
-Default %default.""")
+"""
 
   lazy val classify_feature_list =
     get_feature_list(classify_features, allowed_features,
@@ -2026,9 +2028,61 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
   }
 
+  def create_doc_only_fact(
+    ty: String,
+    featvec_factory: SparseFeatureVectorFactory,
+    binning_status: BinningStatus,
+    output_skip_message: Boolean
+  ): Option[DocFeatVecFactory[Co]] = {
+    if (params.features_simple_doc_only_gram_choices.contains(ty))
+      Some(new GramDocFeatVecFactory[Co](featvec_factory,
+        binning_status, ty))
+    else {
+      if (output_skip_message)
+        errprint(s"Skipping label-dependent feature type $ty")
+      None
+    }
+  }
+
+  def create_doc_cell_fact(
+    ty: String,
+    featvec_factory: SparseFeatureVectorFactory,
+    binning_status: BinningStatus,
+    output_skip_message: Boolean
+  ): Option[CandidateFeatVecFactory[Co]] = {
+    if (params.features_simple_doc_cell_gram_choices contains ty)
+      Some(new GramCandidateFeatVecFactory[Co](featvec_factory,
+        binning_status, ty))
+    else if (params.features_matching_gram_choices contains ty)
+      Some(new GramMatchingCandidateFeatVecFactory[Co](featvec_factory,
+        binning_status, ty))
+    else ty match {
+      case "trivial" =>
+        Some(new TrivialCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status))
+      case "misc" =>
+        Some(new MiscCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status))
+      case "types-in-common" =>
+        Some(new TypesInCommonCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status))
+      case "model-compare" =>
+        Some(new ModelCompareCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status))
+      case "rank-score" =>
+        Some(new RankScoreCandidateFeatVecFactory[Co](featvec_factory,
+          binning_status))
+      case _ => {
+        if (output_skip_message)
+          errprint(s"Skipping document-only feature type $ty")
+        None
+      }
+    }
+  }
+
   /**
-   * Used in conjunction with the reranker. Create a factory that
-   * constructs candidate feature vectors for the reranker,
+   * Used in conjunction with the classifier and reranker. Create a factory
+   * that constructs candidate feature vectors for the reranker,
    * i.e. feature vectors measuring the compatibility between a given
    * document and a given cell.
    *
@@ -2047,62 +2101,29 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       case "only" => BinningOnly
       case "no" => BinningNo
     }
-    def create_doc_only_fact(ty: String): Option[DocFeatVecFactory[Co]] = {
-      if (params.features_simple_doc_only_gram_choices.contains(ty))
-        Some(new GramDocFeatVecFactory[Co](featvec_factory,
-          binning_status, ty))
-      else {
-        if (output_skip_message)
-          errprint(s"Skipping label-dependent feature type $ty")
-        None
-      }
-    }
-
-    def create_doc_cell_fact(ty: String
-    ): Option[CandidateFeatVecFactory[Co]] = {
-      if (params.features_simple_doc_cell_gram_choices contains ty)
-        Some(new GramCandidateFeatVecFactory[Co](featvec_factory,
-          binning_status, ty))
-      else if (params.features_matching_gram_choices contains ty)
-        Some(new GramMatchingCandidateFeatVecFactory[Co](featvec_factory,
-          binning_status, ty))
-      else ty match {
-        case "trivial" =>
-          Some(new TrivialCandidateFeatVecFactory[Co](featvec_factory,
-            binning_status))
-        case "misc" =>
-          Some(new MiscCandidateFeatVecFactory[Co](featvec_factory,
-            binning_status))
-        case "types-in-common" =>
-          Some(new TypesInCommonCandidateFeatVecFactory[Co](featvec_factory,
-            binning_status))
-        case "model-compare" =>
-          Some(new ModelCompareCandidateFeatVecFactory[Co](featvec_factory,
-            binning_status))
-        case "rank-score" =>
-          Some(new RankScoreCandidateFeatVecFactory[Co](featvec_factory,
-            binning_status))
-        case _ => {
-          if (output_skip_message)
-            errprint(s"Skipping document-only feature type $ty")
-          None
-        }
-      }
-    }
 
     if (feature_list.size == 0)
       params.parser.usageError(s"Can't specify empty --$arg")
     //else if (feature_list.size == 1)
     //  create_fact(feature_list.head)
     else if (!include_doc_cell) {
-      val facts = feature_list.flatMap(create_doc_only_fact)
+      val facts = feature_list.flatMap { ty =>
+        create_doc_only_fact(ty, featvec_factory, binning_status,
+          output_skip_message)
+      }
       new CombiningDocFeatVecFactory[Co](featvec_factory, binning_status,
         facts)
     } else {
       val doc_only_facts =
-        if (include_doc_only) feature_list.flatMap(create_doc_only_fact)
+        if (include_doc_only) feature_list.flatMap { ty =>
+          create_doc_only_fact(ty, featvec_factory, binning_status,
+            output_skip_message)
+        }
         else Iterable()
-      val facts = doc_only_facts ++ feature_list.flatMap(create_doc_cell_fact)
+      val facts = doc_only_facts ++ feature_list.flatMap { ty =>
+        create_doc_cell_fact(ty, featvec_factory, binning_status,
+          output_skip_message)
+      }
       new CombiningCandidateFeatVecFactory[Co](featvec_factory, binning_status,
         facts)
     }

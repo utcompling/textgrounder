@@ -24,13 +24,29 @@ import util.textdb.{Row, Schema}
 
 import gridlocate._
 
+abstract class TwitterDoc(
+  schema: Schema,
+  lang_model: DocLangModel,
+  coord: SphereCoord,
+  salience: Option[Double],
+  val lang: String,
+  val location: String,
+  val timezone: String,
+  val utc_offset: String
+) extends RealSphereDoc(schema, lang_model, coord, salience)
+
 class TwitterTweetDoc(
   schema: Schema,
   lang_model: DocLangModel,
   coord: SphereCoord,
   salience: Option[Double],
+  lang: String,
+  location: String,
+  timezone: String,
+  utc_offset: String,
   val id: Long
-) extends RealSphereDoc(schema, lang_model, coord, salience) {
+) extends TwitterDoc(schema, lang_model, coord, salience, lang, location,
+    timezone, utc_offset) {
   def title = id.toString
 }
 
@@ -41,6 +57,10 @@ class TwitterTweetDocSubfactory(
       coord: SphereCoord) =
     new TwitterTweetDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
+      row.get_or_else[String]("lang", ""),
+      row.get_or_else[String]("location", ""),
+      row.get_or_else[String]("timezone", ""),
+      row.get_or_else[String]("utc_offset", ""),
       row.get_or_else[Long]("title", 0L))
 }
 
@@ -49,8 +69,13 @@ class TwitterUserDoc(
   lang_model: DocLangModel,
   coord: SphereCoord,
   salience: Option[Double],
+  lang: String,
+  location: String,
+  timezone: String,
+  utc_offset: String,
   val user: String
-) extends RealSphereDoc(schema, lang_model, coord, salience) {
+) extends TwitterDoc(schema, lang_model, coord, salience, lang, location,
+    timezone, utc_offset) {
   def title = user
 }
 
@@ -61,5 +86,9 @@ class TwitterUserDocSubfactory(
       coord: SphereCoord) =
     new TwitterUserDoc(row.schema, lang_model, coord,
       row.get_if[Double]("salience"),
+      row.get_or_else[String]("lang", ""),
+      row.get_or_else[String]("location", ""),
+      row.get_or_else[String]("timezone", ""),
+      row.get_or_else[String]("utc_offset", ""),
       row.get_or_else[String]("user", ""))
 }

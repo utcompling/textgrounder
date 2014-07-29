@@ -42,6 +42,7 @@ import util.debug._
 import gridlocate._
 
 import langmodel.{LangModel,LangModelFactory,Unigram}
+import learning.SparseFeatureVectorFactory
 
 /*
 
@@ -405,6 +406,20 @@ baseline to match it to a location.
 of the most common toponym.
 
 """
+
+  override def allowed_features = super.allowed_features ++
+    Seq("lang", "location", "timezone")
+
+  override def classify_features_help =
+    super.classify_features_help +
+"""
+'lang' (language of tweets)
+
+'location' (user-specified location in tweets)
+
+'timezone' (user-specified time zone and UTC offset in tweets)
+"""
+
   var coord_strategy =
     ap.option[String]("coord-strategy", "cs",
       default = "top-ranked",
@@ -537,6 +552,20 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       case "celldist-most-common-toponym" =>
         new CellDistMostCommonToponymSphereGridRanker(ranker_name, grid)
       case other => super.create_named_ranker(other, grid)
+    }
+  }
+
+  override def create_doc_only_fact(
+    ty: String,
+    featvec_factory: SparseFeatureVectorFactory,
+    binning_status: BinningStatus,
+    output_skip_message: Boolean
+  ) = {
+    ty match {
+      case "lang" | "location" | "timezone" =>
+        Some(new TwitterDocFeatVecFactory(featvec_factory, binning_status, ty))
+      case other => super.create_doc_only_fact(other, featvec_factory,
+        binning_status, output_skip_message)
     }
   }
 
