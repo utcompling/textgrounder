@@ -23,6 +23,49 @@
 #...
 #}}
 
+# This usually occurs under 'coordinates/etc.' in English,
+# 'coordenadas/coord/coords/localização/legenda/local/etc.'
+# in Portuguese, 'coord/coor/coordenadas/localización/ubicación/situación/
+# coordenadas_geográficas/capital_coord/acuartelamiento/etc.'' in Spanish,
+# 'координаты/etc.' in Russian, presumably
+# 'koordinate' in German, presumably 'koordinaty' in Polish, etc.
+# The nested coordinates may use other templates besides {{coord}},
+# e.g. {{coor dms}}, {{coor dm}} or {{geocoordenadas}} (Portuguese).
+
+# 2. In the Polish Wikipedia:
+
+#{{Krater uderzeniowy infobox
+# |nazwa               = Serpent Mound
+# |grafika             = Serpent Mound Crater.jpg
+# |opis grafiki        = Zdjęcie lotnicze
+# |ciało niebieskie    = [[Ziemia]]
+# |średnica krateru    = 8 km
+# |głębokość krateru   =
+# |wiek                = <320 M[[rok|a]]
+# |nazwany imieniem    =
+# |współrzędne         = 39° 2' N 83° 24' W
+#...
+#}}
+
+#{{Krater uderzeniowy infobox
+# |nazwa               = Manson
+# |grafika             = Mansonimpact.jpg
+# |opis grafiki        = Krater na tle [[Mapa geologiczna|mapy geologicznej]] stanu Iowa
+# |ciało niebieskie    = [[Ziemia]]
+# |średnica krateru    = 35 km
+# |głębokość krateru   =
+# |wiek                = 73,8 ± 0,3 M[[rok|a]]
+# |nazwany imieniem    =[[Manson (Iowa)|miasto Manson]]
+# |współrzędne         = 42 35 N 94 33 W
+#...
+#}}
+
+# 3. In the Spanish Wikipedia and perhaps in others, there are cases where
+# coordinates are fetched from Wikidata. An example is the page for
+# 'Moulins (Ille y Vilaine)', where the 'Ficha de localidad de Francia'
+# template has empty latitude/longitude but it's still visible at the top
+# of the page, pulled from Wikidata property P625.
+
 import sys, re
 from optparse import OptionParser
 from nlputil import *
