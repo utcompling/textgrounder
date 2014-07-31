@@ -20,17 +20,21 @@ package preprocess
 
 import scala.collection.mutable
 
+import java.text.{SimpleDateFormat, ParseException}
+
 import net.liftweb
 
 import util.argparser._
+import util.collection._
 import util.experiment._
 import util.io.localfh
 import util.print._
 
 class FilterTweetsParameters(ap: ArgParser) {
-  var id_file = ap.option[String]("id-file",
+  var tweet_file = ap.option[String]("tweet-file",
     must = be_specified,
-    help = """File containing tweet ID's. There should be one ID per line.""")
+    help = """File containing usernames and timestamps and possibly other
+fields, separated by tabs.""")
   var output = ap.option[String]("output",
     must = be_specified,
     help = """Prefix of files to which filtered tweets are written to.
@@ -49,6 +53,23 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
   type TParam = FilterTweetsParameters
 
   def create_param_object(ap: ArgParser) = new FilterTweetsParameters(ap)
+
+  /**
+   * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
+   * into a time in milliseconds since the Epoch (Jan 1 1970, or so).
+   */
+  def parse_time(timestring: String): Option[Long] = {
+    val sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZZZ yyyy")
+    try {
+      sdf.parse(timestring)
+      Some(sdf.getCalendar.getTimeInMillis)
+    } catch {
+      case pe: ParseException => {
+        // errprint("Error parsing date %s: %s", timestring, pe)
+        None
+      }
+    }
+  }
 
   /**
    * Retrieve a string along a path, checking to make sure the path
@@ -76,19 +97,20 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
 
   def run_program(args: Array[String]) = {
 
-    def parse_line(line: String) = {
+    def parse_line(line: String): Option[(String, Long)] = {
       val parsed = liftweb.json.parse(line)
-      val id = force_string(parsed, "id_str")
-      if (id != "")
-        Some(id.toLong)
-      else
-        None
+      val user = force_string(parsed, "user", "screen_name")
+      val maybe_timestamp = parse_time(force_string(parsed, "created_at"))
+      maybe_timestamp.map { timestamp => (user, timestamp) }
     }
 
-    // Set of tweet ID's to filter on
-    errprint("Loading tweet ID's from %s...", params.id_file)
-    val ids =
-      (for (line <- localfh.openr(params.id_file)) yield line.toLong).toSet
+    // Set of usernames and timestamps to filter on
+    val names_times = setmap[String, Long]()
+    errprint("Loading usernames and timestamps from %s...", params.tweet_file)
+    for (line <- localfh.openr(params.tweet_file)) {
+      val fields = line.split("\t")
+      names_times(fields(0)) += fields(1).toLong
+    }
 
     for (file <- params.input) {
       errprint("Processing %s...", file)
@@ -98,8 +120,8 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
         compression = comptype)
       for (line <- lines) {
         parse_line(line) match {
-          case Some(tweet_id) => {
-            if (ids contains tweet_id)
+          case Some((user, timestamp)) => {
+            if (names_times(user) contains (timestamp / 1000))
               outfile.println(line)
           }
           case None => ()
