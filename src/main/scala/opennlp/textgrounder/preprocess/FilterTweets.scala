@@ -19,12 +19,10 @@ package opennlp.textgrounder
 package preprocess
 
 import scala.collection.mutable
-import scala.util.Random
 
 import net.liftweb
 
 import util.argparser._
-import util.collection._
 import util.experiment._
 import util.io.localfh
 import util.print._
@@ -64,13 +62,13 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
       fieldval \= field
       if (fieldval == liftweb.json.JNothing) {
         val fieldpath = path mkString "."
-        errprint("Can't find field path %s in tweet", fieldpath)
+        // errprint("Can't find field path %s in tweet", fieldpath)
         return ""
       }
     }
     val values = fieldval.values
     if (values == null) {
-      errprint("Null value from path %s", fields mkString ".")
+      // errprint("Null value from path %s", fields mkString ".")
       ""
     } else
       fieldval.values.toString
@@ -80,22 +78,32 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
 
     def parse_line(line: String) = {
       val parsed = liftweb.json.parse(line)
-      force_string(parsed, "id_str").toLong
+      val id = force_string(parsed, "id_str")
+      if (id != "")
+        Some(id.toLong)
+      else
+        None
     }
 
     // Set of tweet ID's to filter on
+    errprint("Loading tweet ID's from %s...", params.id_file)
     val ids =
       (for (line <- localfh.openr(params.id_file)) yield line.toLong).toSet
 
     for (file <- params.input) {
+      errprint("Processing %s...", file)
       val (lines, comptype, uncompname) =
         localfh.openr_with_compression_info(file)
       val outfile = localfh.openw("%s%s" format (params.output, uncompname),
         compression = comptype)
       for (line <- lines) {
-        val tweet_id = parse_line(line)
-        if (ids contains tweet_id)
-          outfile.println(line)
+        parse_line(line) match {
+          case Some(tweet_id) => {
+            if (ids contains tweet_id)
+              outfile.println(line)
+          }
+          case None => ()
+        }
       }
       outfile.close()
     }
