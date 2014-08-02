@@ -65,7 +65,7 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
       Some(sdf.getCalendar.getTimeInMillis)
     } catch {
       case pe: ParseException => {
-        // errprint("Error parsing date %s: %s", timestring, pe)
+        errprint("Error parsing date %s: %s", timestring, pe)
         None
       }
     }
@@ -98,10 +98,23 @@ object FilterTweets extends ExperimentApp("FilterTweets") {
   def run_program(args: Array[String]) = {
 
     def parse_line(line: String): Option[(String, Long)] = {
-      val parsed = liftweb.json.parse(line)
+      val parsed = try {
+        liftweb.json.parse(line)
+      } catch {
+        case jpe: liftweb.json.JsonParser.ParseException => {
+          errprint("Error parsing line: %s", line)
+          jpe.printStackTrace
+          return None
+        }
+      }
       val user = force_string(parsed, "user", "screen_name")
-      val maybe_timestamp = parse_time(force_string(parsed, "created_at"))
-      maybe_timestamp.map { timestamp => (user, timestamp) }
+      val ts = force_string(parsed, "created_at")
+      if (ts == "")
+        None
+      else {
+        val maybe_timestamp = parse_time(ts)
+        maybe_timestamp.map { timestamp => (user, timestamp) }
+      }
     }
 
     // Set of usernames and timestamps to filter on
