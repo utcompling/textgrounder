@@ -1451,7 +1451,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       params.language)
   }
 
-  lazy protected val the_stopwords = {
+  lazy val the_stopwords = {
     if (params.no_stopwords) Set[String]()
     else read_stopwords
   }
