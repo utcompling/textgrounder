@@ -453,14 +453,14 @@ Default '%default'.""")
       help = """Value of K for use in the mean-shift algorithm
 (see '--coord-strategy').  For this value of K, we choose the K best cells
 and then apply the mean-shift algorithm to the central points of those cells.
-Default '%default'.""")
+Default %default.""")
 
   var mean_shift_window =
     ap.option[Double]("mean-shift-window", "msw",
       default = 1.0,
       must = be_>(0.0),
       help = """Window to use in the mean-shift algorithm
-(see '--coord-strategy'). Default '%default'.""")
+(see '--coord-strategy'). Default %default.""")
 
   var mean_shift_max_stddev =
     ap.option[Double]("mean-shift-max-stddev", "msms",
@@ -468,21 +468,25 @@ Default '%default'.""")
       must = be_>(0.0),
       help = """Maximum allowed standard deviation (i.e. approximately the
 average distance of the points from their mean) among the points selected by
-the mean-shift algorithm (see '--coord-strategy'). Default '%default'.""")
+the mean-shift algorithm (see '--coord-strategy'). Default %default.""")
 
   var mean_shift_max_iterations =
     ap.option[Int]("mean-shift-max-iterations", "msmi",
       default = 100,
       must = be_>(0),
       help = """Maximum number of iterations in the mean-shift algorithm
-(see '--coord-strategy'). Default '%default'.""")
+(see '--coord-strategy'). Default %default.""")
+
+  var co_train =
+    ap.flag("co-train", "ct",
+      help = """Do co-training.""")
 
   var co_train_interpolate_factor =
     ap.option[Double]("co-train-interpolate-factor", "ctif",
       default = 0.5,
       must = be_and(be_>=(0), be_<=(1)),
       help = """Factor used for interpolating between base corpus (e.g.
-Wikipedia) and a newly labeled corpus. Default '%default'. FIXME: This
+Wikipedia) and a newly labeled corpus. Default %default. FIXME: This
 should be an algorithm that depends on the relative sizes of the corpora.""")
 
   var co_train_window =
@@ -490,26 +494,84 @@ should be an algorithm that depends on the relative sizes of the corpora.""")
       default = 10,
       must = be_>(0),
       help = """Window in words on either side of a toponym used in
-co-training when creating pseudo-documents. Default '%default'.""")
+co-training when creating pseudo-documents. Default %default.""")
 
   var co_train_min_size =
     ap.option[Int]("co-train-min-size", "ctmsz",
       default = 1000,
       must = be_>(0),
-      help = """Minimum batch size in co-training. Default '%default'.""")
+      help = """Minimum batch size in co-training. Default %default.""")
 
   var co_train_min_score =
     ap.option[Double]("co-train-min-score", "ctmsc",
       default = Double.MinValue,
       help = """Minimum score in co-training when creating batches.
-Default '%default'.""")
+Default %default.""")
 
   var co_train_max_distance =
     ap.option[Double]("co-train-max-distance", "ctmd",
       default = 100.0,
       must = be_>(0),
       help = """Maximum distance in co-training when creating pseudo-documents.
+Default %default.""")
+
+  var topres_resolver =
+    ap.option[String]("topres-resolver", "trr",
+      default = "spider",
+      choices = Seq("random", "population", "spider", "maxent", "prob"),
+      help = """Resolver to use for toponym resolution when co-training.
 Default '%default'.""")
+
+  var topres_iterations =
+    ap.option[Int]("topres-iterations", "trit",
+      default = 1,
+      must = be_>(0),
+      help = """Number of iterations in toponym resolver during weighted
+min dist. Default %default.""")
+
+  var topres_weights_file =
+    ap.option[String]("topres-weights-file", "trwf",
+      help = """Weights file, if any, to use in toponym resolver during
+weighted min dist.""")
+
+  var topres_write_weights_file =
+    ap.option[String]("topres-write-weights-file", "trwwf",
+      help = """File to write weights to, if any, during toponym resolution.""")
+
+  var topres_log_file =
+    ap.option[String]("topres-log-file", "trlf",
+      help = """Log file, if any, during toponym resolution.""")
+
+  var topres_maxent_model_dir =
+    ap.option[String]("topres-maxent-model-dir", "trmmd",
+      help = """Maxent model dir, if any, during toponym resolution.""")
+
+  var topres_pop_component =
+    ap.option[Double]("topres-pop-component", "trpc",
+      default = 0.0,
+      help = """Population component coefficient during toponym resolution.
+Default %default.""")
+
+  var topres_dg =
+    ap.flag("topres-dg", "trdg",
+      help = """Include document geolocation component during probabilistic
+toponym resolver.""")
+
+  var topres_me =
+    ap.flag("topres-me", "trme",
+      help = """Include maxent component during probabilistic toponym
+resolver.""")
+
+  var topres_input =
+    ap.option[String]("topres-input", "tri",
+      default = null,
+      help = """Input path for toponym resolution.""")
+
+  var topres_corpus_format =
+    ap.option[String]("topres-corpus-format", "trcf",
+      choices = Seq("trconll", "raw"),
+      default = "trconll",
+      help = """Corpus format for toponym resolution.""")
 }
 
 
@@ -654,7 +716,16 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
    * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run() = {
-    val ranker = create_ranker
+    val base_ranker = create_ranker
+    val ranker = if (!params.co_train) base_ranker else {
+      val cotrainer = new CoTrainer
+      val unlabeled = cotrainer.read_fieldspring_gold_corpus(
+        params.topres_input, params.topres_corpus_format)
+      val resolver = cotrainer.create_resolver(this)
+      val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled,
+        resolver)
+      docgeo.ranker
+    }
     val grid = ranker.grid
     if (debug("no-evaluation"))
       Iterable()

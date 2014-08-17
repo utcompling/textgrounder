@@ -73,6 +73,53 @@ abstract class GridRanker[Co](
 }
 
 /**
+ * A ranker for ranking cells in a grid as possible matches for a given
+ * document (aka "grid-locating a document").
+ *
+ * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,
+ *   a year, etc.), which tends to determine the grid structure.
+ * @param ranker_name Name of the ranker, for output purposes
+ * @param grid Grid containing the cells over which this ranker operates
+ */
+class InterpolatingGridRanker[Co](
+  val r1: GridRanker[Co],
+  val r2: GridRanker[Co],
+  val interp_factor: Double
+  // FIXME: Is it OK for this to be r1.grid specifically?
+) extends GridRanker[Co]("interpolating", r1.grid) {
+  /** Optional initialization stage passing one or more times over the
+   * test data. */
+  override def initialize(
+    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+  ) {
+    r1.initialize(get_docstats)
+    r2.initialize(get_docstats)
+  }
+
+  def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
+      include_correct: Boolean) = {
+    // We match up the cells by going through the cells in one of the two,
+    // and for each cell's centroid, looking up the best cell in the other
+    // for this centroid.
+    val cells_scores_1 = r1.evaluate(item, correct, include_correct)
+    val cells_scores_2 = r2.evaluate(item, correct, include_correct)
+    val min_score_2 = cells_scores_2.minBy(_._2)._2
+    val scores_2_map = cells_scores_2.toMap
+    // FIXME! What do to when a cell is found in r1 but not in r2? Here we
+    // take the minimum value of any r2 cells. There should be something
+    // more well-founded.
+    // FIXME! Should we symmetrically do the same with cells in r2 but not
+    // r1?
+    cells_scores_1.map { case (cell, score) =>
+      val cell2 = r2.grid.find_best_cell_for_coord(cell.get_centroid,
+        create_non_recorded = true).get
+      val score2 = scores_2_map.getOrElse(cell2, min_score_2)
+      (cell, score * interp_factor + score2 * (1 - interp_factor))
+    }.toSeq.sortWith(_._2 > _._2)
+  }
+}
+
+/**
  * A grid ranker that does not use reranking.
  *
  * @tparam Co Type of document's identifying coordinate (e.g. a lat/long tuple,

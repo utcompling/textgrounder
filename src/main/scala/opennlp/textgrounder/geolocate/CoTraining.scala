@@ -107,7 +107,7 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
   /**
    * Convert a FieldSpring-style document into a TextGrounder document.
    */
-  def get_grid_doc(ranker: SphereGridRanker) = {
+  def get_grid_doc(ranker: GridRanker[SphereCoord]) = {
     // Convert to a raw document (textdb row)
     val row = get_textdb_doc_status_row
     // Convert to a GridDoc
@@ -161,14 +161,11 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
  */
 abstract class CCorpus(
 ) {
-  // var fscorpus: Option[StoredCorpus] = None
-  // var ranker: Option[SphereGridRanker] = None
-
   def docs: Iterable[CDoc]
-  def to_docgeo_ranker(driver: GeolocateDriver): SphereGridRanker
+  def to_docgeo_ranker(driver: GeolocateDriver): GridRanker[SphereCoord]
 }
 
-class TextGrounderCCorpus(ranker: SphereGridRanker) extends CCorpus {
+class TextGrounderCCorpus(ranker: GridRanker[SphereCoord]) extends CCorpus {
   def docs = unsupported()
   def to_docgeo_ranker(driver: GeolocateDriver) = ranker
 }
@@ -214,8 +211,7 @@ class FieldSpringCCorpus extends CCorpus {
 
   def to_docgeo_ranker(driver: GeolocateDriver) =
     driver.create_ranker_from_document_streams(Iterable(("co-training",
-        _ => get_textdb_doc_status_rows.toIterator))).
-      asInstanceOf[SphereGridRanker]
+        _ => get_textdb_doc_status_rows.toIterator)))
 }
 
 class CCorpusDocumentSource(corpus: CCorpus) extends DocumentSource {
@@ -224,37 +220,8 @@ class CCorpusDocumentSource(corpus: CCorpus) extends DocumentSource {
   def next = iterator.next
 }
 
-object CCorpus {
-  def read_fieldspring_gold_corpus(corpus: String, corpus_format: String) = {
-    val tokenizer = new OpenNLPTokenizer()
-    // val recognizer = new OpenNLPRecognizer()
-
-    val gold_corpus = Corpus.createStoredCorpus
-    corpus_format match {
-      case "trconll" => {
-        errout("Reading gold corpus from $corpus ...")
-        val gold_file = new File(corpus)
-        if(gold_file.isDirectory)
-            gold_corpus.addSource(new TrXMLDirSource(gold_file, tokenizer))
-        else
-            gold_corpus.addSource(new TrXMLSource(new BufferedReader(new FileReader(gold_file)), tokenizer))
-        gold_corpus.setFormat(BaseApp.CORPUS_FORMAT.TRCONLL)
-        gold_corpus.load()
-        errprint("done.")
-      }
-    }
-
-    gold_corpus
-  }
-}
-
-abstract class DocGeo {
-  def label(corpus: FieldSpringCCorpus)
-
-}
-
 // document geolocator
-class SimpleDocGeo(val ranker: SphereGridRanker) extends DocGeo {
+class DocGeo(val ranker: GridRanker[SphereCoord]) {
   def label_using_cell_evaluator(corpus: FieldSpringCCorpus) {
     val evaluator = ranker.grid.driver.asInstanceOf[GeolocateDriver].
       create_cell_evaluator(ranker)
@@ -287,7 +254,7 @@ class SimpleDocGeo(val ranker: SphereGridRanker) extends DocGeo {
           // FIXME: This doesn't work with mean shift. Assumes we're always
           // taking the topmost cell.
         val cells_scores = 
-          ranker.return_ranked_cells(griddoc, None, include_correct = false)
+          ranker.evaluate(griddoc, None, include_correct = false)
         val (cell, score) = cells_scores.head
         val coord = cell.get_centroid
         doc.fsdoc.setGoldCoord(coord.lat, coord.long)
@@ -297,55 +264,55 @@ class SimpleDocGeo(val ranker: SphereGridRanker) extends DocGeo {
   }
 }
 
-class InterpolatingDocGeo(r1: SphereGridRanker,
-    r2: SphereGridRanker, interp_factor: Double) extends DocGeo {
-
-  require(interp_factor >= 0 && interp_factor <= 1)
-
-  def label(corpus: FieldSpringCCorpus) {
-    // FIXME: We need to call initialize() on the GridRanker with all of the
-    // GridDocs.
-    // FIXME: Can the GridRanker handle initialize() being called multiple
-    // times? Fix it so it can.
-    for (doc <- corpus.docs) {
-      // FIXME: Does it matter that we supply r1 here instead of r2,
-      // or instead of creating the document twice, one for each ranker?
-      doc.get_grid_doc(r1) foreach { griddoc =>
-        // We match up the cells by going through the cells in one of the two,
-        // and for each cell's centroid, looking up the best cell in the other
-        // for this centroid.
-        val cells_scores_1 = 
-          r1.return_ranked_cells(griddoc, None, include_correct = false)
-        val cells_scores_2 = 
-          r2.return_ranked_cells(griddoc, None, include_correct = false)
-        val scores_2_map = cells_scores_2.toMap
-        val cells_scores =
-          cells_scores_1.flatMap { case (cell, score) =>
-            val cell2 = r2.grid.find_best_cell_for_coord(cell.get_centroid,
-              create_non_recorded = false)
-            cell2.flatMap { scores_2_map.get(_) } map { score2 =>
-              (cell, score * interp_factor + score2 * (1 - interp_factor))
-            }
-          }.toSeq.sortWith(_._2 > _._2)
-        if (cells_scores.size == 0)
-          errprint("Error evaluating document '%s': Interpolated cell list is empty",
-            griddoc.title)
-        else {
-          // FIXME: This doesn't work with mean shift. Assumes we're always
-          // taking the topmost cell.
-          val (cell, score) = cells_scores.head
-          val coord = cell.get_centroid
-          doc.fsdoc.setGoldCoord(coord.lat, coord.long)
-          doc.score = score
-        }
-      }
-    }
-  }
-}
+//class InterpolatingDocGeo(r1: GridRanker[SphereCoord],
+//    r2: GridRanker[SphereCoord], interp_factor: Double) extends DocGeo {
+//
+//  require(interp_factor >= 0 && interp_factor <= 1)
+//
+//  def label(corpus: FieldSpringCCorpus) {
+//    // FIXME: We need to call initialize() on the GridRanker with all of the
+//    // GridDocs.
+//    // FIXME: Can the GridRanker handle initialize() being called multiple
+//    // times? Fix it so it can.
+//    for (doc <- corpus.docs) {
+//      // FIXME: Does it matter that we supply r1 here instead of r2,
+//      // or instead of creating the document twice, one for each ranker?
+//      doc.get_grid_doc(r1) foreach { griddoc =>
+//        // We match up the cells by going through the cells in one of the two,
+//        // and for each cell's centroid, looking up the best cell in the other
+//        // for this centroid.
+//        val cells_scores_1 = 
+//          r1.return_ranked_cells(griddoc, None, include_correct = false)
+//        val cells_scores_2 = 
+//          r2.return_ranked_cells(griddoc, None, include_correct = false)
+//        val scores_2_map = cells_scores_2.toMap
+//        val cells_scores =
+//          cells_scores_1.flatMap { case (cell, score) =>
+//            val cell2 = r2.grid.find_best_cell_for_coord(cell.get_centroid,
+//              create_non_recorded = false)
+//            cell2.flatMap { scores_2_map.get(_) } map { score2 =>
+//              (cell, score * interp_factor + score2 * (1 - interp_factor))
+//            }
+//          }.toSeq.sortWith(_._2 > _._2)
+//        if (cells_scores.size == 0)
+//          errprint("Error evaluating document '%s': Interpolated cell list is empty",
+//            griddoc.title)
+//        else {
+//          // FIXME: This doesn't work with mean shift. Assumes we're always
+//          // taking the topmost cell.
+//          val (cell, score) = cells_scores.head
+//          val coord = cell.get_centroid
+//          doc.fsdoc.setGoldCoord(coord.lat, coord.long)
+//          doc.score = score
+//        }
+//      }
+//    }
+//  }
+//}
 
 object DocGeo {
   def train(corpus: CCorpus, driver: GeolocateDriver) =
-    new SimpleDocGeo(corpus.to_docgeo_ranker(driver))
+    new DocGeo(corpus.to_docgeo_ranker(driver))
   /**
    * Interpolate between two document geolocators. We need to hook into
    * return_ranked_cells() in some way and match up the cells, interpolating
@@ -355,9 +322,9 @@ object DocGeo {
    * should interpolate here or create a special GridRanker that
    * interpolates between two other GridRankers.
    */
-  def interpolate(c1: SimpleDocGeo, c2: SimpleDocGeo,
-      interp_factor: Double) =
-    new InterpolatingDocGeo(c1.ranker, c2.ranker, interp_factor)
+  def interpolate(c1: DocGeo, c2: DocGeo, interp_factor: Double) =
+    new DocGeo(new InterpolatingGridRanker(c1.ranker, c2.ranker,
+      interp_factor))
 }
 
 class TopRes(resolver: Resolver) {
@@ -368,7 +335,7 @@ class TopRes(resolver: Resolver) {
   }
 }
 
-class CoTrainer(driver: GeolocateDriver) {
+class CoTrainer {
   def choose_batch(corpus: FieldSpringCCorpus,
       threshold: Double, minsize: Int): FieldSpringCCorpus = {
     val meet_threshold = corpus.docs.filter { _.score >= threshold }
@@ -451,7 +418,7 @@ class CoTrainer(driver: GeolocateDriver) {
    *    meaning we can't iterate over the documents.
    * 2. 
    */
-  def train(base: SphereGridRanker, unlabeled: FieldSpringCCorpus,
+  def train(base: GridRanker[SphereCoord], unlabeled: FieldSpringCCorpus,
       resolver: Resolver): (DocGeo, CCorpus) = {
     val driver = base.grid.driver.asInstanceOf[GeolocateDriver]
     // set of labeled documents, originally empty
@@ -460,7 +427,7 @@ class CoTrainer(driver: GeolocateDriver) {
     var labeled_pseudo = new FieldSpringCCorpus()
     // toponym resolver, possibly trained on wp (if WISTR)
     var topres = new TopRes(resolver)
-    val wp_docgeo = new SimpleDocGeo(base)
+    val wp_docgeo = new DocGeo(base)
     while (true) {
       val docgeo1 = DocGeo.train(labeled_pseudo, driver)
       val docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
@@ -485,5 +452,46 @@ class CoTrainer(driver: GeolocateDriver) {
         return (docgeo, labeled)
     }
     ???
+  }
+
+  def create_resolver(driver: GeolocateDriver): Resolver = {
+    val params = driver.params
+    params.topres_resolver match {
+      case "random" => new RandomResolver
+      case "population" => new PopulationResolver
+      case "spider" => new WeightedMinDistResolver(params.topres_iterations,
+        params.topres_weights_file, params.topres_log_file)
+      case "maxent" => new MaxentResolver(params.topres_log_file,
+        params.topres_maxent_model_dir)
+      case "prob" => new ProbabilisticResolver(params.topres_log_file,
+        params.topres_maxent_model_dir, params.topres_write_weights_file,
+        params.topres_pop_component, params.topres_dg,
+        params.topres_me)
+    }
+  }
+
+  def read_fieldspring_gold_corpus(corpus: String, corpus_format: String) = {
+    val tokenizer = new OpenNLPTokenizer()
+    // val recognizer = new OpenNLPRecognizer()
+
+    val gold_corpus = Corpus.createStoredCorpus
+    corpus_format match {
+      case "trconll" => {
+        errout("Reading gold corpus from $corpus ...")
+        val gold_file = new File(corpus)
+        if(gold_file.isDirectory)
+            gold_corpus.addSource(new TrXMLDirSource(gold_file, tokenizer))
+        else
+            gold_corpus.addSource(new TrXMLSource(new BufferedReader(new FileReader(gold_file)), tokenizer))
+        gold_corpus.setFormat(BaseApp.CORPUS_FORMAT.TRCONLL)
+        gold_corpus.load()
+        errprint("done.")
+      }
+    }
+
+    val ccorp = new FieldSpringCCorpus
+    for (doc <- gold_corpus)
+      ccorp += new CDoc(doc.asInstanceOf[Document[Token]], 0.0)
+    ccorp
   }
 }
