@@ -2490,7 +2490,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def get_docs_cells_from_raw_documents(grid: Grid[Co],
       raw_docs: Iterator[DocStatus[Row]]) = {
     get_docs_cells_from_documents(grid,
-      grid.docfact.raw_documents_to_documents(raw_docs))
+      grid.docfact.raw_documents_to_documents(raw_docs, skip_no_coord = true))
   }
 
   // Fetch document-cell pairs, for the correct cell, from training data.

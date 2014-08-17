@@ -504,13 +504,15 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * creating splits for cross-validation (as done when training a reranker).
    *
    * @param rawdoc Raw document as directly read from a corpus.
+   * @param skip_no_coord If true, skip documents without a coordinate.
    * @param note_globally Whether to incorporate the document's word
    *  counts into the global smoothing statistics. (FIXME, this should be
    *  handled separately, as above.)
    * @return a DocStatus describing the document.
    */
   def raw_document_to_document_status(rawdoc: DocStatus[Row],
-      note_globally: Boolean): (DocStatus[(Row, GridDoc[Co])]) = {
+      skip_no_coord: Boolean, note_globally: Boolean
+    ): (DocStatus[(Row, GridDoc[Co])]) = {
     rawdoc map_result { row =>
       try {
         val split = row.gets_or_else("split", "unknown")
@@ -561,7 +563,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         assert_==(double_tokens, tokens, "#tokens")
         num_documents_by_split(split) += 1
         word_tokens_of_documents_by_split(split) += tokens
-        if (!doc.has_coord) {
+        if (!doc.has_coord && skip_no_coord) {
           num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
           word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
           (Some((row, doc)), "skipped", "document has no coordinate",
@@ -642,31 +644,12 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
   }
 
   /**
-   * Convert a line (a single record) from a textdb database (document corpus)
-   * into a document, returning a DocStatus describing the document.
-   *
-   * @param filehand The FileHandler for the file system holding the corpus.
-   *   Largely used for logging purposes.
-   * @param file The file name from which this line was read, for logging
-   *   purposes.
-   * @param line The line itself.
-   * @param lineno The line number of the line, for logging purposes.
-   * @param schema Schema for textdb, indicating names of fields, etc.
-   */
-  def line_to_document_status(filehand: FileHandler, file: String,
-      line: String, lineno: Long, schema: Schema
-    ): DocStatus[(Row, GridDoc[Co])] = {
-    val rowstat =
-      GridDocFactory.line_to_raw_document(filehand, file, line, lineno, schema)
-    raw_document_to_document_status(rowstat, note_globally = false)
-  }
-
-  /**
    * Convert raw documents into document statuses.
    *
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
+   * @param skip_no_coord If true, skip documents without a coordinate.
    * @param finish_globally Whether to compute global backoff statistics.
    *   Normally true, but may be false during bootstrapping of those
    *   statistics.
@@ -674,12 +657,13 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    */
   def raw_documents_to_document_statuses(
     rawdocs: Iterator[DocStatus[Row]],
+    skip_no_coord: Boolean,
     note_globally: Boolean,
     finish_globally: Boolean
   ): Iterator[DocStatus[(Row, GridDoc[Co])]] = {
     val docstats =
       rawdocs map { rawdoc =>
-        raw_document_to_document_status(rawdoc, note_globally)
+        raw_document_to_document_status(rawdoc, skip_no_coord, note_globally)
       }
 
     // NOTE!!! We *cannot* rewrite the following to use `foreach` instead of
@@ -740,6 +724,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * should ideally be used for these remaining extra arguments.
    *
    * @param rawdoc Raw document as directly read from a corpus.
+   * @param skip_no_coord If true, skip documents without a coordinate.
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -750,11 +735,12 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    */
   def raw_documents_to_documents(
     rawdocs: Iterator[DocStatus[Row]],
+    skip_no_coord: Boolean,
     note_globally: Boolean = false,
     finish_globally: Boolean = true
   ) = {
     val docstats = raw_documents_to_document_statuses(rawdocs,
-      note_globally, finish_globally)
+      skip_no_coord, note_globally, finish_globally)
     document_statuses_to_documents(docstats)
   }
 
@@ -765,6 +751,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @param dir Directory containing the corpus.
    * @param suffix Suffix specifying a particular corpus if many exist in
    *   the same dir (e.g. "-dev")
+   * @param skip_no_coord If true, skip documents without a coordinate.
    * @param note_globally Whether to add each document's words to the global
    *   backoff statistics.  Normally false, but may be true during
    *   bootstrapping of those statistics.
@@ -774,12 +761,13 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", note_globally: Boolean = false,
-      finish_globally: Boolean = true) = {
+      suffix: String = "", skip_no_coord: Boolean,
+      note_globally: Boolean = false, finish_globally: Boolean = true) = {
     val rawdocs =
       GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix,
         with_messages = driver.params.verbose)
-    raw_documents_to_document_statuses(rawdocs, note_globally, finish_globally)
+    raw_documents_to_document_statuses(rawdocs, skip_no_coord,
+      note_globally, finish_globally)
   }
 
   /**

@@ -78,7 +78,7 @@ import util.textdb._
 
 class CDoc(val fsdoc: Document[Token], var score: Double) {
   val schema = new Schema(Iterable("title", "coord", "unigram-counts"),
-    Map("corpus-type" -> "generic"))
+    Map("corpus-type" -> "generic", "split" -> "training"))
 
   /**
    * Convert the stored FieldSpring-style documents to TextDB rows so they
@@ -92,7 +92,8 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
       words(form) += 1
     val doc_gold = fsdoc.getGoldCoord
     val coord =
-      "%s,%s" format (doc_gold.getLatDegrees, doc_gold.getLngDegrees)
+      if (doc_gold == null) "" else
+        "%s,%s" format (doc_gold.getLatDegrees, doc_gold.getLngDegrees)
     val props = IndexedSeq(fsdoc.getId, coord, Encoder.count_map(words))
     Row(schema, props)
   }
@@ -112,7 +113,7 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     val row = get_textdb_doc_status_row
     // Convert to a GridDoc
     val rowdocstat = ranker.grid.docfact.raw_document_to_document_status(
-      row, note_globally = false)
+      row, skip_no_coord = false, note_globally = false)
     val docstat = rowdocstat map_all { case (row, griddoc) => griddoc }
     val maybe_griddoc = doc_counter_tracker.handle_status(docstat)
     // raw_document_to_document_status() doesn't compute the backoff

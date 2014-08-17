@@ -128,6 +128,7 @@ class InitializedCombinedGrid[Co](
     // sub-grids is messier to implement.)
     docfact.raw_documents_to_documents(
       get_rawdocs("reading %s for combined global backoff stats"),
+      skip_no_coord = true,
       note_globally = true,
       finish_globally = false
     ).foreach { doc => () }

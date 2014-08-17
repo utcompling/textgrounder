@@ -68,8 +68,9 @@ trait Ranker[Query, Candidate] {
   final def evaluate(item: Query, correct: Option[Candidate],
       include_correct: Boolean) = {
     val scored_cands = imp_evaluate(item, correct, include_correct)
-    assert(is_reverse_sorted(scored_cands.map(_._2)),
-      s"Candidates should be reverse-sorted: $scored_cands")
+    if (scored_cands.size > 0)
+      assert(is_reverse_sorted(scored_cands.map(_._2)),
+        s"Candidates should be reverse-sorted: $scored_cands")
     scored_cands
   }
 }

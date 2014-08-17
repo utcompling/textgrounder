@@ -578,6 +578,7 @@ abstract class Grid[Co](
     // mapping stages onto the documents. See `raw_documents_to_documents`.
     val docstats = docfact.raw_documents_to_document_statuses(
         get_rawdocs("reading"),
+        skip_no_coord = true,
         note_globally = true,
         finish_globally = false
       ) map { stat =>

@@ -748,7 +748,8 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
             val get_docstats = () =>
               eval_location.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
-                  get_file_handler, dir, document_textdb_suffix))
+                  get_file_handler, dir, document_textdb_suffix,
+                  skip_no_coord = false))
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(get_docstats)
           }

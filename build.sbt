@@ -38,7 +38,9 @@ resolvers ++= Seq("Cloudera Maven Repository" at "https://repository.cloudera.co
 resolvers += "snapshots" at "http://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= Seq(
-  // "com.google.guava" % "guava" % "15.0",
+  // For FieldSpring:
+  "com.google.guava" % "guava" % "17.0",
+  //
   // "org.jdom" % "jdom" % "2.0.5",
   "org.apache.commons" % "commons-lang3" % "3.3.2",
   "org.apache.commons" % "commons-compress" % "1.8.1",

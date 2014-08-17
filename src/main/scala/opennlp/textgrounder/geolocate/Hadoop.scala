@@ -277,9 +277,12 @@ class DocEvalMapper
     val get_docstats = () => {
       val lines = new HadoopIterator
       lines.map {
-        case (filehand, file, line, lineno) =>
-          ranker.grid.docfact.line_to_document_status(filehand, file, line,
-                          lineno, schema)
+        case (filehand, file, line, lineno) => {
+          val rowstat = GridDocFactory.line_to_raw_document(filehand, file,
+            line, lineno, schema)
+          ranker.grid.docfact.raw_document_to_document_status(rowstat,
+            skip_no_coord = true, note_globally = false)
+        }
       } map { stat =>
         stat.foreach {
           case (row, doc) => doc.lang_model.finish_after_global() }
