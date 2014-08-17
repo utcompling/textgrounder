@@ -216,7 +216,7 @@ class FieldSpringCCorpus extends CCorpus {
 }
 
 class CCorpusDocumentSource(corpus: CCorpus) extends DocumentSource {
-  def iterator = corpus.docs.toSeq.map(_.fsdoc).iterator
+  val iterator = corpus.docs.toSeq.map(_.fsdoc).iterator
   def hasNext = iterator.hasNext
   def next = iterator.next
 }
