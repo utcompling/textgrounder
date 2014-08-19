@@ -1178,6 +1178,20 @@ respectively.  If unspecified, temporary files will be created to hold
 the submodels, and deleted upon exit unless '--debug preserve-tmp-files'
 is given.""")
 
+  var save_vw_submodels_levels =
+    ap.option[String]("save-vw-submodels-levels", "svsml",
+      default = "",
+      help = """If specified, save previously trained Vowpal Wabbit submodels
+only at the given level(s). The value should be one or more numbers separated
+by commas. If not specified, save at all levels.""")
+
+  def parse_submodel_levels(spec: String) =
+    if (spec == "") Set[Int]()
+    else spec.split(",").map(_.toInt).toSet
+
+  val save_vw_submodels_levels_set =
+    parse_submodel_levels(save_vw_submodels_levels)
+
   var load_vw_model =
     ap.option[String]("load-vw-model", "lvm",
       default = "",
@@ -1191,6 +1205,16 @@ from the given filename instead of training a new model.""")
 from the given filename during hierarchical classification, instead of
 training a new model. The filename should have %l and %i in it, which will
 be replaced by the level and classifier index, respectively.""")
+
+  var load_vw_submodels_levels =
+    ap.option[String]("load-vw-submodels-levels", "lvsml",
+      default = "",
+      help = """If specified, load previously trained Vowpal Wabbit submodels
+only at the given level(s). The value should be one or more numbers separated
+by commas. If not specified, load at all levels.""")
+
+  val load_vw_submodels_levels_set =
+    parse_submodel_levels(load_vw_submodels_levels)
 
   var vw_args =
     ap.option[String]("vw-args",
@@ -2573,11 +2597,21 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       def replace_level_index(str: String) =
         str.replace("%l", level.toString).replace("%i", cindex)
       val save_vw_model =
-        if (level > 1) replace_level_index(params.save_vw_submodels)
-        else params.save_vw_model
+        if (level > 1) {
+          val spec = params.save_vw_submodels_levels_set
+          if (spec.size == 0 || spec(level))
+            replace_level_index(params.save_vw_submodels)
+          else
+            ""
+        } else params.save_vw_model
       val load_vw_model =
-        if (level > 1) replace_level_index(params.load_vw_submodels)
-        else params.load_vw_model
+        if (level > 1) {
+          val spec = params.load_vw_submodels_levels_set
+          if (spec.size == 0 || spec(level))
+            replace_level_index(params.load_vw_submodels)
+          else
+            ""
+        } else params.load_vw_model
       val (classifier, featvec_factory) =
         create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
           save_vw_model, load_vw_model, vw_args,
