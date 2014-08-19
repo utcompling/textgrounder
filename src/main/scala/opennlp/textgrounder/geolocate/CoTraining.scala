@@ -22,6 +22,7 @@ package geolocate
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.util.{Left, Right}
+import scala.util.control.Breaks._
 
 import java.io._
 
@@ -121,6 +122,35 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     maybe_griddoc.foreach { _.lang_model.finish_after_global() }
     maybe_griddoc
   }
+
+  def debug_print(prefix: String = "") {
+    errprint("%sDocument %s [%s pred=%s]:", prefix, fsdoc.getId,
+      fsdoc.getGoldCoord, fsdoc.getSystemCoord)
+    for (sent <- fsdoc) {
+      val words = for (token <- sent.getTokens; form = token.getForm) yield {
+        if (token.isToponym) {
+          val toponym = token.asInstanceOf[Toponym]
+          if (toponym.getAmbiguity == 0)
+            "[%s amb=0]" format form
+          else {
+            val gold =
+              if (toponym.hasGold)
+                " %s" format toponym.getGold.getRegion.getCenter
+              else
+                ""
+            val pred =
+              if (toponym.hasSelected)
+                " pred=%s" format toponym.getSelected.getRegion.getCenter
+              else
+                ""
+            "[%s%s%s]" format (form, gold, pred)
+          }
+        } else
+          form
+      }
+      errprint("  %s%s", prefix, words mkString " ")
+    }
+  }
 }
 
 
@@ -199,6 +229,8 @@ class FieldSpringCCorpus extends CCorpus {
 
   def is_empty = docs.isEmpty
 
+  def size = docs.size
+
   /**
    * Convert the stored FieldSpring-style documents to TextDB rows so they
    * can be used to create a TextGrounder document geolocator (ranker).
@@ -213,6 +245,12 @@ class FieldSpringCCorpus extends CCorpus {
   def to_docgeo_ranker(driver: GeolocateDriver) =
     driver.create_ranker_from_document_streams(Iterable(("co-training",
         _ => get_textdb_doc_status_rows.toIterator)))
+
+  def debug_print(prefix: String = "") {
+    for ((doc, index) <- docs.zipWithIndex) {
+      doc.debug_print("#%s: " format (index + 1))
+    }
+  }
 }
 
 class CCorpusDocumentSource(corpus: CCorpus) extends DocumentSource {
@@ -429,30 +467,58 @@ class CoTrainer {
     // toponym resolver, possibly trained on wp (if WISTR)
     var topres = new TopRes(resolver)
     val wp_docgeo = new DocGeo(base)
-    while (true) {
-      val docgeo1 = DocGeo.train(labeled_pseudo, driver)
-      val docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
-        driver.params.co_train_interpolate_factor)
-      docgeo.label(unlabeled)
-      val chosen_labeled = choose_batch(unlabeled,
-        driver.params.co_train_min_score, driver.params.co_train_min_size)
-      val accepted_labeled =
-        chosen_labeled.filter(doc => toponym_candidate_near_location(
-          doc, driver.params.co_train_max_distance))
-      topres.resolve(accepted_labeled)
-      val resolved_pseudo =
-        get_pseudo_documents_surrounding_toponyms(accepted_labeled,
-          driver.params.co_train_window, driver.the_stopwords)
-      for (doc <- resolved_pseudo)
-        labeled_pseudo += doc
-      for (doc <- accepted_labeled.docs) {
-        labeled += doc
-        unlabeled -= doc
+    var iteration = 0
+    var docgeo: DocGeo = null
+    breakable {
+      while (true) {
+        iteration += 1
+        errprint("Iteration %s: Size of unlabeled corpus: %s docs",
+          iteration, unlabeled.size)
+        errprint("Iteration %s: Size of labeled corpus: %s docs",
+          iteration, labeled.size)
+        errprint("Iteration %s: Size of labeled-pseudo corpus: %s docs",
+          iteration, labeled_pseudo.size)
+        val docgeo1 = DocGeo.train(labeled_pseudo, driver)
+        docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
+          driver.params.co_train_interpolate_factor)
+        docgeo.label(unlabeled)
+        val chosen_labeled = choose_batch(unlabeled,
+          driver.params.co_train_min_score, driver.params.co_train_min_size)
+        errprint("Iteration %s: Size of chosen unlabeled: %s docs",
+          iteration, chosen_labeled.size)
+        val accepted_labeled =
+          chosen_labeled.filter(doc => toponym_candidate_near_location(
+            doc, driver.params.co_train_max_distance))
+        errprint("Iteration %s: Size of accepted labeled: %s docs",
+          iteration, accepted_labeled.size)
+        if (accepted_labeled.is_empty) {
+          errprint("Terminating, accepted-labeled corpus is empty")
+          break
+        }
+        errprint("Accepted-labeled corpus:")
+        accepted_labeled.debug_print()
+        topres.resolve(accepted_labeled)
+        val resolved_pseudo =
+          get_pseudo_documents_surrounding_toponyms(accepted_labeled,
+            driver.params.co_train_window, driver.the_stopwords)
+        errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
+          iteration, resolved_pseudo.size)
+        errprint("Resolved-pseudo corpus:")
+        for ((doc, index) <- resolved_pseudo.zipWithIndex)
+          doc.debug_print("#%s: " format (index + 1))
+        for (doc <- resolved_pseudo)
+          labeled_pseudo += doc
+        for (doc <- accepted_labeled.docs) {
+          labeled += doc
+          unlabeled -= doc
+        }
+        if (unlabeled.is_empty) {
+          errprint("Terminating, unlabeled corpus is empty")
+          break
+        }
       }
-      if (unlabeled.is_empty)
-        return (docgeo, labeled)
     }
-    ???
+    (docgeo, labeled)
   }
 
   def create_resolver(driver: GeolocateDriver): Resolver = {
