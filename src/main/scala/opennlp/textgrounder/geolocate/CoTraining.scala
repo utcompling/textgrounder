@@ -127,7 +127,7 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     errprint("%sDocument %s [%s pred=%s]:", prefix, fsdoc.getId,
       fsdoc.getGoldCoord, fsdoc.getSystemCoord)
     for (sent <- fsdoc) {
-      val words = for (token <- sent.getTokens; form = token.getForm) yield {
+      val words = for (token <- sent; form = token.getForm) yield {
         if (token.isToponym) {
           val toponym = token.asInstanceOf[Toponym]
           if (toponym.getAmbiguity == 0)
@@ -423,7 +423,7 @@ class CoTrainer {
     new CDoc(doc, 0.0)
   }
 
-  var next_id = 1
+  var next_id = 0
 
   /**
    * For each toponym in each document, construct a pseudo-document consisting
@@ -438,6 +438,7 @@ class CoTrainer {
          if token.isToponym;
          toponym = token.asInstanceOf[Toponym]
          if toponym.getAmbiguity > 0 && toponym.hasGold) yield {
+      next_id += 1
       val start_index = math.max(0, tok_index - window)
       val end_index = math.min(doc_as_array.size, tok_index + window + 1)
       val doc_tokens = doc_as_array.slice(start_index, end_index).
