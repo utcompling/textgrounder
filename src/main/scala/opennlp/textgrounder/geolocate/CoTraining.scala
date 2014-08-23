@@ -27,11 +27,12 @@ import scala.util.control.Breaks._
 import java.io._
 
 import opennlp.fieldspring.tr.app._
+import opennlp.fieldspring.tr.app.BaseApp.CORPUS_FORMAT
 import opennlp.fieldspring.tr.resolver._
 import opennlp.fieldspring.tr.text._
 import opennlp.fieldspring.tr.text.prep._
 import opennlp.fieldspring.tr.text.io._
-import opennlp.fieldspring.tr.util.TextUtil
+import opennlp.fieldspring.tr.util.{TextUtil, TopoUtil}
 
 import gridlocate._
 
@@ -459,7 +460,7 @@ class CoTrainer {
    * 2. 
    */
   def train(base: GridRanker[SphereCoord], unlabeled: FieldSpringCCorpus,
-      resolver: Resolver): (DocGeo, CCorpus) = {
+      resolver: Resolver): (DocGeo, FieldSpringCCorpus) = {
     val driver = base.grid.driver.asInstanceOf[GeolocateDriver]
     // set of labeled documents, originally empty
     var labeled = new FieldSpringCCorpus()
@@ -522,6 +523,15 @@ class CoTrainer {
     (docgeo, labeled)
   }
 
+  def corpus_format_to_enum(corpus_format: String) = {
+    corpus_format match {
+      case "trconll" => CORPUS_FORMAT.TRCONLL
+      case "raw" => CORPUS_FORMAT.PLAIN
+      case "geotext" => CORPUS_FORMAT.GEOTEXT
+      case "wikitext" => CORPUS_FORMAT.WIKITEXT
+    }
+  }
+
   def create_resolver(driver: GeolocateDriver): Resolver = {
     val params = driver.params
     params.topres_resolver match {
@@ -536,6 +546,20 @@ class CoTrainer {
         params.topres_pop_component, params.topres_dg,
         params.topres_me)
     }
+  }
+
+  def convert_stored_corpus(corpus: StoredCorpus) = {
+    val ccorp = new FieldSpringCCorpus
+    for (doc <- corpus)
+      ccorp += new CDoc(doc.asInstanceOf[Document[Token]], 0.0)
+    ccorp
+  }
+
+  def read_fieldspring_test_corpus(corpus: String) = {
+    errout("Reading serialized corpus from $corpus ...")
+    val test_corpus = TopoUtil.readStoredCorpusFromSerialized(corpus)
+    errprint("done.")
+    test_corpus
   }
 
   def read_fieldspring_gold_corpus(corpus: String, corpus_format: String) = {
@@ -556,10 +580,15 @@ class CoTrainer {
         errprint("done.")
       }
     }
+    gold_corpus
+  }
 
-    val ccorp = new FieldSpringCCorpus
-    for (doc <- gold_corpus)
-      ccorp += new CDoc(doc.asInstanceOf[Document[Token]], 0.0)
-    ccorp
+  def evaluate_topres_corpus(test_corpus: StoredCorpus,
+      gold_corpus: StoredCorpus, corpus_format: String,
+      do_oracle_eval: Boolean) {
+    val evaluate_corpus = new EvaluateCorpus
+    evaluate_corpus.doEval(test_corpus, gold_corpus,
+      corpus_format_to_enum(corpus_format), true, do_oracle_eval)
   }
 }
+

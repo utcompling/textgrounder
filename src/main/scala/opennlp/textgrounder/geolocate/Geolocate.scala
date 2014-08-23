@@ -567,11 +567,20 @@ resolver.""")
       default = null,
       help = """Input path for toponym resolution.""")
 
+  var topres_serialized_corpus_input =
+    ap.option[String]("topres-serialized-corpus-input", "trsci",
+      default = null,
+      help = """Serialized corpus input path for toponym resolution.""")
+
   var topres_corpus_format =
     ap.option[String]("topres-corpus-format", "trcf",
       choices = Seq("trconll", "raw"),
       default = "trconll",
       help = """Corpus format for toponym resolution.""")
+
+  var topres_do_oracle_eval =
+    ap.flag("topres-do-oracle-eval", "trdoe",
+      help = """Do oracle evaluation during toponym resolution.""")
 }
 
 
@@ -719,11 +728,16 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
     val base_ranker = create_ranker
     val ranker = if (!params.co_train) base_ranker else {
       val cotrainer = new CoTrainer
-      val unlabeled = cotrainer.read_fieldspring_gold_corpus(
-        params.topres_input, params.topres_corpus_format)
+      val unlabeled = cotrainer.convert_stored_corpus(
+        cotrainer.read_fieldspring_test_corpus(
+          params.topres_input))
       val resolver = cotrainer.create_resolver(this)
       val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled,
         resolver)
+      val gold = cotrainer.read_fieldspring_gold_corpus(
+        params.topres_serialized_corpus_input, params.topres_corpus_format)
+      cotrainer.evaluate_topres_corpus(ccorpus.to_stored_corpus, gold,
+        params.topres_corpus_format, params.topres_do_oracle_eval)
       docgeo.ranker
     }
     val grid = ranker.grid
