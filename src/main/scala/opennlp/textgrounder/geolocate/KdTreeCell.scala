@@ -201,11 +201,16 @@ class KdTreeGrid(
   //   else get_nodes_to_depth(nodes.flatMap(get_node_children), depth - 1)
   // }
 
-  def get_nodes_to_subdivide_depth(nodes: Iterable[KdTree]) = {
-    val new_cutoff_size = cutoffBucketSize /
-      driver.asInstanceOf[GeolocateDriver].params.subdivide_factor
+  def get_nodes_to_subdivide_depth(nodes: Iterable[KdTree],
+      new_cutoff_size: Int) = {
+    if (debug("describe-kd-tree"))
+      errprint("get_nodes_to_subdivide_depth: cutoff=%s", new_cutoff_size)
     val new_nodes = get_nodes_to_cutoff(nodes, new_cutoff_size)
-    (new_nodes, new_cutoff_size)
+    if (debug("describe-kd-tree")) {
+      for (node <- new_nodes)
+        errprint("  %s", describe_this_node(node, 0))
+    }
+    new_nodes
   }
 
   // In MultiRegularGrid, we need to create and populate a new grid at a
@@ -223,16 +228,27 @@ class KdTreeGrid(
   def create_subdivided_grid(create_docfact: => GridDocFactory[SphereCoord],
       id: String) = {
     // Fetch the nodes down to the new cutoff size
-    val (new_nodes, new_cutoff_size) = get_nodes_to_subdivide_depth(leaf_nodes)
-    new KdTreeGrid(docfact, id, bucketSize, splitMethod, useBackoff,
+    val new_cutoff_size = cutoffBucketSize /
+      driver.asInstanceOf[GeolocateDriver].params.subdivide_factor
+    val new_nodes = get_nodes_to_subdivide_depth(leaf_nodes, new_cutoff_size)
+    val ret = new KdTreeGrid(docfact, id, bucketSize, splitMethod, useBackoff,
       interpolateWeight, Some(this), new_nodes, new_cutoff_size)
+    if (debug("describe-kd-tree")) {
+      errprint(s"For grid $id:")
+      for (node <- new_nodes)
+        errprint("  %s", ret.describe_this_node(node, 0))
+    }
+    ret
   }
 
   def get_subdivided_cells(cell: SphereCell) = {
     val kdcell = cell.asInstanceOf[KdTreeCell]
-    val (new_nodes, _) =
-      get_nodes_to_subdivide_depth(Seq(kdcell.kdnode))
+    val new_nodes =
+      get_nodes_to_subdivide_depth(Seq(kdcell.kdnode), cutoffBucketSize)
     if (debug("assert-leaf")) {
+      // WARNING!!! This appears to only make sense for 2-level hierarchies.
+      // For 3-level hierarchies, you will expect to get non-leaves
+      // returned on level 2.
       errprint("Asserting leaf in get_subdivided_cells")
       for (node <- new_nodes)
         assert(node.getLeft == null && node.getRight == null, {
@@ -247,7 +263,7 @@ class KdTreeGrid(
     new_nodes.map(nodes_to_cell(_))
   }
 
-  def describe_node(node: KdTree, depth: Int,
+  def describe_this_node(node: KdTree, depth: Int,
       fn: KdTree => String = x => "") {
     errprint("%s%s#: (%s,%s) - (%s,%s): %s%s",
       "  " * depth,
@@ -259,6 +275,11 @@ class KdTreeGrid(
         if (str == "") ""
         else s": $str"
       })
+  }
+
+  def describe_node(node: KdTree, depth: Int,
+      fn: KdTree => String = x => "") {
+    describe_this_node(node, depth, fn)
     val left = node.getLeft
     if (left != null)
       describe_node(left, depth + 1, fn)
@@ -421,6 +442,9 @@ class KdTreeGrid(
     super.output_ranking_data(docid, xpred_cells, xparent_cell, xcorrect_cell)
     if (xparent_cell == None || !debug("assert-leaf"))
       return
+    // WARNING!!! assert-leaf appears to only make sense for 2-level
+    // hierarchies. For 3-level hierarchies, you will expect to get non-leaves
+    // returned on level 2.
     val parent_cell = xparent_cell.get.asInstanceOf[KdTreeCell]
     val pred_cells = xpred_cells.asInstanceOf[Iterable[(KdTreeCell, Double)]]
     errprint("Asserting leaf in output_ranking_data")
