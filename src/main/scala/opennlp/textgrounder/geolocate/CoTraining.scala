@@ -368,10 +368,9 @@ object DocGeo {
 }
 
 class TopRes(resolver: Resolver) {
-  def resolve(corpus: FieldSpringCCorpus) {
+  def resolve(corpus: FieldSpringCCorpus) = {
     val stored_corpus = corpus.to_stored_corpus
-    val ret = resolver.disambiguate(stored_corpus)
-    assert(ret == stored_corpus)
+    resolver.disambiguate(stored_corpus)
   }
 }
 
@@ -399,8 +398,8 @@ class CoTrainer {
     val doc_gold = doc.fsdoc.getGoldCoord
     for (sent <- doc.fsdoc) {
       for (toponym <- sent.getToponyms) {
-        if (toponym.hasGold) {
-          val location = toponym.getGold.getRegion.getCenter
+        for (cand <- toponym.getCandidates) {
+          val location = cand.getRegion.getCenter
           if (location.distanceInKm(doc_gold) <= threshold)
             return true
         }
@@ -416,7 +415,7 @@ class CoTrainer {
    */
   def make_pseudo_document(id: String, toponym: Toponym, tokens: Iterable[Token]
     ): CDoc = {
-    val coord = toponym.getGold.getRegion.getCenter
+    val coord = toponym.getSelected.getRegion.getCenter
     val lat = coord.getLatDegrees
     val long = coord.getLngDegrees
     val doc = new GeoTextDocument(id, "unknown", lat, long)
@@ -438,7 +437,7 @@ class CoTrainer {
          (token, tok_index) <- doc_as_array.zipWithIndex;
          if token.isToponym;
          toponym = token.asInstanceOf[Toponym]
-         if toponym.getAmbiguity > 0 && toponym.hasGold) yield {
+         if toponym.getAmbiguity > 0 && toponym.hasSelected) yield {
       next_id += 1
       val start_index = math.max(0, tok_index - window)
       val end_index = math.min(doc_as_array.size, tok_index + window + 1)
@@ -497,11 +496,12 @@ class CoTrainer {
           errprint("Terminating, accepted-labeled corpus is empty")
           break
         }
-        errprint("Accepted-labeled corpus:")
-        accepted_labeled.debug_print()
-        topres.resolve(accepted_labeled)
+        val resolved_stored_corpus = topres.resolve(accepted_labeled)
+        val resolved = convert_stored_corpus(resolved_stored_corpus)
+        errprint("Resolved corpus:")
+        resolved.debug_print()
         val resolved_pseudo =
-          get_pseudo_documents_surrounding_toponyms(accepted_labeled,
+          get_pseudo_documents_surrounding_toponyms(resolved,
             driver.params.co_train_window, driver.the_stopwords)
         errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
           iteration, resolved_pseudo.size)
@@ -556,7 +556,7 @@ class CoTrainer {
   }
 
   def read_fieldspring_test_corpus(corpus: String) = {
-    errout("Reading serialized corpus from $corpus ...")
+    errout(s"Reading serialized corpus from $corpus ...")
     val test_corpus = TopoUtil.readStoredCorpusFromSerialized(corpus)
     errprint("done.")
     test_corpus
@@ -569,7 +569,7 @@ class CoTrainer {
     val gold_corpus = Corpus.createStoredCorpus
     corpus_format match {
       case "trconll" => {
-        errout("Reading gold corpus from $corpus ...")
+        errout(s"Reading gold corpus from $corpus ...")
         val gold_file = new File(corpus)
         if(gold_file.isDirectory)
             gold_corpus.addSource(new TrXMLDirSource(gold_file, tokenizer))

@@ -730,12 +730,12 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       val cotrainer = new CoTrainer
       val unlabeled = cotrainer.convert_stored_corpus(
         cotrainer.read_fieldspring_test_corpus(
-          params.topres_input))
+          params.topres_serialized_corpus_input))
       val resolver = cotrainer.create_resolver(this)
       val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled,
         resolver)
       val gold = cotrainer.read_fieldspring_gold_corpus(
-        params.topres_serialized_corpus_input, params.topres_corpus_format)
+        params.topres_input, params.topres_corpus_format)
       cotrainer.evaluate_topres_corpus(ccorpus.to_stored_corpus, gold,
         params.topres_corpus_format, params.topres_do_oracle_eval)
       docgeo.ranker
