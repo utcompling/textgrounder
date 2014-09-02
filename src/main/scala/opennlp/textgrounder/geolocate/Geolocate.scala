@@ -524,7 +524,7 @@ Default '%default'.""")
 
   var topres_iterations =
     ap.option[Int]("topres-iterations", "trit",
-      default = 1,
+      default = 10,
       must = be_>(0),
       help = """Number of iterations in toponym resolver during weighted
 min dist. Default %default.""")
