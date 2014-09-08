@@ -37,8 +37,11 @@ import opennlp.fieldspring.tr.util.{TextUtil, TopoUtil}
 import gridlocate._
 
 import util.collection._
+import util.debug._
 import util.error.unsupported
 import util.io.localfh
+import util.math._
+import util.metering._
 import util.print.{errprint, errout}
 import util.spherical._
 import util.textdb._
@@ -90,13 +93,16 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
    */
   def get_textdb_row = {
     val words = intmap[String]()
-    for (sent <- fsdoc; token <- sent.getTokens; form = token.getForm)
+    for (sent <- fsdoc; token <- sent.getTokens; form = token.getForm;
+         if form != "")
       words(form) += 1
     val doc_gold = fsdoc.getGoldCoord
     val coord =
       if (doc_gold == null) "" else
         "%s,%s" format (doc_gold.getLatDegrees, doc_gold.getLngDegrees)
-    val props = IndexedSeq(fsdoc.getId, coord, Encoder.count_map(words))
+    val word_field = Encoder.count_map(words)
+    // errprint("Words: %s", word_field)
+    val props = IndexedSeq(fsdoc.getId, coord, word_field)
     Row(schema, props)
   }
 
@@ -124,33 +130,64 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     maybe_griddoc
   }
 
-  def debug_print(prefix: String = "") {
-    errprint("%sDocument %s [%s pred=%s]:", prefix, fsdoc.getId,
-      fsdoc.getGoldCoord, fsdoc.getSystemCoord)
+  /**
+   * Return closest distance between document location and any candidate of
+   * any toponym, or -1 if no toponym candidates.
+   */
+  def error_distance_from_nearest_toponym_candidate = {
+    var mindist = Double.MaxValue
+    val doc_gold = fsdoc.getGoldCoord
     for (sent <- fsdoc) {
-      val words = for (token <- sent; form = token.getForm) yield {
-        if (token.isToponym) {
-          val toponym = token.asInstanceOf[Toponym]
-          if (toponym.getAmbiguity == 0)
-            "[%s amb=0]" format form
-          else {
-            val gold =
-              if (toponym.hasGold)
-                " %s" format toponym.getGold.getRegion.getCenter
-              else
-                ""
-            val pred =
-              if (toponym.hasSelected)
-                " pred=%s" format toponym.getSelected.getRegion.getCenter
-              else
-                ""
-            "[%s%s%s]" format (form, gold, pred)
-          }
-        } else
-          form
+      for (toponym <- sent.getToponyms) {
+        for (cand <- toponym.getCandidates) {
+          val location = cand.getRegion.getCenter
+          val dist = location.distanceInKm(doc_gold)
+          if (dist < mindist)
+            mindist = dist
+        }
       }
-      errprint("  %s%s", prefix, words mkString " ")
     }
+    if (mindist == Double.MaxValue) -1.0
+    else mindist
+  }
+
+  /**
+   * Return closest distance between document location and any predicted
+   * toponym, or -1 if no toponyms.
+   */
+  def error_distance_from_nearest_predicted_toponym = {
+    var mindist = Double.MaxValue
+    val doc_gold = fsdoc.getGoldCoord
+    for (sent <- fsdoc) {
+      for (toponym <- sent.getToponyms) {
+        if (toponym.hasSelected) {
+          val location = toponym.getSelected.getRegion.getCenter
+          val dist = location.distanceInKm(doc_gold)
+          if (dist < mindist)
+            mindist = dist
+        } else {
+          errprint("Toponym %s has no prediction", toponym.getForm)
+        }
+      }
+    }
+    if (mindist == Double.MaxValue) -1.0
+    else mindist
+  }
+
+  /**
+   * Return true if one of the toponyms in the document has a candidate that
+   * is close to the resolved document location.
+   */
+  def toponym_candidate_near_location(threshold: Double): Boolean = {
+    val errdist = error_distance_from_nearest_toponym_candidate
+    if (errdist < 0 || errdist > threshold)
+      false
+    else
+      true
+  }
+
+  def debug_print(prefix: String = "") {
+    FieldSpringCCorpus.debug_print_doc(fsdoc, prefix)
   }
 }
 
@@ -202,6 +239,50 @@ class TextGrounderCCorpus(ranker: GridRanker[SphereCoord]) extends CCorpus {
   def to_docgeo_ranker(driver: GeolocateDriver) = ranker
 }
 
+object FieldSpringCCorpus {
+  def convert_stored_corpus(corpus: StoredCorpus) = {
+    val ccorp = new FieldSpringCCorpus
+    for (doc <- corpus)
+      ccorp += new CDoc(doc.asInstanceOf[Document[Token]], 0.0)
+    ccorp
+  }
+
+  def debug_print_doc[T <: Token](fsdoc: Document[T], prefix: String = "") {
+    errprint("%sDocument %s [%s pred=%s]:", prefix, fsdoc.getId,
+      fsdoc.getGoldCoord, fsdoc.getSystemCoord)
+    for (sent <- fsdoc) {
+      val words = for (token <- sent; form = token.getForm) yield {
+        if (token.isToponym) {
+          val toponym = token.asInstanceOf[Toponym]
+          if (toponym.getAmbiguity == 0)
+            "[%s amb=0]" format form
+          else {
+            val gold =
+              if (toponym.hasGold)
+                " %s" format toponym.getGold.getRegion.getCenter
+              else
+                ""
+            val pred =
+              if (toponym.hasSelected)
+                " pred=%s" format toponym.getSelected.getRegion.getCenter
+              else
+                ""
+            "[%s%s%s]" format (form, gold, pred)
+          }
+        } else
+          form
+      }
+      errprint("  %s%s", prefix, words mkString " ")
+    }
+  }
+
+  def debug_print_corpus(corpus: StoredCorpus, prefix: String = "") {
+    for ((doc, index) <- corpus.zipWithIndex) {
+      debug_print_doc(doc, "%s#%s: " format (prefix, index + 1))
+    }
+  }
+}
+
 class FieldSpringCCorpus extends CCorpus {
   val docs = mutable.LinkedHashSet[CDoc]()
 
@@ -249,7 +330,7 @@ class FieldSpringCCorpus extends CCorpus {
 
   def debug_print(prefix: String = "") {
     for ((doc, index) <- docs.zipWithIndex) {
-      doc.debug_print("#%s: " format (index + 1))
+      doc.debug_print("%s#%s: " format (prefix, index + 1))
     }
   }
 }
@@ -289,7 +370,8 @@ class DocGeo(val ranker: GridRanker[SphereCoord]) {
     // GridDocs.
     // FIXME: Can the GridRanker handle initialize() being called multiple
     // times? Fix it so it can.
-    for (doc <- corpus.docs) {
+    val task = new Meter("labeling", "document")
+    corpus.docs.foreachMetered(task) { doc =>
       doc.get_grid_doc(ranker) foreach { griddoc =>
           // FIXME: This doesn't work with mean shift. Assumes we're always
           // taking the topmost cell.
@@ -301,6 +383,19 @@ class DocGeo(val ranker: GridRanker[SphereCoord]) {
         doc.score = score
       }
     }
+  }
+
+  def label_and_evaluate(corpus: FieldSpringCCorpus) {
+    label(corpus)
+    // BEWARE of sets, need to convert to sequences!
+    val docs = corpus.docs.toIndexedSeq
+    val errdists = docs.map(_.error_distance_from_nearest_predicted_toponym).
+      filter(_ >= 0)
+    errprint("Number of documents with error distances: %s/%s",
+      errdists.size, docs.size)
+    errprint("Acc@161: %.2f", errdists.count(_ <= 161).toDouble / errdists.size)
+    errprint("Mean: %.2f km", mean(errdists))
+    errprint("Median: %.2f km", median(errdists))
   }
 }
 
@@ -390,25 +485,6 @@ class CoTrainer {
   }
 
   /**
-   * Return true if one of the toponyms in the document has a candidate that
-   * is close to the resolved document location.
-   */
-  def toponym_candidate_near_location(doc: CDoc, threshold: Double
-    ): Boolean = {
-    val doc_gold = doc.fsdoc.getGoldCoord
-    for (sent <- doc.fsdoc) {
-      for (toponym <- sent.getToponyms) {
-        for (cand <- toponym.getCandidates) {
-          val location = cand.getRegion.getCenter
-          if (location.distanceInKm(doc_gold) <= threshold)
-            return true
-        }
-      }
-    }
-    return false
-  }
-
-  /**
    * Construct a pseudo-document created from a given toponym and the tokens
    * surrounding that toponym. The location of the document is set to the
    * location of the toponym.
@@ -488,8 +564,8 @@ class CoTrainer {
         errprint("Iteration %s: Size of chosen unlabeled: %s docs",
           iteration, chosen_labeled.size)
         val accepted_labeled =
-          chosen_labeled.filter(doc => toponym_candidate_near_location(
-            doc, driver.params.co_train_max_distance))
+          chosen_labeled.filter(doc => doc.toponym_candidate_near_location(
+            driver.params.co_train_max_distance))
         errprint("Iteration %s: Size of accepted labeled: %s docs",
           iteration, accepted_labeled.size)
         if (accepted_labeled.is_empty) {
@@ -497,22 +573,29 @@ class CoTrainer {
           break
         }
         val resolved_stored_corpus = topres.resolve(accepted_labeled)
-        val resolved = convert_stored_corpus(resolved_stored_corpus)
-        errprint("Resolved corpus:")
-        resolved.debug_print()
+        val resolved =
+          FieldSpringCCorpus.convert_stored_corpus(resolved_stored_corpus)
+        if (debug("cotrain")) {
+          errprint("Resolved corpus:")
+          resolved.debug_print()
+        }
         val resolved_pseudo =
           get_pseudo_documents_surrounding_toponyms(resolved,
             driver.params.co_train_window, driver.the_stopwords)
-        errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
-          iteration, resolved_pseudo.size)
-        errprint("Resolved-pseudo corpus:")
-        for ((doc, index) <- resolved_pseudo.zipWithIndex)
-          doc.debug_print("#%s: " format (index + 1))
+        if (debug("cotrain")) {
+          errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
+            iteration, resolved_pseudo.size)
+          errprint("Resolved-pseudo corpus:")
+          for ((doc, index) <- resolved_pseudo.zipWithIndex)
+            doc.debug_print("#%s: " format (index + 1))
+        }
         for (doc <- resolved_pseudo)
           labeled_pseudo += doc
         for (doc <- accepted_labeled.docs) {
-          labeled += doc
           unlabeled -= doc
+        }
+        for (doc <- resolved.docs) {
+          labeled += doc
         }
         if (unlabeled.is_empty) {
           errprint("Terminating, unlabeled corpus is empty")
@@ -548,13 +631,6 @@ class CoTrainer {
     }
   }
 
-  def convert_stored_corpus(corpus: StoredCorpus) = {
-    val ccorp = new FieldSpringCCorpus
-    for (doc <- corpus)
-      ccorp += new CDoc(doc.asInstanceOf[Document[Token]], 0.0)
-    ccorp
-  }
-
   def read_fieldspring_test_corpus(corpus: String) = {
     errout(s"Reading serialized corpus from $corpus ...")
     val test_corpus = TopoUtil.readStoredCorpusFromSerialized(corpus)
@@ -586,6 +662,12 @@ class CoTrainer {
   def evaluate_topres_corpus(test_corpus: StoredCorpus,
       gold_corpus: StoredCorpus, corpus_format: String,
       do_oracle_eval: Boolean) {
+    if (debug("cotrain")) {
+      errprint("Test corpus:")
+      FieldSpringCCorpus.debug_print_corpus(test_corpus)
+      errprint("Gold corpus:")
+      FieldSpringCCorpus.debug_print_corpus(gold_corpus)
+    }
     val evaluate_corpus = new EvaluateCorpus
     evaluate_corpus.doEval(test_corpus, gold_corpus,
       corpus_format_to_enum(corpus_format), true, do_oracle_eval)

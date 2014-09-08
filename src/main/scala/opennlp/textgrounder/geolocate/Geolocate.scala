@@ -728,12 +728,18 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
     val base_ranker = create_ranker
     val ranker = if (!params.co_train) base_ranker else {
       val cotrainer = new CoTrainer
-      val unlabeled = cotrainer.convert_stored_corpus(
+      val unlabeled = FieldSpringCCorpus.convert_stored_corpus(
         cotrainer.read_fieldspring_test_corpus(
           params.topres_serialized_corpus_input))
       val resolver = cotrainer.create_resolver(this)
       val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled,
         resolver)
+      // Evaluate the toponym corpus using the base ranker; this considers
+      // the error distance to be the smallest distance to any toponym
+      errprint("Base ranker document-level evaluation of toponym corpus:")
+      (new DocGeo(base_ranker)).label_and_evaluate(ccorpus)
+      errprint("Co-trainer document-level evaluation of toponym corpus:")
+      docgeo.label_and_evaluate(ccorpus)
       val gold = cotrainer.read_fieldspring_gold_corpus(
         params.topres_input, params.topres_corpus_format)
       cotrainer.evaluate_topres_corpus(ccorpus.to_stored_corpus, gold,
