@@ -542,9 +542,9 @@ weighted min dist.""")
     ap.option[String]("topres-log-file", "trlf",
       help = """Log file, if any, during toponym resolution.""")
 
-  var topres_maxent_model_dir =
-    ap.option[String]("topres-maxent-model-dir", "trmmd",
-      help = """Maxent model dir, if any, during toponym resolution.""")
+  // var topres_maxent_model_dir =
+  //  ap.option[String]("topres-maxent-model-dir", "trmmd",
+  //    help = """Maxent model dir, if any, during toponym resolution.""")
 
   var topres_pop_component =
     ap.option[Double]("topres-pop-component", "trpc",
@@ -564,12 +564,10 @@ resolver.""")
 
   var topres_input =
     ap.option[String]("topres-input", "tri",
-      default = null,
       help = """Input path for toponym resolution.""")
 
   var topres_serialized_corpus_input =
     ap.option[String]("topres-serialized-corpus-input", "trsci",
-      default = null,
       help = """Serialized corpus input path for toponym resolution.""")
 
   var topres_corpus_format =
@@ -581,8 +579,27 @@ resolver.""")
   var topres_do_oracle_eval =
     ap.flag("topres-do-oracle-eval", "trdoe",
       help = """Do oracle evaluation during toponym resolution.""")
-}
 
+  var topres_gazetteer =
+    ap.option[String]("topres-gazetteer", "trg",
+      help = """Gazetteer for toponym resolution. Used during
+WISTR training.""")
+
+  var topres_stopwords =
+    ap.option[String]("topres-stopwords", "trs",
+      help = """Stopwords file for toponym resolution. Used during
+WISTR training.""")
+
+  var topres_wistr_threshold =
+    ap.option[Double]("topres-wistr-threshold", "trwt",
+      default = 10.0,
+      help = """Maximum distance threshold during WISTR training.""")
+
+  var topres_wistr_feature_dir =
+    ap.option[String]("topres-wistr-feature-dir", "trwfd",
+      help = """Directory containing pre-computed Wikipedia features,
+needed during WISTR training.""")
+}
 
 trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   override type TParam <: GeolocateParameters
@@ -731,9 +748,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       val unlabeled = FieldSpringCCorpus.convert_stored_corpus(
         cotrainer.read_fieldspring_test_corpus(
           params.topres_serialized_corpus_input))
-      val resolver = cotrainer.create_resolver(this)
-      val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled,
-        resolver)
+      val (docgeo, ccorpus) = cotrainer.train(base_ranker, unlabeled)
       // Evaluate the toponym corpus using the base ranker; this considers
       // the error distance to be the smallest distance to any toponym
       errprint("Base ranker document-level evaluation of toponym corpus:")

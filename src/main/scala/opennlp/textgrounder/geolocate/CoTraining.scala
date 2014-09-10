@@ -25,6 +25,7 @@ import scala.util.{Left, Right}
 import scala.util.control.Breaks._
 
 import java.io._
+import java.nio.file.Files
 
 import opennlp.fieldspring.tr.app._
 import opennlp.fieldspring.tr.app.BaseApp.CORPUS_FORMAT
@@ -82,7 +83,7 @@ import util.textdb._
 // }
 
 class CDoc(val fsdoc: Document[Token], var score: Double) {
-  val schema = new Schema(Iterable("title", "coord", "unigram-counts"),
+  val schema = new Schema(Iterable("title", "id", "coord", "unigram-counts"),
     Map("corpus-type" -> "generic", "split" -> "training"))
 
   /**
@@ -102,7 +103,9 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
         "%s,%s" format (doc_gold.getLatDegrees, doc_gold.getLngDegrees)
     val word_field = Encoder.count_map(words)
     // errprint("Words: %s", word_field)
-    val props = IndexedSeq(fsdoc.getId, coord, word_field)
+    val props = IndexedSeq(
+      if (fsdoc.title != null) fsdoc.title else fsdoc.getId,
+      fsdoc.getId, coord, word_field)
     Row(schema, props)
   }
 
@@ -314,14 +317,41 @@ class FieldSpringCCorpus extends CCorpus {
   def size = docs.size
 
   /**
-   * Convert the stored FieldSpring-style documents to TextDB rows so they
-   * can be used to create a TextGrounder document geolocator (ranker).
+   * Convert the stored FieldSpring-style documents to TextDB rows.
    * FIXME: This seems hackish, especially having to convert the words into
    * a serialized string which is then parsed.
+   */
+  def get_textdb_rows: Iterable[Row] = {
+    for (doc <- docs.toSeq) yield
+      doc.get_textdb_row
+  }
+
+  /**
+   * Convert the stored FieldSpring-style documents to TextDB rows surrounded
+   * by DocStatus objects so they can be used to create a TextGrounder
+   * document geolocator (ranker). FIXME: This seems hackish, especially
+   * having to convert the words into a serialized string which is then parsed.
    */
   def get_textdb_doc_status_rows: Iterable[DocStatus[Row]] = {
     for (doc <- docs.toSeq) yield
       doc.get_textdb_doc_status_row
+  }
+
+  /**
+   * Write the text of the corpus to FILE in the format used in
+   * TextGrounder and required by WISTR.
+   */
+  def write_corpus_text(file: PrintStream) = {
+    for (doc <- docs) {
+      val fsdoc = doc.fsdoc
+      file.println("Article title: %s" format
+        (if (fsdoc.title != null) fsdoc.title else fsdoc.getId))
+      file.println(s"Article ID: ${fsdoc.getId}")
+      for (sent <- doc.fsdoc; token <- sent.getTokens; form = token.getOrigForm;
+           if form != "") {
+        file.println(form)
+      }
+    }
   }
 
   def to_docgeo_ranker(driver: GeolocateDriver) =
@@ -462,8 +492,112 @@ object DocGeo {
       interp_factor))
 }
 
-class TopRes(resolver: Resolver) {
-  def resolve(corpus: FieldSpringCCorpus) = {
+class TopRes {
+  def create_resolver(driver: GeolocateDriver, logfile: String,
+      wistr_dir: String): Resolver = {
+    val params = driver.params
+    params.topres_resolver match {
+      case "random" => new RandomResolver
+      case "population" => new PopulationResolver
+      case "spider" => new WeightedMinDistResolver(params.topres_iterations,
+        params.topres_weights_file, logfile)
+      case "maxent" => new MaxentResolver(logfile, wistr_dir)
+      case "prob" => new ProbabilisticResolver(logfile,
+        wistr_dir, params.topres_write_weights_file,
+        params.topres_pop_component, params.topres_dg,
+        params.topres_me)
+    }
+  }
+
+  // Given a corpus labeled with both document location and toponyms,
+  // and another corpus labeled only with document locations, effectively
+  // train WISTR on the combination of the two and a version of Wikipedia.
+  // We actually require that the Wikipedia feature generation be previously
+  // done, since it's time consuming and we can reuse it each time.
+  def train_wistr(labeled: FieldSpringCCorpus, dglabeled: FieldSpringCCorpus,
+      driver: GeolocateDriver) = {
+
+    require(driver.params.topres_input != null,
+      "--topres-input must be specified for WISTR training")
+    require(driver.params.topres_gazetteer != null,
+      "--topres-gazetteer must be specified for WISTR training")
+    require(driver.params.topres_stopwords != null,
+      "--topres-stopwords must be specified for WISTR training")
+    require(driver.params.topres_wistr_feature_dir != null,
+      "--topres-wistr-feature-dir must be specified for WISTR training")
+
+    if (debug("cotrain")) {
+      errprint("Labeled corpus:")
+      labeled.debug_print()
+      errprint("DG-labeled corpus:")
+      dglabeled.debug_print()
+    }
+ 
+    val fh = localfh
+
+    val labeled_rows = labeled.get_textdb_rows
+    val dglabeled_rows = dglabeled.get_textdb_rows
+    val rows_filename =
+      File.createTempFile("textgrounder.cotrain.rows", null).toString
+    errprint("Writing rows to %s.data.txt", rows_filename)
+    TextDB.write_textdb_rows(fh, rows_filename,
+      (labeled_rows ++ dglabeled_rows).toIterator)
+    val text_filename =
+      File.createTempFile("textgrounder.cotrain.text", null).toString
+    errprint("Writing text to %s", text_filename)
+    val textfile = fh.openw(text_filename)
+    labeled.write_corpus_text(textfile)
+    dglabeled.write_corpus_text(textfile)
+    textfile.close()
+
+    val wistr_dir =
+      Files.createTempDirectory("textgrounder.cotrain.wistr.dir").toString
+    errprint("Using WISTR dir %s", wistr_dir)
+    val args = Array("-w", text_filename, "-c", s"$rows_filename.data.txt",
+      "-i", driver.params.topres_input, "-g", driver.params.topres_gazetteer,
+      "-s", driver.params.topres_stopwords, "-d", wistr_dir)
+    errprint("Executing: SupervisedTRFeatureExtractor %s", args mkString " ")
+    SupervisedTRFeatureExtractor.main(args)
+
+    // Combine the txt files in WISTR_DIR with the txt files in
+    // --topres-wistr-feature-dir.
+    //
+    errprint("Combining WISTR Wikipedia feature files in %s with newly generated feature files in %s",
+      driver.params.topres_wistr_feature_dir, wistr_dir)
+    for (path <- fh.list_files(driver.params.topres_wistr_feature_dir);
+         if path.endsWith(".txt")) {
+      val (dir, tail) = fh.split_filename(path)
+      val wistr_dir_file = fh.join_filename(wistr_dir, tail)
+      val outfile = fh.openw(wistr_dir_file, append = fh.exists(wistr_dir_file))
+      for (line <- fh.openr(path))
+        outfile.println(line)
+      outfile.close()
+    }
+
+    // Train the WISTR models using OpenNLP.
+    val args2 = Array(wistr_dir)
+    errprint("Executing: SupervisedTRMaxentModelTrainer %s", args2 mkString " ")
+    SupervisedTRMaxentModelTrainer.main(args2)
+
+    wistr_dir
+  }
+
+  // Do any necessary training given a corpus labeled with both document
+  // location and toponyms, and another corpus labeled only with document
+  // locations; the two are meant to be combined. Currently this does
+  // WISTR training; SPIDER doesn't require training. Return a resolver
+  // object to be passed into the resolve() function.
+  def train(labeled: FieldSpringCCorpus, dglabeled: FieldSpringCCorpus,
+      driver: GeolocateDriver) = {
+    val wistr_dir =
+      if (driver.params.topres_resolver == "maxent")
+        train_wistr(labeled, dglabeled, driver)
+      else
+        null
+    create_resolver(driver, driver.params.topres_log_file, wistr_dir)
+  }
+
+  def resolve(corpus: FieldSpringCCorpus, resolver: Resolver) = {
     val stored_corpus = corpus.to_stored_corpus
     resolver.disambiguate(stored_corpus)
   }
@@ -525,24 +659,30 @@ class CoTrainer {
   }
 
   /**
-   * Do co-training, given a base labeled corpus (e.g. Wikipedia) and
-   * an unlabeled corpus.
+   * Do co-training, given a base docgeo-labeled corpus (e.g. Wikipedia) and
+   * an unlabeled corpus containing toponym candidate annotations.
    *
-   * We have four corpora here:
-   *
-   * 1. A corpus whose source is TextGrounder. This should wrap a ranker,
-   *    meaning we can't iterate over the documents.
-   * 2. 
+   * Co-training involves alternating between two classifiers, training
+   * each one on the predictions of the other.
    */
-  def train(base: GridRanker[SphereCoord], unlabeled: FieldSpringCCorpus,
-      resolver: Resolver): (DocGeo, FieldSpringCCorpus) = {
+  def train(base: GridRanker[SphereCoord], unlabeled: FieldSpringCCorpus
+      ): (DocGeo, FieldSpringCCorpus) = {
     val driver = base.grid.driver.asInstanceOf[GeolocateDriver]
-    // set of labeled documents, originally empty
+    // Set of labeled documents, originally empty. These have been labeled
+    // labeled by the document geolocator and passed to the toponym resolver,
+    // which then resolves toponyms in them. As a result they have both
+    // document and toponym labels (the former as the gold labels, the
+    // latter as the "selected" labels rather than the gold ones).
     var labeled = new FieldSpringCCorpus()
-    // set of labeled pseudo-documents corresponding to labeled documents
+    // Set of labeled pseudo-documents corresponding to labeled documents.
+    // After the labeled documents are toponym-resolved, for every toponym
+    // a pseudo-document is created by taking a window of 10 or so words
+    // on each side of the toponym, with the toponym's location as the
+    // document's location. These also have both document and toponym
+    // labels.
     var labeled_pseudo = new FieldSpringCCorpus()
     // toponym resolver, possibly trained on wp (if WISTR)
-    var topres = new TopRes(resolver)
+    var topres = new TopRes
     val wp_docgeo = new DocGeo(base)
     var iteration = 0
     var docgeo: DocGeo = null
@@ -555,30 +695,60 @@ class CoTrainer {
           iteration, labeled.size)
         errprint("Iteration %s: Size of labeled-pseudo corpus: %s docs",
           iteration, labeled_pseudo.size)
+        // Create a new document geolocator based on the labeled pseudo-docs,
+        // and then create a second document geolocator that interpolates
+        // between the first one and the base docgeo (e.g. trained on
+        // Wikipedia).
         val docgeo1 = DocGeo.train(labeled_pseudo, driver)
         docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
           driver.params.co_train_interpolate_factor)
+        // Label remaining unlabeled docs with docgeo.
         docgeo.label(unlabeled)
-        val chosen_labeled = choose_batch(unlabeled,
+        // Choose some batch, based on the score.
+        val chosen_dglabeled = choose_batch(unlabeled,
           driver.params.co_train_min_score, driver.params.co_train_min_size)
         errprint("Iteration %s: Size of chosen unlabeled: %s docs",
-          iteration, chosen_labeled.size)
-        val accepted_labeled =
-          chosen_labeled.filter(doc => doc.toponym_candidate_near_location(
+          iteration, chosen_dglabeled.size)
+        // Toponym resolver further winnows the batch, only accepting
+        // documents with some candidate near the chosen docgeo location.
+        val accepted_dglabeled =
+          chosen_dglabeled.filter(doc => doc.toponym_candidate_near_location(
             driver.params.co_train_max_distance))
         errprint("Iteration %s: Size of accepted labeled: %s docs",
-          iteration, accepted_labeled.size)
-        if (accepted_labeled.is_empty) {
+          iteration, accepted_dglabeled.size)
+        if (accepted_dglabeled.is_empty) {
           errprint("Terminating, accepted-labeled corpus is empty")
           break
         }
-        val resolved_stored_corpus = topres.resolve(accepted_labeled)
+        if (debug("cotrain")) {
+          errprint("Accepted-DG-labeled corpus:")
+          accepted_dglabeled.debug_print()
+        }
+        // At this point, if we need to train the toponym resolver, e.g.
+        // WISTR, we train it on the combination of the `labeled` and
+        // `accepted_dglabeled` docs. Note that the former has both docgeo
+        // and toponym labels, while the latter has only docgeo labels.
+        // For WISTR, this also depends on the whole Wikipedia corpus.
+        // It should be possible to do feature extraction on Wikipedia only
+        // once and then combine the features.
+        val resolver = topres.train(labeled, accepted_dglabeled, driver)
+
+        // Do toponym resolution on the accepted batch of documents labeled
+        // by the docgeo.
+        val resolved_stored_corpus =
+          topres.resolve(accepted_dglabeled, resolver)
+        if (debug("cotrain")) {
+          errprint("Resolved stored corpus:")
+          FieldSpringCCorpus.debug_print_corpus(resolved_stored_corpus)
+        }
         val resolved =
           FieldSpringCCorpus.convert_stored_corpus(resolved_stored_corpus)
         if (debug("cotrain")) {
           errprint("Resolved corpus:")
           resolved.debug_print()
         }
+        // Create pseudo-documents based on the accepted, toponym-resolved
+        // batch of documents.
         val resolved_pseudo =
           get_pseudo_documents_surrounding_toponyms(resolved,
             driver.params.co_train_window, driver.the_stopwords)
@@ -589,9 +759,12 @@ class CoTrainer {
           for ((doc, index) <- resolved_pseudo.zipWithIndex)
             doc.debug_print("#%s: " format (index + 1))
         }
+        // Add pseudo-documents to current set to be passed to the docgeo.
         for (doc <- resolved_pseudo)
           labeled_pseudo += doc
-        for (doc <- accepted_labeled.docs) {
+        // Remove accepted labeled batch from set of unlabeled docs, and
+        // add corresponding set with toponym labels to set of labeled docs.
+        for (doc <- accepted_dglabeled.docs) {
           unlabeled -= doc
         }
         for (doc <- resolved.docs) {
@@ -615,22 +788,6 @@ class CoTrainer {
     }
   }
 
-  def create_resolver(driver: GeolocateDriver): Resolver = {
-    val params = driver.params
-    params.topres_resolver match {
-      case "random" => new RandomResolver
-      case "population" => new PopulationResolver
-      case "spider" => new WeightedMinDistResolver(params.topres_iterations,
-        params.topres_weights_file, params.topres_log_file)
-      case "maxent" => new MaxentResolver(params.topres_log_file,
-        params.topres_maxent_model_dir)
-      case "prob" => new ProbabilisticResolver(params.topres_log_file,
-        params.topres_maxent_model_dir, params.topres_write_weights_file,
-        params.topres_pop_component, params.topres_dg,
-        params.topres_me)
-    }
-  }
-
   def read_fieldspring_test_corpus(corpus: String) = {
     errout(s"Reading serialized corpus from $corpus ...")
     val test_corpus = TopoUtil.readStoredCorpusFromSerialized(corpus)
@@ -651,7 +808,7 @@ class CoTrainer {
             gold_corpus.addSource(new TrXMLDirSource(gold_file, tokenizer))
         else
             gold_corpus.addSource(new TrXMLSource(new BufferedReader(new FileReader(gold_file)), tokenizer))
-        gold_corpus.setFormat(BaseApp.CORPUS_FORMAT.TRCONLL)
+        gold_corpus.setFormat(CORPUS_FORMAT.TRCONLL)
         gold_corpus.load()
         errprint("done.")
       }

@@ -59,7 +59,7 @@ libraryDependencies ++= Seq(
   // unmanaged junto.jar includes a copy of Argot 0.3.5, so we will have
   // class path problems with a newer managed version of Argot until we
   // remove this!)
-  // "org.clapper" %% "argot" % "1.0.1",
+  "org.clapper" %% "argot" % "1.0.1",
   // If we remove Argot we need to include Argot's dependencies.
   "org.clapper" %% "grizzled-scala" % "1.2",
   // 
