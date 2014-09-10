@@ -21,6 +21,7 @@
 package opennlp.textgrounder
 package geolocate
 
+import scala.util.control.Breaks._
 import scala.util.matching.Regex
 import scala.util.Random
 import math._
@@ -30,7 +31,7 @@ import util.argparser._
 import util.collection._
 import util.error._
 import util.experiment._
-import util.io.{FileHandler, LocalFileHandler}
+import util.io.localfh
 import util.numeric.format_double
 import util.os._
 import util.print.{errprint, outprint}
@@ -955,11 +956,24 @@ object GeolocateDocumentTag extends
      */
     def default = null
     /**
-     * Return tail of filename.
+     * Return tail of filename. Normally this is the last component,
+     * but if that component is less than 10 chars, keep taking
+     * previous components until total length is at least 10 chars or
+     * beginning of filename reached.
      */
     def filetail = (value: Any) => value match {
       case x:String => {
-        val (dir, tail) = util.io.localfh.split_filename(x)
+        val (dir1, tail1) = localfh.split_filename(x)
+        var dir = dir1
+        var tail = tail1
+        breakable {
+          while (tail.size < 10) {
+            val (dir2, tail2) = localfh.split_filename(dir)
+            if (dir2 == "." || tail2 == "") break
+            dir = dir2
+            tail = localfh.join_filename(tail2, tail)
+          }
+        }
         tail
       }
       case _ => valonly(value)
@@ -1003,7 +1017,7 @@ object GeolocateDocumentTag extends
      */
     val param_handling = Seq[(String, Any => String)](
       ("input", xs => xs.asInstanceOf[Seq[String]] map { x =>
-        val (dir, tail) = util.io.localfh.split_filename(x)
+        val (dir, tail) = localfh.split_filename(x)
         if (dir.endsWith("twitter-geotext"))
           "geotext-" + tail.replace("docthresh-", "thresh")
         else
@@ -1122,7 +1136,31 @@ object GeolocateDocumentTag extends
       ("save-vw-model", full("saveModel", filetail)),
       ("load-vw-model", full("loadModel", filetail)),
       ("save-vw-submodels", full("saveSubmodels", filetail)),
-      ("load-vw-submodels", full("saveSubmodels", filetail))
+      ("load-vw-submodels", full("saveSubmodels", filetail)),
+      // Co-training
+      ("co-train", default),
+      ("co-train-interpolate-factor", short("ctInterp")),
+      ("co-train-window", short("ctWin")),
+      ("co-train-min-size", short("ctMinSz")),
+      ("co-train-min-score", short("ctMinSc")),
+      ("co-train-max-distance", short("ctMaxDist")),
+      ("topres-resolver", valonly_camel),
+      ("topres-iterations", short("trIter")),
+      ("topres-weights-file", full("trWeights", filetail)),
+      ("topres-write-weights-file", full("trWriteWeights", filetail)),
+      ("topres-log-file", full("trLog", filetail)),
+      ("topres-maxent-model-dir", full("trMaxentModel", filetail)),
+      ("topres-pop-component", short("trPop")),
+      ("topres-dg", echo("trDG")),
+      ("topres-me", echo("trME")),
+      ("topres-input", full("trInput", filetail)),
+      ("topres-serialized-corpus-input", full("trSerInput", filetail)),
+      ("topres-corpus-format", valonly_camel),
+      ("topres-do-oracle-eval", echo("trOracleEval")),
+      ("topres-gazetteer", full("trGaz", filetail)),
+      ("topres-stopwords", full("trStopw", filetail)),
+      ("topres-wistr-threshold", short("trWISTRThresh")),
+      ("topres-wistr-feature-dir", full("trWISTRFeat", filetail))
     )
 
     // Map listing how to handle params.
