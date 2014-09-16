@@ -48,13 +48,13 @@ class FrobTextDBParameters(parser: ArgParser) extends
       help = """Directory containing input corpus.""")
   var input_suffix =
     ap.option[String]("s", "input-suffix",
-      metavar = "DIR",
+      metavar = "SUFFIX",
       default = "",
       help = """Suffix used to select the appropriate files to operate on.
 Defaults to the empty string, which will match any TextDB file.""")
   var output_suffix =
     ap.option[String]("output-suffix",
-      metavar = "DIR",
+      metavar = "SUFFIX",
       help = """Suffix used when generating the output files.  Defaults to
 the value of --input-suffix.""")
   val add_field =
@@ -129,18 +129,43 @@ argument is four values separated by commas, i.e.
   MINLAT,MINLONG,MAXLAT,MAXLONG
 
 For example, 25.0,-126.0,49.0,-60.0 for North America.""")
+  val filter_field =
+    ap.option[String]("filter-field",
+      metavar = "FIELD:FILE",
+      help = """Filter the specified field by name, selecting only the rows
+whose value for that field is in the specified file (one value per line).""")
+  val filter_field_not =
+    ap.option[String]("filter-field-not",
+      metavar = "FIELD:FILE",
+      help = """Filter the specified field by name, selecting only the rows
+whose value for that field is not in the specified file (one value per
+line).""")
 
-  val bounding_box =
-    if (filter_bounding_box != null)
-      filter_bounding_box.split(",").map(_.toDouble)
-    else
-      Array()
-  if (bounding_box.size > 0)
+  val filterers = mutable.Buffer[RecordFilterer]()
+
+  if (filter_bounding_box != null) {
+    val bounding_box = filter_bounding_box.split(",").map(_.toDouble)
     require(bounding_box.size == 4)
+    filterers += new FilterBoundingBox(bounding_box)
+  }
+
+  private def parse_filter_field(value: String) = {
+    val Array(field, file) = value.split(":")
+    (field, io.localfh.openr(file).toSet)
+  }
+
+  if (filter_field != null) {
+    val (field, file) = parse_filter_field(filter_field)
+    filterers += new FilterField(field, file)
+  }
+  if (filter_field_not != null) {
+    val (field, file) = parse_filter_field(filter_field_not)
+    filterers += new FilterFieldNot(field, file)
+  }
 
   val frobbers = mutable.Buffer[RecordFrobber]()
 
-  def parse_add_field_by(value: String) = {
+  private def parse_add_field_by(value: String) = {
     val Array(destfield, srcfield, pairs@_*) = value.split(",")
     val split_pairs = pairs.map { pair =>
       pair.split(":") match {
@@ -230,6 +255,47 @@ class ConvertToUnigramCounts extends RecordFrobber {
       unigram_counts(word) += 1
     val unigram_counts_text = encode_count_map(unigram_counts.toSeq)
     docparams += (("unigram-counts", unigram_counts_text))
+  }
+}
+
+/**
+ * Abstract class for filtering a record in some fashion, according to
+ * a command-line parameter. There will be a list of such items,
+ * determined by command-line parameters, which will be processed in
+ * order for each record.
+ */
+abstract class RecordFilterer {
+  def filter(schema: Schema, fieldvals: IndexedSeq[String]): Boolean
+}
+
+class FilterBoundingBox(bounding_box: Array[Double]) extends RecordFilterer {
+  def filter(schema: Schema, fieldvals: IndexedSeq[String]) = {
+    val Array(minlat, minlong, maxlat, maxlong) = bounding_box
+    schema.get_value_if[SphereCoord](fieldvals, "coord") match {
+      case None => false
+      case Some(coord) =>
+        coord.lat >= minlat && coord.lat <= maxlat &&
+        coord.long >= minlong && coord.long <= maxlong
+    }
+  }
+}
+
+class FilterField(field: String, values: Set[String]) extends RecordFilterer {
+  def filter(schema: Schema, fieldvals: IndexedSeq[String]) = {
+    schema.get_value_if[String](fieldvals, field) match {
+      case None => false
+      case Some(value) => values.contains(value)
+    }
+  }
+}
+
+class FilterFieldNot(field: String, values: Set[String]
+  ) extends RecordFilterer {
+  def filter(schema: Schema, fieldvals: IndexedSeq[String]) = {
+    schema.get_value_if[String](fieldvals, field) match {
+      case None => true
+      case Some(value) => !values.contains(value)
+    }
   }
 }
 
@@ -361,17 +427,7 @@ class FrobTextDB(
   }
 
   def filter_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) = {
-    if (params.bounding_box.size == 0)
-      true
-    else {
-      val Array(minlat, minlong, maxlat, maxlong) = params.bounding_box
-      schema.get_value_if[SphereCoord](fieldvals, "coord") match {
-        case None => false
-        case Some(coord) =>
-          coord.lat >= minlat && coord.lat <= maxlat &&
-          coord.long >= minlong && coord.long <= maxlong
-      }
-    }
+    params.filterers.forall(_.filter(schema, fieldvals))
   }
 
   def process_row(schema: SchemaFromFile, fieldvals: IndexedSeq[String]) {
