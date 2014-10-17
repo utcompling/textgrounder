@@ -519,7 +519,8 @@ Default %default.""")
   var topres_resolver =
     ap.option[String]("topres-resolver", "trr",
       default = "spider",
-      choices = Seq("random", "population", "spider", "maxent", "prob"),
+      aliasedChoices = Seq(Seq("random"), Seq("population"), Seq("spider"),
+        Seq("maxent", "wistr"), Seq("wistr-spider"), Seq("prob")),
       help = """Resolver to use for toponym resolution when co-training.
 Default '%default'.""")
 

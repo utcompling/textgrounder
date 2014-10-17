@@ -493,6 +493,21 @@ object DocGeo {
       interp_factor))
 }
 
+class WistrSpiderResolver(logfile: String, wistr_dir: String,
+    num_iterations: Int, document_coord: DOCUMENT_COORD) extends Resolver {
+
+  def disambiguate(corpus: StoredCorpus): StoredCorpus = {
+    val weights_filename =
+      File.createTempFile("textgrounder.wistr-spider.weights", null).toString
+    val wistr = new ProbabilisticResolver(logfile, wistr_dir,
+      weights_filename, 0.0, dgProbOnly = false, meProbOnly = true)
+    val spider = new WeightedMinDistResolver(num_iterations,
+      weights_filename, logfile, document_coord)
+    wistr.disambiguate(corpus)
+    spider.disambiguate(corpus)
+  }
+}
+
 class TopRes {
   def document_coord_to_enum(document_coord: String) = {
     document_coord match {
@@ -512,6 +527,9 @@ class TopRes {
         params.topres_weights_file, logfile,
         document_coord_to_enum(params.topres_spider_document_coord))
       case "maxent" => new MaxentResolver(logfile, wistr_dir)
+      case "wistr-spider" => new WistrSpiderResolver(logfile, wistr_dir,
+        params.topres_iterations,
+        document_coord_to_enum(params.topres_spider_document_coord))
       case "prob" => new ProbabilisticResolver(logfile,
         wistr_dir, params.topres_write_weights_file,
         params.topres_pop_component, params.topres_dg,
@@ -600,7 +618,10 @@ class TopRes {
   def train(labeled: FieldSpringCCorpus, dglabeled: FieldSpringCCorpus,
       driver: GeolocateDriver) = {
     val wistr_dir =
-      if (driver.params.topres_resolver == "maxent")
+      if (driver.params.topres_resolver == "maxent" ||
+          // In case we rename maxent -> wistr
+          driver.params.topres_resolver == "wistr" ||
+          driver.params.topres_resolver == "wistr-spider")
         train_wistr(labeled, dglabeled, driver)
       else
         null
