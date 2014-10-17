@@ -30,6 +30,7 @@ import java.nio.file.Files
 import opennlp.fieldspring.tr.app._
 import opennlp.fieldspring.tr.app.BaseApp.CORPUS_FORMAT
 import opennlp.fieldspring.tr.resolver._
+import WeightedMinDistResolver.DOCUMENT_COORD
 import opennlp.fieldspring.tr.text._
 import opennlp.fieldspring.tr.text.prep._
 import opennlp.fieldspring.tr.text.io._
@@ -493,6 +494,14 @@ object DocGeo {
 }
 
 class TopRes {
+  def document_coord_to_enum(document_coord: String) = {
+    document_coord match {
+      case "no" => DOCUMENT_COORD.NO
+      case "addtopo" => DOCUMENT_COORD.ADDTOPO
+      case "weighted" => DOCUMENT_COORD.WEIGHTED
+    }
+  }
+
   def create_resolver(driver: GeolocateDriver, logfile: String,
       wistr_dir: String): Resolver = {
     val params = driver.params
@@ -500,7 +509,8 @@ class TopRes {
       case "random" => new RandomResolver
       case "population" => new PopulationResolver
       case "spider" => new WeightedMinDistResolver(params.topres_iterations,
-        params.topres_weights_file, logfile)
+        params.topres_weights_file, logfile,
+        document_coord_to_enum(params.topres_spider_document_coord))
       case "maxent" => new MaxentResolver(logfile, wistr_dir)
       case "prob" => new ProbabilisticResolver(logfile,
         wistr_dir, params.topres_write_weights_file,

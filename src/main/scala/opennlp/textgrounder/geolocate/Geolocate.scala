@@ -600,6 +600,17 @@ WISTR training.""")
     ap.option[String]("topres-wistr-feature-dir", "trwfd",
       help = """Directory containing pre-computed Wikipedia features,
 needed during WISTR training.""")
+
+  var topres_spider_document_coord =
+    ap.option[String]("topres-spider-document-coord", "trsdc",
+      choices = Seq("no", "addtopo", "weighted"),
+      default = "no",
+      help = """How/whether to include the document-level gold coordinate into SPIDER.
+
+no = Don't include.
+addtopo = Add an extra toponym with a single candidate set to the given coordinate.
+weighted = Initialize the weight of all candidates in relation to the distance they
+   are from the gold coordinate.""")
 }
 
 trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
