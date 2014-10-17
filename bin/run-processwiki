@@ -47,6 +47,8 @@ coord-words-untok = Same as 'coord-words' but split only on whitespace;
                     periods that are likely to be end-of-sentence markers).
 all-words-untok = Same as 'all-words' but without further tokenization, as in
                   'coord-words-untok'.
+all-words-untok-oapl = Same as 'all-words-untok' but with one article per
+                       line instead of one word per line.
 toponym-eval = Generate data file for use in toponym evaluation.  The file
                is similar in format to a counts file, but also has internal
                links marked specially, indicating both the surface text of
@@ -278,6 +280,12 @@ elif [ "$step" = all-words-untok ]; then
 action="Generating raw text, all articles, untokenized"
 args="--output-all-words --raw-text --no-tokenize"
 outfile="$OUT_ALL_WORDS_UNTOK_FILE"
+
+elif [ "$step" = all-words-untok-oapl ]; then
+
+action="Generating raw text, all articles, untokenized, one article per line"
+args="--output-all-words --raw-text --no-tokenize --one-article-per-line"
+outfile="$OUT_ALL_WORDS_UNTOK_OAPL_FILE"
 
 else
 echo "Unrecognized step $step"

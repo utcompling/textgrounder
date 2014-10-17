@@ -1957,9 +1957,15 @@ class OutputAllWords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
-    for word in word_generator:
-      if debug['some']: errprint("Saw word: %s" % word)
-      else: splitprint("%s" % word)
+    if Opts.one_article_per_line:
+      words = []
+      for word in word_generator:
+        words.append(word)
+      splitprint("%s" % ' '.join(words))
+    else:
+      for word in word_generator:
+        if debug['some']: errprint("Saw word: %s" % word)
+        else: splitprint("%s" % word)
 
   def process_text_for_data(self, text):
     #handler = ExtractCoordinatesFromSource()
@@ -2409,6 +2415,9 @@ when different.""", action="store_true")
   op.add_option("--no-tokenize", help="""When outputting words, don't tokenize.
 This causes words to only be split on whitespace, rather than also on
 punctuation.""", action="store_true")
+  op.add_option("--one-article-per-line", help="""When outputting words,
+put all words on one line rather than putting one word per line.""",
+action="store_true")
   op.add_option("--find-coord-links",
                 help="""Find all links and print info about them, for
 articles with coordinates or redirects to such articles.  Includes count of

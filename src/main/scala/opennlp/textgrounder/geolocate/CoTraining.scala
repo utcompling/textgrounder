@@ -679,7 +679,7 @@ class CoTrainer {
       ): (DocGeo, FieldSpringCCorpus) = {
     val driver = base.grid.driver.asInstanceOf[GeolocateDriver]
     // Set of labeled documents, originally empty. These have been labeled
-    // labeled by the document geolocator and passed to the toponym resolver,
+    // by the document geolocator and passed to the toponym resolver,
     // which then resolves toponyms in them. As a result they have both
     // document and toponym labels (the former as the gold labels, the
     // latter as the "selected" labels rather than the gold ones).
