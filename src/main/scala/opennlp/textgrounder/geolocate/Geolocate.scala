@@ -498,23 +498,42 @@ should be an algorithm that depends on the relative sizes of the corpora.""")
 co-training when creating pseudo-documents. Default %default.""")
 
   var co_train_min_size =
-    ap.option[Int]("co-train-min-size", "ctmsz",
+    ap.option[Int]("co-train-min-size", "ctminsz",
       default = 1000,
       must = be_>(0),
       help = """Minimum batch size in co-training. Default %default.""")
 
   var co_train_min_score =
-    ap.option[Double]("co-train-min-score", "ctmsc",
+    ap.option[Double]("co-train-min-score", "ctminsc",
       default = Double.MinValue,
       help = """Minimum score in co-training when creating batches.
 Default %default.""")
 
-  var co_train_max_distance =
-    ap.option[Double]("co-train-max-distance", "ctmd",
-      default = 100.0,
+  var co_train_min_distance =
+    ap.option[Double]("co-train-min-distance", "ctmind",
+      default = 100.0, // 8.0,
       must = be_>(0),
-      help = """Maximum distance in co-training when creating pseudo-documents.
-Default %default.""")
+      help = """Starting (minimum) distance threshold (in km) in co-training
+when creating pseudo-documents. We allow pseudo-documents with a toponym
+candidate whose distance to the predicted document-level distance is less
+than this threshold. When we run out of documents, we increase the threshold
+by multiplying by '--co-train-distance-factor', until we reach
+'--co-train-max-distance'. Default %default.""")
+
+  var co_train_distance_factor =
+    ap.option[Double]("co-train-distance-factor", "ctdf",
+      default = 2.0,
+      must = be_>(0),
+      help = """Factor we multiply the distance threshold by when no more
+documents exist to be processed at the current threshold. See
+'--co-train-min-distance' and '--co-train-max-distance'. Default %default.""")
+
+  var co_train_max_distance =
+    ap.option[Double]("co-train-max-distance", "ctmaxd",
+      default = 100.0, // 512.0,
+      must = be_>(0),
+      help = """Ending (maximum) distance threhsold (in km) in co-training
+when creating pseudo-documents. Default %default.""")
 
   var topres_resolver =
     ap.option[String]("topres-resolver", "trr",
@@ -1155,24 +1174,27 @@ object GeolocateDocumentTag extends
       ("co-train-window", short("ctWin")),
       ("co-train-min-size", short("ctMinSz")),
       ("co-train-min-score", short("ctMinSc")),
+      ("co-train-min-distance", short("ctMinDist")),
       ("co-train-max-distance", short("ctMaxDist")),
+      ("co-train-distance-factor", short("ctDistF")),
       ("topres-resolver", valonly_camel),
+      ("topres-spider-document-coord", valonly_camel),
       ("topres-iterations", short("trIter")),
-      ("topres-weights-file", full("trWeights", filetail)),
-      ("topres-write-weights-file", full("trWriteWeights", filetail)),
-      ("topres-log-file", full("trLog", filetail)),
-      ("topres-maxent-model-dir", full("trMaxentModel", filetail)),
       ("topres-pop-component", short("trPop")),
       ("topres-dg", echo("trDG")),
       ("topres-me", echo("trME")),
       ("topres-input", full("trInput", filetail)),
       ("topres-serialized-corpus-input", full("trSerInput", filetail)),
+      ("topres-log-file", full("trLog", filetail)),
       ("topres-corpus-format", valonly_camel),
       ("topres-do-oracle-eval", echo("trOracleEval")),
-      ("topres-gazetteer", full("trGaz", filetail)),
-      ("topres-stopwords", full("trStopw", filetail)),
       ("topres-wistr-threshold", short("trWISTRThresh")),
-      ("topres-wistr-feature-dir", full("trWISTRFeat", filetail))
+      ("topres-wistr-feature-dir", full("trWISTRFeat", filetail)),
+      ("topres-maxent-model-dir", full("trMaxentModel", filetail)),
+      ("topres-weights-file", full("trWeights", filetail)),
+      ("topres-write-weights-file", full("trWriteWeights", filetail)),
+      ("topres-gazetteer", full("trGaz", filetail)),
+      ("topres-stopwords", full("trStopw", filetail))
     )
 
     // Map listing how to handle params.

@@ -715,98 +715,106 @@ class CoTrainer {
     // toponym resolver, possibly trained on wp (if WISTR)
     var topres = new TopRes
     val wp_docgeo = new DocGeo(base)
-    var iteration = 0
     var docgeo: DocGeo = null
-    breakable {
-      while (true) {
-        iteration += 1
-        errprint("Iteration %s: Size of unlabeled corpus: %s docs",
-          iteration, unlabeled.size)
-        errprint("Iteration %s: Size of labeled corpus: %s docs",
-          iteration, labeled.size)
-        errprint("Iteration %s: Size of labeled-pseudo corpus: %s docs",
-          iteration, labeled_pseudo.size)
-        // Create a new document geolocator based on the labeled pseudo-docs,
-        // and then create a second document geolocator that interpolates
-        // between the first one and the base docgeo (e.g. trained on
-        // Wikipedia).
-        val docgeo1 = DocGeo.train(labeled_pseudo, driver)
-        docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
-          driver.params.co_train_interpolate_factor)
-        // Label remaining unlabeled docs with docgeo.
-        docgeo.label(unlabeled)
-        // Choose some batch, based on the score.
-        val chosen_dglabeled = choose_batch(unlabeled,
-          driver.params.co_train_min_score, driver.params.co_train_min_size)
-        errprint("Iteration %s: Size of chosen unlabeled: %s docs",
-          iteration, chosen_dglabeled.size)
-        // Toponym resolver further winnows the batch, only accepting
-        // documents with some candidate near the chosen docgeo location.
-        val accepted_dglabeled =
-          chosen_dglabeled.filter(doc => doc.toponym_candidate_near_location(
-            driver.params.co_train_max_distance))
-        errprint("Iteration %s: Size of accepted labeled: %s docs",
-          iteration, accepted_dglabeled.size)
-        if (accepted_dglabeled.is_empty) {
-          errprint("Terminating, accepted-labeled corpus is empty")
-          break
-        }
-        if (debug("cotrain")) {
-          errprint("Accepted-DG-labeled corpus:")
-          accepted_dglabeled.debug_print()
-        }
-        // At this point, if we need to train the toponym resolver, e.g.
-        // WISTR, we train it on the combination of the `labeled` and
-        // `accepted_dglabeled` docs. Note that the former has both docgeo
-        // and toponym labels, while the latter has only docgeo labels.
-        // For WISTR, this also depends on the whole Wikipedia corpus.
-        // It should be possible to do feature extraction on Wikipedia only
-        // once and then combine the features.
-        val resolver = topres.train(labeled, accepted_dglabeled, driver)
+    var dist_threshold = driver.params.co_train_min_distance
+    var outer_iteration = 0
+    while (dist_threshold <= driver.params.co_train_max_distance) {
+      var iteration = 0
+      outer_iteration += 1
+      breakable {
+        while (true) {
+          iteration += 1
+          val iter_string = "%s-%s" format (outer_iteration, iteration)
+          errprint("Iteration %s: Size of unlabeled corpus: %s docs",
+            iter_string, unlabeled.size)
+          errprint("Iteration %s: Size of labeled corpus: %s docs",
+            iter_string, labeled.size)
+          errprint("Iteration %s: Size of labeled-pseudo corpus: %s docs",
+            iter_string, labeled_pseudo.size)
+          // Create a new document geolocator based on the labeled pseudo-docs,
+          // and then create a second document geolocator that interpolates
+          // between the first one and the base docgeo (e.g. trained on
+          // Wikipedia).
+          val docgeo1 = DocGeo.train(labeled_pseudo, driver)
+          docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
+            driver.params.co_train_interpolate_factor)
+          // Label remaining unlabeled docs with docgeo.
+          docgeo.label(unlabeled)
+          // Choose some batch, based on the score.
+          val chosen_dglabeled = choose_batch(unlabeled,
+            driver.params.co_train_min_score, driver.params.co_train_min_size)
+          errprint("Iteration %s: Size of chosen unlabeled: %s docs",
+            iter_string, chosen_dglabeled.size)
+          // Toponym resolver further winnows the batch, only accepting
+          // documents with some candidate near the chosen docgeo location.
+          val accepted_dglabeled =
+            chosen_dglabeled.filter(doc => doc.toponym_candidate_near_location(
+              dist_threshold))
+          errprint("Iteration %s: Size of accepted labeled: %s docs",
+            iter_string, accepted_dglabeled.size)
+          if (accepted_dglabeled.is_empty) {
+            errprint("Terminating, accepted-labeled corpus is empty")
+            break
+          }
+          if (debug("cotrain")) {
+            errprint("Accepted-DG-labeled corpus:")
+            accepted_dglabeled.debug_print()
+          }
+          // At this point, if we need to train the toponym resolver, e.g.
+          // WISTR, we train it on the combination of the `labeled` and
+          // `accepted_dglabeled` docs. Note that the former has both docgeo
+          // and toponym labels, while the latter has only docgeo labels.
+          // For WISTR, this also depends on the whole Wikipedia corpus.
+          // It should be possible to do feature extraction on Wikipedia only
+          // once and then combine the features.
+          val resolver = topres.train(labeled, accepted_dglabeled, driver)
 
-        // Do toponym resolution on the accepted batch of documents labeled
-        // by the docgeo.
-        val resolved_stored_corpus =
-          topres.resolve(accepted_dglabeled, resolver)
-        if (debug("cotrain")) {
-          errprint("Resolved stored corpus:")
-          FieldSpringCCorpus.debug_print_corpus(resolved_stored_corpus)
-        }
-        val resolved =
-          FieldSpringCCorpus.convert_stored_corpus(resolved_stored_corpus)
-        if (debug("cotrain")) {
-          errprint("Resolved corpus:")
-          resolved.debug_print()
-        }
-        // Create pseudo-documents based on the accepted, toponym-resolved
-        // batch of documents.
-        val resolved_pseudo =
-          get_pseudo_documents_surrounding_toponyms(resolved,
-            driver.params.co_train_window, driver.the_stopwords)
-        if (debug("cotrain")) {
-          errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
-            iteration, resolved_pseudo.size)
-          errprint("Resolved-pseudo corpus:")
-          for ((doc, index) <- resolved_pseudo.zipWithIndex)
-            doc.debug_print("#%s: " format (index + 1))
-        }
-        // Add pseudo-documents to current set to be passed to the docgeo.
-        for (doc <- resolved_pseudo)
-          labeled_pseudo += doc
-        // Remove accepted labeled batch from set of unlabeled docs, and
-        // add corresponding set with toponym labels to set of labeled docs.
-        for (doc <- accepted_dglabeled.docs) {
-          unlabeled -= doc
-        }
-        for (doc <- resolved.docs) {
-          labeled += doc
-        }
-        if (unlabeled.is_empty) {
-          errprint("Terminating, unlabeled corpus is empty")
-          break
+          // Do toponym resolution on the accepted batch of documents labeled
+          // by the docgeo.
+          val resolved_stored_corpus =
+            topres.resolve(accepted_dglabeled, resolver)
+          if (debug("cotrain")) {
+            errprint("Resolved stored corpus:")
+            FieldSpringCCorpus.debug_print_corpus(resolved_stored_corpus)
+          }
+          val resolved =
+            FieldSpringCCorpus.convert_stored_corpus(resolved_stored_corpus)
+          if (debug("cotrain")) {
+            errprint("Resolved corpus:")
+            resolved.debug_print()
+          }
+          // Create pseudo-documents based on the accepted, toponym-resolved
+          // batch of documents.
+          val resolved_pseudo =
+            get_pseudo_documents_surrounding_toponyms(resolved,
+              driver.params.co_train_window, driver.the_stopwords)
+          if (debug("cotrain")) {
+            errprint("Iteration %s: Size of resolved-pseudo corpus: %s docs",
+              iter_string, resolved_pseudo.size)
+            errprint("Resolved-pseudo corpus:")
+            for ((doc, index) <- resolved_pseudo.zipWithIndex)
+              doc.debug_print("#%s: " format (index + 1))
+          }
+          // Add pseudo-documents to current set to be passed to the docgeo.
+          for (doc <- resolved_pseudo)
+            labeled_pseudo += doc
+          // Remove accepted labeled batch from set of unlabeled docs, and
+          // add corresponding set with toponym labels to set of labeled docs.
+          for (doc <- accepted_dglabeled.docs) {
+            unlabeled -= doc
+          }
+          for (doc <- resolved.docs) {
+            labeled += doc
+          }
+          if (unlabeled.is_empty) {
+            errprint("Terminating, unlabeled corpus is empty")
+            break
+          }
         }
       }
+      dist_threshold *= driver.params.co_train_distance_factor
     }
+
     (docgeo, labeled)
   }
 
