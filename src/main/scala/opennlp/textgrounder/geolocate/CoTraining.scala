@@ -416,8 +416,7 @@ class DocGeo(val ranker: GridRanker[SphereCoord]) {
     }
   }
 
-  def label_and_evaluate(corpus: FieldSpringCCorpus) {
-    label(corpus)
+  def evaluate(corpus: FieldSpringCCorpus) {
     // BEWARE of sets, need to convert to sequences!
     val docs = corpus.docs.toIndexedSeq
     val errdists = docs.map(_.error_distance_from_nearest_predicted_toponym).
@@ -427,6 +426,11 @@ class DocGeo(val ranker: GridRanker[SphereCoord]) {
     errprint("Acc@161: %.2f", errdists.count(_ <= 161).toDouble / errdists.size)
     errprint("Mean: %.2f km", mean(errdists))
     errprint("Median: %.2f km", median(errdists))
+  }
+
+  def label_and_evaluate(corpus: FieldSpringCCorpus) {
+    label(corpus)
+    evaluate(corpus)
   }
 }
 

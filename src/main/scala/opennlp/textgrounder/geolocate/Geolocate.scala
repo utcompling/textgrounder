@@ -785,6 +785,11 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
           params.topres_serialized_corpus_input)
       val to_test_ccorpus =
         FieldSpringCCorpus(to_test_stored_corpus)
+      val base_ranker_to_test_stored_corpus =
+        cotrainer.read_fieldspring_test_corpus(
+          params.topres_serialized_corpus_input)
+      val base_ranker_to_test_ccorpus =
+        FieldSpringCCorpus(base_ranker_to_test_stored_corpus)
       val unlabeled_for_cotrain = FieldSpringCCorpus(
         cotrainer.read_fieldspring_test_corpus(
           params.topres_serialized_corpus_input))
@@ -808,6 +813,23 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 
       ///////// Evaluate full toponym test corpus using co-trainer
       //
+      // Evaluate the full toponym corpus using the base ranker; this considers
+      // the error distance to be the smallest distance to any toponym
+      errprint("Base ranker toponym and document evaluation of co-train-resolved full toponym corpus:")
+      // Need to add docgeo labels to the test corpus in order for
+      // addtopo to work
+      base_docgeo.label(base_ranker_to_test_ccorpus)
+      val disambiguated_base_ranker_test_stored_corpus =
+        resolver.disambiguate(base_ranker_to_test_stored_corpus)
+      val disambiguated_base_ranker_test_ccorpus =
+        FieldSpringCCorpus(disambiguated_base_ranker_test_stored_corpus)
+      base_docgeo.evaluate(disambiguated_base_ranker_test_ccorpus)
+
+      errprint("Evaluation of co-train toponym resolver w/base docgeo on full toponym corpus:")
+      cotrainer.evaluate_topres_corpus(disambiguated_base_ranker_test_stored_corpus,
+        gold, params.topres_corpus_format, params.topres_do_oracle_eval)
+
+      errprint("Co-trainer toponym and document evaluation of co-train-resolved full toponym corpus:")
       // Need to add docgeo labels to the test corpus in order for
       // addtopo to work
       docgeo.label(to_test_ccorpus)
@@ -815,31 +837,38 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
         resolver.disambiguate(to_test_stored_corpus)
       val disambiguated_test_ccorpus =
         FieldSpringCCorpus(disambiguated_test_stored_corpus)
-      // Evaluate the full toponym corpus using the base ranker; this considers
-      // the error distance to be the smallest distance to any toponym
-      errprint("Base ranker document-level evaluation of co-train-resolved full toponym corpus:")
-      base_docgeo.label_and_evaluate(disambiguated_test_ccorpus)
-      errprint("Co-trainer document-level evaluation of co-train-resolved full toponym corpus:")
-      docgeo.label_and_evaluate(disambiguated_test_ccorpus)
-      errprint("Evaluation of co-train toponym resolver on full toponym corpus:")
+      docgeo.evaluate(disambiguated_test_ccorpus)
+
+      errprint("Evaluation of co-train toponym resolver w/co-train docgeo on full toponym corpus:")
       cotrainer.evaluate_topres_corpus(disambiguated_test_stored_corpus, gold,
         params.topres_corpus_format, params.topres_do_oracle_eval)
 
       ///////// Evaluate full toponym test corpus using normal resolver
-      val normal_resolver = (new TopRes).create_resolver(this,
-        params.topres_log_file, params.topres_wistr_feature_dir)
-      val normal_disambiguated_test_stored_corpus =
-        normal_resolver.disambiguate(to_test_stored_corpus)
-      val normal_disambiguated_test_ccorpus =
-        FieldSpringCCorpus(normal_disambiguated_test_stored_corpus)
+
       // Evaluate the full toponym corpus using the base ranker; this considers
       // the error distance to be the smallest distance to any toponym
-      errprint("Base ranker document-level evaluation of normal-resolved full toponym corpus:")
-      base_docgeo.label_and_evaluate(normal_disambiguated_test_ccorpus)
-      errprint("Co-trainer document-level evaluation of normal-resolved full toponym corpus:")
-      docgeo.label_and_evaluate(normal_disambiguated_test_ccorpus)
-      errprint("Evaluation of normal toponym resolver on full toponym corpus:")
-      cotrainer.evaluate_topres_corpus(normal_disambiguated_test_stored_corpus,
+      errprint("Base ranker toponym and document evaluation of normal-resolved full toponym corpus:")
+      val base_ranker_normal_resolver = (new TopRes).create_resolver(this,
+        params.topres_log_file, params.topres_wistr_feature_dir)
+      val base_ranker_normal_disambiguated_test_stored_corpus =
+        base_ranker_normal_resolver.disambiguate(base_ranker_to_test_stored_corpus)
+      val base_ranker_normal_disambiguated_test_ccorpus =
+        FieldSpringCCorpus(base_ranker_normal_disambiguated_test_stored_corpus)
+      base_docgeo.evaluate(base_ranker_normal_disambiguated_test_ccorpus)
+      errprint("Evaluation of normal toponym resolver w/base docgeo on full toponym corpus:")
+      cotrainer.evaluate_topres_corpus(base_ranker_normal_disambiguated_test_stored_corpus,
+        gold, params.topres_corpus_format, params.topres_do_oracle_eval)
+
+      errprint("Co-trainer toponym and document evaluation of normal-resolved full toponym corpus:")
+      val cotrain_ranker_normal_resolver = (new TopRes).create_resolver(this,
+        params.topres_log_file, params.topres_wistr_feature_dir)
+      val cotrain_ranker_normal_disambiguated_test_stored_corpus =
+        cotrain_ranker_normal_resolver.disambiguate(to_test_stored_corpus)
+      val cotrain_ranker_normal_disambiguated_test_ccorpus =
+        FieldSpringCCorpus(cotrain_ranker_normal_disambiguated_test_stored_corpus)
+      docgeo.evaluate(cotrain_ranker_normal_disambiguated_test_ccorpus)
+      errprint("Evaluation of normal toponym resolver w/co-train docgeo on full toponym corpus:")
+      cotrainer.evaluate_topres_corpus(cotrain_ranker_normal_disambiguated_test_stored_corpus,
         gold, params.topres_corpus_format, params.topres_do_oracle_eval)
 
       ///////// Return co-train document geolocator for further eval
