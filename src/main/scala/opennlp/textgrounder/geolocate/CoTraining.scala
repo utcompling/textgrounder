@@ -416,21 +416,22 @@ class DocGeo(val ranker: GridRanker[SphereCoord]) {
     }
   }
 
-  def evaluate(corpus: FieldSpringCCorpus) {
+  def evaluate(corpus: FieldSpringCCorpus, prefix: String) {
     // BEWARE of sets, need to convert to sequences!
     val docs = corpus.docs.toIndexedSeq
     val errdists = docs.map(_.error_distance_from_nearest_predicted_toponym).
       filter(_ >= 0)
-    errprint("Number of documents with error distances: %s/%s",
-      errdists.size, docs.size)
-    errprint("Acc@161: %.2f", errdists.count(_ <= 161).toDouble / errdists.size)
-    errprint("Mean: %.2f km", mean(errdists))
-    errprint("Median: %.2f km", median(errdists))
+    errprint("%sNumber of documents with error distances: %s/%s",
+      prefix, errdists.size, docs.size)
+    errprint("%sAcc@161: %.2f", prefix,
+      errdists.count(_ <= 161).toDouble / errdists.size)
+    errprint("%sMean: %.2f km", prefix, mean(errdists))
+    errprint("%sMedian: %.2f km", prefix, median(errdists))
   }
 
-  def label_and_evaluate(corpus: FieldSpringCCorpus) {
+  def label_and_evaluate(corpus: FieldSpringCCorpus, prefix: String) {
     label(corpus)
-    evaluate(corpus)
+    evaluate(corpus, prefix)
   }
 }
 
@@ -876,7 +877,7 @@ class CoTrainer {
   }
 
   def evaluate_topres_corpus(test_corpus: StoredCorpus,
-      gold_corpus: StoredCorpus, corpus_format: String,
+      gold_corpus: StoredCorpus, prefix: String, corpus_format: String,
       do_oracle_eval: Boolean) {
     if (debug("cotrain")) {
       errprint("Test corpus:")
@@ -885,7 +886,7 @@ class CoTrainer {
       FieldSpringCCorpus.debug_print_corpus(gold_corpus)
     }
     val evaluate_corpus = new EvaluateCorpus
-    evaluate_corpus.doEval(test_corpus, gold_corpus,
+    evaluate_corpus.doEval(test_corpus, gold_corpus, prefix,
       corpus_format_to_enum(corpus_format), true, do_oracle_eval)
   }
 }
