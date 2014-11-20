@@ -1319,19 +1319,6 @@ object GeolocateDocumentTag extends
       ("num-training-docs", short("ntrain")),
       ("num-test-docs", short("ntest")),
       ("num-top-cells-to-output", short("ncellout")),
-      ("verbose", omit),
-      ("results", omit),
-      ("no-parallel", omit),
-      ("print-results", omit),
-      ("rough-ranker-args", full("rrargs")),
-      ("vw-args", full("VWargs")),
-      ("nested-vw-args", full("nestVWargs")),
-      ("fallback-vw-args", full("fbVWargs")),
-      ("debug", full("dbg")),
-      ("save-vw-model", full("saveModel", filetail)),
-      ("load-vw-model", full("loadModel", filetail)),
-      ("save-vw-submodels", full("saveSubmodels", filetail)),
-      ("load-vw-submodels", full("saveSubmodels", filetail)),
       // Co-training
       ("co-train", default),
       ("co-train-interpolate-factor", short("ctInterp")),
@@ -1358,7 +1345,21 @@ object GeolocateDocumentTag extends
       ("topres-weights-file", full("trWeights", filetail)),
       ("topres-write-weights-file", full("trWriteWeights", filetail)),
       ("topres-gazetteer", full("trGaz", filetail)),
-      ("topres-stopwords", full("trStopw", filetail))
+      ("topres-stopwords", full("trStopw", filetail)),
+      // Low-priority args
+      ("verbose", omit),
+      ("results", omit),
+      ("no-parallel", omit),
+      ("print-results", omit),
+      ("rough-ranker-args", full("rrargs")),
+      ("vw-args", full("VWargs")),
+      ("nested-vw-args", full("nestVWargs")),
+      ("fallback-vw-args", full("fbVWargs")),
+      ("debug", full("dbg")),
+      ("save-vw-model", full("saveModel", filetail)),
+      ("load-vw-model", full("loadModel", filetail)),
+      ("save-vw-submodels", full("saveSubmodels", filetail)),
+      ("load-vw-submodels", full("saveSubmodels", filetail))
     )
 
     // Map listing how to handle params.
