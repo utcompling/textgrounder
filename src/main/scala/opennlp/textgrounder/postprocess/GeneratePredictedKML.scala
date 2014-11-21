@@ -37,6 +37,8 @@ class GeneratePredictedKMLParameters(ap: ArgParser) extends
   the common prefix of the two; or the directory containing them, provided
   there is only one textdb in the directory.""")
 
+  var title = ap.option[String]("title",
+    help = """Title of KML file. If omitted, defaults to name of input file.""")
 }
 
 /**
@@ -51,24 +53,32 @@ object GeneratePredictedKML extends ExperimentApp("GeneratePredictedKML") {
   def create_param_object(ap: ArgParser) = new GeneratePredictedKMLParameters(ap)
 
   def run_program(args: Array[String]) = {
-    val kml_placemarks =
+    val top_coords =
       for (line <- localfh.openr(params.input)) yield {
         val Array(doc, sentind, topind, toponym, selected, location, coord) =
           line.split("\t")
         val Array(lat, long) = coord.split(",")
+        (toponym, lat, long)
+      }
+    val top_coords_counts =
+      top_coords.toSeq.groupBy(identity).map { x => (x._1, x._2.size) }
+
+    val kml_placemarks = top_coords_counts map {
+      case ((toponym, lat, long), count) => {
         <Placemark>
-          <name>{ toponym }</name>
+          <name>{ s"$toponym ($count)" }</name>
           <Point>
             <coordinates>{ s"$long,$lat" }</coordinates>
           </Point>
         </Placemark>
       }
+    }
 
     val kml =
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www
 .w3.org/2005/Atom">
   <Document>
-    <name>{ "Predicted toponym locations from " + params.input }</name>
+    <name>{ if (params.title != null) params.title else params.input }</name>
     <open>1</open>
     <Folder>
       <name>Predicted toponym locations</name>
