@@ -1,6 +1,6 @@
-//  GenerateTwitterUserLocationKML.scala
+//  GeneratePredictedKML.scala
 //
-//  Copyright (C) 2013-2014 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2014 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -23,13 +23,12 @@ import collection.mutable
 import util.argparser._
 import util.collection._
 import util.experiment._
-import util.io
+import util.io.localfh
 import util.print._
-import util.textdb._
 
 import util.debug._
 
-class GenerateTwitterUserLocationKMLParameters(ap: ArgParser) {
+class GeneratePredictedKMLParameters(ap: ArgParser) {
   var input = ap.positional[String]("input",
     must = be_specified,
     help = """Results file to analyze, a textdb database. The value can be
@@ -53,38 +52,37 @@ multiple times, or by separating values by a comma.
 
 /**
  * An application to generate KML showing the "locations" (location of first
- * tweet) of users in a file as output by ParseTweets.
+ * tweet) of predicted toponyms in a file output by
+ * '--debug toponym-prediction-prefix'.
  */
-object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUserLocationKML") {
+object GeneratePredictedKML extends ExperimentApp("GeneratePredictedKML") {
 
-  type TParam = GenerateTwitterUserLocationKMLParameters
+  type TParam = GeneratePredictedKMLParameters
 
-  def create_param_object(ap: ArgParser) = new GenerateTwitterUserLocationKMLParameters(ap)
+  def create_param_object(ap: ArgParser) = new GeneratePredictedKMLParameters(ap)
 
   def run_program(args: Array[String]) = {
-    val rows = TextDB.read_textdb(io.localfh, params.input)
     val kml_placemarks =
-      for {row <- rows
-           coord = row.gets("coord")
-           if coord != ""
-           user = row.gets("user")
-      } yield {
-      <Placemark>
-        <name>{ user }</name>
-        <Point>
-          <coordinates>{ coord }</coordinates>
-        </Point>
-      </Placemark>
+      for (line <- localfh.openr(params.input)) yield {
+        val Array(doc, sentind, topind, toponym, selected, location, coord) =
+          line.split("\t")
+        val Array(lat, long) = coord.split(",")
+        <Placemark>
+          <name>{ toponym }</name>
+          <Point>
+            <coordinates>{ s"$long,$lat" }</coordinates>
+          </Point>
+        </Placemark>
       }
 
     val kml =
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www
 .w3.org/2005/Atom">
   <Document>
-    <name>{ "Twitter user locations from " + params.input }</name>
+    <name>{ "Predicted toponym locations from " + params.input }</name>
     <open>1</open>
     <Folder>
-      <name>Twitter user locations</name>
+      <name>Predicted toponym locations</name>
       <open>1</open>
       <LookAt>
         <latitude>42</latitude>
