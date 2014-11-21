@@ -798,6 +798,23 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       val unlabeled_for_cotrain = FieldSpringCCorpus(
         cotrainer.read_fieldspring_test_corpus(
           params.topres_serialized_corpus_input))
+
+      // Temporary hack
+      //val outambiguity = debugval("toponym-output-ambiguity")
+      //if (outambiguity != "") {
+      //  val file = localfh.openw(outambiguity)
+      //  for (doc <- ct_full_stored_corpus.toSeq.sortBy { _.getId }) {
+      //    for ((sent, sentind) <- doc.zipWithIndex) {
+      //      for ((toponym, topind) <- sent.getToponyms.zipWithIndex;
+      //           if toponym.getAmbiguity > 0) {
+      //        file.println("%s\t%s\t%s\t%s\t%s" format (
+      //          doc.getId, sentind, topind, toponym.getForm,
+      //          toponym.getAmbiguity))
+      //      }
+      //    }
+      //  }
+      //}
+
       val gold = cotrainer.read_fieldspring_gold_corpus(
         params.topres_input, params.topres_corpus_format)
       def eval_topres_corpus(corpus: StoredCorpus, prefix: String) {
@@ -815,7 +832,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
                 val selected = toponym.getSelected
                 file.println("%s\t%s\t%s\t%s\t%s\t%s,%s\t%s" format (
                   doc.getId, sentind, topind, toponym.getForm,
-                  toponym.getSelectedIdx,
+                  toponym.getSelectedIdx, // toponym.getAmbiguity,
                   selected.getName, selected.getAdmin1Code,
                   selected.getRegion.getCenter))
               }
@@ -1051,7 +1068,7 @@ object GeolocateDocumentTag extends
 
   override def run_program(args: Array[String]) = {
     /////// Various ways of handling params
-  
+
     // Convert foo-bar-baz or foo_bar_baz to fooBarBaz
     def snake_to_camel_case(str: String) =
       "[-_]([a-z])".r.replaceAllIn(str, m => m.group(1).toUpperCase)
