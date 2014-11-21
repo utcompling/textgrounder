@@ -28,7 +28,8 @@ import util.print._
 
 import util.debug._
 
-class GeneratePredictedKMLParameters(ap: ArgParser) {
+class GeneratePredictedKMLParameters(ap: ArgParser) extends
+    DebugParameters(ap) {
   var input = ap.positional[String]("input",
     must = be_specified,
     help = """Results file to analyze, a textdb database. The value can be
@@ -36,18 +37,6 @@ class GeneratePredictedKMLParameters(ap: ArgParser) {
   the common prefix of the two; or the directory containing them, provided
   there is only one textdb in the directory.""")
 
-  var debug =
-    ap.option[String]("d", "debug", metavar = "FLAGS",
-      help = """Output debug info of the given types.  Multiple debug
-parameters can be specified, indicating different types of info to output.
-Separate parameters by spaces, colons or semicolons.  Params can be boolean,
-if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
-list-valued; multiple values are specified by including the parameter
-multiple times, or by separating values by a comma.
-""")
-
-  if (ap.parsedValues && debug != null)
-    parse_debug_spec(debug)
 }
 
 /**

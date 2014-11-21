@@ -18,6 +18,7 @@
 
 package opennlp.textgrounder.util
 
+import argparser._
 import collection._
 
 protected class DebugPackage {
@@ -84,6 +85,21 @@ protected class DebugPackage {
 
   def debuglist_matches_alphanum(param: String, str: String) =
     debuglist(param).exists(entry => matches_alphanum(entry, str))
+
+  class DebugParameters(ap: ArgParser) {
+    var debug =
+      ap.option[String]("d", "debug", metavar = "FLAGS",
+        help = """Output debug info of the given types.  Multiple debug
+  parameters can be specified, indicating different types of info to output.
+  Separate parameters by spaces, colons or semicolons.  Params can be boolean,
+  if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
+  list-valued; multiple values are specified by including the parameter
+  multiple times, or by separating values by a comma.
+  """)
+
+    if (ap.parsedValues && debug != null)
+      parse_debug_spec(debug)
+  }
 }
 
 package object debug extends DebugPackage { }
