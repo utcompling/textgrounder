@@ -32,10 +32,8 @@ class GeneratePredictedKMLParameters(ap: ArgParser) extends
     DebugParameters(ap) {
   var input = ap.positional[String]("input",
     must = be_specified,
-    help = """Results file to analyze, a textdb database. The value can be
-  any of the following: Either the data or schema file of the database;
-  the common prefix of the two; or the directory containing them, provided
-  there is only one textdb in the directory.""")
+    help = """File containing data to analyze, output during the toponym
+resolution process, using '--debug toponym-prediction-prefix'.""")
 
   var title = ap.option[String]("title",
     help = """Title of KML file. If omitted, defaults to name of input file.""")
