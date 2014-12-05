@@ -878,7 +878,7 @@ class CoTrainer {
 
   def evaluate_topres_corpus(test_corpus: StoredCorpus,
       gold_corpus: StoredCorpus, prefix: String, corpus_format: String,
-      do_oracle_eval: Boolean) {
+      do_oracle_eval: Boolean) = {
     if (debug("cotrain")) {
       errprint("Test corpus:")
       FieldSpringCCorpus.debug_print_corpus(test_corpus)

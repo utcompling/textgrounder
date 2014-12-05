@@ -37,7 +37,10 @@ import util.debug._
 class AnalyzeToponymDifferencesParameters(ap: ArgParser) {
   var input1 = ap.positional[String]("input1",
     must = be_specified,
-    help = """First toponym prediction file to analyze.""")
+    help = """First toponym prediction file to analyze, a textdb database.
+The value can be any of the following: Either the data or schema file of the
+database; the common prefix of the two; or the directory containing them,
+provided there is only one textdb in the directory.""")
 
   var input2 = ap.positional[String]("input2",
     must = be_specified,
@@ -59,11 +62,17 @@ object AnalyzeToponymDifferences extends ExperimentApp("AnalyzeToponymDifference
   def process_file(file: String) = {
     val predmap = mutable.Map[(String, Int, Int), (String, Int)]()
     val toplocs = intmapmap[String, String]()
-    for (line <- localfh.openr(file)) {
-      val Array(doc, sentind, topind, toponym, selected, location, coords) =
-        line.split("\t")
-      predmap((doc, sentind.toInt, topind.toInt)) = (toponym, selected.toInt)
-      toplocs(toponym)(location) += 1
+    //for (line <- localfh.openr(file)) {
+    //  val Array(doc, sentind, topind, toponym, selected, location, coords) =
+    //    line.split("\t")
+    //  predmap((doc, sentind.toInt, topind.toInt)) = (toponym, selected.toInt)
+    //  toplocs(toponym)(location) += 1
+    //}
+    for (row <- TextDB.read_textdb(localfh, file)) {
+      val toponym = row.gets("toponym")
+      predmap((row.gets("docid"), row.gets("sentind").toInt, row.gets("topind").toInt)) =
+        (toponym, row.gets("selectedind").toInt)
+      toplocs(toponym)(row.gets("predloc")) += 1
     }
     val most_common_top = toplocs.map { case (toponym, locs) =>
       (toponym, locs.toSeq.maxBy(_._2))

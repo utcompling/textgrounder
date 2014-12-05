@@ -25,6 +25,7 @@ import util.collection._
 import util.experiment._
 import util.io.localfh
 import util.print._
+import util.textdb.TextDB
 
 import util.debug._
 
@@ -33,7 +34,10 @@ class GeneratePredictedKMLParameters(ap: ArgParser) extends
   var input = ap.positional[String]("input",
     must = be_specified,
     help = """File containing data to analyze, output during the toponym
-resolution process, using '--debug toponym-prediction-prefix'.""")
+resolution process, using '--debug toponym-prediction-prefix'; a textdb
+database. The value can be any of the following: Either the data or schema
+file of the database; the common prefix of the two; or the directory
+containing them, provided there is only one textdb in the directory.""")
 
   var title = ap.option[String]("title",
     help = """Title of KML file. If omitted, defaults to name of input file.""")
@@ -50,14 +54,24 @@ object GeneratePredictedKML extends ExperimentApp("GeneratePredictedKML") {
 
   def create_param_object(ap: ArgParser) = new GeneratePredictedKMLParameters(ap)
 
+  def read_coords(file: String) = {
+    //for (line <- localfh.openr(file)) yield {
+    //  val Array(doc, sentind, topind, toponym, selected, location, coord) =
+    //    line.split("\t")
+    //  val Array(lat, long) = coord.split(",")
+    //  (toponym, lat, long)
+    //}
+    val rows = TextDB.read_textdb(localfh, file)
+    for {row <- rows
+         toponym = row.gets("toponym")
+         predcoord = row.gets("predcoord")
+         Array(lat, long) = predcoord.split(",")
+        } 
+      yield (toponym, lat, long)
+  }
+
   def run_program(args: Array[String]) = {
-    val top_coords =
-      for (line <- localfh.openr(params.input)) yield {
-        val Array(doc, sentind, topind, toponym, selected, location, coord) =
-          line.split("\t")
-        val Array(lat, long) = coord.split(",")
-        (toponym, lat, long)
-      }
+    val top_coords = read_coords(params.input)
     val top_coords_counts =
       top_coords.toSeq.groupBy(identity).map { x => (x._1, x._2.size) }
 

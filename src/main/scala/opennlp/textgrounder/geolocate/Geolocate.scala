@@ -37,7 +37,7 @@ import util.numeric.format_double
 import util.os._
 import util.print.{errprint, outprint}
 import util.spherical._
-import util.textdb.Encoder
+import util.textdb.{Encoder, TextDB}
 import util.time.format_minutes_seconds
 
 import util.debug._
@@ -45,6 +45,9 @@ import gridlocate._
 
 import langmodel.{LangModel,LangModelFactory,Unigram}
 import learning.SparseFeatureVectorFactory
+
+import opennlp.fieldspring.tr.eval.SignatureEvaluator
+import opennlp.fieldspring.tr.text.StoredToken
 
 /*
 
@@ -817,33 +820,52 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 
       val gold = cotrainer.read_fieldspring_gold_corpus(
         params.topres_input, params.topres_corpus_format)
-      def eval_topres_corpus(corpus: StoredCorpus, prefix: String) {
+      def eval_topres_corpus(corpus: StoredCorpus, prefix: String) = {
         cotrainer.evaluate_topres_corpus(corpus, gold, prefix + ": ",
           params.topres_corpus_format, params.topres_do_oracle_eval)
       }
-      def output_predictions(corpus: StoredCorpus, suffix: String) {
+      def output_predictions(corpus: StoredCorpus, suffix: String,
+          evaluator: SignatureEvaluator[StoredToken]) {
         val outprefix = debugval("toponym-prediction-prefix")
         if (outprefix != "") {
-          val file = localfh.openw(outprefix + "." + suffix)
-          for (doc <- corpus.toSeq.sortBy { _.getId }) {
-            for ((sent, sentind) <- doc.zipWithIndex) {
-              for ((toponym, topind) <- sent.getToponyms.zipWithIndex;
-                   if toponym.getAmbiguity > 0 && toponym.hasSelected) {
-                val selected = toponym.getSelected
-                file.println("%s\t%s\t%s\t%s\t%s\t%s,%s\t%s" format (
-                  doc.getId, sentind, topind, toponym.getForm,
-                  toponym.getSelectedIdx, // toponym.getAmbiguity,
-                  selected.getName, selected.getAdmin1Code,
-                  selected.getRegion.getCenter))
-              }
+          val outprops =
+            for (doc <- corpus.toSeq.sortBy { _.getId };
+                 (sent, sentind) <- doc.zipWithIndex;
+                 (toponym, topind) <- sent.getToponyms.zipWithIndex;
+                 if toponym.getAmbiguity > 0 && toponym.hasSelected) yield {
+              val selected = toponym.getSelected
+              val selected_info = Seq(
+                "docid" -> doc.getId,
+                "sentind" -> sentind,
+                "topind" -> topind,
+                "toponym" -> toponym.getForm,
+                "selectedind" -> toponym.getSelectedIdx,
+                "ambiguity" -> toponym.getAmbiguity,
+                "predloc" -> s"${selected.getName},${selected.getAdmin1Code}",
+                "predcoord" -> selected.getRegion.getCenter)
+              val correct_info =
+                if (evaluator.correctLocations.containsKey(toponym)) {
+                  val correct = evaluator.correctLocations.get(toponym)
+                  Seq(
+                    "correctind" -> toponym.getCandidates.indexOf(correct),
+                    "correctloc" -> s"${correct.getName},${correct.getAdmin1Code}",
+                    "correctcoord" -> correct.getRegion.getCenter)
+                } else {
+                  Seq(
+                    "correctind" -> -1,
+                    "correctloc" -> "",
+                    "correctcoord" -> ""
+                  )
+                }
+              selected_info ++ correct_info
             }
-          }
-          file.close()
+          TextDB.write_constructed_textdb(localfh, outprefix + "." + suffix,
+            outprops.iterator)
         }
       }
       def eval_topres_and_output_predictions(corpus: StoredCorpus, affix: String) {
-        eval_topres_corpus(corpus, affix)
-        output_predictions(corpus, affix)
+        val evaluator = eval_topres_corpus(corpus, affix)
+        output_predictions(corpus, affix, evaluator)
       }
 
       // Train the co-trainer
