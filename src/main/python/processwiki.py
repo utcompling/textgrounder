@@ -102,8 +102,11 @@ incoming_link_count = intdict()
 # Map anchor text to a hash that maps articles to counts
 anchor_text_map = {}
 
-# Set listing articles containing coordinates
-coordinate_articles = set()
+# Map of articles and their coordinates
+coordinate_articles = {}
+
+# Map of redirects to coordinate articles
+coordinate_redirects = {}
 
 debug_cur_title = None
 
@@ -116,10 +119,12 @@ def read_coordinates_file(filename):
     m = re.match('Article title: (.*)', line)
     if m:
       title = capfirst(m.group(1))
-    elif re.match('Article coordinates: ', line):
-      coordinate_articles.add(title)
-      if status.item_processed(maxtime=Opts.max_time_per_stage):
-        break
+    else:
+      m = re.match('Article coordinates: (.*)', line)
+      if m:
+        coordinate_articles[title] = m.group(1)
+        if status.item_processed(maxtime=Opts.max_time_per_stage):
+          break
     
 # Read in redirects.  Record redirects as additional articles with coordinates
 # if the article pointed to has coordinates. NOTE: Must be done *AFTER*
@@ -131,8 +136,11 @@ def read_redirects_from_article_data(filename):
   def process(art):
     if art.namespace != 'Main':
       return
-    if art.redir and capfirst(art.redir) in coordinate_articles:
-      coordinate_articles.add(art.title)
+    if art.redir:
+      redir = capfirst(art.redir)
+      if redir in coordinate_articles:
+        coordinate_articles[art.title] = coordinate_articles[redir]
+        coordinate_redirects[art.title] = redir
 
   read_article_data_file(filename, process, maxtime=Opts.max_time_per_stage)
 
@@ -2160,11 +2168,18 @@ class ToponymEvalDataHandler(ExtractUsefulText):
       pass
     else:
       article = capfirst(tempargs[0])
+      if not coordinate_articles:
+        yield ('link', tempargs)
       # Skip links to articles without coordinates
-      if coordinate_articles and article not in coordinate_articles:
+      elif article not in coordinate_articles:
         pass
       else:
-        yield ('link', tempargs)
+        anchortext = tempargs[-1]
+        if article in coordinate_redirects:
+          article = coordinate_redirects[article]
+        # OpenNLP sentence detector gets confused by periods in the numbers,
+        # so replace them with underscore
+        yield ('coordlink', [anchortext, article, coordinate_articles[article].replace(".", "_")])
         return
 
     for chunk in self.join_arguments_as_generator(yield_internal_link_args(text)):
@@ -2187,7 +2202,11 @@ class GenerateToponymEvalData(ArticleHandler):
     text = format_text_second_pass(text)
 
     splitprint("Article title: %s" % self.title)
+    splitprint("Article ID: %s" % self.id)
     chunkgen = ToponymEvalDataHandler().process_source_text(text)
+    # Map of toponyms and their resolution, which is a list [ARTICLE,COORDS].
+    toponyms = {}
+    allwords = []
     #for chunk in chunkgen:
     #  errprint("Saw chunk: %s" % (chunk,))
     # groupby() allows us to group all the non-link chunks (which are raw
@@ -2197,15 +2216,61 @@ class GenerateToponymEvalData(ArticleHandler):
       #args = [arg for arg in g]
       #errprint("Saw k=%s, g=%s" % (k,args))
       if k:
-         for (linktext, linkargs) in g:
-           splitprint("Link: %s" % '|'.join(linkargs))
+         for (linkname, linkargs) in g:
+           # Eliminate newlines, which will mess up parsing
+           linktext = "[[[Link: %s]]]" % '|'.join(linkargs).replace("\n", " ")
+           if Opts.one_article_per_line:
+             allwords += [linktext]
+           else:
+             splitprint(linktext)
+           # Treat mentions of links to coordinate articles as toponyms and
+           # record them so we can find subsequent mentions.
+           if linkname == 'coordlink':
+             anchortext, article, coords = linkargs
+             toponyms[anchortext] = [article, coords]
+             # If the anchor text is something like "Buffalo, New York",
+             # reduce it to just "Buffalo", since that is how subsequent
+             # mentions are likely to appear.
+             short_anchortext = re.sub(",.*", "", anchortext)
+             toponyms[short_anchortext] = [article, coords]
+
       else:
         # Now process the resulting text into chunks.  Join them back together
         # again (to handle cases like "the [[latent variable]]s are ..."), and
         # split to find words.
-        for word in split_text_into_words(''.join(g)):
-          if word:
-            splitprint("%s" % word)
+        words = [word for word in split_text_into_words(''.join(g)) if word]
+        # Look for mentions of previously seen toponyms (i.e. links to
+        # coordinate articles), up to a maximum number of words. If found,
+        # treat as if this mention was explicitly linked.
+        MAX_WINDOW_SIZE = 8
+        for winsize in xrange(MAX_WINDOW_SIZE, 0, -1):
+          for start in xrange(0, len(words) - winsize):
+            window = words[start:start + winsize]
+            windowstr = ' '.join(window)
+            windowstr = windowstr.replace(' ,', ',')
+            windowstr = windowstr.replace(' .', '.')
+            if windowstr in toponyms:
+              article, coords = toponyms[windowstr]
+              words[start:start + winsize] = ["[[[Synthlink: %s|%s|%s]]]" % (
+                  windowstr, article, coords)]
+        # Print out words and synthesized links.
+        if Opts.one_article_per_line:
+          allwords += words
+        else:
+          for word in words:
+            splitprint(word)
+    if Opts.one_article_per_line:
+      joined_words = ' '.join(allwords)
+      # Undo tokenization of periods so that the sentence detector can
+      # correctly split sentences, and be smart about abbreviations e.g. "N.Y.",
+      # which should appear all together with no spaces in the middle.
+      joined_words = re.sub(r"\. ([A-Za-z]) \.", r".\1.", joined_words)
+      # Repeat in case of longer abbreviations e.g. "P.C.E."; won't get
+      # completely handled after just one iteration because of the
+      # non-overlapping restriction on matches.
+      joined_words = re.sub("\. ([A-Za-z]) \.", r".\1.", joined_words)
+      joined_words = joined_words.replace(" .", ".")
+      splitprint(joined_words)
 
 # Generate article data of various sorts
 class GenerateArticleData(ArticleHandler):
