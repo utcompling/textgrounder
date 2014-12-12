@@ -2218,7 +2218,7 @@ class GenerateToponymEvalData(ArticleHandler):
       if k:
          for (linkname, linkargs) in g:
            # Eliminate newlines, which will mess up parsing
-           linktext = "[[[Link: %s]]]" % '|'.join(linkargs).replace("\n", " ")
+           linktext = "[[[Link: %s]]]" % '@@@'.join(linkargs).replace("\n", " ")
            if Opts.one_article_per_line:
              allwords += [linktext]
            else:
@@ -2251,7 +2251,7 @@ class GenerateToponymEvalData(ArticleHandler):
             windowstr = windowstr.replace(' .', '.')
             if windowstr in toponyms:
               article, coords = toponyms[windowstr]
-              words[start:start + winsize] = ["[[[Synthlink: %s|%s|%s]]]" % (
+              words[start:start + winsize] = ["[[[Synthlink: %s@@@%s@@@%s]]]" % (
                   windowstr, article, coords)]
         # Print out words and synthesized links.
         if Opts.one_article_per_line:
