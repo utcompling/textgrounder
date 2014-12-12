@@ -4,6 +4,18 @@
 # preprocessed files from a raw Wikipedia dump.  See comments below and
 # in README.preprocess.
 
+# Process options.
+
+# FIXME: Make the remaining environment variables that we use into options.
+while true; do
+  case "$1" in
+    --no-concatenate )
+      NO_CONCATENATE=yes; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
 if [ -z "$*" ]; then
   cat >&2 <<FOO
 Usage: $0 [STEPS ...]
@@ -58,6 +70,8 @@ toponym-eval = Generate data file for use in toponym evaluation.  The file
                and article name are not the same; e.g. the surface text
                "Georgia" may variously refer to the U.S. state, the country
                in the Caucasus, or various other places.
+toponym-eval-raw-oapl = Same as 'toponym-eval' but with raw text of the articles
+                        and one article per line, as with '*-oapl'.
 
 Also possible are combinations of steps, e.g.
 
@@ -257,6 +271,14 @@ args="--coords-file $OUT_COORDS_FILE \
   --generate-toponym-eval"
 outfile="$OUT_TOPONYM_EVAL_FILE"
 
+elif [ "$step" = toponym-eval-raw-oapl ]; then
+
+action="Generating toponym eval data"
+args="--coords-file $OUT_COORDS_FILE \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  --generate-toponym-eval --raw-text --one-article-per-line"
+outfile="$OUT_TOPONYM_EVAL_FILE"
+
 elif [ "$step" = coord-words ]; then
 
 action="Generating raw text, coord articles only"
@@ -362,16 +384,18 @@ else
     echo "Ended at `date`: Waiting."
     numrun=0
   fi
-  echo "$action, combining the files ..."
-  all_files="$splits"
-  echo "$action, concatenating all files ($all_files) ..."
-  cmd="cat $all_files > $outfile"
-  echo "Executing at `date`: $cmd"
-  cat $all_files > $outfile
-  echo "Ended at `date`: $cmd"
-  echo "$action, removing intermediate split files ($splits_removable) ..."
-  rm -f $splits_removable
-  echo "$action ... done."
+  if [ -z "$NO_CONCATENATE" ]; then
+    echo "$action, combining the files ..."
+    all_files="$splits"
+    echo "$action, concatenating all files ($all_files) ..."
+    cmd="cat $all_files > $outfile"
+    echo "Executing at `date`: $cmd"
+    cat $all_files > $outfile
+    echo "Ended at `date`: $cmd"
+    echo "$action, removing intermediate split files ($splits_removable) ..."
+    rm -f $splits_removable
+    echo "$action ... done."
+  fi
 
 fi
 
