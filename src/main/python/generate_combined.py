@@ -83,6 +83,13 @@ def output_combined_article_data(filename, coords_file, links_file,
     if art.namespace != 'Main':
       return
     coord = coords_hash.get(art.title, None)
+    if coord and Opts.suppress_coordinate_articles:
+      return
+    if Opts.all_articles:
+      if not coord:
+        coord = Coord(0.0,0.0)
+      if art.incoming_links is None:
+        art.incoming_links = 0
     if coord:
       art.coord = coord
     if art.redir and capfirst(art.redir) in coords_hash:
@@ -122,6 +129,14 @@ Wikipedia articles. Output by processwiki.py --find-links.""",
 --coords-counts or --only-coords, listing all the articles with associated
 coordinates.  May be filtered only for articles and coordinates.""",
                   metavar="FILE")
+    op.add_option("--all-articles",
+                help="""Keep all articles, supplying 0,0 for the coordinate
+of articles without coordinates.""",
+                action="store_true")
+    op.add_option("--suppress-coordinate-articles",
+                help="""Suppress articles with coordinates; for use with
+--all-articles.""",
+                action="store_true")
     op.add_option("--training-fraction", type='float', default=80,
                   help="""Fraction of total articles to use for training.
   The absolute amount doesn't matter, only the value relative to the test
