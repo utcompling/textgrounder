@@ -293,6 +293,10 @@ def mean(list):
   return sum(list) / float(len(list))
 
 def split_text_into_words(text, ignore_punc=False, include_nl=False):
+  # The regexp below for punctuation requires whitespace following the
+  # punctuation to avoid splitting commas etc. in the middle of a word;
+  # add whitespace to make sure we handle trailing punctuation.
+  text = text + ' '
   # This regexp splits on whitespace, but also handles the following cases:
   # 1. Any of , ; . etc. at the end of a word
   # 2. Parens or quotes in words like (foo) or "bar"
@@ -307,7 +311,7 @@ def split_text_into_words(text, ignore_punc=False, include_nl=False):
   # The use of izip and cycle will pair True with return values that come
   # from the grouping in the split re, and False with regular words.
   for (ispunc, word) in izip(cycle([False, True]),
-                  re.split('([,;."):]*\s+[("]*)', text)):
+                  re.split('([,;.?!"\'):]*\s+[("\']*)', text)):
     if not word: continue
     if ispunc:
       # Divide the punctuation up 
