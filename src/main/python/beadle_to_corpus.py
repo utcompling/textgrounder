@@ -46,7 +46,7 @@ def run(infile, outputprefix):
           else:
             errprint("Found unparsable location: %s" % latlong)
     words = [word.replace("%", "%25").replace(":", "%3A") for word in
-        split_text_into_words(text)]
+        split_text_into_words(text, ignore_punc=True) if word != "-"]
     countmap = intdict()
     for word in words:
       countmap[word] += 1
