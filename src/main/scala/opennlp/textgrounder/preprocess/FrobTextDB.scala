@@ -30,6 +30,7 @@ import collection._
 import error._
 import experiment._
 import io.FileHandler
+import print.errprint
 import spherical._
 import textdb._
 
@@ -70,6 +71,15 @@ the value of --input-suffix.""")
       metavar = "FIELD",
       help = """Remove a field, either from all rows (for a normal field)
 or a fixed field.""")
+  val coords_from_results =
+    ap.option[String]("coords-from-results",
+      metavar = "TEXTDB",
+      help = """Substitute the 'coord' field with predicted coordinates taken
+from the given TextDB results file (output by TextGrounder when --results-file
+is specified). The results file is actually a TextDB database, and the value
+can be any of the following: Either the data or schema file of the database;
+the common prefix of the two; or the directory containing them, provided
+there is only one TextDB in the directory.""")
   val add_field_by_range =
     ap.option[String]("add-field-by-range",
       metavar = "DESTFIELD,SRCFIELD,NAME:MAXVAL,NAME:MAXVAL,...[,NAME]",
@@ -190,6 +200,9 @@ line).""")
   }
   if (convert_to_unigram_counts)
     frobbers += new ConvertToUnigramCounts
+  if (coords_from_results != null) {
+    frobbers += new CoordsFromResults(coords_from_results)
+  }
   if (output_suffix == null)
     output_suffix = input_suffix
 }
@@ -255,6 +268,25 @@ class ConvertToUnigramCounts extends RecordFrobber {
       unigram_counts(word) += 1
     val unigram_counts_text = encode_count_map(unigram_counts.toSeq)
     docparams += (("unigram-counts", unigram_counts_text))
+  }
+}
+
+/**
+ * Implement --coords-from-results.
+ */
+class CoordsFromResults(resultsfile: String) extends RecordFrobber {
+  val results_coords = mutable.Map[String, String]()
+  errprint("Reading predicted coordinates from %s ...", resultsfile)
+  for (row <- TextDB.read_textdb(io.localfh, resultsfile)) {
+    results_coords(row.gets("title")) = row.gets("pred-coord")
+  }
+  errprint("Reading predicted coordinates from %s ... done.", resultsfile)
+  def frob(docparams: mutable.Map[String, String]) {
+    val title = docparams("title")
+    if (results_coords contains title)
+      docparams("coord") = results_coords(title)
+    else
+      errprint("Unable to find replacement coord for %s", title)
   }
 }
 
