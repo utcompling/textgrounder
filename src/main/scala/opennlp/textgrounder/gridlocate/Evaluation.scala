@@ -1118,14 +1118,16 @@ class FullRankedDocEvalResult[Co](
     if (debug("relcontribgrams")) {
       def output_relcontribgrams(celltag: String, cell: GridCell[Co],
           othertag: String, others: Iterable[GridCell[Co]]) {
+        if (cell.is_empty || others.exists(_.is_empty))
+          return
         val compared_string =
           if (others.isEmpty) ""
           else " compared to %s" format othertag
         errprint("%s: Words contributing most to %s %s%s", doctag, celltag,
           cell, compared_string)
         val grams =
-          document.grid_lm.get_most_contributing_grams(
-            cell.grid_lm, others.map { _.grid_lm })
+          cell.grid_lm.get_most_contributing_grams(
+            document.grid_lm, others.map { _.grid_lm })
         for ((gram, count) <-
              grams.take(GridLocateConstants.relcontribgrams_to_print))
           errprint("%s: %s = %s", doctag,
@@ -1140,12 +1142,12 @@ class FullRankedDocEvalResult[Co](
           "correct cell %s" format cinfo.correct_cell,
           Iterable(cinfo.correct_cell))
       }
-      output_relcontribgrams("predicted cell", pred_cell,
-        "all others", pred_cells.map(_._1).tail)
-      correct.foreach { cinfo =>
-        output_relcontribgrams("correct cell", cinfo.correct_cell,
-          "all others", pred_cells.map(_._1).filter(_ != cinfo.correct_cell))
-      }
+      //output_relcontribgrams("predicted cell", pred_cell,
+      //  "all others", pred_cells.map(_._1).tail)
+      //correct.foreach { cinfo =>
+      //  output_relcontribgrams("correct cell", cinfo.correct_cell,
+      //    "all others", pred_cells.map(_._1).filter(_ != cinfo.correct_cell))
+      //}
     }
   }
 
