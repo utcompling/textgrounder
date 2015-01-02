@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Usage: convert-old-docfile-to-metadata-schema-and-file [--no-dir-prefix] DIR ...
+# Usage: convert-old-docfile-to-metadata-schema-and-file [--add-dir-prefix] [--output-dir DIR] ...
 
 # For a given dir, split the old document-info file into a document metadata
 # file and associated schema.  Specifically:
@@ -11,7 +11,7 @@
 # -- Output that first line to a corresponding schema file.
 # -- In the process, keep the compression of the original document-info file.
 #
-# If --no-dir-prefix, don't include the directory as part of the prefix.
+# If --add-dir-prefix, include the directory as part of the prefix.
 
 # Find compression by extension.  Output one of bzip2, gzip or none.
 find_compression_by_extension() {

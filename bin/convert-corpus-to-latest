@@ -2,7 +2,9 @@
 
 # USAGE: convert-corpus-to-latest WIKITAG
 #
-# where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
+# where WIKITAG is something like 'dewiki-20120225'. This should be run
+# from within the directory you want to convert. It's unclear how important
+# the WIKITAG actually is.
 
 wikitag="$1"
 echo "Converting Wikipedia corpus $wikitag to latest format ..."
