@@ -27,22 +27,23 @@ def add_latlong(beadle_file, article_data_file):
 
   lineno = 0
   def repl(m):
-    innards = m.group(1)
+    loc = m.group(1)
+    innards = m.group(2)
     args = {}
     for m in re.finditer(r' ([a-z]+)="([^"]*)"', innards):
       args[m.group(1)] = m.group(2)
     if "latlong" not in args:
       if "place" not in args:
-        errprint("Line %s: Found loc decl without place=: <loc %s/>" % (lineno, innards))
+        errprint("Line %s: Found loc decl without place=: <%s%s/>" % (lineno, loc, innards))
       elif args["place"] in coord_hash:
-        return "<loc" + innards + " autolatlong=\"" + coord_hash[args["place"]] + "\"/>"
+        return '<%s%s autolatlong="%s"/>' % (loc, innards, coord_hash[args["place"]])
       else:
         errprint("Line %s: Unable to find coordinate for %s" % (lineno, args["place"]))
-    return "<loc" + innards + "/>"
+    return "<%s%s/>" % (loc, innards)
 
   for line in uchompopen(beadle_file):
     lineno += 1
-    uniprint(re.sub("<loc( [^>]*?)/?>", repl, line))
+    uniprint(re.sub(r"<((?:part)?loc)( [^>]*?)/?>", repl, line))
   errprint("Done.")
 
 ############################################################################
