@@ -599,7 +599,7 @@ def next_split_set(split_fractions, max_split_size=None):
 
   # Normalize so that the smallest value is 1.
 
-  minval = min(split_fractions)
+  minval = min([x for x in split_fractions if x > 0])
   split_fractions = [float(val)/minval for val in split_fractions]
 
   # The algorithm used is as follows.  We cycle through the output sets in
@@ -615,6 +615,8 @@ def next_split_set(split_fractions, max_split_size=None):
   while True:
     this_output = False
     for j in xrange(num_splits):
+      if split_fractions[j] == 0:
+        continue
       #print "j=%s, this_output=%s" % (j, this_output)
       if (cumulative_articles[j] < split_fractions[j] and
           (max_split_size[j] == 0 or total_articles[j] < max_split_size[j])):
@@ -624,6 +626,8 @@ def next_split_set(split_fractions, max_split_size=None):
         this_output = True
     if not this_output:
       for j in xrange(num_splits):
+        if split_fractions[j] == 0:
+          continue
         while cumulative_articles[j] >= split_fractions[j]:
           cumulative_articles[j] -= split_fractions[j]
 
