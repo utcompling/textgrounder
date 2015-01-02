@@ -460,6 +460,20 @@ Default '%default'.""")
 and then apply the mean-shift algorithm to the central points of those cells.
 Default %default.""")
 
+  var restrict_predictions =
+    ap.option[String]("restrict-predictions", "rp",
+      help = """Restrict predicted cells to a given bounding box.""")
+
+  val restrict_predictions_bounding_box =
+    if (restrict_predictions != null) {
+      val bounding_box = restrict_predictions.split(",").map(_.toDouble)
+      require(bounding_box.size == 4)
+      Some(BoundingBox(SphereCoord(bounding_box(0), bounding_box(1)),
+        SphereCoord(bounding_box(2), bounding_box(3))))
+    }
+  else
+    None
+
   var mean_shift_window =
     ap.option[Double]("mean-shift-window", "msw",
       default = 1.0,

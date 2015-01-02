@@ -146,7 +146,9 @@ abstract class SimpleGridRanker[Co](
 
   def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) =
-    return_ranked_cells(item, correct, include_correct)
+    return_ranked_cells(item, correct, include_correct).filter {
+      case (cell, score) => grid.cell_fits_restriction(cell)
+    }
 }
 
 /**

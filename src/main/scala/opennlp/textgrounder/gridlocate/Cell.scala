@@ -479,6 +479,8 @@ abstract class Grid[Co](
     }
   }
 
+  def cell_fits_restriction(cell: GridCell[Co]): Boolean = true
+
   /**
    * Add the given training documents to the cell grid.
    *

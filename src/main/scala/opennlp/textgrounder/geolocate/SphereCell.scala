@@ -262,6 +262,12 @@ abstract class RectangularGrid(
     } else None
   }
 
+  override def cell_fits_restriction(cell: SphereCell) = {
+    cell_matches_bbox(cell.asInstanceOf[RectangularCell],
+      driver.asInstanceOf[GeolocateDriver].params.
+      restrict_predictions_bounding_box)
+  }
+
   def cell_matches_bbox(cell: RectangularCell, bbox: Option[BoundingBox]) = {
     bbox == None || {
       val cell_box =
