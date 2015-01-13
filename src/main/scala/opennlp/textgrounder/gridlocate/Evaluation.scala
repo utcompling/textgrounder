@@ -1142,12 +1142,12 @@ class FullRankedDocEvalResult[Co](
           "correct cell %s" format cinfo.correct_cell,
           Iterable(cinfo.correct_cell))
       }
-      //output_relcontribgrams("predicted cell", pred_cell,
-      //  "all others", pred_cells.map(_._1).tail)
-      //correct.foreach { cinfo =>
-      //  output_relcontribgrams("correct cell", cinfo.correct_cell,
-      //    "all others", pred_cells.map(_._1).filter(_ != cinfo.correct_cell))
-      //}
+      output_relcontribgrams("predicted cell", pred_cell,
+        "all others", pred_cells.map(_._1).tail)
+      correct.foreach { cinfo =>
+        output_relcontribgrams("correct cell", cinfo.correct_cell,
+          "all others", pred_cells.map(_._1).filter(_ != cinfo.correct_cell))
+      }
     }
   }
 
