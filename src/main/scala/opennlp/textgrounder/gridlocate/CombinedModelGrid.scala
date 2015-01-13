@@ -57,12 +57,13 @@ abstract class CombinedGrid[Co](
       grids.map(_.create_subdivided_grid(create_docfact, id))
     )
 
-  def get_subdivided_cells(cell: GridCell[Co]) =
-    grids.flatMap(_.get_subdivided_cells(cell))
+  def imp_get_subdivided_cells(cell: GridCell[Co]) =
+    grids.flatMap(_.imp_get_subdivided_cells(cell))
 
   protected def initialize_cells() { }
 
-  def iter_nonempty_cells = grids.toIndexedSeq.flatMap(_.iter_nonempty_cells)
+  def imp_iter_nonempty_cells =
+    grids.toIndexedSeq.flatMap(_.imp_iter_nonempty_cells)
 }
 
 /**

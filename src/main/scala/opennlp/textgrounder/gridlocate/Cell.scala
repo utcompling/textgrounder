@@ -426,11 +426,10 @@ abstract class Grid[Co](
     id: String): Grid[Co]
 
   /**
-   * If this grid was created by subdividing another grid, then, for a given
-   * cell in that grid, return the corresponding subdivided cells in this
-   * grid. Error if this grid was not created by subdivision.
+   * Implementation of `get_subdivided_cells`. Not meant to be called
+   * externally.
    */
-  def get_subdivided_cells(cell: GridCell[Co]): Iterable[GridCell[Co]]
+  def imp_get_subdivided_cells(cell: GridCell[Co]): Iterable[GridCell[Co]]
 
   /**
    * Find the correct cell for the given coordinate. If no such cell exists,
@@ -448,8 +447,8 @@ abstract class Grid[Co](
    * then it can be given a null implementation using `???`, provided that
    * both of the above functions are overridden.
    */
-  def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean):
-    Option[GridCell[Co]]
+  def find_best_cell_for_coord(coord: Co, create_non_recorded: Boolean
+    ): Option[GridCell[Co]]
 
   /**
    * Find the correct cell for the given document, based on the document's
@@ -479,6 +478,10 @@ abstract class Grid[Co](
     }
   }
 
+  /**
+   * True if cell fits some user-specified restriction, e.g. a bounding box
+   * on the possible cells that can be returned as part of a ranking.
+   */
   def cell_fits_restriction(cell: GridCell[Co]): Boolean = true
 
   /**
@@ -501,9 +504,10 @@ abstract class Grid[Co](
   protected def initialize_cells()
 
   /**
-   * Iterate over all non-empty cells.
+   * Iterate over all non-empty cells. Not meant to be called externally;
+   * use `iter_nonempty_cells` instead.
    */
-  def iter_nonempty_cells: IndexedSeq[GridCell[Co]]
+  def imp_iter_nonempty_cells: IndexedSeq[GridCell[Co]]
 
   /**
    * Output a "ranking grid" of information so that a nice graph
@@ -539,11 +543,17 @@ abstract class Grid[Co](
   var num_nonempty_cells = 0
 
   /**
+   * Iterate over all non-empty cells.
+   */
+  def iter_nonempty_cells: IndexedSeq[GridCell[Co]] = {
+    imp_iter_nonempty_cells.filter(cell_fits_restriction)
+  }
+
+  /**
    * Iterate over all non-empty cells, making sure to include the given cells
    *  even if empty.
    */
-  def iter_nonempty_cells_including(include: IndexedSeq[GridCell[Co]]
-  ) = {
+  def iter_nonempty_cells_including(include: IndexedSeq[GridCell[Co]]) = {
     val cells = iter_nonempty_cells
     if (include.size == 0)
       cells
@@ -562,6 +572,15 @@ abstract class Grid[Co](
   ): IndexedSeq[GridCell[Co]] = {
     val include = if (doinc) IndexedSeq(maybeinc.get) else IndexedSeq()
     iter_nonempty_cells_including(include)
+  }
+
+  /**
+   * If this grid was created by subdividing another grid, then, for a given
+   * cell in that grid, return the corresponding subdivided cells in this
+   * grid. Error if this grid was not created by subdivision.
+   */
+  def get_subdivided_cells(cell: GridCell[Co]): Iterable[GridCell[Co]] = {
+    imp_get_subdivided_cells(cell).filter(cell_fits_restriction)
   }
 
   /**

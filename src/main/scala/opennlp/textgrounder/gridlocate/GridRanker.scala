@@ -146,9 +146,12 @@ abstract class SimpleGridRanker[Co](
 
   def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) =
-    return_ranked_cells(item, correct, include_correct).filter {
-      case (cell, score) => grid.cell_fits_restriction(cell)
-    }
+    // We used to apply the user-specified restriction (e.g. bounding box)
+    // at this point, but this doesn't work with hierarchical ranking.
+    // Instead now we apply the restriction as early as possible, so that
+    // in effect the cells outside the restriction don't exist.
+    return_ranked_cells(item, correct, include_correct)
+      //.filter { case (cell, score) => grid.cell_fits_restriction(cell) }
 }
 
 /**

@@ -122,7 +122,7 @@ class TimeGrid(
     id: String) = ???
 
   // FIXME!
-  def get_subdivided_cells(cell: GridCell[TimeCoord]) = ???
+  def imp_get_subdivided_cells(cell: GridCell[TimeCoord]) = ???
 
   def find_best_cell_for_coord(coord: TimeCoord,
       create_non_recorded: Boolean) = ???
@@ -159,7 +159,7 @@ class TimeGrid(
     )
   }
 
-  def iter_nonempty_cells = {
+  def imp_iter_nonempty_cells = {
     for {
       category <- categories
       pair = pairs(category)

@@ -222,7 +222,7 @@ class KdTreeGrid(
   // be nodes higher up than the actual leaf nodes in the underlying K-d tree),
   // which should be lower down than the leaf nodes in the existing grid.
   // I think we need to ensure that the leaf nodes in the new grid are the
-  // same ones returned by get_subdivided_cells. FIXME: When are
+  // same ones returned by imp_get_subdivided_cells. FIXME: When are
   // iter_nonempty_cells and find_best_cell_for_coord called during
   // hierarchical classification?
   def create_subdivided_grid(create_docfact: => GridDocFactory[SphereCoord],
@@ -241,7 +241,7 @@ class KdTreeGrid(
     ret
   }
 
-  def get_subdivided_cells(cell: SphereCell) = {
+  def imp_get_subdivided_cells(cell: SphereCell) = {
     val kdcell = cell.asInstanceOf[KdTreeCell]
     val new_nodes =
       get_nodes_to_subdivide_depth(Seq(kdcell.kdnode), cutoffBucketSize)
@@ -249,7 +249,7 @@ class KdTreeGrid(
       // WARNING!!! This appears to only make sense for 2-level hierarchies.
       // For 3-level hierarchies, you will expect to get non-leaves
       // returned on level 2.
-      errprint("Asserting leaf in get_subdivided_cells")
+      errprint("Asserting leaf in imp_get_subdivided_cells")
       for (node <- new_nodes)
         assert(node.getLeft == null && node.getRight == null, {
           errprint("Saw non-leaf node:")
@@ -422,7 +422,7 @@ class KdTreeGrid(
   /**
    * Iterate over all non-empty cells.
    */
-  def iter_nonempty_cells = {
+  def imp_iter_nonempty_cells = {
     // Converting to IndexedSeq is very important because otherwise it's
     // a set and all sorts of unexpected things result from mapping a
     // set to something else with duplicate items. Since mapping a set

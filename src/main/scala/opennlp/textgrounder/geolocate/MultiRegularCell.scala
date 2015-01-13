@@ -295,7 +295,7 @@ class MultiRegularGrid(
     // Multiplying by the reciprocal seems to be more accurate than dividing.
     // For example, 175.0 / .14 = 1249.9999999999998 where the correct
     // answer is exactly 1250.0. If we directly call floor() we get 1249
-    // instead of 1250, which screws up calculations in get_subdivided_cells(),
+    // instead of 1250, which screws up calculations in imp_get_subdivided_cells(),
     // so that it may return 0 subcells in the case where the larger cell
     // being subdivided has only one document in it and that document's
     // coordinate falls exactly on the lower latitude or longitude boundary
@@ -458,7 +458,7 @@ class MultiRegularGrid(
       cell_offset_degrees, width_of_multi_cell, new_docfact, id)
   }
 
-  def get_subdivided_cells(cell: SphereCell) = {
+  def imp_get_subdivided_cells(cell: SphereCell) = {
     cell match {
       case rec: RectangularCell => {
         val jitter = 0.0001
@@ -600,7 +600,7 @@ class MultiRegularGrid(
     }
   }
 
-  def iter_nonempty_cells = {
+  def imp_iter_nonempty_cells = {
     assert(all_cells_computed)
     (for {
       v <- corner_to_multi_cell.values
