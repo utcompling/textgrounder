@@ -546,7 +546,16 @@ abstract class Grid[Co](
    * Iterate over all non-empty cells.
    */
   def iter_nonempty_cells: IndexedSeq[GridCell[Co]] = {
-    imp_iter_nonempty_cells.filter(cell_fits_restriction)
+    // We tried to apply the user-specified restriction (e.g. bounding box)
+    // at this point, but this doesn't work with Vowpal Wabbit.
+    // Basically, the classifiers are trained with an expected number of
+    // cells in them, and by filtering early on, we change the mapping
+    // between cells and labels (computed by calling lookup_cell() in
+    // create_vowpal_wabbit_classifier()), which wreaks all sorts of havoc
+    // (and leads to an assertion failure as the number of labels is wrong).
+    // Instead we apply the restriction once we've fetched the scores, and
+    // at each level in the hierarchical model.
+    imp_iter_nonempty_cells // .filter(cell_fits_restriction)
   }
 
   /**
@@ -580,7 +589,8 @@ abstract class Grid[Co](
    * grid. Error if this grid was not created by subdivision.
    */
   def get_subdivided_cells(cell: GridCell[Co]): Iterable[GridCell[Co]] = {
-    imp_get_subdivided_cells(cell).filter(cell_fits_restriction)
+    // See comment in iter_nonempty_cells()
+    imp_get_subdivided_cells(cell) // .filter(cell_fits_restriction)
   }
 
   /**

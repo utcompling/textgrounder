@@ -146,12 +146,8 @@ abstract class SimpleGridRanker[Co](
 
   def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) =
-    // We used to apply the user-specified restriction (e.g. bounding box)
-    // at this point, but this doesn't work with hierarchical ranking.
-    // Instead now we apply the restriction as early as possible, so that
-    // in effect the cells outside the restriction don't exist.
     return_ranked_cells(item, correct, include_correct)
-      //.filter { case (cell, score) => grid.cell_fits_restriction(cell) }
+      .filter { case (cell, score) => grid.cell_fits_restriction(cell) }
 }
 
 /**
@@ -743,7 +739,9 @@ class HierarchicalClassifierGridRanker[Co](
         (cell, score)
       }
     var prev_scores =
-      raw_prev_scores.toIndexedSeq.sortWith(_._2 > _._2)
+      raw_prev_scores.toIndexedSeq.filter {
+        case (cell, score) => coarsest_grid.cell_fits_restriction(cell)
+      }.sortWith(_._2 > _._2)
     if (do_gridrank)
       coarsest_grid.output_ranking_data(s"${doc.title} (level 1)",
         prev_scores, None, correct)
@@ -759,7 +757,9 @@ class HierarchicalClassifierGridRanker[Co](
         // Find the corresponding ranker and run it
         val ranker = rankers(old_cell)
         val doc_ranked_scores =
-          ranker.score_doc_directly(doc).toIndexedSeq.sortWith(_._2 > _._2)
+          ranker.score_doc_directly(doc).toIndexedSeq.filter {
+            case (cell, score) => finer.cell_fits_restriction(cell)
+          }.sortWith(_._2 > _._2)
         if (do_gridrank) {
           val docid = "%s (level %s, index %s, cell %s)" format (
             doc.title, level, index, old_cell.format_location)
