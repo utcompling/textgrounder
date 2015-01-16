@@ -49,7 +49,7 @@ as tab-separated fields and the latter naming the fields.""")
     ap.option[Int]("filter-below-count", "fbc",
       metavar = "INT",
       default = 10,
-      must = be_>(0),
+      must = be_>=(0),
       help = """Filter words whose total count is less than the specified
 amount. Default %default.""")
 
@@ -57,7 +57,7 @@ amount. Default %default.""")
     ap.option[Int]("filter-below-length", "fbl",
       metavar = "INT",
       default = 3,
-      must = be_>(0),
+      must = be_>=(0),
       help = """Filter words whose total length is less than the specified
 amount. Default %default.""")
 
