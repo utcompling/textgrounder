@@ -1,4 +1,4 @@
-//  GenerateToponymHeatmap.scala
+//  GenerateLocationHeatmap.scala
 //
 //  Copyright (C) 2014 Ben Wing, The University of Texas at Austin
 //
@@ -26,7 +26,7 @@ import util.textdb.TextDB
 
 import util.debug._
 
-class GenerateToponymHeatmapParameters(ap: ArgParser) extends DebugParameters(ap) {
+class GenerateLocationHeatmapParameters(ap: ArgParser) extends DebugParameters(ap) {
   var input = ap.option[String]("input",
     must = be_specified,
     help = """File containing data to analyze, output during the toponym
@@ -63,11 +63,11 @@ incompatible with diff mode (when '--input2' is used).""")
  * to be the predictions of a toponym resolver as output by
  * '--debug toponym-prediction-prefix'.
  */
-object GenerateToponymHeatmap extends ExperimentApp("GenerateToponymHeatmap") {
+object GenerateLocationHeatmap extends ExperimentApp("GenerateLocationHeatmap") {
 
-  type TParam = GenerateToponymHeatmapParameters
+  type TParam = GenerateLocationHeatmapParameters
 
-  def create_param_object(ap: ArgParser) = new GenerateToponymHeatmapParameters(ap)
+  def create_param_object(ap: ArgParser) = new GenerateLocationHeatmapParameters(ap)
 
   def read_coords(file: String) = {
     //for (line <- localfh.openr(file)) yield {
@@ -77,8 +77,8 @@ object GenerateToponymHeatmap extends ExperimentApp("GenerateToponymHeatmap") {
     //}
     val rows = TextDB.read_textdb(localfh, file)
     for {row <- rows
-         predcoord = row.gets("predcoord")
-         correctcoord = row.gets("correctcoord")
+         predcoord = row.gets_if("predcoord") getOrElse row.gets("pred-coord")
+         correctcoord = row.gets_if("correctcoord") getOrElse row.gets("correct-coord")
         } 
       yield (predcoord, correctcoord)
   }
