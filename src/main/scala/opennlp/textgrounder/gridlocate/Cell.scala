@@ -192,6 +192,9 @@ abstract class GridCell[Co](
   def add_document(doc: GridDoc[Co]) {
     assert(!finished)
 
+    if (!grid.cell_fits_restriction(this))
+      return
+
     /* Formerly, we arranged things so that we were passed in all documents,
        regardless of the split.  The reason for this was that the decision
        was made to accumulate saliences from all documents, even in the
