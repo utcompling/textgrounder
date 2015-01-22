@@ -16,57 +16,71 @@ def run(infile, outputprefix):
   outdatafile = open(outputprefix + ".data.txt", "w")
   xmldoc = minidom.parseString(filetext)
 
-  paras = xmldoc.getElementsByTagName('p')
-  for para in paras:
-    paraid = para.getAttribute("id") or "unknown"
-    text = getText(para.childNodes)
-    #errprint("Saw paragraph: %s" % text)
-    locs = para.getElementsByTagName('loc')
-    if len(locs) > 1:
-      errprint("Found multiple locations in paragraph: %s" % locs)
-    lat = None
-    lon = None
-    if len(locs) == 1:
-      loc = locs[0]
-      latlong = loc.getAttribute("latlong") or loc.getAttribute("autolatlong")
-      if latlong:
-        m = re.match("^([-0-9.]+),([-0-9.]+)$", latlong)
-        if m:
-          lat = float(m.group(1))
-          lon = float(m.group(2))
-          #errprint("Found location (decimal): %s,%s" % (lat, lon))
-        else:
-          m = re.match("^([-0-9]+)'([-0-9]+)'([-0-9]+)N/([-0-9]+)'([-0-9]+)'([-0-9]+)W$",
-              latlong)
-          if m:
-            lat = float(m.group(1)) + float(m.group(2))/60.0 + float(m.group(3))/3600.0
-            lon = -(float(m.group(4)) + float(m.group(5))/60.0 + float(m.group(6))/3600.0)
-            
-            #errprint("Found location (DMS): %s,%s" % (lat, lon))
-          else:
-            errprint("Found unparsable location: %s" % latlong)
-    words = [word.replace("%", "%25").replace(":", "%3A") for word in
-        split_text_into_words(text, ignore_punc=True) if word != "-"]
-    countmap = intdict()
-    for word in words:
-      countmap[word] += 1
-    textfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
-    include = False
-    if lat is not None and lon is not None:
-      if not Opts.suppress_coord_paras:
-        include = True
+  chapters = [x for x in xmldoc.getElementsByTagName('div')
+      if x.getAttribute("type") in ["preface", "chapter"]]
+  for chapter in chapters:
+    heads = chapter.getElementsByTagName('head')
+    headtext = ' '.join(getText(head.childNodes) for head in heads)
+    if "PREFACE" in headtext:
+      chnum = "PREFACE"
     else:
-      if Opts.include_non_coord_paras:
-        include = True
-        lat = 0.0
-        lon = 0.0
-    if include:
-      uniprint("%s\tbeadle.%s\t%s,%s\t%s" % (paraid, paraid, lat, lon, textfield),
-          outfile=outdatafile)
-    #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
+      m = re.search(r"CHAPTET?R\s+([A-Z]+)", headtext)
+      if not m:
+        errprint("Can't parse chapter number in head text: [[%s]]" % headtext)
+        chnum = "unknown"
+      else:
+        chnum = m.group(1)
+    paras = chapter.getElementsByTagName('p')
+    for para in paras:
+      paraid = para.getAttribute("id") or "unknown"
+      text = getText(para.childNodes)
+      #errprint("Saw paragraph: %s" % text)
+      locs = para.getElementsByTagName('loc')
+      if len(locs) > 1:
+        errprint("Found multiple locations in paragraph: %s" % locs)
+      lat = None
+      lon = None
+      if len(locs) == 1:
+        loc = locs[0]
+        latlong = loc.getAttribute("latlong") or loc.getAttribute("autolatlong")
+        if latlong:
+          m = re.match("^([-0-9.]+),([-0-9.]+)$", latlong)
+          if m:
+            lat = float(m.group(1))
+            lon = float(m.group(2))
+            #errprint("Found location (decimal): %s,%s" % (lat, lon))
+          else:
+            m = re.match("^([-0-9]+)'([-0-9]+)'([-0-9]+)N/([-0-9]+)'([-0-9]+)'([-0-9]+)W$",
+                latlong)
+            if m:
+              lat = float(m.group(1)) + float(m.group(2))/60.0 + float(m.group(3))/3600.0
+              lon = -(float(m.group(4)) + float(m.group(5))/60.0 + float(m.group(6))/3600.0)
+              #errprint("Found location (DMS): %s,%s" % (lat, lon))
+            else:
+              errprint("Found unparsable location: %s" % latlong)
+      words = [word.replace("%", "%25").replace(":", "%3A") for word in
+          split_text_into_words(text, ignore_punc=True) if word != "-"]
+      countmap = intdict()
+      for word in words:
+        countmap[word] += 1
+      textfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
+      include = False
+      if lat is not None and lon is not None:
+        if not Opts.suppress_coord_paras:
+          include = True
+      else:
+        if Opts.include_non_coord_paras:
+          include = True
+          lat = 0.0
+          lon = 0.0
+      if include:
+        uniprint("%s\tbeadle.%s\t%s\t%s,%s\t%s" % (paraid, paraid, chnum, lat,
+          lon, textfield), outfile=outdatafile)
+      #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
+
   outdatafile.close()
   outschemafile = open(outputprefix + ".schema.txt", "w")
-  print >>outschemafile, "id\ttitle\tcoord\tunigram-counts"
+  print >>outschemafile, "id\ttitle\tchapter\tcoord\tunigram-counts"
   print >>outschemafile, "corpus-type\tgeneric"
   print >>outschemafile, "split\tdev"
   outschemafile.close()
