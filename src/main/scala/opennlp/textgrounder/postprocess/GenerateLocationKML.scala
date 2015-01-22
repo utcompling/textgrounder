@@ -1,4 +1,4 @@
-//  GenerateTwitterUserLocationKML.scala
+//  GenerateLocationKML.scala
 //
 //  Copyright (C) 2013-2014 Ben Wing, The University of Texas at Austin
 //
@@ -29,7 +29,7 @@ import util.textdb._
 
 import util.debug._
 
-class GenerateTwitterUserLocationKMLParameters(ap: ArgParser) {
+class GenerateLocationKMLParameters(ap: ArgParser) {
   var input = ap.positional[String]("input",
     must = be_specified,
     help = """Results file to analyze, a textdb database. The value can be
@@ -47,6 +47,11 @@ list-valued; multiple values are specified by including the parameter
 multiple times, or by separating values by a comma.
 """)
 
+  var text_field =
+    ap.option[String]("text-field", metavar = "FIELD",
+      help = """Field to use for text labeling markers. Default is no labeling.
+""")
+
   if (ap.parsedValues && debug != null)
     parse_debug_spec(debug)
 }
@@ -55,11 +60,11 @@ multiple times, or by separating values by a comma.
  * An application to generate KML showing the "locations" (location of first
  * tweet) of users in a file as output by ParseTweets.
  */
-object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUserLocationKML") {
+object GenerateLocationKML extends ExperimentApp("GenerateLocationKML") {
 
-  type TParam = GenerateTwitterUserLocationKMLParameters
+  type TParam = GenerateLocationKMLParameters
 
-  def create_param_object(ap: ArgParser) = new GenerateTwitterUserLocationKMLParameters(ap)
+  def create_param_object(ap: ArgParser) = new GenerateLocationKMLParameters(ap)
 
   def run_program(args: Array[String]) = {
     val rows = TextDB.read_textdb(io.localfh, params.input)
@@ -67,14 +72,18 @@ object GenerateTwitterUserLocationKML extends ExperimentApp("GenerateTwitterUser
       for {row <- rows
            coord = row.gets("coord")
            if coord != ""
-           user = row.gets("user")
       } yield {
-      <Placemark>
-        <name>{ user }</name>
-        <Point>
-          <coordinates>{ coord }</coordinates>
-        </Point>
-      </Placemark>
+        val name = if (params.text_field != null)
+          Seq(<name>{ row.gets(params.text_field) }</name>)
+        else
+          Seq()
+
+        <Placemark>
+          { name }
+          <Point>
+            <coordinates>{ coord }</coordinates>
+          </Point>
+        </Placemark>
       }
 
     val kml =
