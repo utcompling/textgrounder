@@ -99,10 +99,8 @@ class GramCellDist[Co](
       totalprob += prob
     }
     // Normalize the probabilities; but if all probabilities are 0, then
-    // we can't normalize, so leave as-is. (FIXME When can this happen?
-    // It does happen when you use --mode=generate-kml and specify grams
-    // that aren't seen.  In other circumstances, the smoothing ought to
-    // ensure that 0 probabilities don't exist?  Anything else I missed?)
+    // we can't normalize, so leave as-is. This will happen, for example,
+    // for words never seen in the entire corpus.
     if (totalprob != 0) {
       normalized = true
       for ((cell, prob) <- cellprobs)
@@ -167,8 +165,13 @@ class CellDistFactory[Co] {
         cellprobs(cell) += count * prob
     }
     val totalprob = (cellprobs.values sum)
-    for ((cell, prob) <- cellprobs)
-      cellprobs(cell) /= totalprob
+    // Renormalize to produce a probability distribution; but if all
+    // probabilities are 0, then we can't normalize, so leave as-is.
+    // This will happen, for example, for words never seen in the entire
+    // corpus.
+    if (totalprob != 0)
+      for ((cell, prob) <- cellprobs)
+        cellprobs(cell) /= totalprob
     val retval = new CellDist[Co](grid)
     retval.set_cell_probabilities(cellprobs)
     retval
