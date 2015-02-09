@@ -77,6 +77,7 @@ protected class ExperimentPackage {
       errprint("Beginning operation at %s" format humandate_full(beginning_time))
       errprint("Arguments: %s" format (args mkString " "))
       val retval = run()
+      output_resource_usage()
       if (ending_time == 0)
         ending_time = curtimesecs
       errprint("Ending operation at %s" format humandate_full(ending_time))

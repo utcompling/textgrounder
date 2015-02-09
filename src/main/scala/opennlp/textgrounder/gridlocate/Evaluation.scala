@@ -520,7 +520,6 @@ abstract class CorpusEvaluator[Co](
       errprint(s"Ending operation at $curtimehuman")
       output_results(isfinal = true)
       errprint(s"Ending final results for ranker $ranker_name")
-      output_resource_usage()
     }
   }
 
