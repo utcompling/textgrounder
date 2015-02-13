@@ -580,10 +580,8 @@ package io {
       new File(dir, file).toString
     def exists(filename: String) =
       new File(filename).exists
-    def is_directory(filename: String) = {
-      check_exists(filename)
+    def is_directory(filename: String) =
       new File(filename).isDirectory
-    }
     def make_directories(filename: String): Boolean =
       new File(filename).mkdirs
     def list_files(dir: String) = {
@@ -629,6 +627,20 @@ package object io {
    * A file handler for stdio handles (stdin, stdout, stderr).
    */
   val stdfh = new StdFileHandler
+
+  /**
+   * Iterate over the given files or directories, reading the files from
+   * each directory given.
+   */
+  def iter_files(filehand: FileHandler,
+      files: Iterable[String]): Iterator[String] = {
+    files.toIterator.flatMap { file =>
+      if (!filehand.is_directory(file))
+        Iterator(file)
+      else
+        filehand.list_files(file).toIterator
+    }
+  }
 
   /**
    * Iterate over the given files, recursively processing the files in

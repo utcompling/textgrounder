@@ -26,8 +26,7 @@ import scala.util.control.Breaks._
 import java.io.PrintStream
 
 import error.warning
-import io.{FileHandler,FileFormatException,iter_files_recursively,
-  iter_files_with_message}
+import io.{FileHandler,FileFormatException,iter_files, iter_files_with_message}
 import print.errprint
 import serialize.TextSerializer
 
@@ -603,32 +602,6 @@ package textdb {
       split_textdb_file(filehand, file, suffix_re, data_ending_re)
 
     /**
-     * Split the base name of an input textdb file into (DIR, PREFIX).
-     * The following can be given:
-     *
-     * 1. A directory or a name ending with /, in which case PREFIX will
-     *    be blank.
-     * 2. The name of a schema or data file, in which the appropriate
-     *    DIR and PREFIX will be extracted.
-     * 3. An actual base name, which will be split appropriately.
-     */
-    def split_input_base(filehand: FileHandler, base: String
-    ): (String, String) = {
-      if (filehand.exists(base)) {
-        if (filehand.is_directory(base)) (base, "")
-        else Schema.split_schema_file(filehand, base) match {
-          case Some((dir, prefix, _, _)) => (dir, prefix)
-          case None => {
-            split_data_file(filehand, base) match {
-              case Some((dir, prefix, _, _)) => (dir, prefix)
-              case None => filehand.split_filename(base)
-            }
-          }
-        }
-      } else filehand.split_filename(base)
-    }
-
-    /**
      * List only the data files of the appropriate suffix.
      */
     def filter_file_by_suffix(file: String, suffix_re: String = "") = {
@@ -651,7 +624,7 @@ package textdb {
      * subdirectories looking for data files.  The data files must have a suffix
      * in their names that matches the given suffix. (If you want more control
      * over the processing, call `read_schema_from_textdb`,
-     * `iter_files_recursively`, and `filter_file_by_suffix`.)
+     * `iter_files`, and `filter_file_by_suffix`.)
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
@@ -669,7 +642,7 @@ package textdb {
         with_messages: Boolean = true) = {
       val schema =
         Schema.read_schema_from_textdb(filehand, dir, prefix, suffix_re)
-      val files = iter_files_recursively(filehand, Iterable(dir)).
+      val files = iter_files(filehand, Iterable(dir)).
           filter(filter_file_by_prefix(filehand, _, prefix)).
           filter(filter_file_by_suffix(_, suffix_re))
       val files_with_message =
@@ -685,16 +658,26 @@ package textdb {
      * over a list of field values.
      */
     def read_textdb_file(filehand: FileHandler, file: String,
-        schema: Schema) = {
+        schema: Schema): Iterator[IndexedSeq[String]] = {
       filehand.openr(file).zipWithIndex.flatMap {
         case (line, idx) => line_to_fields(line, idx + 1, schema)
       }
     }
 
+    /**
+     * Read the items from the given textdb and schema files. Returns a
+     * schema and an iterator over a list of field values.
+     */
+    def read_textdb_and_schema(filehand: FileHandler, datafile: String,
+        schemafile: String): (Schema, Iterator[IndexedSeq[String]]) = {
+      val schema = Schema.read_schema_file(filehand, schemafile)
+      (schema, read_textdb_file(filehand, datafile, schema))
+    }
+
     /*
     FIXME: Should be implemented.
 
-    def read_textdb_data_with_filenames(filehand: FileHandler, dir: String,
+    def read_textdb_dir_with_filenames(filehand: FileHandler, dir: String,
         prefix: String = "", suffix_re: String = "",
         with_messages: Boolean = true) = ...
     */
@@ -719,7 +702,7 @@ package textdb {
      *   one per value. The schema specifies the names of the values and
      *   can be used to access values from the fields.
      */
-    def read_textdb_data(filehand: FileHandler, dir: String,
+    def read_textdb_dir(filehand: FileHandler, dir: String,
         prefix: String = "", suffix_re: String = "",
         with_messages: Boolean = true) = {
       val (schema, files) =
@@ -729,14 +712,79 @@ package textdb {
     }
 
     /**
-     * Read a database from a directory and return the rows in the database.
-     * If you want more control over the processing, use `read_textdb_data`.
-     * For even more control than that, use `get_textdb_files` and
-     * `read_textdb_file`.
+     * Read a database from a TextDB and return the raw rows in the database,
+     * for each separate file. This is meant for lower-level processing; use
+     * `read_textdb` for high-level access.
      *
      * @param filehand File handler object of base
      * @param base Base of textdb. Can be a directory, in which case any
      *   files in the directory matching `suffix_re` will be considered.
+     * @param suffix_re Suffix regexp picking out the correct data files
+     * @param with_message If true, "Processing ..." messages will be
+     *   displayed as each file is processed and as each directory is visited
+     *   during processing.
+     *
+     * @return A tuple `(schema, field_iter)` where `field_iter` is an
+     *   iterator of iterators of fields. The top-level iterator has
+     *   one sub-iterator per file. Each field is an IndexedSeq of strings,
+     *   one per value. The schema specifies the names of the values and
+     *   can be used to access values from the fields.
+     */
+    def read_textdb_data(filehand: FileHandler, base: String,
+        suffix_re: String = "", with_messages: Boolean = true) = {
+      def readit(dir: String, datafile: String, schemafile: String) = {
+        val (schema, fields) =
+          read_textdb_and_schema(filehand,
+            filehand.join_filename(dir, datafile),
+            filehand.join_filename(dir, schemafile))
+        (schema, Iterator(fields))
+      }
+      val (schema, fields) = {
+        if (filehand.is_directory(base)) {
+          read_textdb_dir(filehand, base, "", suffix_re, with_messages)
+        } else if (!filehand.exists(base)) {
+          val (dir, prefix) = filehand.split_filename(base)
+          read_textdb_dir(filehand, dir, prefix, suffix_re, with_messages)
+        } else {
+          Schema.split_schema_file(filehand, base) match {
+            case Some((dir, prefix, suffix, ending)) => {
+              val dataending = ending.replace(Schema.schema_ending_text,
+                TextDB.data_ending_text)
+              readit(dir, prefix + suffix + dataending,
+                prefix + suffix + ending)
+            }
+            case None => {
+              split_data_file(filehand, base) match {
+                case Some((dir, prefix, suffix, ending)) => {
+                  val schemaending = ending.replace(TextDB.data_ending_text,
+                    Schema.schema_ending_text)
+                  readit(dir, prefix + suffix + ending,
+                    prefix + suffix + schemaending)
+                }
+                case None => {
+                  val (dir, prefix) = filehand.split_filename(base)
+                  read_textdb_dir(filehand, dir, prefix, suffix_re,
+                    with_messages)
+                }
+              }
+            }
+          }
+        }
+      }
+      (schema, fields)
+    }
+
+    /**
+     * Read a database from a TextDB and return the rows in the database.
+     * If you want more control over the processing, use `read_textdb_data`.
+     * For even more control than that, use `read_textdb_dir`,
+     * `read_textdb_file`, and/or `read_textdb_and_schema`.
+     *
+     * @param filehand File handler object of base
+     * @param base Base of textdb. Can be a directory, in which case any
+     *   files in the directory matching `suffix_re` will be considered.
+     *   Can name either a data or schema file, and the corresponding
+     *   filename will be generated appropriately and located.
      * @param suffix_re Suffix regexp picking out the correct data files
      * @param with_message If true, "Processing ..." messages will be
      *   displayed as each file is processed and as each directory is visited
@@ -748,10 +796,8 @@ package textdb {
      */
     def read_textdb(filehand: FileHandler, base: String,
         suffix_re: String = "", with_messages: Boolean = true) = {
-      val (dir, tail) = split_input_base(filehand, base)
-      val (schema, fields) =
-        read_textdb_data(filehand, dir, tail,
-          suffix_re, with_messages)
+      val (schema, fields) = read_textdb_data(filehand, base,
+        suffix_re, with_messages)
       fields.flatten.map { schema.make_row(_) }
     }
 

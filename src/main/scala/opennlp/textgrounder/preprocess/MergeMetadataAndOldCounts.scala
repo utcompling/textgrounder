@@ -188,7 +188,7 @@ counts file also containing the metadata.
         params.output_dir)
 
     val (schema, field_iter) =
-      TextDB.read_textdb_data(filehand, params.input_dir)
+      TextDB.read_textdb_dir(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {
       var (_, prefix, _, _) =
