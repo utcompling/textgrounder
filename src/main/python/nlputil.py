@@ -624,16 +624,18 @@ def next_split_set(split_fractions, max_split_size=None):
       #print "j=%s, this_output=%s" % (j, this_output)
       if (cumulative_articles[j] < split_fractions[j] and
           (max_split_size[j] == 0 or total_articles[j] < max_split_size[j])):
-        yield j
-        cumulative_articles[j] += 1
-        total_articles[j] += 1
+        numarts = yield j
+        if numarts is None:
+          numarts = 1
+        cumulative_articles[j] += numarts
+        total_articles[j] += numarts
         this_output = True
     if not this_output:
       for j in xrange(num_splits):
         if split_fractions[j] == 0:
           continue
-        while cumulative_articles[j] >= split_fractions[j]:
-          cumulative_articles[j] -= split_fractions[j]
+        assert cumulative_articles[j] >= split_fractions[j]
+        cumulative_articles[j] -= split_fractions[j]
 
 #############################################################################
 #                               NLP Programs                                #
