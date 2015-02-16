@@ -28,7 +28,7 @@ import util.error.{warning, assert_==}
 import util.experiment._
 import util.print.errprint
 import util.numeric.pretty_double
-import util.textdb.{Encoder, Row}
+import util.textdb._
 
 import langmodel.{LangModelFactory, Gram}
 
@@ -634,6 +634,25 @@ abstract class Grid[Co](
     docfact.finish_document_loading()
   }
 
+  protected def add_salient_points() {
+    if (driver.params.salience_file != null) {
+      if (driver.params.verbose)
+        errprint("Reading salient points...")
+      for (row <- TextDB.read_textdb(driver.get_file_handler,
+           driver.params.salience_file)) {
+        val name = row.gets("name")
+        val coord = driver.deserialize_coord(row.gets("coord"))
+        val salience = row.get[Double]("salience")
+        add_salient_point(coord, name, salience)
+      }
+      if (driver.params.verbose)
+        errprint("Reading salient points... done.")
+    }
+  }
+
+  protected def initialize_centroids() {
+  }
+
   /**
    * This function is called externally when all documents have been added.
    * It finishes initializing the document factory (which compute global
@@ -644,6 +663,8 @@ abstract class Grid[Co](
     finish_document_factory()
     initialize_cells()
     all_cells_computed = true
+    add_salient_points()
+    initialize_centroids()
     driver.heartbeat
   }
 

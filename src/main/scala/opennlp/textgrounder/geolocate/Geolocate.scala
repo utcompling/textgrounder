@@ -462,17 +462,31 @@ Default %default.""")
 
   var restrict_predictions =
     ap.option[String]("restrict-predictions", "rp",
-      help = """Restrict predicted cells to a given bounding box.""")
+      help = """Restrict predicted cells to a given bounding box.
+Format of the bounding box restriction is 'SWLAT,SWLONG,NELAT,NELONG';
+colons can also be used in place of some or all of the commas.""")
 
-  val restrict_predictions_bounding_box =
-    if (restrict_predictions != null) {
-      val bounding_box = restrict_predictions.split(",").map(_.toDouble)
-      require(bounding_box.size == 4)
-      Some(BoundingBox(SphereCoord(bounding_box(0), bounding_box(1)),
-        SphereCoord(bounding_box(2), bounding_box(3))))
-    }
-  else
-    None
+  var restrict_predictions_file =
+    ap.option[String]("restrict-predictions-file", "rpf",
+      help = """Restrict predicted cells to rectangles given in a file.
+The file should consist of one rectangle per line, in the same format
+as for '--restrict-predictions'.""")
+
+  val restrict_predictions_bboxes = {
+    if (restrict_predictions != null)
+      Seq(BoundingBox.deserialize(restrict_predictions))
+    else if (restrict_predictions_file != null)
+      localfh.openr(restrict_predictions_file).map(BoundingBox.deserialize).
+        toSeq
+    else
+      Seq()
+  }
+
+  var centroids_file =
+    ap.option[String]("centroids-file", "cef",
+      help = """File containing centroids to use to override normally-computed
+centroids. The file should consist of one centroid per line, in the standard
+format LAT,LONG.""")
 
   var mean_shift_window =
     ap.option[Double]("mean-shift-window", "msw",

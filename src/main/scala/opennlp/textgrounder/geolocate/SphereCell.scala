@@ -181,15 +181,19 @@ abstract class RectangularCell(
    */
   val centroid = new Array[Double](2)
 
+  var override_centroid: Option[SphereCoord] = None
+
   def get_centroid = {
-    val nd = num_docs
-    if (nd == 0) {
-      // if we have an empty cell, there is no such thing as
-      // a centroid, so default to the center
-      get_true_center
-    } else {
-      // use the centroid
-      SphereCoord(centroid(0) / nd, centroid(1) / nd)
+    override_centroid.getOrElse {
+      val nd = num_docs
+      if (nd == 0) {
+        // if we have an empty cell, there is no such thing as
+        // a centroid, so default to the center
+        get_true_center
+      } else {
+        // use the centroid
+        SphereCoord(centroid(0) / nd, centroid(1) / nd)
+      }
     }
   }
 
@@ -255,17 +259,20 @@ abstract class RectangularGrid(
 ) extends RealSphereGrid(docfact, id) {
 
   def get_bbox(bboxstr: String) = {
-    if (bboxstr != "") {
-      val Array(swlat, swlong, nelat, nelong) = bboxstr.split(":")
-      Some(BoundingBox(SphereCoord(swlat.toDouble, swlong.toDouble),
-             SphereCoord(nelat.toDouble, nelong.toDouble)))
-    } else None
+    if (bboxstr != "")
+      Some(BoundingBox.deserialize(bboxstr))
+    else None
   }
 
   override def cell_fits_restriction(cell: SphereCell) = {
-    cell_matches_bbox(cell.asInstanceOf[RectangularCell],
-      driver.asInstanceOf[GeolocateDriver].params.
-      restrict_predictions_bounding_box)
+    val rpboxes =
+      driver.asInstanceOf[GeolocateDriver].params.restrict_predictions_bboxes
+    rpboxes.isEmpty || {
+      val rcell = cell.asInstanceOf[RectangularCell]
+      val cell_box =
+        BoundingBox(rcell.get_southwest_coord, rcell.get_northeast_coord)
+      rpboxes.exists(box => cell_box.overlaps(box))
+    }
   }
 
   def cell_matches_bbox(cell: RectangularCell, bbox: Option[BoundingBox]) = {
@@ -280,6 +287,24 @@ abstract class RectangularGrid(
     bbox match {
       case None => "no bounding box"
       case Some(b) => s"bounding box $b"
+    }
+  }
+
+  override protected def initialize_centroids() {
+    super.initialize_centroids()
+    val gdriver = driver.asInstanceOf[GeolocateDriver]
+    if (gdriver.params.centroids_file != null) {
+      if (driver.params.verbose)
+        errprint("Reading centroids...")
+      for (line <-
+           driver.get_file_handler.openr(gdriver.params.centroids_file)) {
+        val coord = SphereCoord.deserialize(line)
+        find_best_cell_for_coord(coord, create_non_recorded = false).map {
+          _.asInstanceOf[RectangularCell].override_centroid = Some(coord)
+        }
+      }
+      if (driver.params.verbose)
+        errprint("Reading centroids... done.")
     }
   }
 

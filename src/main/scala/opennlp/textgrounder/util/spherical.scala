@@ -290,8 +290,10 @@ protected class SphericalPackage {
 
   implicit object BoundingBox extends TextSerializer[BoundingBox] {
     def deserialize(foo: String) = {
-      val Array(sw, ne) = foo.split(":", -1)
-      BoundingBox(SphereCoord.deserialize(sw), SphereCoord.deserialize(ne))
+      val bounding_box = foo.split("[,:]", -1).map(_.toDouble)
+      require(bounding_box.size == 4)
+      BoundingBox(SphereCoord(bounding_box(0), bounding_box(1)),
+        SphereCoord(bounding_box(2), bounding_box(3)))
     }
 
     def serialize(foo: BoundingBox) =

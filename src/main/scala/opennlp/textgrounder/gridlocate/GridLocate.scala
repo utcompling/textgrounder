@@ -1812,18 +1812,6 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
     }
 
     grid.finish_adding_documents()
-    if (params.salience_file != null) {
-      if (params.verbose)
-        errprint("Reading salient points...")
-      for (row <- TextDB.read_textdb(get_file_handler, params.salience_file)) {
-        val name = row.gets("name")
-        val coord = deserialize_coord(row.gets("coord"))
-        val salience = row.get[Double]("salience")
-        grid.add_salient_point(coord, name, salience)
-      }
-      if (params.verbose)
-        errprint("Reading salient points... done.")
-    }
     grid.finish()
 
     if (params.output_training_cell_lang_models) {
