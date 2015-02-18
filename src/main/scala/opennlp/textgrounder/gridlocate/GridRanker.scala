@@ -808,14 +808,9 @@ class AverageCellProbabilityGridRanker[Co](
   ranker_name: String,
   grid: Grid[Co]
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
-  def create_cell_dist_factory = new CellDistFactory[Co]
-
-  val cdist_factory = create_cell_dist_factory
-
   def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
-    val celldist =
-      cdist_factory.get_cell_dist_for_lang_model(grid, doc.grid_lm)
+    val celldist = CellDist.get_cell_dist_for_lang_model(grid, doc.grid_lm)
     val cells = celldist.get_ranked_cells(correct, include_correct)
     // If there are no words in the document, the list of cells will
     // be empty. In that case, just return the cells in an arbitrary order

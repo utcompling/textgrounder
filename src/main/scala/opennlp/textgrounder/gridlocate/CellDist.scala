@@ -31,18 +31,10 @@ import langmodel.{Gram,LangModel}
  * A general distribution over cells, associating a probability with each
  * cell.  The caller needs to provide the probabilities.
  */
-
 class CellDist[Co](
-  val grid: Grid[Co]
+  val grid: Grid[Co],
+  val cellprobs: Iterable[(GridCell[Co], Double)]
 ) {
-  val cellprobs = mutable.Map[GridCell[Co], Double]()
-
-  def set_cell_probabilities(
-      probs: collection.Map[GridCell[Co], Double]) {
-    cellprobs.clear()
-    cellprobs ++= probs
-  }
-
   /**
    * Return a ranked list of all the cells. We may need to add the
    * specified correct cell to the list. See `Ranker.evaluate`.
@@ -57,6 +49,56 @@ class CellDist[Co](
         Map(correct.get -> 0.0) ++ cellprobs.toMap
     // sort by second element of tuple, in reverse order
     probs.toIndexedSeq sortWith (_._2 > _._2)
+  }
+}
+
+object CellDist {
+  /**
+   * Return a cell distribution over a language model.  This works
+   * by adding up the language models of the individual grams,
+   * weighting by the count of the each gram.
+   */
+  def get_cell_dist_for_lang_model[Co](grid: Grid[Co],
+      lang_model: LangModel) = {
+    val base_cells = grid.iter_nonempty_cells
+    val parallel = !grid.driver.params.no_parallel
+    val cells =
+      if (parallel)
+        base_cells.par
+      else
+        base_cells
+
+    val norm_factors = lang_model.iter_grams.map { case (gram, count) =>
+      val raw_factor =
+        cells.map(cell => cell.grid_lm.gram_prob(gram)).sum
+      val norm_factor =
+        if (raw_factor == 0)
+          1.0
+        else
+          1.0/raw_factor
+      (gram, count * norm_factor)
+    }
+    val cellprobs = cells.map { cell =>
+      val cellprob = norm_factors.map { case (gram, factor) =>
+        factor * cell.grid_lm.gram_prob(gram)
+      }.sum
+      (cell, cellprob)
+    }
+    // Renormalize to produce a probability distribution; but if all
+    // probabilities are 0, then we can't normalize, so leave as-is.
+    // This will happen, for example, for words never seen in the entire
+    // corpus.
+    val totalprob = cellprobs.map(_._2).sum
+    val total_norm_factor =
+      if (totalprob == 0)
+        1.0
+      else
+        1.0/totalprob
+    val normed_cell_probs =
+      cellprobs.map { case (cell, cellprob) =>
+        (cell, total_norm_factor * cellprob)
+      }
+    new CellDist(grid, normed_cell_probs.toIndexedSeq)
   }
 }
 
@@ -78,10 +120,27 @@ class CellDist[Co](
  */
 
 class GramCellDist[Co](
-  grid: Grid[Co],
+  val grid: Grid[Co],
   val gram: Gram
-) extends CellDist[Co](grid) {
+) {
+  val cellprobs = mutable.Map[GridCell[Co], Double]()
   var normalized = false
+
+  /**
+   * Return a ranked list of all the cells. We may need to add the
+   * specified correct cell to the list. See `Ranker.evaluate`.
+   */
+  def get_ranked_cells(correct: Option[GridCell[Co]],
+      include_correct: Boolean) = {
+    val probs =
+      if (!include_correct)
+        cellprobs
+      else
+        // Elements on right override those on left
+        Map(correct.get -> 0.0) ++ cellprobs.toMap
+    // sort by second element of tuple, in reverse order
+    probs.toIndexedSeq sortWith (_._2 > _._2)
+  }
 
   protected def init() {
     // It's expensive to compute the value for a given gram so we cache
@@ -151,30 +210,4 @@ class CellDistFactory[Co] {
       }
     }
   }
-
-  /**
-   * Return a cell distribution over a language model.  This works
-   * by adding up the unsmoothed language models of the individual grams,
-   * weighting by the count of the each gram.
-   */
-  def get_cell_dist_for_lang_model(grid: Grid[Co], lang_model: LangModel) = {
-    val cellprobs = doublemap[GridCell[Co]]()
-    for ((gram, count) <- lang_model.iter_grams) {
-      val dist = get_cell_dist(grid, gram)
-      for ((cell, prob) <- dist.cellprobs)
-        cellprobs(cell) += count * prob
-    }
-    val totalprob = (cellprobs.values sum)
-    // Renormalize to produce a probability distribution; but if all
-    // probabilities are 0, then we can't normalize, so leave as-is.
-    // This will happen, for example, for words never seen in the entire
-    // corpus.
-    if (totalprob != 0)
-      for ((cell, prob) <- cellprobs)
-        cellprobs(cell) /= totalprob
-    val retval = new CellDist[Co](grid)
-    retval.set_cell_probabilities(cellprobs)
-    retval
-  }
 }
-
