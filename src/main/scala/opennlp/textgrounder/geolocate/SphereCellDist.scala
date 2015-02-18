@@ -23,14 +23,15 @@ import math._
 
 import util.spherical._
 
-import gridlocate.{Grid,GramCellDist,CellDistFactory}
+import langmodel.Gram
+import gridlocate.{Grid,CellDist,CellDistFactory}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * This is the Sphere-specific version of `GramCellDist`, which is used for
+ * This is the Sphere-specific version of `CellDist`, which is used for
  * a distribution over cells that is associated with a single gram.  This
  * is used in particular for the rankers and Geolocate applications that
  * need to invert the per-cell language models to obtain a per-gram cell
@@ -47,28 +48,30 @@ import gridlocate.{Grid,GramCellDist,CellDistFactory}
  * `SphereCellDistFactory` class, which handles caching of common gram
  * (which may get requested multiple times across a set of documents).
  * The above cases generally create a factory and then request individual
- * `SphereGramCellDist` objects using `get_cell_dist`, which may call
- * `create_gram_cell_dist` to create the actual `SphereGramCellDist`.
+ * `SphereCellDist` objects using `get_cell_dist`, which may call
+ * `create_gram_cell_dist` to create the actual `SphereCellDist`.
  *
  * @param gram Gram for which the cell is computed
  * @param cellprobs Hash table listing probabilities associated with cells
  */
 
-object SphereGramCellDist {
+object SphereCellDist {
   // Convert cell to a KML file showing the distribution
-  def generate_kml_file(celldist: GramCellDist[SphereCoord],
+  def generate_kml_file(grid: SphereGrid, gram: Gram,
+    celldist: CellDist[SphereCoord],
     filename: String, params: KMLParameters
   ) {
     val xform = if (params.kml_transform == "log") (x: Double) => log(x)
     else if (params.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
     else (x: Double) => x
 
-    val xf_minprob = xform(celldist.cellprobs.values min)
-    val xf_maxprob = xform(celldist.cellprobs.values max)
+    val cellprobs = celldist.cellprobs
+    val xf_minprob = xform(cellprobs.map(_._2).min)
+    val xf_maxprob = xform(cellprobs.map(_._2).max)
 
     def yield_cell_kml = {
       for {
-        (cell, prob) <- celldist.cellprobs
+        (cell, prob) <- cellprobs
         kml <- cell.asInstanceOf[KMLSphereCell].generate_kml(
           xform(prob), xf_minprob, xf_maxprob, params)
         expr <- kml
@@ -81,7 +84,7 @@ object SphereGramCellDist {
     // have a unigram language model, we need some language model in the
     // grid in order to call gram_to_string. All grid_lm language models
     // use the same memoizer.
-    val some_lm = celldist.grid.iter_nonempty_cells.head.grid_lm
+    val some_lm = grid.iter_nonempty_cells.head.grid_lm
 
     val kml =
       <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -102,10 +105,10 @@ object SphereGramCellDist {
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ some_lm.gram_to_string(celldist.gram) }</name>
+            <name>{ some_lm.gram_to_string(gram) }</name>
             <open>1</open>
             <description>{ "Cell distribution for gram '%s'" format
-              some_lm.gram_to_string(celldist.gram) }
+              some_lm.gram_to_string(gram) }
             </description>
             <LookAt>
               <latitude>{ KMLConstants.look_at_latitude }</latitude>

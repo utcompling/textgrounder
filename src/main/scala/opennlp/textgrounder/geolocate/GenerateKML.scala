@@ -134,7 +134,8 @@ class GenerateKMLDriver extends
     val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord]
     for (word <- params.split_kml_words) {
-      val celldist = cdist_factory.get_cell_dist(grid, Unigram.to_index(word))
+      val gram = Unigram.to_index(word)
+      val celldist = cdist_factory.get_cell_dist(grid, gram)
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
@@ -143,7 +144,7 @@ Not generating an empty KML file.""", word)
         kmlparams.kml_max_height = params.kml_max_height
         kmlparams.kml_transform = params.kml_transform
         kmlparams.kml_include_cell_names = params.kml_include_cell_names
-        SphereGramCellDist.generate_kml_file(celldist,
+        SphereCellDist.generate_kml_file(grid, gram, celldist,
           "%s%s.kml" format (params.kml_prefix, word),
           kmlparams)
       }
