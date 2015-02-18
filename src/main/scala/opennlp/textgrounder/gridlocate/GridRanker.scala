@@ -810,15 +810,16 @@ class AverageCellProbabilityGridRanker[Co](
 ) extends SimpleGridRanker[Co](ranker_name, grid) {
   def return_ranked_cells(doc: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
-    val celldist = CellDist.get_cell_dist_for_lang_model(grid, doc.grid_lm)
-    val cells = celldist.get_ranked_cells(correct, include_correct)
+    val cellprobs = CellDist.get_cell_dist_for_lang_model(grid, doc.grid_lm)
+    val ranking = CellDist.get_ranked_cells(cellprobs,
+      correct, include_correct)
     // If there are no words in the document, the list of cells will
     // be empty. In that case, just return the cells in an arbitrary order
     // (the order they appear in the hash table). This is similar to
     // returning randomly but should hopefully give the same results each
     // time, so the ACP results don't have any randomness in them.
-    if (!cells.isEmpty)
-      cells
+    if (!ranking.isEmpty)
+      ranking
     else
       for (cell <- grid.iter_nonempty_cells_including(correct, include_correct))
         yield (cell, 0.0)

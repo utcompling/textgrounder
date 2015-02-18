@@ -27,20 +27,13 @@ import util.print.errprint
 
 import langmodel.{Gram,LangModel}
 
-/**
- * A general distribution over cells, associating a probability with each
- * cell.  The caller needs to provide the probabilities.
- */
-class CellDist[Co](
-  val grid: Grid[Co],
-  val cellprobs: Iterable[(GridCell[Co], Double)]
-) {
+object CellDist {
   /**
    * Return a ranked list of all the cells. We may need to add the
    * specified correct cell to the list. See `Ranker.evaluate`.
    */
-  def get_ranked_cells(correct: Option[GridCell[Co]],
-      include_correct: Boolean) = {
+  def get_ranked_cells[Co](cellprobs: Iterable[(GridCell[Co], Double)],
+      correct: Option[GridCell[Co]], include_correct: Boolean) = {
     val probs =
       if (!include_correct)
         cellprobs
@@ -50,9 +43,7 @@ class CellDist[Co](
     // sort by second element of tuple, in reverse order
     probs.toIndexedSeq sortWith (_._2 > _._2)
   }
-}
 
-object CellDist {
   /**
    * Return a cell distribution over a language model.  This works
    * by adding up the language models of the individual grams,
@@ -70,7 +61,7 @@ object CellDist {
 
     val norm_factors = lang_model.iter_grams.map { case (gram, count) =>
       val raw_factor =
-        cells.map(cell => cell.grid_lm.gram_prob(gram)).sum
+        base_cells.view.map(cell => cell.grid_lm.gram_prob(gram)).sum
       val norm_factor =
         if (raw_factor == 0)
           1.0
@@ -98,7 +89,7 @@ object CellDist {
       cellprobs.map { case (cell, cellprob) =>
         (cell, total_norm_factor * cellprob)
       }
-    new CellDist(grid, normed_cell_probs.toIndexedSeq)
+    normed_cell_probs.toIndexedSeq
   }
 }
 
@@ -126,21 +117,9 @@ class GramCellDist[Co](
   val cellprobs = mutable.Map[GridCell[Co], Double]()
   var normalized = false
 
-  /**
-   * Return a ranked list of all the cells. We may need to add the
-   * specified correct cell to the list. See `Ranker.evaluate`.
-   */
   def get_ranked_cells(correct: Option[GridCell[Co]],
-      include_correct: Boolean) = {
-    val probs =
-      if (!include_correct)
-        cellprobs
-      else
-        // Elements on right override those on left
-        Map(correct.get -> 0.0) ++ cellprobs.toMap
-    // sort by second element of tuple, in reverse order
-    probs.toIndexedSeq sortWith (_._2 > _._2)
-  }
+      include_correct: Boolean) =
+    CellDist.get_ranked_cells(cellprobs, correct, include_correct)
 
   protected def init() {
     // It's expensive to compute the value for a given gram so we cache
