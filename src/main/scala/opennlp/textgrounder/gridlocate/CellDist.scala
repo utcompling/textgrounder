@@ -21,7 +21,6 @@ package gridlocate
 
 import collection.mutable
 
-import util.collection.LRUCache
 import util.error.warning
 import util.print.errprint
 
@@ -69,7 +68,7 @@ class CellDistFactory[Co] {
   * look to see what its probability is in all cells; normalize, and we have
   * a cell distribution.
   */
-  def create_cell_dist(grid: Grid[Co], gram: Gram) = {
+  def get_cell_dist(grid: Grid[Co], gram: Gram) = {
     val cellprobs = grid.iter_nonempty_cells.map { cell =>
       (cell, cell.grid_lm.gram_prob(gram))
     }
@@ -84,25 +83,6 @@ class CellDistFactory[Co] {
         (true, cellprobs.map { case (cell, prob) => (cell, prob / totalprob) })
 
     new CellDist[Co](norm_cellprobs, normalized)
-  }
-
-  var cached_dists: LRUCache[Gram, CellDist[Co]] = null
-
-  /**
-   * Return a cell distribution over a single gram, using a least-recently-used
-   * cache to optimize access.
-   */
-  def get_cell_dist(grid: Grid[Co], gram: Gram) = {
-    if (cached_dists == null)
-      cached_dists = new LRUCache(maxsize = GridLocateConstants.lru_cache_size)
-    cached_dists.get(gram) match {
-      case Some(dist) => dist
-      case None => {
-        val dist = create_cell_dist(grid, gram)
-        cached_dists(gram) = dist
-        dist
-      }
-    }
   }
 
   /**
