@@ -499,6 +499,17 @@ data as tab-separated fields and the latter naming the fields.
 
 See also '--print-results' for outputting human-readable results to stderr.""")
 
+  var checksum_file =
+    ap.option[String]("checksum-file", "checksum", "cksum",
+      metavar = "FILE",
+      help = """If specified, prefix of file to store checksum results into.
+Results are stored similarly to a textdb database, with two files written,
+with extensions '.data.txt' and '.schema.txt', with the former storing the
+data as tab-separated fields and the latter naming the fields.""")
+
+  var checksum_filedesc: java.io.PrintStream = null
+  var checksum_schema: Schema = null
+
   var print_results =
     ap.flag("print-results", "show-results", "pr", "sr",
       help = """Show individual results for each test document. Use

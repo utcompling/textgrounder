@@ -35,6 +35,7 @@ import util.numeric._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.errprint
 import util.table.table_column_format
+import util.textdb.{TextDB, Schema}
 
 import learning.{Ranker, Reranker}
 
@@ -681,6 +682,23 @@ abstract class GridEvaluator[Co](
             case ("processed", Some(res)) => {
               if (want_indiv_results)
                 res.print_result(status.docdesc)
+              if (driver.params.checksum_file != null) {
+                val row = res.to_row
+                if (driver.params.checksum_filedesc == null) {
+                  val fileh = driver.get_file_handler
+                  val fields = row.map(_._1)
+                  driver.params.checksum_schema = new Schema(fields)
+                  driver.params.checksum_schema.output_constructed_schema_file(
+                    fileh, driver.params.checksum_file)
+                  driver.params.checksum_filedesc = fileh.openw(
+                    TextDB.construct_data_file(driver.params.checksum_file))
+                }
+                val fieldvals = row.map("%s" format _._2)
+                driver.params.checksum_filedesc.println(
+                  driver.params.checksum_schema.make_line(fieldvals))
+                driver.params.checksum_filedesc.println(s"===${status.docdesc}===")
+                driver.params.checksum_filedesc.flush()
+              }
             }
             case _ => super.print_status(status)
           }
