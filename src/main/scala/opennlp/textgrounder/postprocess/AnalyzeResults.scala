@@ -77,6 +77,10 @@ the files are specified on the command line, ignoring any '--sort-*' and
     help="""Don't sort; output according the order of files given on the
 command line.""")
 
+  var combine = ap.flag("combine",
+    help="""Combine the predictions of all files specified, instead of treating
+each separately.""")
+
   var omit = ap.option[String]("omit",
     default = "",
     help="""Fields to omit, separated by commas. Possible values:
@@ -179,7 +183,8 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
 
   def run_program(args: Array[String]) = {
     val file_stats = mutable.Buffer[FileStats]()
-    for (infile <- params.input) {
+    // Process a set of one or more files together
+    def process_infiles(infiles: Iterable[String]) {
       val cell_stats = mutable.Map[String, CellStats]()
       val correct_cells = intmap[String]()
       val pred_cells = intmap[String]()
@@ -193,7 +198,7 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
       var error_dist_true_center = Vector[Double]()
       var error_dist_centroid = Vector[Double]()
       var error_dist_central_point = Vector[Double]()
-      for (row <- TextDB.read_textdb(localfh, infile)) {
+      for (infile <- infiles; row <- TextDB.read_textdb(localfh, infile)) {
         correct_cells(row.gets("correct-cell")) += 1
         pred_cells(row.gets("pred-cell")) += 1
         cell_stats(row.gets("correct-cell")) =
@@ -224,12 +229,15 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
         val meanval = mean(error_dist_central_point)
         val medianval = median(error_dist_central_point)
         val average = (meanval + medianval) / 2.0
-        file_stats += FileStats(infile, numinst = numseen,
+        file_stats += FileStats(infiles.head, numinst = numseen,
           accuracy = accuracy, acc161 = acc161,
           mean = meanval, median = medianval,
           average = average)
       } else {
-        outprint(s"File: $infile")
+        if (infiles.size == 1)
+          outprint(s"File: ${infiles.head}")
+        else
+          outprint(s"""Files: ${infiles mkString " "}""")
         outprint("Accuracy: %.2f%% (%s/%s)" format
           (numcorrect.toDouble / numseen * 100, numcorrect, numseen))
         print_stats("Oracle distance to central point", oracle_dist_central_point, km = true)
@@ -248,6 +256,13 @@ object AnalyzeResults extends ExperimentApp("AnalyzeResults") {
         output_freq_of_freq(params.correct_cell_distribution,
           correct_cells, cell_stats)
     }
+
+    if (params.combine)
+      process_infiles(params.input)
+    else
+      for (infile <- params.input)
+        process_infiles(Seq(infile))
+
     if (!params.detailed) {
       val sorted_stats =
         if (params.no_sort) file_stats
