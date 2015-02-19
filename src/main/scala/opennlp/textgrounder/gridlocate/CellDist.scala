@@ -103,7 +103,7 @@ class CellDistFactory[Co] {
 
     val norm_factors = lang_model.iter_grams.map { case (gram, count) =>
       val raw_factor =
-        base_cells.view.map(cell => cell.grid_lm.gram_prob(gram)).sum
+        cells.map(cell => cell.grid_lm.gram_prob(gram)).sum
       val norm_factor =
         if (raw_factor == 0)
           1.0
