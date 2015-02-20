@@ -156,6 +156,11 @@ Wikipedia article, etc.).""")
 
   val num_corpora = input.size + train.size
 
+  if (ap.parsedValues) {
+    if (num_corpora == 0)
+      ap.error("Must specify a training corpus")
+  }
+
   var importance =
     ap.option[String]("importance",
       help = """Importance weights for corpora. There should be as many
@@ -167,10 +172,26 @@ weights given as corpora, separated by commas.""")
   if (importance_weights.size != num_corpora)
     ap.error(s"Need $num_corpora importance weights but saw ${importance_weights.size}")
 
-  if (ap.parsedValues) {
-    if (num_corpora == 0)
-      ap.error("Must specify a training corpus")
-  }
+  val combine_corpora =
+    ap.option[String]("combine-corpora", "cc",
+      choices = Seq("concatenate", "separate-grids", "interpolate"),
+      default = "concatenate",
+      help = """Method of combining multiple corpora.
+Possibilities are 'concatenate' (concatenate corpora into a single grid),
+'separate-grids' (create separate grids and search over the combination of
+all cells in all grids), 'interpolate' (create separate grids and interpolate;
+currently requires only two corpora).""")
+
+  val interpolate_grid_factor =
+    ap.option[Double]("interpolate-grid-factor", "igf",
+      must = be_and(be_>=(0), be_<=(1)),
+      default = 0.5,
+      help = """Factor for interpolating grids when combining corpora
+using interpolation.""")
+
+  if (combine_corpora == "interpolate" && num_corpora != 2)
+    ap.error("For combine method 'interpolate', exactly two corpora required")
+
 }
 
 trait GridLocateLangModelParameters {
@@ -1732,28 +1753,36 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def read_raw_training_document_streams:
       Iterable[(String, String => Iterator[DocStatus[RawDoc]])] = {
-    (params.input ++ params.train).zip(params.importance_weights).
-        zipWithIndex.map {
-      case ((dir, importance), index) => {
-        val id = s"#${index + 1}"
-        (id, (operation: String) => {
-          val task = show_progress(s"$id $operation",
-            "training document",
-            maxtime = params.max_time_per_stage,
-            maxitems = params.num_training_docs)
-          val docs = GridDocFactory.read_raw_documents_from_textdb(
-            get_file_handler, dir, "-training", importance,
-            with_messages = params.verbose)
-          val sleep_at = debugval("sleep-at-docs")
-          docs.mapMetered(task) { doc =>
-            if (sleep_at != "" && task.num_processed == sleep_at.toInt) {
-              errprint("Reached %s documents, sleeping...")
-              Thread.sleep(5000)
+    val streams =
+      (params.input ++ params.train).zip(params.importance_weights).
+          zipWithIndex.map {
+        case ((dir, importance), index) => {
+          val id = s"#${index + 1}"
+          (id, (operation: String) => {
+            val task = show_progress(s"$id $operation",
+              "training document",
+              maxtime = params.max_time_per_stage,
+              maxitems = params.num_training_docs)
+            val docs = GridDocFactory.read_raw_documents_from_textdb(
+              get_file_handler, dir, "-training", importance,
+              with_messages = params.verbose)
+            val sleep_at = debugval("sleep-at-docs")
+            docs.mapMetered(task) { doc =>
+              if (sleep_at != "" && task.num_processed == sleep_at.toInt) {
+                errprint("Reached %s documents, sleeping...")
+                Thread.sleep(5000)
+              }
+              doc
             }
-            doc
-          }
-        })
+          })
+        }
       }
+    params.combine_corpora match {
+      case "concatenate" =>
+        Iterable(("#1", (operation: String) => {
+          streams.toIterator.flatMap(_._2(operation))
+        }))
+      case "separate-grid" | "interpolate" => streams
     }
   }
 
@@ -2949,12 +2978,24 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_ranker_from_document_streams(
     streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]
   ) = {
-    if (params.ranker == "hierarchical-classifier")
-      create_hierarchical_classifier_ranker(params.ranker, streams)
-    else {
-      val grid = create_grid_from_document_streams(None, 0, streams)
-      create_named_ranker(params.ranker, grid)
+    def create_underlying_ranker(
+      streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]
+    ) = {
+      if (params.ranker == "hierarchical-classifier")
+        create_hierarchical_classifier_ranker(params.ranker, streams)
+      else {
+        val grid = create_grid_from_document_streams(None, 0, streams)
+        create_named_ranker(params.ranker, grid)
+      }
     }
+    if (params.combine_corpora == "interpolate") {
+      assert(streams.size == 2)
+      val fgranker = create_underlying_ranker(Iterable(streams.head))
+      val bgranker = create_underlying_ranker(Iterable(streams.tail.head))
+      new InterpolatingGridRanker(fgranker, bgranker,
+        params.interpolate_grid_factor)
+    } else
+      create_underlying_ranker(streams)
   }
 
   /**

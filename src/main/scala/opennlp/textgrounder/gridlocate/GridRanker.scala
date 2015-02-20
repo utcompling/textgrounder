@@ -81,40 +81,47 @@ abstract class GridRanker[Co](
  * @param grid Grid containing the cells over which this ranker operates
  */
 class InterpolatingGridRanker[Co](
-  val r1: GridRanker[Co],
-  val r2: GridRanker[Co],
+  val fg: GridRanker[Co],
+  val bg: GridRanker[Co],
   val interp_factor: Double
-  // FIXME: Is it OK for this to be r1.grid specifically?
-) extends GridRanker[Co]("interpolating", r1.grid) {
+  // FIXME: Is it OK for this to be fg.grid specifically?
+) extends GridRanker[Co]("interpolating", fg.grid) {
   /** Optional initialization stage passing one or more times over the
    * test data. */
   override def initialize(
     get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ) {
-    r1.initialize(get_docstats)
-    r2.initialize(get_docstats)
+    fg.initialize(get_docstats)
+    bg.initialize(get_docstats)
   }
 
   def imp_evaluate(item: GridDoc[Co], correct: Option[GridCell[Co]],
       include_correct: Boolean) = {
-    // We match up the cells by going through the cells in one of the two,
-    // and for each cell's centroid, looking up the best cell in the other
-    // for this centroid.
-    val cells_scores_1 = r1.evaluate(item, correct, include_correct)
-    val cells_scores_2 = r2.evaluate(item, correct, include_correct)
-    if (cells_scores_2.size == 0) cells_scores_1 else {
-      val min_score_2 = cells_scores_2.minBy(_._2)._2
-      val scores_2_map = cells_scores_2.toMap
-      // FIXME! What do to when a cell is found in r1 but not in r2? Here we
-      // take the minimum value of any r2 cells. There should be something
-      // more well-founded.
-      // FIXME! Should we symmetrically do the same with cells in r2 but not
-      // r1?
-      cells_scores_1.map { case (cell, score) =>
-        val cell2 = r2.grid.find_best_cell_for_coord(cell.get_centroid,
-          create_non_recorded = true).get
-        val score2 = scores_2_map.getOrElse(cell2, min_score_2)
-        (cell, score * interp_factor + score2 * (1 - interp_factor))
+    // We match up the cells by going through the cells in the background
+    // ranker, and for each cell's centroid, looking up the containing cell
+    // in the foreground ranker for this centroid (if any), then
+    // interpolating the scores.
+    val cells_scores_fg = fg.evaluate(item, correct, include_correct)
+    val cells_scores_bg = bg.evaluate(item, correct, include_correct)
+    if (cells_scores_fg.size == 0) cells_scores_bg
+    else if (cells_scores_bg.size == 0) cells_scores_fg
+    else {
+      val scores_fg_map = cells_scores_fg.toMap
+      // FIXME! This is written with a uniform grid in mind. Doubtful it
+      // will work well with K-d trees, where there are no holes in the
+      // grid.
+      // FIXME! We need to do something better when a cell is found in the
+      // foreground but not the background; or we need to interpolate
+      // fg with fg + bg rather than fg with bg.
+      // FIXME! We are doing the equivalent of Jelinek smoothing.
+      // Implement Dirichlet and PGT smoothing.
+      cells_scores_bg.map { case (cellbg, scorebg) =>
+        val cellfg = fg.grid.find_best_cell_for_coord(cellbg.get_centroid,
+          create_non_recorded = false)
+        if (cellfg == None) (cellbg, scorebg) else {
+          val scorefg = scores_fg_map(cellfg.get)
+          (cellbg, scorefg * (1 - interp_factor) + scorebg * interp_factor)
+        }
       }.toSeq.sortWith(_._2 > _._2)
     }
   }

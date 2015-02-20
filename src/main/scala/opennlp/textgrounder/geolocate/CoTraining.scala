@@ -495,8 +495,8 @@ object DocGeo {
    * should interpolate here or create a special GridRanker that
    * interpolates between two other GridRankers.
    */
-  def interpolate(c1: DocGeo, c2: DocGeo, interp_factor: Double) =
-    new DocGeo(new InterpolatingGridRanker(c1.ranker, c2.ranker,
+  def interpolate(fg: DocGeo, bg: DocGeo, interp_factor: Double) =
+    new DocGeo(new InterpolatingGridRanker(fg.ranker, bg.ranker,
       interp_factor))
 }
 
@@ -752,7 +752,7 @@ class CoTrainer {
             // between the first one and the base docgeo (e.g. trained on
             // Wikipedia).
             val docgeo1 = DocGeo.train(labeled_pseudo, driver)
-            docgeo = DocGeo.interpolate(wp_docgeo, docgeo1,
+            docgeo = DocGeo.interpolate(docgeo1, wp_docgeo,
               driver.params.co_train_interpolate_factor)
             // Label remaining unlabeled docs with docgeo.
             docgeo.label(unlabeled)
