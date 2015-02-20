@@ -762,11 +762,11 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", skip_no_coord: Boolean,
+      suffix: String, importance: Double, skip_no_coord: Boolean,
       note_globally: Boolean = false, finish_globally: Boolean = true) = {
     val rawdocs =
       GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix,
-        with_messages = driver.params.verbose)
+        importance, with_messages = driver.params.verbose)
     raw_documents_to_document_statuses(rawdocs, skip_no_coord,
       note_globally, finish_globally)
   }
@@ -786,9 +786,10 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_raw_text(filehand: FileHandler, dir: String,
-      note_globally: Boolean = false, finish_globally: Boolean = true) = {
+      importance: Double, note_globally: Boolean = false,
+      finish_globally: Boolean = true) = {
     val schema = new Schema(Iterable(), Map("corpus-type" -> "raw-text"))
-    val fake_rawdoc = RawDoc(Row(schema, IndexedSeq()), 1.0)
+    val fake_rawdoc = RawDoc(Row(schema, IndexedSeq()), importance)
     val the_files = iter_files_recursively(filehand, Iterable(dir))
     val files =
       if (driver.params.verbose)
@@ -996,7 +997,7 @@ object GridDocFactory {
    * @return Iterator over document statuses of raw documents.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", importance: Double = 1.0, with_messages: Boolean = false
+      suffix: String, importance: Double, with_messages: Boolean = false
   ): Iterator[DocStatus[RawDoc]] = {
     val (schema, files) =
       TextDB.get_textdb_files(filehand, dir, suffix_re = suffix,
@@ -1004,7 +1005,8 @@ object GridDocFactory {
     files.flatMap { file =>
       filehand.openr(file).zipWithIndex.map {
         case (line, idx) =>
-          line_to_raw_document(filehand, file, line, idx + 1, importance, schema)
+          line_to_raw_document(filehand, file, line, idx + 1, importance,
+            schema)
       }
     }
   }

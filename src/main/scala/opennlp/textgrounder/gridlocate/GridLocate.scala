@@ -154,8 +154,21 @@ Wikipedia article, etc.).""")
     ap.multiPositional[String]("train",
       help = """One or more training corpora. See '--input'.""")
 
+  val num_corpora = input.size + train.size
+
+  var importance =
+    ap.option[String]("importance",
+      help = """Importance weights for corpora. There should be as many
+weights given as corpora, separated by commas.""")
+
+  val importance_weights =
+    if (importance != null) importance.split(",").toSeq.map(_.toDouble)
+    else Seq.fill(num_corpora)(1.0)
+  if (importance_weights.size != num_corpora)
+    ap.error(s"Need $num_corpora importance weights but saw ${importance_weights.size}")
+
   if (ap.parsedValues) {
-    if (input.size + train.size == 0)
+    if (num_corpora == 0)
       ap.error("Must specify a training corpus")
   }
 }
@@ -1719,8 +1732,9 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    */
   def read_raw_training_document_streams:
       Iterable[(String, String => Iterator[DocStatus[RawDoc]])] = {
-    (params.input ++ params.train).zipWithIndex.map {
-      case (dir, index) => {
+    (params.input ++ params.train).zip(params.importance_weights).
+        zipWithIndex.map {
+      case ((dir, importance), index) => {
         val id = s"#${index + 1}"
         (id, (operation: String) => {
           val task = show_progress(s"$id $operation",
@@ -1728,7 +1742,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             maxtime = params.max_time_per_stage,
             maxitems = params.num_training_docs)
           val docs = GridDocFactory.read_raw_documents_from_textdb(
-            get_file_handler, dir, "-training", with_messages = params.verbose)
+            get_file_handler, dir, "-training", importance,
+            with_messages = params.verbose)
           val sleep_at = debugval("sleep-at-docs")
           docs.mapMetered(task) { doc =>
             if (sleep_at != "" && task.num_processed == sleep_at.toInt) {

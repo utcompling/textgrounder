@@ -74,14 +74,14 @@ class CreateBalancedCorpusDriver extends
     for (set <- sets) {
       // Record documents seen in each cell
       val docs_in_cell = bufmap[SphereCell, RawDoc]()
-      (params.input ++ params.train).zipWithIndex.foreach {
-        case (dir, index) => {
+      (params.input ++ params.train).zip(params.importance_weights).
+          zipWithIndex.foreach {
+        case ((dir, importance), index) => {
           val id = s"#${index + 1}"
           val task = show_progress(s"$id creating balanced corpus from",
             s"$set document")
           val rawdocs_statuses = GridDocFactory.read_raw_documents_from_textdb(
-            get_file_handler, dir, s"-$set",
-            importance = 1.0,
+            get_file_handler, dir, s"-$set", importance,
             with_messages = params.verbose)
           // FIXME: Should there be an easier way to process through the
           // DocStatus wrappers when we don't much care about the statuses?
