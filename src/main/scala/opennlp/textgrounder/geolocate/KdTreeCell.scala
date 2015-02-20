@@ -32,11 +32,10 @@ import util.experiment._
 import util.error._
 import util.print.errprint
 import util.spherical.SphereCoord
-import util.textdb.Row
 
 import langmodel.UnigramLangModel
 
-import gridlocate.{DocStatus, GridDocFactory}
+import gridlocate.{RawDoc, DocStatus, GridDocFactory}
 
 class KdTreeCell(
   cellgrid: KdTreeGrid,
@@ -293,7 +292,7 @@ class KdTreeGrid(
   }
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[Row]]) {
+      get_rawdocs: String => Iterator[DocStatus[RawDoc]]) {
     if (existingGrid != None)
       return
 

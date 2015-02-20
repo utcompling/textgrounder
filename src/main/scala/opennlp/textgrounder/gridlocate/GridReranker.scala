@@ -22,7 +22,6 @@ package gridlocate
 import util.error.assert_==
 import util.print._
 import util.numeric.{pretty_long, pretty_double}
-import util.textdb.Row
 
 import learning._
 import learning.vowpalwabbit._
@@ -76,7 +75,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   ranker_name: String,
   val trainer: SingleWeightLinearClassifierTrainer[GridRerankerInst[Co]]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GridDoc[Co], GridCell[Co], DocStatus[Row], GridRerankerInst[Co],
+    GridDoc[Co], GridCell[Co], DocStatus[RawDoc], GridRerankerInst[Co],
     FeatureVector, AggregateFeatureVector, TrainingData[GridRerankerInst[Co]]
     ] { self =>
   protected def create_rerank_classifier(
@@ -123,7 +122,7 @@ abstract class LinearClassifierGridRerankerTrainer[Co](
   /**
    * Train a reranker, based on external training data.
    */
-  override def apply(training_data: Iterable[DocStatus[Row]]) =
+  override def apply(training_data: Iterable[DocStatus[RawDoc]]) =
     super.apply(training_data).asInstanceOf[GridReranker[Co]]
 
   override def format_query_item(item: GridDoc[Co]) = {
@@ -165,7 +164,7 @@ abstract class VowpalWabbitGridRerankerTrainer[Co](
   val save_vw_model: String,
   val vw_args: Iterable[String]
 ) extends PointwiseClassifyingRerankerTrainer[
-    GridDoc[Co], GridCell[Co], DocStatus[Row],
+    GridDoc[Co], GridCell[Co], DocStatus[RawDoc],
     RawAggregateFeatureVector,
     RawFeatureVector,
     RawAggregateFeatureVector,
@@ -222,7 +221,7 @@ abstract class VowpalWabbitGridRerankerTrainer[Co](
   /**
    * Train a reranker, based on external training data.
    */
-  override def apply(training_data: Iterable[DocStatus[Row]]) =
+  override def apply(training_data: Iterable[DocStatus[RawDoc]]) =
     super.apply(training_data).asInstanceOf[GridReranker[Co]]
 
   override def format_query_item(item: GridDoc[Co]) = {

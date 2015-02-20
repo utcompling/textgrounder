@@ -22,7 +22,7 @@ package geolocate
 import collection.mutable
 
 import util.spherical._
-import util.textdb.{Row, Schema}
+import util.textdb.Schema
 import util.error.warning_once
 
 import gridlocate._
@@ -48,7 +48,7 @@ abstract class SphereDocSubfactory[TDoc <: SphereDoc](
    * Return value can be None if the document is to be skipped; otherwise,
    * it will be recorded in the appropriate split.
    */
-  def create_document(row: Row, lang_model: DocLangModel,
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord): TDoc
   def record_training_document_in_subfactory(doc: SphereDoc) { }
 }
@@ -82,11 +82,11 @@ class SphereDocFactory(
   def wikipedia_subfactory =
     corpus_type_to_subfactory("wikipedia").asInstanceOf[WikipediaDocSubfactory]
 
-  def create_document(row: Row,
+  def create_document(rawdoc: RawDoc,
      lang_model: DocLangModel) = {
-    val coord = row.get_or_else[SphereCoord]("coord", null)
-    find_subfactory(row).
-      create_document(row, lang_model, coord)
+    val coord = rawdoc.row.get_or_else[SphereCoord]("coord", null)
+    find_subfactory(rawdoc).
+      create_document(rawdoc, lang_model, coord)
   }
 
   override def record_training_document_in_subfactory(doc: SphereDoc) {
@@ -100,8 +100,8 @@ class SphereDocFactory(
    * parameter and calls `find_subfactory(java.lang.String)` to find
    * the appropriate subfactory.
    */
-  def find_subfactory(row: Row): SphereDocSubfactory[_ <: SphereDoc] = {
-    val cortype = row.gets_or_else("corpus-type", "generic")
+  def find_subfactory(rawdoc: RawDoc): SphereDocSubfactory[_ <: SphereDoc] = {
+    val cortype = rawdoc.row.gets_or_else("corpus-type", "generic")
     find_subfactory(cortype)
   }
 
@@ -135,10 +135,10 @@ class GenericSphereDoc(
 class GenericSphereDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[GenericSphereDoc](docfact) {
-  def create_document(row: Row, lang_model: DocLangModel,
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord) =
-    new GenericSphereDoc(row.schema, lang_model, coord,
-      row.get_if[Double]("salience"),
-      row.get_or_else[String]("title", "unknown")
+    new GenericSphereDoc(rawdoc.row.schema, lang_model, coord,
+      rawdoc.row.get_if[Double]("salience"),
+      rawdoc.row.get_or_else[String]("title", "unknown")
     )
 }

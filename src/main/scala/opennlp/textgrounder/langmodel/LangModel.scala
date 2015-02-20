@@ -213,9 +213,10 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    * "ngram-counts" or "text").
    *
    * @param doc Document to set the lang model of.
-   * @param diststr String from the document file, describing the lang model.
+   * @param countstr String from the document file, describing the lang model.
+   * @param importance Factor to weight the counts.
    */
-  def create_lang_model(countstr: String): LangModel
+  def create_lang_model(countstr: String, importance: Double): LangModel
 }
 
 trait KLDivergenceCache {

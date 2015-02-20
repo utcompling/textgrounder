@@ -22,7 +22,6 @@ package gridlocate
 import util.experiment._
 import util.error.warning
 import util.print.errprint
-import util.textdb.Row
 
 /**
  * A combined grid composed of sub-grids, with the cells of the grid consisting
@@ -84,7 +83,7 @@ class UninitializedCombinedGrid[Co](
   ) = new UninitializedCombinedGrid(docfact, id, grids)
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[Row]]) {
+      get_rawdocs: String => Iterator[DocStatus[RawDoc]]) {
     for (grid <- grids) grid.add_training_documents_to_grid(get_rawdocs)
   }
 
@@ -121,7 +120,7 @@ class InitializedCombinedGrid[Co](
   ) = new InitializedCombinedGrid(docfact, id, grids)
 
   def add_training_documents_to_grid(
-    get_rawdocs: String => Iterator[DocStatus[Row]]
+    get_rawdocs: String => Iterator[DocStatus[RawDoc]]
   ) {
     // We need to process the documents again to compute combined global
     // backoff stats for the test documents that we read in. (The alternative

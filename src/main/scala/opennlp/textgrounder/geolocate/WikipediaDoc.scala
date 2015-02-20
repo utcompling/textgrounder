@@ -28,7 +28,7 @@ import util.print.errprint
 import util.serialize.TextSerializer._
 import util.spherical._
 import util.string.capfirst
-import util.textdb.{Schema, Row}
+import util.textdb.Schema
 
 import gridlocate._
 
@@ -76,16 +76,16 @@ class WikipediaDoc(
 class WikipediaDocSubfactory(
   override val docfact: SphereDocFactory
 ) extends SphereDocSubfactory[WikipediaDoc](docfact) {
-  override def create_document(row: Row, lang_model: DocLangModel,
+  override def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord) = {
-    val namespace = row.gets_or_else("namepace", "")
+    val namespace = rawdoc.row.gets_or_else("namepace", "")
     // docs with namespace != Main should be filtered during preproc
     assert(namespace == "" || namespace == "Main",
       s"Namespace $namespace not empty or Main")
-    new WikipediaDoc(row.schema, lang_model, coord,
-      id = row.get_or_else[Long]("id", 0L),
-      title = row.get_or_else[String]("title", ""),
-      salience = row.get_if[Int]("incoming_links").map { _.toDouble }
+    new WikipediaDoc(rawdoc.row.schema, lang_model, coord,
+      id = rawdoc.row.get_or_else[Long]("id", 0L),
+      title = rawdoc.row.get_or_else[String]("title", ""),
+      salience = rawdoc.row.get_if[Int]("incoming_links").map { _.toDouble }
     )
   }
 

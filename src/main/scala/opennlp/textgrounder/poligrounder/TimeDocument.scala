@@ -22,7 +22,7 @@ package poligrounder
 import collection.mutable
 
 import util.spherical._
-import util.textdb.{Row, Schema}
+import util.textdb.Schema
 import util.print._
 import util.time._
 
@@ -50,10 +50,10 @@ class TimeDocFactory(
 ) extends GridDocFactory[TimeCoord](
   driver, lang_model_factory
 ) {
-  def create_document(row: Row, lang_model: DocLangModel) =
-    new TimeDoc(row.schema, lang_model,
-      row.get[TimeCoord]("min-timestamp"),
-      row.get[String]("user")
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel) =
+    new TimeDoc(rawdoc.row.schema, lang_model,
+      rawdoc.row.get[TimeCoord]("min-timestamp"),
+      rawdoc.row.get[String]("user")
     )
 }
 

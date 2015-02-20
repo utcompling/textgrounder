@@ -303,7 +303,7 @@ abstract class PointwiseClassifyingReranker[Query, Candidate, FV, AFV <: FV](
  * where the query object in a QTI is a "cooked" form of the document that
  * requires global information computed from the other splits of the external
  * data (e.g. back-off statistics in a language model). This is used by
- * `GridLocate`, where `ExtInst` is `DocStatus[Row]`, describing the raw-data
+ * `GridLocate`, where `ExtInst` is `DocStatus[RawDoc]`, describing the raw-data
  * form of a document read from an external corpus. Generating an initial
  * ranker computes back-off statistics from the set of initial-ranker training
  * data used to initialize the ranker, and in turn, conversion of a raw

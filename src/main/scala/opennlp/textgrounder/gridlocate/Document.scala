@@ -48,6 +48,8 @@ import util.debug._
 /////////////////////////////////////////////////////////////////////////////
 
 
+case class RawDoc(row: Row, importance: Double)
+
 /**
  * Object encapsulating the result of attempting to read a document from
  * some external source, or convert such a document to another format.
@@ -204,7 +206,7 @@ case class DocStatus[TDoc](
  * counting occurrences of events but not too much else.
  *
  * @tparam T type of the document being processed (usually either
- *   `Row` or `GridDoc`)
+ *   `RawDoc` or `GridDoc`)
  * @param shortfile A version of the source file name, used in logging
  *   messages; may omit directories or other information shared among
  *   multiple file names.
@@ -283,7 +285,7 @@ class DocCounterTracker[T](
  * See `DocCounterTracker` for more info, e.g. the concept of "counter".
  *
  * @tparam T type of the document being processed (usually either
- *   `Row` or `GridDoc`)
+ *   `RawDoc` or `GridDoc`)
  * @param driver Object used to transmit counters externally, e.g. to
  *   log files, to the Hadoop job tracker machine, etc.
  */
@@ -469,14 +471,14 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
   def coord_handler = implicitly[CoordHandler[Co]]
 
   /**
-   * Create, initialize and return a document from the given raw row.
+   * Create, initialize and return a document from the given raw document.
    * Throw an error if errors found.
    *
-   * @param row Row describing record loaded from a corpus
+   * @param rawdoc Raw document describing record loaded from a corpus
    * @param lang_model Language model(s) describing the document, as
-   *   computed from data in the row
+   *   computed from data in the raw document
    */
-  protected def create_document(row: Row, lang_model: DocLangModel
+  protected def create_document(rawdoc: RawDoc, lang_model: DocLangModel
   ): GridDoc[Co]
 
   /* Record a training document in any subsidiary factores, subclasses, etc.
@@ -498,7 +500,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * this way, we allow the logging to be delayed until the point where a
    * given document is actually consumed, for proper sequencing.
    *
-   * We separate out raw (class `Row`) and processed documents
+   * We separate out raw (class `RawDoc`) and processed documents
    * (class `GridDoc`) because in some circumstances we may need to
    * process the raw documents multiple times in different ways, e.g. when
    * creating splits for cross-validation (as done when training a reranker).
@@ -510,12 +512,12 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    *  handled separately, as above.)
    * @return a DocStatus describing the document.
    */
-  def raw_document_to_document_status(rawdoc: DocStatus[Row],
+  def raw_document_to_document_status(rawdocstat: DocStatus[RawDoc],
       skip_no_coord: Boolean, note_globally: Boolean
-    ): (DocStatus[(Row, GridDoc[Co])]) = {
-    rawdoc map_result { row =>
+      ): (DocStatus[(RawDoc, GridDoc[Co])]) = {
+    rawdocstat map_result { rd =>
       try {
-        val split = row.gets_or_else("split", "unknown")
+        val split = rd.row.gets_or_else("split", "unknown")
         num_records_by_split(split) += 1
 
         def catch_doc_validation[T](body: => T) = {
@@ -537,22 +539,22 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         }
 
         val grid_lm = catch_doc_validation {
-          val counts = row.gets(driver.grid_word_count_field)
+          val counts = rd.row.gets(driver.grid_word_count_field)
           lang_model_factory.grid_lang_model_factory.builder.
-            create_lang_model(counts)
+            create_lang_model(counts, rd.importance)
         }
         val rerank_lm =
           if (driver.rerank_word_count_field == driver.grid_word_count_field)
             grid_lm
           else
             catch_doc_validation {
-              val counts = row.gets(driver.rerank_word_count_field)
+              val counts = rd.row.gets(driver.rerank_word_count_field)
               lang_model_factory.rerank_lang_model_factory.builder.
-                create_lang_model(counts)
+                create_lang_model(counts, rd.importance)
             }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
         val doc = catch_doc_validation {
-          create_document(row, lang_model)
+          create_document(rd, lang_model)
         }
         // if (doc == None) // used to mean skipped
         // num_non_error_skipped_records_by_split(split) += 1
@@ -566,7 +568,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         if (!doc.has_coord && skip_no_coord) {
           num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
           word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
-          (Some((row, doc)), "skipped", "document has no coordinate",
+          (Some((rd, doc)), "skipped", "document has no coordinate",
             doc.title)
         } else {
           num_documents_with_coordinates_by_split(split) += 1
@@ -584,27 +586,26 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
             doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
           }
           doc.lang_model.finish_before_global()
-          (Some((row, doc)), "processed", "", "")
+          (Some((rd, doc)), "processed", "", "")
         }
       } catch {
         case e:DocValidationException => {
-          warning("Line %s: %s", rawdoc.lineno, e.message)
+          warning("Line %s: %s", rawdocstat.lineno, e.message)
           (None, "bad", "error validating document field", "")
         }
         case e:LangModelCreationException => {
-          val rd = rawdoc.maybedoc.get
           if (driver.grid_word_count_field ==
               driver.rerank_word_count_field)
             warning("Line %s: %s, word-counts field: %s",
-              rawdoc.lineno, e.message,
-              row.gets_or_else(driver.grid_word_count_field,
+              rawdocstat.lineno, e.message,
+              rd.row.gets_or_else(driver.grid_word_count_field,
                 "(missing word-counts field)"))
           else
             warning("Line %s: %s, grid word-counts field: %s, rerank word-counts field: %s",
-              rawdoc.lineno, e.message,
-              row.gets_or_else(driver.grid_word_count_field,
+              rawdocstat.lineno, e.message,
+              rd.row.gets_or_else(driver.grid_word_count_field,
                 "(missing word-counts field)"),
-              row.gets_or_else(driver.rerank_word_count_field,
+              rd.row.gets_or_else(driver.rerank_word_count_field,
                 "(missing rerank word-counts field)"))
           (None, "bad", "error creating document language model", "")
         }
@@ -619,10 +620,10 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * do this). This does not record the document in the cell grid; the
    * caller needs to do that if needed.
    */
-  def record_training_document_in_factory(stat: DocStatus[(Row, GridDoc[Co])]
+  def record_training_document_in_factory(stat: DocStatus[(RawDoc, GridDoc[Co])]
     ) {
-    stat foreach_all { case (status, (row, doc)) =>
-      val split = row.gets_or_else("split", "unknown")
+    stat foreach_all { case (status, (rawdoc, doc)) =>
+      val split = rawdoc.row.gets_or_else("split", "unknown")
       val double_tokens = doc.lang_model.grid_lm.num_tokens
       val tokens = double_tokens.toInt
       // Partial counts should not occur in training documents.
@@ -656,11 +657,11 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def raw_documents_to_document_statuses(
-    rawdocs: Iterator[DocStatus[Row]],
+    rawdocs: Iterator[DocStatus[RawDoc]],
     skip_no_coord: Boolean,
     note_globally: Boolean,
     finish_globally: Boolean
-  ): Iterator[DocStatus[(Row, GridDoc[Co])]] = {
+  ): Iterator[DocStatus[(RawDoc, GridDoc[Co])]] = {
     val docstats =
       rawdocs map { rawdoc =>
         raw_document_to_document_status(rawdoc, skip_no_coord, note_globally)
@@ -674,7 +675,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
     else
       docstats.map { stat =>
         stat.foreach {
-          case (row, doc) => doc.lang_model.finish_after_global() }
+          case (rawdoc, doc) => doc.lang_model.finish_after_global() }
         stat
       }
   }
@@ -692,10 +693,10 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator directly over processed documents.
    */
   def document_statuses_to_documents(
-    rowdocstats: Iterator[DocStatus[(Row, GridDoc[Co])]]
+    rddocstats: Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ): Iterator[GridDoc[Co]] = {
     val docstats =
-      rowdocstats map { _ map_all { case (raw, cooked) => cooked } }
+      rddocstats map { _ map_all { case (raw, cooked) => cooked } }
     new DocCounterTrackerFactory[GridDoc[Co]](driver).
       process_statuses(docstats)
   }
@@ -734,7 +735,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over documents.
    */
   def raw_documents_to_documents(
-    rawdocs: Iterator[DocStatus[Row]],
+    rawdocs: Iterator[DocStatus[RawDoc]],
     skip_no_coord: Boolean,
     note_globally: Boolean = false,
     finish_globally: Boolean = true
@@ -787,7 +788,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
   def read_document_statuses_from_raw_text(filehand: FileHandler, dir: String,
       note_globally: Boolean = false, finish_globally: Boolean = true) = {
     val schema = new Schema(Iterable(), Map("corpus-type" -> "raw-text"))
-    val fake_row = Row(schema, IndexedSeq())
+    val fake_rawdoc = RawDoc(Row(schema, IndexedSeq()), 1.0)
     val the_files = iter_files_recursively(filehand, Iterable(dir))
     val files =
       if (driver.params.verbose)
@@ -799,7 +800,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
       val words = lines.flatMap(_.split("""\s+""")).toIterable
       if (words.size == 0) {
         warning(s"Skipping empty file $file")
-        DocStatus[(Row, GridDoc[Co])](filehand, file, 1, None, "skipped",
+        DocStatus[(RawDoc, GridDoc[Co])](filehand, file, 1, None, "skipped",
           "empty document", "")
       } else {
         val grid_lm =
@@ -816,14 +817,14 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
           }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
         // FIXME!! Record statistics about total types/tokens/etc.
-        val doc = create_document(fake_row, lang_model)
+        val doc = create_document(fake_rawdoc, lang_model)
         if (note_globally) {
           doc.lang_model.foreach(lm => lm.factory.note_lang_model_globally(lm))
         }
         doc.lang_model.finish_before_global()
         if (finish_globally)
           doc.lang_model.finish_after_global()
-        DocStatus(filehand, file, 1, Some((fake_row, doc)), "processed",
+        DocStatus(filehand, file, 1, Some((fake_rawdoc, doc)), "processed",
           "", "")
       }
     }
@@ -973,10 +974,10 @@ object GridDocFactory {
    * @param schema Schema for textdb, indicating names of fields, etc.
    */
   def line_to_raw_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema): DocStatus[Row] = {
+      lineno: Long, importance: Double, schema: Schema): DocStatus[RawDoc] = {
     line_to_fields(line, lineno, schema) match {
       case Some(fields) =>
-        DocStatus(filehand, file, lineno, Some(Row(schema, fields)),
+        DocStatus(filehand, file, lineno, Some(RawDoc(Row(schema, fields), importance)),
           "processed", "", "")
       case None =>
         DocStatus(filehand, file, lineno, None, "bad",
@@ -995,15 +996,15 @@ object GridDocFactory {
    * @return Iterator over document statuses of raw documents.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String = "", with_messages: Boolean = false
-  ): Iterator[DocStatus[Row]] = {
+      suffix: String = "", importance: Double = 1.0, with_messages: Boolean = false
+  ): Iterator[DocStatus[RawDoc]] = {
     val (schema, files) =
       TextDB.get_textdb_files(filehand, dir, suffix_re = suffix,
         with_messages = with_messages)
     files.flatMap { file =>
       filehand.openr(file).zipWithIndex.map {
         case (line, idx) =>
-          line_to_raw_document(filehand, file, line, idx + 1, schema)
+          line_to_raw_document(filehand, file, line, idx + 1, importance, schema)
       }
     }
   }

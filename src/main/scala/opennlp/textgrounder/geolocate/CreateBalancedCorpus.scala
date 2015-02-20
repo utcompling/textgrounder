@@ -73,7 +73,7 @@ class CreateBalancedCorpusDriver extends
     val sets = Seq("training", "dev", "test")
     for (set <- sets) {
       // Record documents seen in each cell
-      val docs_in_cell = bufmap[SphereCell, Row]()
+      val docs_in_cell = bufmap[SphereCell, RawDoc]()
       (params.input ++ params.train).zipWithIndex.foreach {
         case (dir, index) => {
           val id = s"#${index + 1}"
@@ -81,13 +81,14 @@ class CreateBalancedCorpusDriver extends
             s"$set document")
           val rawdocs_statuses = GridDocFactory.read_raw_documents_from_textdb(
             get_file_handler, dir, s"-$set",
+            importance = 1.0,
             with_messages = params.verbose)
           // FIXME: Should there be an easier way to process through the
           // DocStatus wrappers when we don't much care about the statuses?
-          val rawdocs = new DocCounterTrackerFactory[Row](this).
+          val rawdocs = new DocCounterTrackerFactory[RawDoc](this).
             process_statuses(rawdocs_statuses)
           rawdocs.foreachMetered(task) { rawdoc =>
-            val coord = rawdoc.get[SphereCoord]("coord")
+            val coord = rawdoc.row.get[SphereCoord]("coord")
             // FIXME: We depend on MultiRegularCell-specific ways of creating
             // cells as necessary.
             val index = multigrid.coord_to_multi_cell_index(coord)
@@ -125,7 +126,7 @@ class CreateBalancedCorpusDriver extends
         }
       }
       // Write out the docs in a random order rather than grouped by cell
-      val rows = (new Random()).shuffle(truncated.flatMap(_._2))
+      val rows = (new Random()).shuffle(truncated.flatMap(_._2).map(_.row))
       TextDB.write_textdb_rows(util.io.localfh, params.output + s"-$set",
         rows.iterator)
     }

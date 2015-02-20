@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package geolocate
 
 import util.spherical._
-import util.textdb.{Row, Schema}
+import util.textdb.Schema
 
 import gridlocate._
 
@@ -38,11 +38,11 @@ class CophirDoc(
 class CophirDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[CophirDoc](docfact) {
-  def create_document(row: Row, lang_model: DocLangModel,
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord) = {
-    new CophirDoc(row.schema, lang_model, coord,
-      row.get_if[Double]("salience"),
-      row.get_or_else[Long]("photo-id", 0L),
-      row.get_or_else[Long]("owner-id", 0L))
+    new CophirDoc(rawdoc.row.schema, lang_model, coord,
+      rawdoc.row.get_if[Double]("salience"),
+      rawdoc.row.get_or_else[Long]("photo-id", 0L),
+      rawdoc.row.get_or_else[Long]("owner-id", 0L))
   }
 }

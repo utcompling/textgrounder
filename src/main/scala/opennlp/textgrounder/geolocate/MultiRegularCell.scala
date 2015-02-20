@@ -28,9 +28,8 @@ import util.error._
 import util.experiment._
 import util.print.{errout, errprint}
 import util.spherical._
-import util.textdb.Row
 
-import gridlocate.{DocStatus, GridDocFactory}
+import gridlocate.{RawDoc, DocStatus, GridDocFactory}
 
 /////////////////////////////////////////////////////////////////////////////
 //                         A regularly spaced grid                         //
@@ -568,7 +567,7 @@ class MultiRegularGrid(
   }
 
   def add_training_documents_to_grid(
-      get_rawdocs: String => Iterator[DocStatus[Row]]) {
+      get_rawdocs: String => Iterator[DocStatus[RawDoc]]) {
     default_add_training_documents_to_grid(get_rawdocs, doc =>
       for (index <- iter_overlapping_multi_cells(doc.coord)) {
         val cell = find_cell_for_cell_index(index, create = true,

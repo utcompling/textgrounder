@@ -20,7 +20,7 @@ package opennlp.textgrounder
 package geolocate
 
 import util.spherical._
-import util.textdb.{Row, Schema}
+import util.textdb.Schema
 
 import gridlocate._
 
@@ -53,15 +53,15 @@ class TwitterTweetDoc(
 class TwitterTweetDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterTweetDoc](docfact) {
-  def create_document(row: Row, lang_model: DocLangModel,
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord) =
-    new TwitterTweetDoc(row.schema, lang_model, coord,
-      row.get_if[Double]("salience"),
-      row.get_or_else[String]("lang", ""),
-      row.get_or_else[String]("location", ""),
-      row.get_or_else[String]("timezone", ""),
-      row.get_or_else[String]("utc_offset", ""),
-      row.get_or_else[Long]("title", 0L))
+    new TwitterTweetDoc(rawdoc.row.schema, lang_model, coord,
+      rawdoc.row.get_if[Double]("salience"),
+      rawdoc.row.get_or_else[String]("lang", ""),
+      rawdoc.row.get_or_else[String]("location", ""),
+      rawdoc.row.get_or_else[String]("timezone", ""),
+      rawdoc.row.get_or_else[String]("utc_offset", ""),
+      rawdoc.row.get_or_else[Long]("title", 0L))
 }
 
 class TwitterUserDoc(
@@ -82,13 +82,13 @@ class TwitterUserDoc(
 class TwitterUserDocSubfactory(
   docfact: SphereDocFactory
 ) extends SphereDocSubfactory[TwitterUserDoc](docfact) {
-  def create_document(row: Row, lang_model: DocLangModel,
+  def create_document(rawdoc: RawDoc, lang_model: DocLangModel,
       coord: SphereCoord) =
-    new TwitterUserDoc(row.schema, lang_model, coord,
-      row.get_if[Double]("salience"),
-      row.get_or_else[String]("lang", ""),
-      row.get_or_else[String]("location", ""),
-      row.get_or_else[String]("timezone", ""),
-      row.get_or_else[String]("utc_offset", ""),
-      row.get_or_else[String]("user", ""))
+    new TwitterUserDoc(rawdoc.row.schema, lang_model, coord,
+      rawdoc.row.get_if[Double]("salience"),
+      rawdoc.row.get_or_else[String]("lang", ""),
+      rawdoc.row.get_or_else[String]("location", ""),
+      rawdoc.row.get_or_else[String]("timezone", ""),
+      rawdoc.row.get_or_else[String]("utc_offset", ""),
+      rawdoc.row.get_or_else[String]("user", ""))
 }

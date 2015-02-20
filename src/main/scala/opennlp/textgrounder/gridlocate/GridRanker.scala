@@ -26,7 +26,6 @@ import math._
 import util.print.errprint
 import util.debug._
 import util.error._
-import util.textdb.Row
 import util.verbose._
 
 import langmodel._
@@ -64,7 +63,7 @@ abstract class GridRanker[Co](
   /** Optional initialization stage passing one or more times over the
    * test data. */
   def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ) { }
 
   override def toString = {
@@ -90,7 +89,7 @@ class InterpolatingGridRanker[Co](
   /** Optional initialization stage passing one or more times over the
    * test data. */
   override def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ) {
     r1.initialize(get_docstats)
     r2.initialize(get_docstats)
@@ -431,7 +430,7 @@ trait NaiveBayesFeature[Co]
    * Needed for NaiveBayesRoughRankerFeature when the wrapped ranker uses
    * Vowpal Wabbit. */
   def initialize(
-      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+      get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]) {
   }
 
   def get_logprob(doc: GridDoc[Co], cell: GridCell[Co]): Double
@@ -449,7 +448,7 @@ class NaiveBayesRoughRankerFeature[Co](
 {
   // Needed for Vowpal Wabbit.
   override def initialize(
-      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+      get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]) {
     rough_ranker.initialize(get_docstats)
   }
 
@@ -475,7 +474,7 @@ class NaiveBayesGridRanker[Co](
 ) extends PointwiseScoreGridRanker[Co](ranker_name, grid) {
 
   override def initialize(
-      get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]) {
+      get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]) {
     for (f <- features)
       f.initialize(get_docstats)
   }
@@ -564,7 +563,7 @@ class VowpalWabbitGridRanker[Co](
   var doc_scores: Map[String, Array[Double]] = _
 
   override def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ) {
     val docs = grid.docfact.document_statuses_to_documents(get_docstats())
     doc_scores = score_test_docs(docs).toMap
@@ -722,7 +721,7 @@ class HierarchicalClassifierGridRanker[Co](
   // val finest_grid = grids.last
 
   override def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, GridDoc[Co])]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, GridDoc[Co])]]
   ) {
     coarse_ranker.initialize(get_docstats)
   }

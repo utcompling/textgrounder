@@ -88,12 +88,12 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     Map("corpus-type" -> "generic", "split" -> "training"))
 
   /**
-   * Convert the stored FieldSpring-style documents to TextDB rows so they
-   * can be used to create a TextGrounder document geolocator (ranker).
-   * FIXME: This seems hackish, especially having to convert the words into
-   * a serialized string which is then parsed.
+   * Convert the stored FieldSpring-style documents to TextGrounder raw
+   * documents so they can be used to create a TextGrounder document
+   * geolocator (ranker). FIXME: This seems hackish, especially having to
+   * convert the words into a serialized string which is then parsed.
    */
-  def get_textdb_row = {
+  def get_rawdoc = {
     val words = intmap[String]()
     for (sent <- fsdoc; token <- sent.getTokens; form = token.getForm;
          if form != "")
@@ -107,12 +107,13 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     val props = IndexedSeq(
       if (fsdoc.title != null) fsdoc.title else fsdoc.getId,
       fsdoc.getId, coord, word_field)
-    Row(schema, props)
+    // FIXME! Set importance weight properly
+    RawDoc(Row(schema, props), 1.0)
   }
 
-  def get_textdb_doc_status_row = {
-    val row = get_textdb_row
-    DocStatus(localfh, "unknown", 1, Some(row), "processed", "", "")
+  def get_doc_status_rawdoc = {
+    val rawdoc = get_rawdoc
+    DocStatus(localfh, "unknown", 1, Some(rawdoc), "processed", "", "")
   }
 
   val doc_counter_tracker =
@@ -121,12 +122,12 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
    * Convert a FieldSpring-style document into a TextGrounder document.
    */
   def get_grid_doc(ranker: GridRanker[SphereCoord]) = {
-    // Convert to a raw document (textdb row)
-    val row = get_textdb_doc_status_row
+    // Convert to a raw document
+    val rawdoc = get_doc_status_rawdoc
     // Convert to a GridDoc
-    val rowdocstat = ranker.grid.docfact.raw_document_to_document_status(
-      row, skip_no_coord = false, note_globally = false)
-    val docstat = rowdocstat map_all { case (row, griddoc) => griddoc }
+    val rddocstat = ranker.grid.docfact.raw_document_to_document_status(
+      rawdoc, skip_no_coord = false, note_globally = false)
+    val docstat = rddocstat map_all { case (rawdoc, griddoc) => griddoc }
     val maybe_griddoc = doc_counter_tracker.handle_status(docstat)
     // raw_document_to_document_status() doesn't compute the backoff
     // stats; we need to do this
@@ -318,24 +319,25 @@ class FieldSpringCCorpus extends CCorpus {
   def size = docs.size
 
   /**
-   * Convert the stored FieldSpring-style documents to TextDB rows.
-   * FIXME: This seems hackish, especially having to convert the words into
-   * a serialized string which is then parsed.
+   * Convert the stored FieldSpring-style documents to TextGrounder raw
+   * documents. FIXME: This seems hackish, especially having to convert the
+   * words into a serialized string which is then parsed.
    */
-  def get_textdb_rows: Iterable[Row] = {
+  def get_rawdocs: Iterable[RawDoc] = {
     for (doc <- docs.toSeq) yield
-      doc.get_textdb_row
+      doc.get_rawdoc
   }
 
   /**
-   * Convert the stored FieldSpring-style documents to TextDB rows surrounded
-   * by DocStatus objects so they can be used to create a TextGrounder
-   * document geolocator (ranker). FIXME: This seems hackish, especially
-   * having to convert the words into a serialized string which is then parsed.
+   * Convert the stored FieldSpring-style documents to TextGrounder raw
+   * documents surrounded by DocStatus objects so they can be used to create
+   * a TextGrounder document geolocator (ranker). FIXME: This seems hackish,
+   * especially having to convert the words into a serialized string which is
+   * then parsed.
    */
-  def get_textdb_doc_status_rows: Iterable[DocStatus[Row]] = {
+  def get_doc_status_rawdocs: Iterable[DocStatus[RawDoc]] = {
     for (doc <- docs.toSeq) yield
-      doc.get_textdb_doc_status_row
+      doc.get_doc_status_rawdoc
   }
 
   /**
@@ -357,7 +359,7 @@ class FieldSpringCCorpus extends CCorpus {
 
   def to_docgeo_ranker(driver: GeolocateDriver) =
     driver.create_ranker_from_document_streams(Iterable(("co-training",
-        _ => get_textdb_doc_status_rows.toIterator)))
+        _ => get_doc_status_rawdocs.toIterator)))
 
   def debug_print(prefix: String = "") {
     for ((doc, index) <- docs.zipWithIndex) {
@@ -575,8 +577,8 @@ class TopRes {
  
     val fh = localfh
 
-    val labeled_rows = labeled.get_textdb_rows
-    val dglabeled_rows = dglabeled.get_textdb_rows
+    val labeled_rows = labeled.get_rawdocs.map(_.row)
+    val dglabeled_rows = dglabeled.get_rawdocs.map(_.row)
     val rows_filename =
       File.createTempFile("textgrounder.cotrain.rows", null).toString
     errprint("Writing rows to %s.data.txt", rows_filename)

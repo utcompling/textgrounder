@@ -59,8 +59,9 @@ class UnigramStorage extends GramStorage {
    * at least once.  These are given as double because in some cases
    * they may store "partial" or weighted counts. For example, when the
    * K-d tree code does interpolation; when --word-weights is given;
-   * when --tf-idf is given. FIXME: This seems ugly in some ways; should
-   * we just store the probability? What about things like
+   * when --tf-idf is given; when an importance weight is present
+   * (e.g. when documents are upweighted). FIXME: This seems ugly in some
+   * ways; should we just store the probability? What about things like
    * --minimum-word-count? How to implement? Perhaps don't transform away from
    * integers until after we've initialized the language model, or include a
    * separate structure to track global minimum-word-count stats?
@@ -352,12 +353,12 @@ class DefaultUnigramLangModelBuilder(
    * External callers should use `add_keys_values`.
    */
   protected def imp_add_keys_values(lm: LangModel, keys: Array[String],
-      values: Array[Int], num_words: Int) {
+      values: Array[Int], num_words: Int, importance: Double) {
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
     for (i <- 0 until num_words) {
-      if(add_word_with_count(lm, keys(i), values(i))) {
+      if(add_word_with_count(lm, keys(i), values(i) * importance)) {
         addedTypes += 1
         addedTokens += values(i)
       }
@@ -376,12 +377,13 @@ class DefaultUnigramLangModelBuilder(
    * adding up the counts for each appearance of the word.
    */
   protected def add_keys_values(lm: LangModel,
-      keys: Array[String], values: Array[Int], num_words: Int) {
+      keys: Array[String], values: Array[Int], num_words: Int,
+      importance: Double) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
     assert_>=(keys.length, num_words)
     assert_>=(values.length, num_words)
-    imp_add_keys_values(lm, keys, values, num_words)
+    imp_add_keys_values(lm, keys, values, num_words, importance)
   }
 
   def finish_before_global(lm: LangModel) {
@@ -413,12 +415,12 @@ class DefaultUnigramLangModelBuilder(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def create_lang_model(countstr: String) = {
+  def create_lang_model(countstr: String, importance: Double) = {
     parse_counts(countstr)
     // Now set the language model on the document.
     val lm = factory.create_lang_model
     add_keys_values(lm, keys_dynarr.array, values_dynarr.array,
-      keys_dynarr.length)
+      keys_dynarr.length, importance)
     lm
   }
 }

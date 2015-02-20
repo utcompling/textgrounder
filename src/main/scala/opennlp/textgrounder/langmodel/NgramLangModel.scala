@@ -410,7 +410,7 @@ class DefaultNgramLangModelBuilder(
    * adding up the counts for each appearance of the ngram.
    */
   protected def add_parsed_ngrams(gendist: LangModel,
-      grams: collection.Map[String, Int]) {
+      grams: collection.Map[String, Int], importance: Double) {
     val lm = gendist.asInstanceOf[NgramLangModel]
     assert(!lm.finished)
     assert(!lm.finished_before_global)
@@ -419,7 +419,7 @@ class DefaultNgramLangModelBuilder(
     var totalTokens = 0
     for ((egram, count) <- grams) {
       val ngram = textdb.decode_ngram_for_map_field(egram)
-      if (add_ngram_with_count(lm, ngram, count)) {
+      if (add_ngram_with_count(lm, ngram, count * importance)) {
         addedTypes += 1
         addedTokens += count
       }
@@ -456,11 +456,11 @@ class DefaultNgramLangModelBuilder(
   def maybe_lowercase(ngram: Iterable[String]) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def create_lang_model(countstr: String) = {
+  def create_lang_model(countstr: String, importance: Double) = {
     parse_counts(countstr)
     // Now set the lang model on the document.
     val lm = factory.create_lang_model
-    add_parsed_ngrams(lm, parsed_ngrams)
+    add_parsed_ngrams(lm, parsed_ngrams, importance)
     lm
   }
 }

@@ -35,7 +35,6 @@ import util.numeric._
 import util.os.{curtimehuman, output_resource_usage}
 import util.print.errprint
 import util.table.table_column_format
-import util.textdb.Row
 
 import learning.{Ranker, Reranker}
 
@@ -535,7 +534,7 @@ abstract class CorpusEvaluator[Co](
    * documents. Meant to be overridden by subclasses.
    */
   def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, TEvalDoc)]]
   ) { }
 
   /**
@@ -549,7 +548,7 @@ abstract class CorpusEvaluator[Co](
    * @return Iterator over evaluation results.
    */
   def process_documents_for_skipping(
-      docstats: Iterator[DocStatus[(Row, TEvalDoc)]]) = {
+      docstats: Iterator[DocStatus[(RawDoc, TEvalDoc)]]) = {
     for ((stat, index) <- docstats.zipWithIndex) yield {
       val statnum = index + 1
       val doctag = s"#$statnum"
@@ -592,7 +591,7 @@ abstract class CorpusEvaluator[Co](
    * @return Iterator over evaluation results.
    */
   def evaluate_documents(
-    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, TEvalDoc)]]
   ) = {
 
     initialize(get_docstats)
@@ -768,7 +767,7 @@ abstract class GridEvaluator[Co](
    * documents. Meant to be overridden by subclasses.
    */
   override def initialize(
-    get_docstats: () => Iterator[DocStatus[(Row, TEvalDoc)]]
+    get_docstats: () => Iterator[DocStatus[(RawDoc, TEvalDoc)]]
   ) { ranker.initialize(get_docstats) }
 
   /**

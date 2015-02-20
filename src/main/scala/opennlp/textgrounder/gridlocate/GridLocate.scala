@@ -1718,7 +1718,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    *   set of raw training documents multiple times.
    */
   def read_raw_training_document_streams:
-      Iterable[(String, String => Iterator[DocStatus[Row]])] = {
+      Iterable[(String, String => Iterator[DocStatus[RawDoc]])] = {
     (params.input ++ params.train).zipWithIndex.map {
       case (dir, index) => {
         val id = s"#${index + 1}"
@@ -1753,7 +1753,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * @return Iterator over raw training documents.
    */
   def get_combined_raw_training_documents(operation: String,
-      streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) =
+      streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]) =
     streams.map(_._2).toIterator.flatMap(get_docs => get_docs(operation))
 
   /**
@@ -1785,7 +1785,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       supergrid: Option[Grid[Co]],
       level: Int,
       id: String,
-      get_rawdocs: String => Iterator[DocStatus[Row]]
+      get_rawdocs: String => Iterator[DocStatus[RawDoc]]
   ) = {
     val levelsuff = if (level == 0) "" else s".l$level"
     val grid = supergrid match {
@@ -1836,7 +1836,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def create_grid_from_document_streams(
     supergrid: Option[Grid[Co]],
     level: Int,
-    streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
+    streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]
   ) = {
     if (streams.size == 1) {
       val (id, get_rawdocs) = streams.head
@@ -2303,14 +2303,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
         /* Create the initial ranker from training data. */
         protected def create_initial_ranker(
-          data: Iterable[DocStatus[Row]]
+          data: Iterable[DocStatus[RawDoc]]
         ) = create_ranker_from_document_streams(Iterable(("rerank",
           _ => data.toIterator)))
 
         /* Convert encapsulated raw documents into document-cell pairs.
          */
         protected def external_instances_to_query_candidate_pairs(
-          insts: Iterator[DocStatus[Row]],
+          insts: Iterator[DocStatus[RawDoc]],
           initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
         ) = {
           val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
@@ -2320,7 +2320,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     /* Training data, in the form of an iterable over raw documents (suitably
      * wrapped in a DocStatus object). */
-    val training_data = new Iterable[DocStatus[Row]] {
+    val training_data = new Iterable[DocStatus[RawDoc]] {
       def iterator =
         read_combined_raw_training_documents(
           "reading %s for generating reranker training data")
@@ -2447,14 +2447,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
         /* Create the initial ranker from training data. */
         protected def create_initial_ranker(
-          data: Iterable[DocStatus[Row]]
+          data: Iterable[DocStatus[RawDoc]]
         ) = create_ranker_from_document_streams(Iterable(("rerank",
           _ => data.toIterator)))
 
         /* Convert encapsulated raw documents into document-cell pairs.
          */
         protected def external_instances_to_query_candidate_pairs(
-          insts: Iterator[DocStatus[Row]],
+          insts: Iterator[DocStatus[RawDoc]],
           initial_ranker: Ranker[GridDoc[Co], GridCell[Co]]
         ) = {
           val grid_ranker = initial_ranker.asInstanceOf[GridRanker[Co]]
@@ -2464,7 +2464,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
     /* Training data, in the form of an iterable over raw documents (suitably
      * wrapped in a DocStatus object). */
-    val training_data = new Iterable[DocStatus[Row]] {
+    val training_data = new Iterable[DocStatus[RawDoc]] {
       def iterator =
         read_combined_raw_training_documents(
           "reading %s for generating reranker training data")
@@ -2500,7 +2500,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
 
   // Convert raw documents into document-cell pairs, for the correct cell.
   def get_docs_cells_from_raw_documents(grid: Grid[Co],
-      raw_docs: Iterator[DocStatus[Row]]) = {
+      raw_docs: Iterator[DocStatus[RawDoc]]) = {
     get_docs_cells_from_documents(grid,
       grid.docfact.raw_documents_to_documents(raw_docs, skip_no_coord = true))
   }
@@ -2830,7 +2830,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * levels, from coarse to fine.
    */
   def create_hierarchical_classifier_ranker(ranker_name: String,
-      streams: Iterable[(String, String => Iterator[DocStatus[Row]])]) = {
+      streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]) = {
     val coarse_grid = create_grid_from_document_streams(None, 1, streams)
     // Sort the grid cells so the numbered cells corresponding to different
     // classifiers have a consistent order to make loading/saving of submodels
@@ -2932,7 +2932,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
    * references this grid.
    */
   def create_ranker_from_document_streams(
-    streams: Iterable[(String, String => Iterator[DocStatus[Row]])]
+    streams: Iterable[(String, String => Iterator[DocStatus[RawDoc]])]
   ) = {
     if (params.ranker == "hierarchical-classifier")
       create_hierarchical_classifier_ranker(params.ranker, streams)
