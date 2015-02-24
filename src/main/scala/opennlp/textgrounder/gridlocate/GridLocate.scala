@@ -112,16 +112,16 @@ English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   var input =
     ap.multiOption[String]("input", "i", "input-corpus", "ic",
-      help = """One or more training corpora. The corpora are in the format
-of a textdb database (a type of flat-file database, with separate schema and
-data files). A corpus can be specified in any of the following ways:
+      help = """One or more training/testing corpora. The corpora are in the
+format of a textdb database (a type of flat-file database, with separate schema
+and data files). A corpus can be specified in any of the following ways:
 Either the data or schema file of the database; the common prefix of the
 two; or the directory containing them, provided there is only one textdb
 in the directory.
 
-Training corpora can be specified either using '--input' (which may be
-repeated multiple times to specify multiple corpora) or as positional
-parameters after all options, or a combination of both.
+Training corpora can be specified either using '--input' or '--train',
+either of which may be repeated multiple times to specify multiple corpora.
+Corpora specified using '--train' are used only for training.
 
 A separate grid is created for each corpus, and test documents are evaluated
 against all cells in all grids.  This allows, for example, a given corpus to
@@ -151,13 +151,13 @@ tweets that were retweeted from some other tweet, article ID for a
 Wikipedia article, etc.).""")
 
   var train =
-    ap.multiPositional[String]("train",
+    ap.multiOption[String]("train", "t",
       help = """One or more training corpora. See '--input'.""")
 
-  val num_corpora = input.size + train.size
+  val num_training_corpora = input.size + train.size
 
   if (ap.parsedValues) {
-    if (num_corpora == 0)
+    if (num_training_corpora == 0)
       ap.error("Must specify a training corpus")
   }
 
@@ -168,9 +168,9 @@ weights given as corpora, separated by commas.""")
 
   val importance_weights =
     if (importance != null) importance.split(",").toSeq.map(_.toDouble)
-    else Seq.fill(num_corpora)(1.0)
-  if (importance_weights.size != num_corpora)
-    ap.error(s"Need $num_corpora importance weights but saw ${importance_weights.size}")
+    else Seq.fill(num_training_corpora)(1.0)
+  if (importance_weights.size != num_training_corpora)
+    ap.error(s"Need $num_training_corpora importance weights but saw ${importance_weights.size}")
 
   val combine_corpora =
     ap.option[String]("combine-corpora", "cc",
@@ -189,7 +189,7 @@ currently requires only two corpora).""")
       help = """Factor for interpolating grids when combining corpora
 using interpolation.""")
 
-  if (combine_corpora == "interpolate" && num_corpora != 2)
+  if (combine_corpora == "interpolate" && num_training_corpora != 2)
     ap.error("For combine method 'interpolate', exactly two corpora required")
 
 }

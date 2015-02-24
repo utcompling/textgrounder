@@ -1013,7 +1013,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
     else {
       val eval_location =
         if (params.eval_file.size == 0)
-          params.input ++ params.train
+          params.input
         else
           params.eval_file
 
