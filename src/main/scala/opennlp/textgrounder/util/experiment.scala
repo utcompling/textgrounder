@@ -706,7 +706,7 @@ protected class ExperimentPackage {
      * Hadoop or regular Java API.  By default, references the regular API,
      * but can be overridden.
      */
-    def get_file_handler: FileHandler = io.localfh
+    def getfh: FileHandler = io.localfh
   }
 
   /**

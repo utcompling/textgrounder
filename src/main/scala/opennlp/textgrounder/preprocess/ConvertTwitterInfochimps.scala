@@ -527,14 +527,13 @@ class ConvertTwitterInfochimpsDriver extends
   type TParam = ConvertTwitterInfochimpsParameters
 
   override def run() {
-    val filehand = get_file_handler
     if (params.output_min_stats)
       new TwitterInfochimpsStatsFileProcessor(params).
-        process_files(filehand, params.files)
+        process_files(getfh, params.files)
     else {
       super.run()
       new ConvertTwitterInfochimpsFileProcessor(params).
-        process_files(filehand, params.files)
+        process_files(getfh, params.files)
     }
   }
 }

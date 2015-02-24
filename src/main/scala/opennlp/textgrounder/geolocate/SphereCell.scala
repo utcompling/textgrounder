@@ -297,7 +297,7 @@ abstract class RectangularGrid(
       if (driver.params.verbose)
         errprint("Reading centroids...")
       for (line <-
-           driver.get_file_handler.openr(gdriver.params.centroids_file)) {
+           driver.getfh.openr(gdriver.params.centroids_file)) {
         val coord = SphereCoord.deserialize(line)
         find_best_cell_for_coord(coord, create_non_recorded = false).map {
           _.asInstanceOf[RectangularCell].override_centroid = Some(coord)

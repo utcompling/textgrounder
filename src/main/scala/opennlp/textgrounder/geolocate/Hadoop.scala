@@ -241,7 +241,7 @@ class DocEvalMapper
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver = new TDriver
 
-  lazy val filehand = driver.get_file_handler
+  lazy val filehand = driver.getfh
 
   override def run(context: TContext) {
     super.init(context)

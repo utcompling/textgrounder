@@ -26,7 +26,7 @@ import util.collection.is_sorted
 import util.debug._
 import util.error._
 import util.experiment._
-import util.io.{FileHandler,localfh}
+import util.io.FileHandler
 import util.metering._
 import util.os.output_resource_usage
 import util.print._
@@ -1516,7 +1516,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   protected def read_stopwords = {
-    read_stopwords_from_file(get_file_handler, params.stopwords_file,
+    read_stopwords_from_file(getfh, params.stopwords_file,
       params.language)
   }
 
@@ -1526,12 +1526,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   }
 
   protected def read_whitelist = {
-    val filehand = get_file_handler
     val wfn = params.whitelist_file
     if(wfn == null || wfn.length == 0)
       Set[String]()
     else
-      filehand.openr(wfn).toSet
+      getfh.openr(wfn).toSet
   }
 
   protected def read_whitelist_weight_file = {
@@ -1540,7 +1539,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       if (params.verbose)
         errprint("Reading whitelist weights...")
       var numwords = 0
-      for (row <- get_file_handler.openr(params.whitelist_weight_file)) {
+      for (row <- getfh.openr(params.whitelist_weight_file)) {
         val Array(word, weightstr) = row.split("\t")
         val weight_1 = weightstr.toDouble
         val weight = if (params.weight_abs) weight_1.abs else weight_1
@@ -1573,7 +1572,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       if (params.verbose)
         errprint("Reading word weights...")
       var numwords = 0
-      for (row <- get_file_handler.openr(params.word_weight_file)) {
+      for (row <- getfh.openr(params.word_weight_file)) {
         val Array(word, weightstr) = row.split("\t")
         val weight_1 = weightstr.toDouble
         val weight = if (params.weight_abs) weight_1.abs else weight_1
@@ -1775,7 +1774,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               maxtime = params.max_time_per_stage,
               maxitems = params.num_training_docs)
             val docs = GridDocFactory.read_raw_documents_from_textdb(
-              get_file_handler, dir, "-training", importance,
+              getfh, dir, "-training", importance,
               with_messages = params.verbose)
             val sleep_at = debugval("sleep-at-docs")
             docs.mapMetered(task) { doc =>
@@ -2797,7 +2796,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               cell.most_salient_point_salience
           )
         }
-      TextDB.write_constructed_textdb(localfh, cell_label_mapping_file,
+      TextDB.write_constructed_textdb(getfh, cell_label_mapping_file,
         rows.iterator)
     }
     // Create classifier trainer.

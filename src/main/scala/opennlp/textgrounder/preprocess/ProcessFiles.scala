@@ -59,7 +59,7 @@ abstract class ProcessFilesDriver extends HadoopableArgParserExperimentDriver {
   type TRunRes = Unit
 
   def run() {
-    if (!get_file_handler.make_directories(params.output_dir))
+    if (!getfh.make_directories(params.output_dir))
       param_error("Output dir %s must not already exist" format
         params.output_dir)
   }

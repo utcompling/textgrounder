@@ -685,7 +685,7 @@ abstract class GridEvaluator[Co](
               if (driver.params.checksum_file != null) {
                 val row = res.to_row
                 if (driver.params.checksum_filedesc == null) {
-                  val fileh = driver.get_file_handler
+                  val fileh = driver.getfh
                   val fields = row.map(_._1)
                   driver.params.checksum_schema = new Schema(fields)
                   driver.params.checksum_schema.output_constructed_schema_file(

@@ -536,7 +536,7 @@ class FrobTextDBDriver extends
   override def run() {
     super.run()
 
-    val filehand = get_file_handler
+    val filehand = getfh
     val fileproc = new FrobTextDB(filehand, params)
     fileproc.process_dir(filehand, params.input_dir)
   }

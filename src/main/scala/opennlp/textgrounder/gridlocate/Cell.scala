@@ -638,7 +638,7 @@ abstract class Grid[Co](
     if (driver.params.salience_file != null) {
       if (driver.params.verbose)
         errprint("Reading salient points...")
-      for (row <- TextDB.read_textdb(driver.get_file_handler,
+      for (row <- TextDB.read_textdb(driver.getfh,
            driver.params.salience_file)) {
         val name = row.gets("name")
         val coord = driver.deserialize_coord(row.gets("coord"))

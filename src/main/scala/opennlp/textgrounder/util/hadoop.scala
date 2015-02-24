@@ -256,7 +256,7 @@ package hadoop {
       /* A very simple file processor that does nothing but note the files
          seen, for Hadoop's benefit. */
       val files =
-        iter_files_recursively(driver.get_file_handler, corpus_dirs).
+        iter_files_recursively(driver.getfh, corpus_dirs).
           filter(TextDB.filter_file_by_suffix(_, corpus_suffix))
       for (file <- files) {
          errprint("Adding %s to input path", file)
@@ -279,7 +279,7 @@ package hadoop {
     private lazy val hadoop_file_handler =
       new HadoopFileHandler(get_configuration)
 
-    override def get_file_handler: FileHandler = hadoop_file_handler
+    override def getfh: FileHandler = hadoop_file_handler
 
     // override type TParam <: HadoopExperimentParameters
 

@@ -833,7 +833,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       // Temporary hack
       //val outambiguity = debugval("toponym-output-ambiguity")
       //if (outambiguity != "") {
-      //  val file = localfh.openw(outambiguity)
+      //  val file = getfh.openw(outambiguity)
       //  for (doc <- ct_full_stored_corpus.toSeq.sortBy { _.getId }) {
       //    for ((sent, sentind) <- doc.zipWithIndex) {
       //      for ((toponym, topind) <- sent.getToponyms.zipWithIndex;
@@ -887,7 +887,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
                 }
               selected_info ++ correct_info
             }
-          TextDB.write_constructed_textdb(localfh, outprefix + "." + suffix,
+          TextDB.write_constructed_textdb(getfh, outprefix + "." + suffix,
             outprops.iterator)
         }
       }
@@ -1022,14 +1022,14 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
 //          case "pcl-travel" => {
 //            val evalobj =
 //              new PCLTravelGeolocateDocEvaluator(ranker, grid,
-//                get_file_handler, params.eval_file)
+//                getfh, params.eval_file)
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
           case "textdb" => {
             val get_docstats = () =>
               eval_location.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_textdb(
-                  get_file_handler, dir, document_textdb_suffix,
+                  getfh, dir, document_textdb_suffix,
                   1.0, skip_no_coord = false))
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(get_docstats)
@@ -1038,7 +1038,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
             val get_docstats = () =>
               eval_location.toIterator.flatMap(dir =>
                 grid.docfact.read_document_statuses_from_raw_text(
-                  get_file_handler, dir, 1.0))
+                  getfh, dir, 1.0))
             val evalobj = create_cell_evaluator(ranker)
             evalobj.evaluate_documents(get_docstats)
           }
@@ -1056,7 +1056,7 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       note_result("time.running.human", format_minutes_seconds(elapsed))
 
       if (params.results_file != null) {
-        val filehand = get_file_handler
+        val filehand = getfh
         write_results_file(results.toIterator, filehand, params.results_file)
       }
       results
@@ -1208,15 +1208,15 @@ object GeolocateDocumentTag extends
      */
     def filetail = (value: Any) => value match {
       case x:String => {
-        val (dir1, tail1) = localfh.split_filename(x)
+        val (dir1, tail1) = driver.getfh.split_filename(x)
         var dir = dir1
         var tail = tail1
         breakable {
           while (tail.size < 10) {
-            val (dir2, tail2) = localfh.split_filename(dir)
+            val (dir2, tail2) = driver.getfh.split_filename(dir)
             if (dir2 == "." || tail2 == "") break
             dir = dir2
-            tail = localfh.join_filename(tail2, tail)
+            tail = driver.getfh.join_filename(tail2, tail)
           }
         }
         tail
@@ -1262,7 +1262,7 @@ object GeolocateDocumentTag extends
      */
     val param_handling = Seq[(String, Any => String)](
       ("input", xs => xs.asInstanceOf[Seq[String]] map { x =>
-        val (dir, tail) = localfh.split_filename(x)
+        val (dir, tail) = driver.getfh.split_filename(x)
         if (dir.endsWith("twitter-geotext"))
           "geotext-" + tail.replace("docthresh-", "thresh")
         else

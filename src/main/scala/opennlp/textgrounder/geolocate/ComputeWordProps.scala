@@ -341,7 +341,7 @@ class ComputeWordPropsDriver extends
         basic_props ++ row_entropy_props
     }
     note_result("textdb-type", "word-entropies")
-    write_constructed_textdb_with_results(util.io.localfh, params.output,
+    write_constructed_textdb_with_results(getfh, params.output,
       row_props.iterator)
   }
 }

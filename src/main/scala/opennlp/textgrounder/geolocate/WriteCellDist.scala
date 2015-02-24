@@ -93,7 +93,7 @@ Not generating a cell-distribution file.""", word)
           }
         note_result("textdb-type", "textgrounder-cell-dist")
         note_result("cell-dist-word", Encoder.string(word))
-        write_constructed_textdb_with_results(util.io.localfh, base,
+        write_constructed_textdb_with_results(getfh, base,
           cellprob_props.iterator)
       }
     }
