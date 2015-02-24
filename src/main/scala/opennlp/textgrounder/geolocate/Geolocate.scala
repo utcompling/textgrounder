@@ -1335,6 +1335,8 @@ object GeolocateDocumentTag extends
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
       ("restrict-predictions", short("restrict")),
+      ("restrict-predictions-file", full("restrict", filetail)),
+      ("centroids-file", full("centroids", filetail)),
       ("cell-offset-degrees", full("offsetdeg")),
       ("kd-tree", echo("Kd")),
       ("kd-split-method", valonly_camel),
