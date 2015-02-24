@@ -18,10 +18,11 @@
 
 package opennlp.textgrounder
 package object langmodel {
-  // FIXME! This is present to handle partial counts but these weren't
-  // ever really used because they didn't seem to help. However, it's also
-  // currently used to handle differently-weighted words, which (so far)
-  // also hasn't helped.
+  // This is present to handle partial counts but these weren't ever really
+  // used because they didn't seem to help. However, it's also currently used
+  // to handle differently-weighted words, which (so far) also hasn't helped.
+  // It's also used to handle importance weights when combining multiple
+  // corpora together ('--combine-corpora concatenate').
   type GramCount = Double
   type Gram = Int
 }
@@ -173,7 +174,7 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    * External callers should use `add_language_model`.
    */
   protected def imp_add_language_model(lm: LangModel, other: LangModel,
-    partial: GramCount = 1.0)
+    weight: Double = 1.0)
 
   /**
    * Incorporate a document into the lang model.  The document is described
@@ -187,16 +188,14 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
 
   /**
    * Incorporate the given lang model into our lang model.
-   * `partial` is a scaling factor (between 0.0 and 1.0) used for
-   * interpolating multiple lang models.
+   * `weight` is a scaling factor used e.g. for interpolating
+   * multiple lang models.
    */
-  def add_language_model(lm: LangModel, other: LangModel,
-      partial: GramCount = 1.0) {
+  def add_language_model(lm: LangModel, other: LangModel, weight: Double = 1.0) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
-    assert(partial >= 0.0 && partial <= 1.0,
-      s"Partial $partial not within [0.0,1.0]")
-    imp_add_language_model(lm, other, partial)
+    assert(weight >= 0.0, s"Weight $weight must be non-negative")
+    imp_add_language_model(lm, other, weight)
   }
 
   /**
@@ -214,9 +213,9 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    *
    * @param doc Document to set the lang model of.
    * @param countstr String from the document file, describing the lang model.
-   * @param importance Factor to weight the counts.
+   * @param weight Factor to weight the counts.
    */
-  def create_lang_model(countstr: String, importance: Double): LangModel
+  def create_lang_model(countstr: String, weight: Double): LangModel
 }
 
 trait KLDivergenceCache {
@@ -452,11 +451,11 @@ abstract class LangModel(val factory: LangModelFactory) {
 
   /**
    * Incorporate the given lang model into our lang model.
-   * `partial` is a scaling factor (between 0.0 and 1.0) used for
+   * `weight` is a scaling factor used e.g. for
    * interpolating multiple lang models.
    */
-  def add_language_model(other: LangModel, partial: GramCount = 1.0) {
-    factory.builder.add_language_model(this, other, partial)
+  def add_language_model(other: LangModel, weight: GramCount = 1.0) {
+    factory.builder.add_language_model(this, other, weight)
   }
 
   /**

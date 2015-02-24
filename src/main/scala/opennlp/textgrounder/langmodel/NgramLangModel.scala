@@ -183,9 +183,11 @@ class OpenNLPNgramStorer extends NgramStorage {
 //   * all ngrams seen at least once.  Each map contains the ngrams for
 //   * a particular value of N.  The map for N = 0 is unused.
 //   *
-//   * These are given as double because in some cases they may store "partial"
-//   * counts (in particular, when the K-d tree code does interpolation on
-//   * cells).  FIXME: This seems ugly, perhaps there is a better way?
+//   * These are given as double because in some cases they may store partial
+//   * or weighted counts, e.g. when the K-d tree code does interpolation on
+//   * cells or when we up-weight an in-domain corpus when combining corpora
+//   * using '--combine-corpora concatenate'. FIXME: This seems a bit ugly,
+//   * perhaps there is a better way?
 //   *
 //   * FIXME: Currently we store ngrams using a Gram, which is simply an index
 //   * into a string table, where the ngram is shoehorned into a string using
@@ -389,8 +391,7 @@ class DefaultNgramLangModelBuilder(
   }
 
   protected def imp_add_language_model(gendist: LangModel,
-      genother: LangModel, partial: GramCount) {
-    // FIXME: Implement partial!
+      genother: LangModel, weight: Double) {
     val lm = gendist.asInstanceOf[NgramLangModel]
     val other = genother.asInstanceOf[NgramLangModel]
     for ((ngram, count) <- other.iter_grams)
@@ -399,7 +400,7 @@ class DefaultNgramLangModelBuilder(
       // way rather than directly calling lm.add_gram() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
-      add_ngram_with_count(lm, Ngram.to_raw(ngram), count)
+      add_ngram_with_count(lm, Ngram.to_raw(ngram), count * weight)
   }
 
   /**
@@ -410,7 +411,7 @@ class DefaultNgramLangModelBuilder(
    * adding up the counts for each appearance of the ngram.
    */
   protected def add_parsed_ngrams(gendist: LangModel,
-      grams: collection.Map[String, Int], importance: Double) {
+      grams: collection.Map[String, Int], weight: Double) {
     val lm = gendist.asInstanceOf[NgramLangModel]
     assert(!lm.finished)
     assert(!lm.finished_before_global)
@@ -419,7 +420,7 @@ class DefaultNgramLangModelBuilder(
     var totalTokens = 0
     for ((egram, count) <- grams) {
       val ngram = textdb.decode_ngram_for_map_field(egram)
-      if (add_ngram_with_count(lm, ngram, count * importance)) {
+      if (add_ngram_with_count(lm, ngram, count * weight)) {
         addedTypes += 1
         addedTokens += count
       }
@@ -456,11 +457,11 @@ class DefaultNgramLangModelBuilder(
   def maybe_lowercase(ngram: Iterable[String]) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def create_lang_model(countstr: String, importance: Double) = {
+  def create_lang_model(countstr: String, weight: Double) = {
     parse_counts(countstr)
     // Now set the lang model on the document.
     val lm = factory.create_lang_model
-    add_parsed_ngrams(lm, parsed_ngrams, importance)
+    add_parsed_ngrams(lm, parsed_ngrams, weight)
     lm
   }
 }

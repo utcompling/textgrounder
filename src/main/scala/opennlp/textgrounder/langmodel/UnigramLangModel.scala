@@ -342,10 +342,9 @@ class DefaultUnigramLangModelBuilder(
   }
 
   protected def imp_add_language_model(lm: LangModel, other: LangModel,
-      partial: GramCount) {
-    // FIXME: Implement partial!
+      weight: Double) {
     for ((word, count) <- other.iter_grams)
-      lm.add_gram(word, count)
+      lm.add_gram(word, count * weight)
   }
 
   /**
@@ -353,12 +352,12 @@ class DefaultUnigramLangModelBuilder(
    * External callers should use `add_keys_values`.
    */
   protected def imp_add_keys_values(lm: LangModel, keys: Array[String],
-      values: Array[Int], num_words: Int, importance: Double) {
+      values: Array[Int], num_words: Int, weight: Double) {
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
     for (i <- 0 until num_words) {
-      if(add_word_with_count(lm, keys(i), values(i) * importance)) {
+      if(add_word_with_count(lm, keys(i), values(i) * weight)) {
         addedTypes += 1
         addedTokens += values(i)
       }
@@ -378,12 +377,12 @@ class DefaultUnigramLangModelBuilder(
    */
   protected def add_keys_values(lm: LangModel,
       keys: Array[String], values: Array[Int], num_words: Int,
-      importance: Double) {
+      weight: Double) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
     assert_>=(keys.length, num_words)
     assert_>=(values.length, num_words)
-    imp_add_keys_values(lm, keys, values, num_words, importance)
+    imp_add_keys_values(lm, keys, values, num_words, weight)
   }
 
   def finish_before_global(lm: LangModel) {
@@ -415,12 +414,12 @@ class DefaultUnigramLangModelBuilder(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def create_lang_model(countstr: String, importance: Double) = {
+  def create_lang_model(countstr: String, weight: Double) = {
     parse_counts(countstr)
     // Now set the language model on the document.
     val lm = factory.create_lang_model
     add_keys_values(lm, keys_dynarr.array, values_dynarr.array,
-      keys_dynarr.length, importance)
+      keys_dynarr.length, weight)
     lm
   }
 }
