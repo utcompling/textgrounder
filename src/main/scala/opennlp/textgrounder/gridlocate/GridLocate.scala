@@ -1767,7 +1767,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       (params.input ++ params.train).zip(params.importance_weights).
           zipWithIndex.map {
         case ((dir, importance), index) => {
-          val id = s"#${index + 1}"
+          val (_, tail) = getfh.split_filename(dir)
+          val id = s"#${index + 1} ($tail)"
           (id, (operation: String) => {
             val task = show_progress(s"$id $operation",
               "training document",
