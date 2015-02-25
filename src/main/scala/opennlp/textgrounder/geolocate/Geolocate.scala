@@ -1145,6 +1145,12 @@ object GeolocateDocumentTag extends
       snake_to_camel_case(valonly(value))
 
     /**
+     * Output the value only, converting to capital camel case.
+     */
+    def valonly_cap_camel: Any => String = value =>
+      snake_to_camel_case(valonly(value)).capitalize
+
+    /**
      * Output the value only of a sequence. Typical for choice options.
      */
     def seqvalonly(sep: String = ",") = (value: Any) => value match {
@@ -1184,9 +1190,9 @@ object GeolocateDocumentTag extends
 
     /**
      * Output 'namevalue' -- same as full() but omitting the = sign.
-     * Typical for options with numeric values.
+     * Typical for options with numeric values or choices.
      */
-    def short(name: String) = full(name, noequals = true)
+    def short(name: String) = full(name, valonly_cap_camel, noequals = true)
     /**
      * Echo the given string. Used for flags or choice options that
      * effectively function like flags.
@@ -1261,14 +1267,8 @@ object GeolocateDocumentTag extends
      * formatted as 'name=value'.
      */
     val param_handling = Seq[(String, Any => String)](
-      ("input", xs => xs.asInstanceOf[Seq[String]] map { x =>
-        val (dir, tail) = driver.getfh.split_filename(x)
-        if (dir.endsWith("twitter-geotext"))
-          "geotext-" + tail.replace("docthresh-", "thresh")
-        else
-          tail
-      } mkString "+"
-      ),
+      ("input", filetail_seq),
+      ("train", full("train", filetail_seq)),
       ("word-weight-file", full("wordWeight", filetail)),
       ("stopwords-file", full("stopwords", filetail)),
       ("salience-file", full("salience", filetail)),
@@ -1314,23 +1314,6 @@ object GeolocateDocumentTag extends
       ("num-levels", short("nlevels")),
       ("subdivide-factor", short("subdivFac")),
       ("beam-size", short("beamsz")),
-      ("reranker",
-        x => "reranker=" + shorten_classifier(x.asInstanceOf[String])),
-      ("rerank-features",
-        x=> "rfeats=" + shorten_features(x.asInstanceOf[String])),
-      ("rerank-binning", full("rbin")),
-      ("rerank-top-n", short("topn")),
-      ("rerank-num-training-splits", short("nsplits")),
-      ("initial-weights", full("initWeights")),
-      ("random-restart", short("rndRestart")),
-      ("rerank-lang-model", xs => xs match {
-        case (x:String, y:String) => "rerank-" + x + y
-      }),
-      ("rerank-interpolate", x => x match {
-        case "yes" => "rinterp"
-        case "no" => "rbackoff"
-        case _ => ""
-      }),
       ("degrees-per-cell", short("deg")),
       ("miles-per-cell", short("miles")),
       ("km-per-cell", short("km")),
@@ -1344,6 +1327,9 @@ object GeolocateDocumentTag extends
       ("kd-bucket-size", short("bucketsz")),
       ("kd-interpolate-weight", short("interpWeight")),
       ("combined-kd-grid", echo("combinedGrid")),
+      ("importance", short("imptance")),
+      ("combine-corpora", short("cc")),
+      ("interpolate-grid-fractor", short("igf")),
       ("center-method", valonly_camel),
       ("weight-cutoff-value", short("cutoffVal")),
       ("weight-cutoff-percent", short("cutoffPct")),
@@ -1372,6 +1358,24 @@ object GeolocateDocumentTag extends
       ("num-training-docs", short("ntrain")),
       ("num-test-docs", short("ntest")),
       ("num-top-cells-to-output", short("ncellout")),
+      // Reranking
+      ("reranker",
+        x => "reranker=" + shorten_classifier(x.asInstanceOf[String])),
+      ("rerank-features",
+        x=> "rfeats=" + shorten_features(x.asInstanceOf[String])),
+      ("rerank-binning", full("rbin")),
+      ("rerank-top-n", short("topn")),
+      ("rerank-num-training-splits", short("nsplits")),
+      ("initial-weights", full("initWeights")),
+      ("random-restart", short("rndRestart")),
+      ("rerank-lang-model", xs => xs match {
+        case (x:String, y:String) => "rerank-" + x + y
+      }),
+      ("rerank-interpolate", x => x match {
+        case "yes" => "rinterp"
+        case "no" => "rbackoff"
+        case _ => ""
+      }),
       // Co-training
       ("co-train", default),
       ("co-train-interpolate-factor", short("ctInterp")),
