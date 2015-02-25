@@ -167,7 +167,8 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    * Actual implementation of `add_document` by subclasses.
    * External callers should use `add_document`.
    */
-  protected def imp_add_document(lm: LangModel, words: Iterable[String])
+  protected def imp_add_document(lm: LangModel, words: Iterable[String],
+    domain: String, weight: Double)
 
   /**
    * Actual implementation of `add_language_model` by subclasses.
@@ -180,10 +181,11 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    * Incorporate a document into the lang model.  The document is described
    * by a sequence of words.
    */
-  def add_document(lm: LangModel, words: Iterable[String]) {
+  def add_document(lm: LangModel, words: Iterable[String], domain: String = "",
+      weight: Double = 1.0) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
-    imp_add_document(lm, words)
+    imp_add_document(lm, words, domain, weight)
   }
 
   /**
@@ -213,9 +215,13 @@ abstract class LangModelBuilder(factory: LangModelFactory) {
    *
    * @param doc Document to set the lang model of.
    * @param countstr String from the document file, describing the lang model.
+   * @param domain Domain (e.g. "in", "out") used for feature augmentation
+   *   for domain adaptation ala Daume 2007 (EasyAdapt). If empty, don't do
+   *   feature augmentation.
    * @param weight Factor to weight the counts.
    */
-  def create_lang_model(countstr: String, weight: Double): LangModel
+  def create_lang_model(countstr: String, domain: String,
+    weight: Double): LangModel
 }
 
 trait KLDivergenceCache {
@@ -445,8 +451,9 @@ abstract class LangModel(val factory: LangModelFactory) {
   /**
    * Incorporate a document into the lang model.
    */
-  def add_document(words: Iterable[String]) {
-    factory.builder.add_document(this, words)
+  def add_document(words: Iterable[String], domain: String = "",
+      weight: Double = 1.0) {
+    factory.builder.add_document(this, words, domain, weight)
   }
 
   /**
@@ -454,7 +461,7 @@ abstract class LangModel(val factory: LangModelFactory) {
    * `weight` is a scaling factor used e.g. for
    * interpolating multiple lang models.
    */
-  def add_language_model(other: LangModel, weight: GramCount = 1.0) {
+  def add_language_model(other: LangModel, weight: Double = 1.0) {
     factory.builder.add_language_model(this, other, weight)
   }
 

@@ -107,8 +107,8 @@ class CDoc(val fsdoc: Document[Token], var score: Double) {
     val props = IndexedSeq(
       if (fsdoc.title != null) fsdoc.title else fsdoc.getId,
       fsdoc.getId, coord, word_field)
-    // FIXME! Set importance weight properly
-    RawDoc(Row(schema, props), 1.0)
+    // FIXME! Set importance weight and domain properly
+    RawDoc(Row(schema, props), "", 1.0)
   }
 
   def get_doc_status_rawdoc = {

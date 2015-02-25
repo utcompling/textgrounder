@@ -323,22 +323,26 @@ class DefaultUnigramLangModelBuilder(
   }
 
   // Returns true if the word was counted, false if it was ignored due to
-  // stoplisting and/or whitelisting
+  // stoplisting and/or whitelisting. DOMAIN is used for feature expansion
+  // ala Daume et al 2007 EasyAdapt.
   protected def add_word_with_count(lm: LangModel, word: String,
-      count: GramCount): Boolean = {
+      count: GramCount, domain: String): Boolean = {
     val lword = maybe_lowercase(word)
     if (!stopwords.contains(lword) &&
         (whitelist.size == 0 || whitelist.contains(lword))) {
       lm.add_gram(Unigram.to_index(lword), count)
+      if (domain != "")
+        lm.add_gram(Unigram.to_index(lword + "_" + domain), count)
       true
     }
     else
       false
   }
 
-  protected def imp_add_document(lm: LangModel, words: Iterable[String]) {
+  protected def imp_add_document(lm: LangModel, words: Iterable[String],
+      domain: String, weight: Double) {
     for (word <- words)
-      add_word_with_count(lm, word, 1)
+      add_word_with_count(lm, word, weight, domain)
   }
 
   protected def imp_add_language_model(lm: LangModel, other: LangModel,
@@ -352,12 +356,12 @@ class DefaultUnigramLangModelBuilder(
    * External callers should use `add_keys_values`.
    */
   protected def imp_add_keys_values(lm: LangModel, keys: Array[String],
-      values: Array[Int], num_words: Int, weight: Double) {
+      values: Array[Int], num_words: Int, domain: String, weight: Double) {
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
     for (i <- 0 until num_words) {
-      if(add_word_with_count(lm, keys(i), values(i) * weight)) {
+      if (add_word_with_count(lm, keys(i), values(i) * weight, domain)) {
         addedTypes += 1
         addedTokens += values(i)
       }
@@ -377,12 +381,12 @@ class DefaultUnigramLangModelBuilder(
    */
   protected def add_keys_values(lm: LangModel,
       keys: Array[String], values: Array[Int], num_words: Int,
-      weight: Double) {
+      domain: String, weight: Double) {
     assert(!lm.finished)
     assert(!lm.finished_before_global)
     assert_>=(keys.length, num_words)
     assert_>=(values.length, num_words)
-    imp_add_keys_values(lm, keys, values, num_words, weight)
+    imp_add_keys_values(lm, keys, values, num_words, domain, weight)
   }
 
   def finish_before_global(lm: LangModel) {
@@ -414,12 +418,12 @@ class DefaultUnigramLangModelBuilder(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def create_lang_model(countstr: String, weight: Double) = {
+  def create_lang_model(countstr: String, domain: String, weight: Double) = {
     parse_counts(countstr)
     // Now set the language model on the document.
     val lm = factory.create_lang_model
     add_keys_values(lm, keys_dynarr.array, values_dynarr.array,
-      keys_dynarr.length, weight)
+      keys_dynarr.length, domain, weight)
     lm
   }
 }

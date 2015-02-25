@@ -362,7 +362,7 @@ class DefaultNgramLangModelBuilder(
    * Returns true if the n-gram was counted, false if it was ignored (e.g.
    * due to length restrictions, stoplisting or whitelisting). */
   protected def add_ngram_with_count(lm: NgramLangModel,
-      ngram: Iterable[String], count: GramCount) = {
+      ngram: Iterable[String], count: GramCount, domain: String) = {
     if (max_ngram > 0 && ngram.size > max_ngram)
       false
     else {
@@ -371,6 +371,9 @@ class DefaultNgramLangModelBuilder(
       //if (!stopwords.contains(lgram) &&
       //    (whitelist.size == 0 || whitelist.contains(lgram))) {
         lm.add_gram(Ngram.to_index(lgram.toArray), count)
+        if (domain != "")
+          lm.add_gram(Ngram.to_index(lgram.toArray ++ Array("_" + domain)),
+            count)
         true
       //}
       //else
@@ -379,15 +382,16 @@ class DefaultNgramLangModelBuilder(
   }
 
   protected def imp_add_document(gendist: LangModel,
-      words: Iterable[String], raw_text_max_ngram: Int) {
+      words: Iterable[String], domain: String, weight: Double,
+      raw_text_max_ngram: Int) {
     val lm = gendist.asInstanceOf[NgramLangModel]
     for (ngram <- (1 to raw_text_max_ngram).flatMap(words.sliding(_)))
-      add_ngram_with_count(lm, ngram, 1)
+      add_ngram_with_count(lm, ngram, weight, domain)
   }
 
   protected def imp_add_document(gendist: LangModel,
-      words: Iterable[String]) {
-    imp_add_document(gendist, words, raw_text_max_ngram)
+      words: Iterable[String], domain: String, weight: Double) {
+    imp_add_document(gendist, words, domain, weight, raw_text_max_ngram)
   }
 
   protected def imp_add_language_model(gendist: LangModel,
@@ -400,7 +404,7 @@ class DefaultNgramLangModelBuilder(
       // way rather than directly calling lm.add_gram() to
       // check for --max-ngram and similar restrictions, just in case
       // they were done differently in the source lang model.
-      add_ngram_with_count(lm, Ngram.to_raw(ngram), count * weight)
+      add_ngram_with_count(lm, Ngram.to_raw(ngram), count * weight, "")
   }
 
   /**
@@ -411,7 +415,7 @@ class DefaultNgramLangModelBuilder(
    * adding up the counts for each appearance of the ngram.
    */
   protected def add_parsed_ngrams(gendist: LangModel,
-      grams: collection.Map[String, Int], weight: Double) {
+      grams: collection.Map[String, Int], domain: String, weight: Double) {
     val lm = gendist.asInstanceOf[NgramLangModel]
     assert(!lm.finished)
     assert(!lm.finished_before_global)
@@ -420,7 +424,7 @@ class DefaultNgramLangModelBuilder(
     var totalTokens = 0
     for ((egram, count) <- grams) {
       val ngram = textdb.decode_ngram_for_map_field(egram)
-      if (add_ngram_with_count(lm, ngram, count * weight)) {
+      if (add_ngram_with_count(lm, ngram, count * weight, domain)) {
         addedTypes += 1
         addedTokens += count
       }
@@ -457,11 +461,11 @@ class DefaultNgramLangModelBuilder(
   def maybe_lowercase(ngram: Iterable[String]) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def create_lang_model(countstr: String, weight: Double) = {
+  def create_lang_model(countstr: String, domain: String, weight: Double) = {
     parse_counts(countstr)
     // Now set the lang model on the document.
     val lm = factory.create_lang_model
-    add_parsed_ngrams(lm, parsed_ngrams, weight)
+    add_parsed_ngrams(lm, parsed_ngrams, domain, weight)
     lm
   }
 }

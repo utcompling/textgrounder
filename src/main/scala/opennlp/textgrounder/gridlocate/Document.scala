@@ -48,7 +48,7 @@ import util.debug._
 /////////////////////////////////////////////////////////////////////////////
 
 
-case class RawDoc(row: Row, importance: Double)
+case class RawDoc(row: Row, domain: String, importance: Double)
 
 /**
  * Object encapsulating the result of attempting to read a document from
@@ -541,7 +541,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         val grid_lm = catch_doc_validation {
           val counts = rd.row.gets(driver.grid_word_count_field)
           lang_model_factory.grid_lang_model_factory.builder.
-            create_lang_model(counts, rd.importance)
+            create_lang_model(counts, rd.domain, rd.importance)
         }
         val rerank_lm =
           if (driver.rerank_word_count_field == driver.grid_word_count_field)
@@ -550,7 +550,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
             catch_doc_validation {
               val counts = rd.row.gets(driver.rerank_word_count_field)
               lang_model_factory.rerank_lang_model_factory.builder.
-                create_lang_model(counts, rd.importance)
+                create_lang_model(counts, rd.domain, rd.importance)
             }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
         val doc = catch_doc_validation {
@@ -762,11 +762,12 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, importance: Double, skip_no_coord: Boolean,
-      note_globally: Boolean = false, finish_globally: Boolean = true) = {
+      suffix: String, domain: String, importance: Double,
+      skip_no_coord: Boolean, note_globally: Boolean = false,
+      finish_globally: Boolean = true) = {
     val rawdocs =
       GridDocFactory.read_raw_documents_from_textdb(filehand, dir, suffix,
-        importance, with_messages = driver.params.verbose)
+        domain, importance, with_messages = driver.params.verbose)
     raw_documents_to_document_statuses(rawdocs, skip_no_coord,
       note_globally, finish_globally)
   }
@@ -786,10 +787,10 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
    * @return Iterator over document statuses.
    */
   def read_document_statuses_from_raw_text(filehand: FileHandler, dir: String,
-      importance: Double, note_globally: Boolean = false,
+      domain: String, importance: Double, note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val schema = new Schema(Iterable(), Map("corpus-type" -> "raw-text"))
-    val fake_rawdoc = RawDoc(Row(schema, IndexedSeq()), importance)
+    val fake_rawdoc = RawDoc(Row(schema, IndexedSeq()), domain, importance)
     val the_files = iter_files_recursively(filehand, Iterable(dir))
     val files =
       if (driver.params.verbose)
@@ -806,14 +807,14 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
       } else {
         val grid_lm =
           lang_model_factory.grid_lang_model_factory.create_lang_model
-        grid_lm.add_document(words)
+        grid_lm.add_document(words, domain, importance)
         val rerank_lm =
           if (driver.rerank_word_count_field == driver.grid_word_count_field)
             grid_lm
           else {
             val lm =
               lang_model_factory.rerank_lang_model_factory.create_lang_model
-            lm.add_document(words)
+            lm.add_document(words, domain, importance)
             lm
           }
         val lang_model = new DocLangModel(grid_lm, rerank_lm)
@@ -975,10 +976,12 @@ object GridDocFactory {
    * @param schema Schema for textdb, indicating names of fields, etc.
    */
   def line_to_raw_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, importance: Double, schema: Schema): DocStatus[RawDoc] = {
+      lineno: Long, domain: String, importance: Double, schema: Schema
+    ): DocStatus[RawDoc] = {
     line_to_fields(line, lineno, schema) match {
       case Some(fields) =>
-        DocStatus(filehand, file, lineno, Some(RawDoc(Row(schema, fields), importance)),
+        DocStatus(filehand, file, lineno,
+          Some(RawDoc(Row(schema, fields), domain, importance)),
           "processed", "", "")
       case None =>
         DocStatus(filehand, file, lineno, None, "bad",
@@ -997,7 +1000,8 @@ object GridDocFactory {
    * @return Iterator over document statuses of raw documents.
    */
   def read_raw_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, importance: Double, with_messages: Boolean = false
+      suffix: String, domain: String, importance: Double,
+      with_messages: Boolean = false
   ): Iterator[DocStatus[RawDoc]] = {
     val (schema, files) =
       TextDB.get_textdb_files(filehand, dir, suffix_re = suffix,
@@ -1005,8 +1009,8 @@ object GridDocFactory {
     files.flatMap { file =>
       filehand.openr(file).zipWithIndex.map {
         case (line, idx) =>
-          line_to_raw_document(filehand, file, line, idx + 1, importance,
-            schema)
+          line_to_raw_document(filehand, file, line, idx + 1, domain,
+            importance, schema)
       }
     }
   }

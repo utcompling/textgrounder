@@ -279,8 +279,8 @@ class DocEvalMapper
       lines.map {
         case (filehand, file, line, lineno) => {
           val rawdocstat = GridDocFactory.line_to_raw_document(filehand, file,
-            // FIXME: Set importance
-            line, lineno, 1.0, schema)
+            // FIXME: Set domain and importance
+            line, lineno, "", 1.0, schema)
           ranker.grid.docfact.raw_document_to_document_status(rawdocstat,
             skip_no_coord = true, note_globally = false)
         }

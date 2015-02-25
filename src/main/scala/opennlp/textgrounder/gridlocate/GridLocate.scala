@@ -154,6 +154,10 @@ Wikipedia article, etc.).""")
     ap.multiOption[String]("train", "t",
       help = """One or more training corpora. See '--input'.""")
 
+  def train_dirs =
+    if (easyadapt) input.map((_, "1")) ++ train.map((_, "2"))
+    else input.map((_, "")) ++ train.map((_, ""))
+
   val num_training_corpora = input.size + train.size
 
   if (ap.parsedValues) {
@@ -167,6 +171,16 @@ Wikipedia article, etc.).""")
 weights given as corpora, separated by commas.""")
 
   val importance_weights =
+    if (importance != null) importance.split(",").toSeq.map(_.toDouble)
+    else Seq.fill(num_training_corpora)(1.0)
+  if (importance_weights.size != num_training_corpora)
+    ap.error(s"Need $num_training_corpora importance weights but saw ${importance_weights.size}")
+
+  val easyadapt =
+    ap.flag("easyadapt", "ea",
+      help = """Implement EasyAdapt domain adaptation using feature
+augmentation.""")
+
     if (importance != null) importance.split(",").toSeq.map(_.toDouble)
     else Seq.fill(num_training_corpora)(1.0)
   if (importance_weights.size != num_training_corpora)
@@ -1764,9 +1778,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
   def read_raw_training_document_streams:
       Iterable[(String, String => Iterator[DocStatus[RawDoc]])] = {
     val streams =
-      (params.input ++ params.train).zip(params.importance_weights).
-          zipWithIndex.map {
-        case ((dir, importance), index) => {
+      params.train_dirs.zip(params.importance_weights).zipWithIndex.map {
+        case (((dir, domain), importance), index) => {
           val (_, tail) = getfh.split_filename(dir)
           val id = s"#${index + 1} ($tail)"
           (id, (operation: String) => {
@@ -1775,7 +1788,7 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
               maxtime = params.max_time_per_stage,
               maxitems = params.num_training_docs)
             val docs = GridDocFactory.read_raw_documents_from_textdb(
-              getfh, dir, "-training", importance,
+              getfh, dir, "-training", domain, importance,
               with_messages = params.verbose)
             val sleep_at = debugval("sleep-at-docs")
             docs.mapMetered(task) { doc =>
