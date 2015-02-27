@@ -58,9 +58,7 @@ abstract class DiscountedUnigramLangModelFactory(
         total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       overall_word_probs(word) += count
-      // Our training docs should never have partial (interpolated) counts.
-      assert (count == count.toInt)
-      total_num_word_tokens += count.toInt
+      total_num_word_tokens += count
       // Note document frequency of word
       document_freq(word) += 1
     }

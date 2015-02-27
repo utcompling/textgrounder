@@ -559,10 +559,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         // if (doc == None) // used to mean skipped
         // num_non_error_skipped_records_by_split(split) += 1
         assert_==(doc.split, split, "split")
-        val double_tokens = doc.grid_lm.num_tokens
-        val tokens = double_tokens.toInt
-        // Partial counts should not occur in training documents.
-        assert_==(double_tokens, tokens, "#tokens")
+        val tokens = doc.grid_lm.num_tokens
         num_documents_by_split(split) += 1
         word_tokens_of_documents_by_split(split) += tokens
         if (!doc.has_coord && skip_no_coord) {
@@ -851,34 +848,34 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
     var total_num_training_documents = 0L
     var total_num_documents_with_coordinates = 0L
     var total_num_training_documents_with_coordinates = 0L
-    var total_word_tokens_of_documents = 0L
-    var total_word_tokens_of_documents_skipped_because_lacking_coordinates = 0L
-    var total_word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates = 0L
-    var total_word_tokens_of_training_documents = 0L
-    var total_word_tokens_of_documents_with_coordinates = 0L
-    var total_word_tokens_of_training_documents_with_coordinates = 0L
+    var total_word_tokens_of_documents = 0.0
+    var total_word_tokens_of_documents_skipped_because_lacking_coordinates = 0.0
+    var total_word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates = 0.0
+    var total_word_tokens_of_training_documents = 0.0
+    var total_word_tokens_of_documents_with_coordinates = 0.0
+    var total_word_tokens_of_training_documents_with_coordinates = 0.0
     for (split <- num_records_by_split.keys) {
       errprint("For split '%s':", split)
 
-      val num_records = num_records_by_split(split).value
+      val num_records = num_records_by_split(split).longValue
       errprint("  %s records seen", num_records)
       total_num_records += num_records
 
       val num_error_skipped_records =
-        num_error_skipped_records_by_split(split).value
+        num_error_skipped_records_by_split(split).longValue
       errprint("  %s records skipped due to error seen",
         num_error_skipped_records)
       total_num_error_skipped_records += num_error_skipped_records
 
       def print_line(documents: String, num_documents: Long,
-          num_tokens: Long) {
+          num_tokens: Double) {
         errprint("  %s %s, %s total tokens, %.2f tokens/document",
           num_documents, documents, num_tokens,
           // Avoid division by zero
-          num_tokens.toDouble / (num_documents + 1e-100))
+          num_tokens / (num_documents + 1e-100))
       }
 
-      val num_documents = num_documents_by_split(split).value
+      val num_documents = num_documents_by_split(split).longValue
       val word_tokens_of_documents =
         word_tokens_of_documents_by_split(split).value
       print_line("documents", num_documents, word_tokens_of_documents)
@@ -886,7 +883,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
       total_word_tokens_of_documents += word_tokens_of_documents
 
       val num_training_documents =
-        num_training_documents_by_split(split).value
+        num_training_documents_by_split(split).longValue
       val word_tokens_of_training_documents =
         word_tokens_of_training_documents_by_split(split).value
       print_line("training documents", num_training_documents,
@@ -896,7 +893,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         word_tokens_of_training_documents
 
       val num_documents_skipped_because_lacking_coordinates =
-        num_documents_skipped_because_lacking_coordinates_by_split(split).value
+        num_documents_skipped_because_lacking_coordinates_by_split(split).longValue
       val word_tokens_of_documents_skipped_because_lacking_coordinates =
         word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(
           split).value
@@ -910,7 +907,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
 
       val num_would_be_training_documents_skipped_because_lacking_coordinates =
         num_would_be_training_documents_skipped_because_lacking_coordinates_by_split(
-        split).value
+        split).longValue
       val word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates =
         word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates_by_split(
           split).value
@@ -923,7 +920,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         word_tokens_of_would_be_training_documents_skipped_because_lacking_coordinates
 
       val num_documents_with_coordinates =
-        num_documents_with_coordinates_by_split(split).value
+        num_documents_with_coordinates_by_split(split).longValue
       val word_tokens_of_documents_with_coordinates =
         word_tokens_of_documents_with_coordinates_by_split(split).value
       print_line("documents having coordinates",
@@ -934,7 +931,7 @@ abstract class GridDocFactory[Co : TextSerializer : CoordHandler](
         word_tokens_of_documents_with_coordinates
 
       val num_training_documents_with_coordinates =
-        num_training_documents_with_coordinates_by_split(split).value
+        num_training_documents_with_coordinates_by_split(split).longValue
       val word_tokens_of_training_documents_with_coordinates =
         word_tokens_of_training_documents_with_coordinates_by_split(split).value
       print_line("training documents having coordinates",

@@ -309,14 +309,14 @@ package hadoop {
         find_split_counter(group, counter)
     }
 
-    protected def imp_increment_counter(name: String, incr: Long) {
+    protected def imp_increment_counter(name: String, incr: Double) {
       val counter = find_counter(name)
-      counter.increment(incr)
+      counter.increment(incr.toLong)
     }
 
     protected def imp_get_counter(name: String) = {
       val counter = find_counter(name)
-      counter.getValue()
+      counter.getValue().toDouble
     }
   }
 

@@ -81,9 +81,9 @@ class EvalStats(
     }
   }
 
-  def total_instances = get_counter("instances.total")
-  def correct_instances = get_counter("instances.correct")
-  def incorrect_instances = get_counter("instances.incorrect")
+  def total_instances = get_counter("instances.total").toLong
+  def correct_instances = get_counter("instances.correct").toLong
+  def incorrect_instances = get_counter("instances.incorrect").toLong
 
   def output_fraction(header: String, amount: Long, total: Long) {
     if (amount > total) {
@@ -104,15 +104,21 @@ class EvalStats(
     output_fraction("Percent incorrect", incorrect_instances, total_instances)
     for ((reason, descr) <- incorrect_reasons) {
       output_fraction(s"  $descr",
-        get_counter("instances.incorrect." + reason), total_instances)
+        get_counter("instances.incorrect." + reason).toLong, total_instances)
     }
   }
 
   def output_other_stats() {
     for (field <- driver_stats.list_local_counters("", recursive = true)) {
       val count = driver_stats.get_local_counter(field)
-      driver_stats.note_result(field, count)
-      errprint(s"$field = $count")
+      val longcount = count.toLong
+      if (count == longcount) {
+        driver_stats.note_result(field, longcount)
+        errprint(s"$field = $longcount")
+      } else {
+        driver_stats.note_result(field, count)
+        errprint(s"$field = $count")
+      }
     }
   }
 

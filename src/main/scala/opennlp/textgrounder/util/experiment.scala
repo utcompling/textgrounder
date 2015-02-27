@@ -336,7 +336,7 @@ protected class ExperimentPackage {
      * overall framework. (The difference is that local counters are placed in
      * their own group, as specified by `local_counter_group`.)
      */
-    def increment_local_counter(name: String, byvalue: Long) {
+    def increment_local_counter(name: String, byvalue: Double) {
       increment_counter(local_to_full_name(name), byvalue)
     }
 
@@ -354,7 +354,7 @@ protected class ExperimentPackage {
      *
      * @see increment_local_counter
      */
-    def increment_counter(name: String, byvalue: Long) {
+    def increment_counter(name: String, byvalue: Double) {
       note_counter(name)
       imp_increment_counter(name, byvalue)
     }
@@ -383,7 +383,7 @@ protected class ExperimentPackage {
     def construct_task_counter_name(name: String) =
       "bytask." + get_task_id + "." + name
 
-    def increment_task_counter(name: String, byvalue: Long = 1) {
+    def increment_task_counter(name: String, byvalue: Double = 1) {
       increment_local_counter(construct_task_counter_name(name), byvalue)
     }
 
@@ -418,8 +418,14 @@ protected class ExperimentPackage {
     class TaskCounterWrapper(name: String) {
       def value = get_task_counter(name)
 
-      def +=(incr: Long) {
+      def longValue = get_task_counter(name).toLong
+
+      def +=(incr: Double) {
         increment_task_counter(name, incr)
+      }
+
+      def +=(incr: Long) {
+        increment_task_counter(name, incr.toDouble)
       }
     }
 
@@ -448,12 +454,12 @@ protected class ExperimentPackage {
      * Underlying implementation to increment the given counter by the
      * given value.
      */
-    protected def imp_increment_counter(name: String, byvalue: Long)
+    protected def imp_increment_counter(name: String, byvalue: Double)
 
     /**
      * Underlying implementation to return the value of the given counter.
      */
-    protected def imp_get_counter(name: String): Long
+    protected def imp_get_counter(name: String): Double
   }
 
   /**
@@ -461,11 +467,11 @@ protected class ExperimentPackage {
    * counters locally.
    */
   trait StandaloneExperimentDriverStats extends ExperimentDriverStats {
-    val counter_values = longmap[String]()
+    val counter_values = doublemap[String]()
 
     def get_task_id = 0
 
-    protected def imp_increment_counter(name: String, incr: Long) {
+    protected def imp_increment_counter(name: String, incr: Double) {
       counter_values(name) += incr
     }
 

@@ -242,7 +242,7 @@ trait LangModelFactory {
   /**
    * Total number of word tokens seen
    */
-  var total_num_word_tokens = 0
+  var total_num_word_tokens = 0.0
 
   /**
    * Corresponding builder object for building up the language model
