@@ -271,6 +271,11 @@ protected class CollectionPackage {
     collection_defaultmap[T,mutable.Map[U,Double]](doublemap[U](default))
   def stringmapmap[T,U](default: String = "") =
     collection_defaultmap[T,mutable.Map[U,String]](stringmap[U](default))
+  def bufmapmap[T,U,V]() =
+    collection_defaultmap[T,mutable.Map[U, mutable.Buffer[V]]](bufmap[U,V]())
+
+  def intmapmapmap[T,U,V](default: Int = 0) =
+    collection_defaultmap[T,mutable.Map[U,mutable.Map[V,Int]]](intmapmap[U,V](default))
 
   // Another way to do this, using subclassing.
   //
