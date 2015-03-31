@@ -272,7 +272,7 @@ trait LangModelFactory {
 /**
  * Normal version of memoizer which maps words to Ints.
  */
-trait GramAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
+class GramAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
   val invalid_gram: Gram = -1
 
   // These should NOT be declared to have a type of mutable.Map[Gram, Int]
@@ -288,14 +288,14 @@ trait GramAsIntMemoizer[Item] extends ToIntMemoizer[Item] {
 /**
  * Normal version of memoizer which maps words to Ints.
  */
-trait StringGramAsIntMemoizer extends GramAsIntMemoizer[String] {
+class StringGramAsIntMemoizer extends GramAsIntMemoizer[String] {
 }
 
 /**
  * Version of memoizer which maps words to themselves as strings. This tests
  * that we don't make any assumptions about memoized words being Ints.
  */
-trait StringGramAsStringMemoizer extends IdentityMemoizer[String] {
+class StringGramAsStringMemoizer extends IdentityMemoizer[String] {
   type Gram = String
 
   val invalid_gram: Gram = null
