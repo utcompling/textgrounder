@@ -25,7 +25,7 @@ def get_lines(infile, date):
         split_text_into_words(text, ignore_punc=True) if word != "-"]
     countmap = intdict()
     for word in words:
-      countmap[word] += 1
+      countmap[word.lower()] += 1
     textfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
     line = ("%s.%s\t%s\t%s\t%s\t%s\t%s" % (infile, paraid, infile, paraid, "0.0,0.0", date, textfield))
     retval.append(line)
