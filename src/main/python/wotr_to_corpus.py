@@ -12,12 +12,40 @@ volume_predictions = {}
 
 def read_volume_text():
   for fn in os.listdir(Opts.text):
-    m = re.match("(?:.*/)?0*([1-9][0-9]*).txt", fn)
+    m = re.match(r"(?:.*/)?0*([1-9][0-9]*)\.txt", fn)
     if not m:
       print "Unable to parse filename: %s" % fn
-      print "File name format should be e.g. 001.txt where 001 means volume 1"
+      print "File name format should be e.g. 001.txt for volume 1"
     else:
       volume_text[m.group(1)] = open(os.path.join(Opts.text, fn)).read()
+
+remonths = "January|February|March|April|May|June|July|August|September|October|November|December"
+redate = r"(?i)(%s)\]? *\[?([0-9]+)\??\]?[,.]* *\[?(186[0-9])" % remonths
+redate_strict = redate + "[.-]"
+
+def find_date(text):
+  mstrict = re.search(redate_strict, text)
+  m = re.search(redate, text)
+  datestrict = mstrict and "%s %s, %s" % (
+      mstrict.group(1).lower(), mstrict.group(2), mstrict.group(3)) or None
+  datelax = m and "%s %s, %s" % (m.group(1).lower(), m.group(2), m.group(3)) or None
+  if Opts.verbose and datelax and datestrict and datelax != datestrict:
+    print "Mismatch: strict=%s, lax=%s" % (datestrict, datelax)
+    print "--------- TEXT ----------"
+    print text.strip()
+    print "--------- END ----------"
+  date = datestrict or datelax
+  if date:
+    if Opts.verbose:
+      print date
+    return date
+  else:
+    if Opts.verbose:
+      print "Unable to find date:"
+      #print "--------- TEXT ----------"
+      #print text.strip()
+      #print "--------- END ----------"
+    return None
 
 def centroid(latlons):
   latsum = 0.0
@@ -76,10 +104,10 @@ def parse_geom(geom):
 
 def read_volume_spans():
   for spanfile in os.listdir(Opts.spans):
-    m = re.match("(.*)-([0-9]+).txt$", spanfile)
+    m = re.match(r"(.*)-([0-9]+)\.txt$", spanfile)
     if not m:
       print "Unable to parse span filename %s" % spanfile
-      print 'File name format should be e.g. "Max Caldwalder-60.txt" where 60 means volume 60'
+      print 'File name format should be e.g. "Max Caldwalder-60.txt" for volume 60'
     else:
       user = m.group(1)
       vol = m.group(2)
@@ -99,15 +127,44 @@ def read_volume_spans():
       for beg, end, coord in spans:
         inside_text = voltext[beg:end].strip()
         if inside_text:
-          io_spans.append([beg, end, coord, inside_text])
+          io_spans.append(["%s-%s" % (beg, end), coord, inside_text])
       volume_spans[vol] = io_spans
+
+def read_predicted_spans():
+  for spanfile in os.listdir(Opts.predicted_spans):
+    m = re.match(r"([0-9]+)\.", spanfile)
+    if not m:
+      print "Unable to parse span filename %s" % spanfile
+      print 'File name format should be e.g. "60.predicted-spans" for volume 60'
+    else:
+      vol = m.group(1)
+      print "Parsing predicted spans for volume %s" % vol
+      filetext = open(Opts.predicted_spans + "/" + spanfile).read()
+      spanno = 1
+      spans = []
+      for span in re.finditer(r'^-----+ BEGIN SPAN -----+$(.*?)^-----+ END SPAN -----+$', filetext, re.M | re.S):
+        spantext = span.group(1)
+        if not Opts.filter_regex or re.search(Opts.filter_regex, spantext):
+          spans.append(["%s" % spanno, None, spantext])
+        spanno += 1
+      volume_spans[vol] = spans
 
 def get_lines():
   vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = []
   for vol in vols:
+    print "Processing volume %s" % vol
     lines = []
-    for beg, end, coord, text in volume_spans[vol]:
+    last_date = None
+    for span, coord, text in volume_spans[vol]:
+      date = find_date(text)
+      if date:
+        last_date = date
+      if not date:
+        date = last_date
+      if not date:
+        #print "No date"
+        date = ""
       words = [word.replace("%", "%25").replace(":", "%3A") for word in
           split_text_into_words(text, ignore_punc=True) if word != "-"]
       countmap = intdict()
@@ -128,8 +185,8 @@ def get_lines():
           lat = 0.0
           lon = 0.0
       if include:
-        line = ("vol%s.%s-%s\t%s\t%s-%s\t%s,%s\t%s" % (
-          vol, beg, end, vol, beg, end, lat, lon, textfield))
+        line = ("vol%s.%s\t%s\t%s\t%s\t%s,%s\t%s" % (
+          vol, span, vol, span, date, lat, lon, textfield))
         lines.append(line)
       #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
     vols_lines.append(lines)
@@ -155,8 +212,11 @@ def run(opts):
   split_gen = next_split_set(
       split_fractions,
       [opts.max_training_size, opts.max_dev_size, opts.max_test_size])
-  read_volume_text()
-  read_volume_spans()
+  if Opts.predicted_spans:
+    read_predicted_spans()
+  else:
+    read_volume_text()
+    read_volume_spans()
 
   vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = get_lines()
@@ -186,19 +246,27 @@ def run(opts):
     print "count for %s: %s" % (split_names[split], split_count[split])
   for split in split_names:
     outschemafile = open("%s-%s.schema.txt" % (opts.output, split), "w")
-    print >>outschemafile, "title\tvol\tspan\tcoord\tunigram-counts"
+    print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
     print >>outschemafile, "corpus-type\tgeneric"
     print >>outschemafile, "split\t%s" % split
     outschemafile.close()
 
 class WOTRToCorpus(NLPProgram):
   def populate_options(self, op):
+    op.add_option("--verbose",
+        help="""Debugging info.""",
+        action="store_true")
     op.add_option("--spans",
         help="""Directory containing spans.""",
         metavar="FILE")
     op.add_option("--text",
         help="""Directory containing text files.""",
         metavar="FILE")
+    op.add_option("--predicted-spans",
+        help="""Directory containing predicted spans.""",
+        metavar="FILE")
+    op.add_option('--filter-regex',
+        help="Regex to filter spans.")
     op.add_option("-o", "--output",
         help="""Output prefix for TextDB corpora.""",
         metavar="FILE")
@@ -243,8 +311,9 @@ A value of 0 means no maximum. Default %default.""",
   def handle_arguments(self, opts, op, args):
     global Opts
     Opts = opts
-    self.need('spans')
-    self.need('text')
+    if not Opts.predicted_spans:
+      self.need('spans')
+      self.need('text')
     self.need('output')
 
   def implement_main(self, opts, params, args):
