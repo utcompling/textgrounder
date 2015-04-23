@@ -1,6 +1,6 @@
-//  PCLCorpusToDTM.scala
+//  DatedCorpusToDTM.scala
 //
-//  Copyright (C) 2014 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2015 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import util.collection._
 import util.experiment._
 import util.io.localfh
 import util.math._
+import util.metering._
 import util.print._
 import util.table._
 import util.textdb._
@@ -34,9 +35,9 @@ import util.debug._
 import langmodel.StringGramAsIntMemoizer
 
 /**
- * See description under `PCLCorpusToDTM`.
+ * See description under `DatedCorpusToDTM`.
  */
-class PCLCorpusToDTMParameters(ap: ArgParser) {
+class DatedCorpusToDTMParameters(ap: ArgParser) {
   var input = ap.multiPositional[String]("input",
     help = """Files to analyze -- TextDB corpora. The values can be any of
 the following: Either the data or schema file of the database; the common
@@ -57,18 +58,71 @@ the file in `--country-file`.""")
   var country_file = ap.option[String]("country-file", "c", "cf",
     help = """File containing mapping from coordinates to countries.""")
 
-  var time_size = ap.option[Int]("time-size", "t", "ts",
-    default = 10,
+  var time_size = ap.option[Double]("time-size", "t", "ts",
+    default = 10.0,
     help = """Size of time chunks in years for grouping documents.""")
 
   var output_prefix = ap.option[String]("output-prefix", "o", "op",
     must = be_specified,
     help = """Output prefix for DTM files.""")
+
+  var preserve_case = ap.flag("preserve-case",
+    help = """Preserve case of words when converting to DTM.""")
+
+  var stopwords_file = ap.option[String]("stopwords-file", "sf",
+    help = """File containing stopwords.""")
+}
+
+case class DMYDate(year: Int, month: Int, day: Int) {
+  def toMDY = "%s %s, %s" format (DMYDate.index_month_map(month), day, year)
+  def toDouble = {
+    val cum_lengths =
+      if (year % 4 == 0) DMYDate.cum_leap_month_lengths
+      else DMYDate.cum_month_lengths
+    val year_days = if (year % 4 == 0) 366 else 365
+    val day_of_year = cum_lengths(month - 1) + day - 1
+    year + day_of_year.toDouble / year_days
+  }
+}
+
+object DMYDate {
+  implicit val ordering = Ordering[(Int, Int, Int)].on((x:DMYDate) => (x.year, x.month, x.day))
+  val months = Seq("january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december")
+  val month_index_map = (months zip Stream.from(1)).toMap
+  val index_month_map = month_index_map.map { case (x,y) => (y,x) }
+  val month_lengths = Seq(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+  val cum_month_lengths = month_lengths.foldLeft(IndexedSeq[Int](0))(
+    (sums, x) => sums :+ (sums.last + x))
+  val leap_month_lengths = Seq(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+  val cum_leap_month_lengths = leap_month_lengths.foldLeft(IndexedSeq[Int](0))(
+    (sums, x) => sums :+ (sums.last + x))
+  def parse(str: String) = {
+    val mdyre = """^([A-Za-z]+) ([0-9]+), ([0-9]+)$""".r
+    val myre = """^([A-Za-z]+),? ([0-9]+)$""".r
+    val yre = """^([0-9]+)$""".r
+    val res =
+      str match {
+        case mdyre(m, d, y) => Some(DMYDate(y.toInt, month_index_map(m.toLowerCase), d.toInt))
+        case myre(m, y) => Some(DMYDate(y.toInt, month_index_map(m.toLowerCase), 1))
+        case yre(y) => Some(DMYDate(y.toInt, 1, 1))
+        case "" => None
+        case _ => {
+          errprint("Unable to parse date: %s" format str)
+          None
+        }
+      }
+    if (res != None && res.get.day > 31) {
+      errprint("Day of month too large: %s" format str)
+      None
+    } else
+      res
+  }
 }
 
 /**
- * Convert a version of the PCL corpus in TextDB format into dynamic DTM
- * format. This can operate in three modes:
+ * Convert a corpus in TextDB format with dates and coordinates into dynamic
+ * DTM format. This can operate in three modes:
  *
  * 1. We group all paragraphs of all coordinates together into one document.
  * 2. We create separate documents for batches of points according to a grid,
@@ -81,13 +135,13 @@ the file in `--country-file`.""")
  * 2. For each coordinate, find the grid cell and time slice.
  * 3. For each grid cell across time slices, generate DTM data.
  */
-object PCLCorpusToDTM extends ExperimentApp("PCLCorpusToDTM") {
+object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 
-  type TParam = PCLCorpusToDTMParameters
+  type TParam = DatedCorpusToDTMParameters
 
-  def create_param_object(ap: ArgParser) = new PCLCorpusToDTMParameters(ap)
+  def create_param_object(ap: ArgParser) = new DatedCorpusToDTMParameters(ap)
 
-  case class Document(title: String, coord: String, date: Int, counts: String)
+  case class Document(title: String, coord: String, date: DMYDate, counts: String)
 
   // Map from cell ID's to years to sequences of documents.
   val slice_counts = bufmapmap[String, Int, Document]()
@@ -105,39 +159,58 @@ object PCLCorpusToDTM extends ExperimentApp("PCLCorpusToDTM") {
     }
   }
 
-  def date_to_time_slice(date: String) = {
-    date.toInt / params.time_size
+  def date_to_time_slice(date: DMYDate) = {
+    (date.toDouble / params.time_size).toInt
   }
+
+  protected def read_stopwords = {
+    if (params.stopwords_file == null)
+      Set[String]()
+    else
+      localfh.openr(params.stopwords_file).toSet
+  }
+
+  lazy val the_stopwords = read_stopwords
 
   def process_file(file: String) {
     errprint("Processing %s ...", file)
-    for (row <- TextDB.read_textdb(localfh, file)) {
+    val task = new Meter("reading", "line")
+    TextDB.read_textdb(localfh, file).foreachMetered(task) { row =>
       val title = row.gets("title")
       val coord = row.gets("coord")
-      val date = row.gets("date")
+      val date = DMYDate.parse(row.gets("date"))
       val counts = row.gets("unigram-counts")
-      if (counts.size > 0)
-        slice_counts(coord_to_cell(coord))(date_to_time_slice(date)) +=
-          Document(title, coord, date.toInt, counts)
+      if (counts.size > 0 && date != None)
+        slice_counts(coord_to_cell(coord))(date_to_time_slice(date.get)) +=
+          Document(title, coord, date.get, counts)
     }
   }
 
   def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String) = {
     val counts = Decoder.count_map_seq(countstr)
     val tokens = counts.map(_._2).sum
+    val processed_counts = intmap[String]()
+    for ((word, count) <- counts) {
+      if (the_stopwords.size == 0 || !the_stopwords(word.toLowerCase)) {
+        if (params.preserve_case)
+          processed_counts(word) += count
+        else
+          processed_counts(word.toLowerCase) += count
+      }
+    }
     val ldastr =
-      counts.map { case (word, count) =>
+      processed_counts.toSeq.sortBy(-_._2).map { case (word, count) =>
         "%s:%s" format (memoizer.to_index(word), count)
       }.mkString(" ")
-    tokens.toString + " " + ldastr
+    processed_counts.size + " " + ldastr
   }
 
   def run_program(args: Array[String]) = {
     for (file <- params.input)
       process_file(file)
-    /* For each slice, we output five files:
+    /* For each geographic slice, we output five files:
      *
-     * 1. foo.mult: DTM document file, listing documents, one per line,
+     * 1. foo-mult.dat: DTM document file, listing documents, one per line,
      *    sorted by timeslice. The format of a line is
      *
      *    NUMTOKENS INDEX:COUNT ...
@@ -146,38 +219,41 @@ object PCLCorpusToDTM extends ExperimentApp("PCLCorpusToDTM") {
      *    and each INDEX:COUNT describes the count of a single word, with the
      *    word converted into a zero-based index.
      *
-     * 2. foo.seq: DTM sequence file, listing the number of documents in
+     * 2. foo-seq.dat: DTM sequence file, listing the number of documents in
      *    each successive timeslice. The first line is the number of
      *    timeslices, and each successive line is the number of documents in
      *    a given timeslice.
      *
-     * 3. foo.vocab: Listing of vocabulary, ordered by index.
+     * 3. foo-vocab.dat: Listing of vocabulary, ordered by index.
      *
-     * 4. foo.doc: Description of each document in the DTM document file.
+     * 4. foo-doc.dat: Description of each document in the DTM document file.
      *
-     * 5. foo.timeslice: Description of each timeslice.
+     * 5. foo-timeslice.dat: Description of each timeslice.
      */
     for ((cell, timeslice_map) <- slice_counts) {
-      val multfile = localfh.openw(params.output_prefix + "." + cell + ".mult")
-      val seqfile = localfh.openw(params.output_prefix + "." + cell + ".seq")
+      val multfile = localfh.openw(params.output_prefix + "." + cell + "-mult.dat")
+      val seqfile = localfh.openw(params.output_prefix + "." + cell + "-seq.dat")
       val vocabfile =
-        localfh.openw(params.output_prefix + "." + cell + ".vocab")
-      val docfile = localfh.openw(params.output_prefix + "." + cell + ".doc")
+        localfh.openw(params.output_prefix + "." + cell + "-vocab.dat")
+      val docfile = localfh.openw(params.output_prefix + "." + cell + "-doc.dat")
       val tsfile =
-        localfh.openw(params.output_prefix + "." + cell + ".timeslice")
+        localfh.openw(params.output_prefix + "." + cell + "-timeslice.dat")
 
       val sorted_timeslices = timeslice_map.toSeq.sortBy(_._1)
       seqfile.println(sorted_timeslices.size.toString)
       val memoizer = new StringGramAsIntMemoizer
       for ((sliceindex, docs) <- sorted_timeslices) {
         seqfile.println(docs.size.toString)
+        import DMYDate.ordering
         val mindate = docs.map(_.date).min
         val maxdate = docs.map(_.date).max
-        tsfile.println("%s-%s" format (mindate, maxdate))
+        val tslice = "%s-%s" format (mindate.toMDY, maxdate.toMDY)
+        tsfile.println(tslice)
+        errprint("For cell %s, processing slice %s" format (cell, tslice))
         for (doc <- docs) {
           multfile.println(counts_to_lda(memoizer, doc.counts))
           docfile.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
-            doc.date, doc.counts))
+            doc.date.toMDY, doc.counts))
         }
       }
       for (i <- 0 to memoizer.maximum_index) {
