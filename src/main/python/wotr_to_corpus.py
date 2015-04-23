@@ -279,7 +279,7 @@ coordinate.""",
         action="store_true")
     op.add_option("--split-by", default="line",
         choices=["line", "volume"],
-        help="""How to split the paragraphs (line, chapter, book).""")
+        help="""How to split the paragraphs (line, volume).""")
     op.add_option("--training-fraction", type='float', default=80,
         help="""Fraction of total articles to use for training.
 The absolute amount doesn't matter, only the value relative to the test
