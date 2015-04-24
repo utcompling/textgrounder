@@ -247,7 +247,8 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         import DMYDate.ordering
         val mindate = docs.map(_.date).min
         val maxdate = docs.map(_.date).max
-        val tslice = "%s-%s" format (mindate.toMDY, maxdate.toMDY)
+        //val tslice = "%s-%s" format (mindate.toMDY, maxdate.toMDY)
+        val tslice = "%s" format mindate.toMDY
         tsfile.println(tslice)
         errprint("For cell %s, processing slice %s" format (cell, tslice))
         for (doc <- docs) {
