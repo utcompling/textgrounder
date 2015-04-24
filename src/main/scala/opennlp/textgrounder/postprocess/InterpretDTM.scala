@@ -30,19 +30,12 @@ import util.table._
  */
 class InterpretDTMParameters(ap: ArgParser) {
   var output_dir = ap.option[String]("output-dir", "o", "od",
+    must = be_specified,
     help = """Directory or directories containing output from running DTM.""")
 
-  var doc_file = ap.option[String]("doc-file", "d", "df",
+  var input_prefix = ap.option[String]("input-prefix", "i", "ip",
     must = be_specified,
-    help = """Document file containing info on the documents sent to DTM.""")
-
-  var vocab_file = ap.option[String]("vocab-file", "v", "vf",
-    must = be_specified,
-    help = """Document file containing info on DTM vocabulary.""")
-
-  var timeslice_file = ap.option[String]("timeslice-file", "t", "tf",
-    must = be_specified,
-    help = """Document file containing info on timeslices.""")
+    help = """Input prefix of files sent to DTM.""")
 
   var words_per_topic = ap.option[Int]("words-per-topic", "w", "wpt",
     default = 10,
@@ -70,7 +63,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     val log_probs = Array.fill(num_seq, num_terms)(0.0)
     for ((line, index) <- localfh.openr(file).zipWithIndex) {
       val seqind = index % num_seq
-      val termind = index / num_terms
+      val termind = index / num_seq
       log_probs(seqind)(termind) = line.toDouble
     }
     log_probs
@@ -98,11 +91,10 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     info_file.close()
 
     // Read vocab file
-    val vocab = localfh.openr(params.vocab_file).toIndexedSeq
+    val vocab = localfh.openr(params.input_prefix + "-vocab.dat").toIndexedSeq
 
-    // Read timeslice file; ignore first slice since we don't get
-    // probabilities for it
-    val timeslices = localfh.openr(params.timeslice_file).toIndexedSeq.tail
+    // Read timeslice file
+    val timeslices = localfh.openr(params.input_prefix + "-timeslice.dat").toIndexedSeq
 
     // For each topic, find the top words
     for (topic <- 0 until num_topics) {
@@ -110,17 +102,26 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
       // by timeslice, then by word
       val log_probs = read_log_probs("%s/lda-seq/topic-%03d-var-e-log-prob.dat"
         format (params.output_dir, topic), num_terms, seq_length)
+      // outprint("Log probs: %s" format log_probs.map(_.toIndexedSeq).toIndexedSeq)
+      outprint("For dir %s, topic %s:" format (dir, topic))
       // For each timeslice, find the top N words by probability.
       // Transpose the resulting array of arrays so we output the timeslice
       // words in columns.
+      // val seq_top_word_probs =
+      //   log_probs.map { seq_topic_probs =>
+      //     seq_topic_probs.zipWithIndex.sortBy(-_._1).
+      //       take(params.words_per_topic).map {
+      //         case (prob, index) => "%s, %s" format (index, prob)
+      //       }.toIndexedSeq
+      //   }.toIndexedSeq.transpose
+      // outprint(format_table(timeslices +: seq_top_word_probs))
       val seq_top_words =
-        log_probs.map { seq_topic_probs =>
-          seq_topic_probs.zipWithIndex.sortBy(-_._1).
-            take(params.words_per_topic).map(_._2).map {
-              index => vocab(index)
-            }.toIndexedSeq
-        }.toIndexedSeq.transpose
-      outprint("For dir %s, topic %s:" format (dir, topic))
+       log_probs.map { seq_topic_probs =>
+         seq_topic_probs.zipWithIndex.sortBy(-_._1).
+           take(params.words_per_topic).map(_._2).map {
+             index => vocab(index)
+           }.toIndexedSeq
+       }.toIndexedSeq.transpose
       outprint(format_table(timeslices +: seq_top_words))
     }
   }
