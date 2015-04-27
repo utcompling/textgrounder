@@ -6,6 +6,7 @@ import os
 import sys
 import json
 
+volume_user = {}
 volume_spans = {}
 volume_text = {}
 volume_predictions = {}
@@ -107,7 +108,7 @@ def read_volume_spans():
     m = re.match(r"(.*)-([0-9]+)\.txt$", spanfile)
     if not m:
       print "Unable to parse span filename %s" % spanfile
-      print 'File name format should be e.g. "Max Caldwalder-60.txt" for volume 60'
+      print 'File name format should be e.g. "Max Cadwalder-60.txt" for volume 60'
     else:
       user = m.group(1)
       vol = m.group(2)
@@ -128,7 +129,20 @@ def read_volume_spans():
         inside_text = voltext[beg:end].strip()
         if inside_text:
           io_spans.append(["%s-%s" % (beg, end), coord, inside_text])
-      volume_spans[vol] = io_spans
+      if vol in volume_spans:
+        if len(volume_spans[vol]) > len(io_spans):
+          print "Volume %s: Not overwriting existing user %s spans with fewer spans from %s (%s < %s)" % (
+              vol, volume_user[vol], user, len(io_spans),
+              len(volume_spans[vol]))
+        else:
+          print "Volume %s: Overwriting existing user %s spans with spans from %s because more of them (%s > %s)" % (
+              vol, volume_user[vol], user, len(io_spans),
+              len(volume_spans[vol]))
+          volume_user[vol] = user
+          volume_spans[vol] = io_spans
+      else:
+        volume_user[vol] = user
+        volume_spans[vol] = io_spans
 
 def read_predicted_spans():
   for spanfile in os.listdir(Opts.predicted_spans):
@@ -194,24 +208,31 @@ def get_lines():
 
 # Given an a file, split the lines based on the split fractions, creating
 # training, dev and test files.
-def output_split_files(filename, output_prefix,
-    split_fractions, max_split_size, split_names):
-  for line in uchompopen(filename, "r"):
-    uniprint(line, outfile=split_files[split_gen.next()])
-  for file in split_files:
-    file.close()
+#def output_split_files(filename, output_prefix,
+#    split_fractions, max_split_size, split_names):
+#  for line in uchompopen(filename, "r"):
+#    uniprint(line, outfile=split_files[split_gen.next()])
+#  for file in split_files:
+#    file.close()
 
-def run(opts):
+def run():
   split_names = ['training', 'dev', 'test']
   split_count = [0, 0, 0]
-  split_files = [open("%s-%s.data.txt" % (opts.output, split), "w")
-    for split in split_names]
-  split_fractions = (
-      [opts.training_fraction, opts.dev_fraction, opts.test_fraction])
+  if Opts.no_write:
+    split_files = [None, None, None]
+  else:
+    split_files = [open("%s-%s.data.txt" % (Opts.output, split), "w")
+      for split in split_names]
+  if Opts.fractions:
+    trainfrac, devfrac, testfrac = re.split(":", Opts.fractions)
+    split_fractions = [float(trainfrac), float(devfrac), float(testfrac)]
+  else:
+    split_fractions = (
+        [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
   split_frac_size = sum(split_fractions)
   split_gen = next_split_set(
       split_fractions,
-      [opts.max_training_size, opts.max_dev_size, opts.max_test_size])
+      [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
   if Opts.predicted_spans:
     read_predicted_spans()
   else:
@@ -220,13 +241,14 @@ def run(opts):
 
   vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = get_lines()
-  if opts.split_by == 'line':
+  if Opts.split_by == 'line':
     for lines in vols_lines:
       for line in lines:
         split = split_gen.next()
         split_count[split] += 1
-        uniprint(line, outfile=split_files[split])
-  elif opts.split_by == 'volume':
+        if not Opts.no_write:
+          uniprint(line, outfile=split_files[split])
+  elif Opts.split_by == 'volume':
     volsize = None
     for lines in vols_lines:
       # send() is weird. Sending a value causes the last yield in the generator
@@ -239,17 +261,20 @@ def run(opts):
       volsize = len(lines)
       for line in lines:
         split_count[split] += 1
-        uniprint(line, outfile=split_files[split])
-  for file in split_files:
-    file.close()
+        if not Opts.no_write:
+          uniprint(line, outfile=split_files[split])
+  if not Opts.no_write:
+    for file in split_files:
+      file.close()
   for split in xrange(3):
     print "count for %s: %s" % (split_names[split], split_count[split])
-  for split in split_names:
-    outschemafile = open("%s-%s.schema.txt" % (opts.output, split), "w")
-    print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
-    print >>outschemafile, "corpus-type\tgeneric"
-    print >>outschemafile, "split\t%s" % split
-    outschemafile.close()
+  if not Opts.no_write:
+    for split in split_names:
+      outschemafile = open("%s-%s.schema.txt" % (Opts.output, split), "w")
+      print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
+      print >>outschemafile, "corpus-type\tgeneric"
+      print >>outschemafile, "split\t%s" % split
+      outschemafile.close()
 
 class WOTRToCorpus(NLPProgram):
   def populate_options(self, op):
@@ -277,9 +302,16 @@ coordinate.""",
     op.add_option("--suppress-coord-paras",
         help="""Suppress paragraphs with coordinates.""",
         action="store_true")
+    op.add_option("--no-write",
+        help="""Don't write anything. Useful to get counts and such.""",
+        action="store_true")
     op.add_option("--split-by", default="line",
         choices=["line", "volume"],
         help="""How to split the paragraphs (line, volume).""")
+    op.add_option("--fractions",
+        help="""Relative fraction of training/dev/test splits, as three
+numbers separated by colons, e.g. '80:10:10'. The absolute amounts don't
+matter, only the relative ratios.""")
     op.add_option("--training-fraction", type='float', default=80,
         help="""Fraction of total articles to use for training.
 The absolute amount doesn't matter, only the value relative to the test
@@ -314,9 +346,10 @@ A value of 0 means no maximum. Default %default.""",
     if not Opts.predicted_spans:
       self.need('spans')
       self.need('text')
-    self.need('output')
+    if not Opts.no_write:
+      self.need('output')
 
   def implement_main(self, opts, params, args):
-    run(opts)
+    run()
 
 WOTRToCorpus()
