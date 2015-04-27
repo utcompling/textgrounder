@@ -5,6 +5,7 @@ import re
 import os
 import sys
 import json
+import random
 
 volume_user = {}
 volume_spans = {}
@@ -206,6 +207,34 @@ def get_lines():
     vols_lines.append(lines)
   return vols_lines
 
+def flatten(lol):
+  return [item for x in lol for item in x]
+
+# Permute vols_lines; also flatten if '--split-by span' (necessary in
+# case we permute by span, so we do this in any case).
+def permute_vols_lines(vols_lines):
+  random.seed("The quick brown fox jumps over the lazy dog")
+  # If permute by span, we need to permute within volumes if split by volume,
+  # else flatten and then permute to get permutation across volumes.
+  if Opts.permute == "span":
+    if Opts.split_by == "volume":
+      for lines in vols_lines:
+        random.shuffle(lines)
+      # Also permute the volumes themselves
+      random.shuffle(vols_lines)
+    else:
+      vols_lines = flatten(vols_lines)
+      random.shuffle(vols_lines)
+    return vols_lines
+  # Otherwise, if permute by volume, permute volumes. Then in any case,
+  # flatten in split by span.
+  if Opts.permute == "volume":
+    random.shuffle(vols_lines)
+  if Opts.split_by == "volume":
+    return vols_lines
+  else:
+    return flatten(vols_lines)
+
 # Given an a file, split the lines based on the split fractions, creating
 # training, dev and test files.
 #def output_split_files(filename, output_prefix,
@@ -216,65 +245,91 @@ def get_lines():
 #    file.close()
 
 def run():
-  split_names = ['training', 'dev', 'test']
-  split_count = [0, 0, 0]
-  if Opts.no_write:
-    split_files = [None, None, None]
-  else:
-    split_files = [open("%s-%s.data.txt" % (Opts.output, split), "w")
-      for split in split_names]
-  if Opts.fractions:
-    trainfrac, devfrac, testfrac = re.split(":", Opts.fractions)
-    split_fractions = [float(trainfrac), float(devfrac), float(testfrac)]
-  else:
-    split_fractions = (
-        [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
-  split_frac_size = sum(split_fractions)
-  split_gen = next_split_set(
-      split_fractions,
-      [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
   if Opts.predicted_spans:
     read_predicted_spans()
   else:
     read_volume_text()
     read_volume_spans()
 
-  vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
-  vols_lines = get_lines()
-  if Opts.split_by == 'line':
-    for lines in vols_lines:
-      for line in lines:
+  lc_values_str = [x for x in re.split(":", Opts.learning_curve)]
+  lc_values = [float(x) for x in lc_values_str]
+  last_lc = lc_values[-1]
+  lc_fractions = [x/last_lc for x in lc_values]
+
+  if Opts.fractions:
+    trainfrac, devfrac, testfrac = re.split(":", Opts.fractions)
+    split_fractions = [float(trainfrac), float(devfrac), float(testfrac)]
+  else:
+    split_fractions = (
+        [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
+  #split_frac_size = sum(split_fractions)
+
+  vols_lines = permute_vols_lines(get_lines())
+  # Total number of spans
+  numspans = (len(vols_lines) if Opts.split_by == "span" else
+      sum(len(x) for x in vols_lines))
+
+  for lcval, lcfrac in zip(lc_values_str, lc_fractions):
+    split_count = [0, 0, 0]
+    split_names = ['training', 'dev', 'test']
+    spancount = 0
+    if len(lc_values_str) == 1:
+      outpref = Opts.output
+    else:
+      outpref = "%s-%s" % (Opts.output, lcval)
+      print "Learning curve prefix: %s" % outpref
+    if Opts.no_write:
+      split_files = [None, None, None]
+    else:
+      split_files = [open("%s-%s.data.txt" % (outpref, split), "w")
+        for split in split_names]
+    split_gen = next_split_set(
+        split_fractions,
+        [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
+    if Opts.split_by == 'span':
+      for line in vols_lines:
         split = split_gen.next()
+        spancount += 1
         split_count[split] += 1
         if not Opts.no_write:
           uniprint(line, outfile=split_files[split])
-  elif Opts.split_by == 'volume':
-    volsize = None
-    for lines in vols_lines:
-      # send() is weird. Sending a value causes the last yield in the generator
-      # to return with a value, then the code loops around and eventually
-      # executes another yield, whose value is returned by send(). The
-      # first time, we have to send None. Because of the way next_split_set()
-      # is written, we have to save the length of the chapter and send it
-      # the next go around.
-      split = split_gen.send(chaptersize)
-      volsize = len(lines)
-      for line in lines:
-        split_count[split] += 1
-        if not Opts.no_write:
-          uniprint(line, outfile=split_files[split])
-  if not Opts.no_write:
-    for file in split_files:
-      file.close()
-  for split in xrange(3):
-    print "count for %s: %s" % (split_names[split], split_count[split])
-  if not Opts.no_write:
-    for split in split_names:
-      outschemafile = open("%s-%s.schema.txt" % (Opts.output, split), "w")
-      print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
-      print >>outschemafile, "corpus-type\tgeneric"
-      print >>outschemafile, "split\t%s" % split
-      outschemafile.close()
+        if float(spancount) / numspans >= lcfrac:
+          break
+    elif Opts.split_by == 'volume':
+      volsize = None
+      outerbreak = False
+      for lines in vols_lines:
+        # send() is weird. Sending a value causes the last yield in the generator
+        # to return with a value, then the code loops around and eventually
+        # executes another yield, whose value is returned by send(). The
+        # first time, we have to send None. Because of the way next_split_set()
+        # is written, we have to save the length of the volume and send it
+        # the next go around.
+        split = split_gen.send(volsize)
+        volsize = len(lines)
+        for line in lines:
+          spancount += 1
+          split_count[split] += 1
+          if not Opts.no_write:
+            uniprint(line, outfile=split_files[split])
+          if float(spancount) / numspans >= lcfrac:
+            outerbreak = True
+            break
+        if outerbreak:
+          break
+    if not Opts.no_write:
+      for file in split_files:
+        file.close()
+    for split in xrange(3):
+      print "count for %s: %s" % (split_names[split], split_count[split])
+    print "total count: %s / %s" % (spancount, numspans)
+    if not Opts.no_write:
+      for split in split_names:
+        outschemafile = open("%s-%s.schema.txt" % (outpref, split), "w")
+        print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
+        print >>outschemafile, "corpus-type\tgeneric"
+        print >>outschemafile, "split\t%s" % split
+        outschemafile.close()
 
 class WOTRToCorpus(NLPProgram):
   def populate_options(self, op):
@@ -305,13 +360,29 @@ coordinate.""",
     op.add_option("--no-write",
         help="""Don't write anything. Useful to get counts and such.""",
         action="store_true")
-    op.add_option("--split-by", default="line",
-        choices=["line", "volume"],
-        help="""How to split the paragraphs (line, volume).""")
+    op.add_option("--split-by", default="span",
+        choices=["span", "volume"],
+        help="""How to split the spans when constructing the training/dev/test
+splits (span, volume), default %default.""")
     op.add_option("--fractions",
         help="""Relative fraction of training/dev/test splits, as three
 numbers separated by colons, e.g. '80:10:10'. The absolute amounts don't
 matter, only the relative ratios.""")
+    op.add_option("--learning-curve", default="100",
+        help="""Output learning curves by relative fraction. The values should
+be floating-point numbers separated by colons and are taken with respect to
+the last value, which should represent the entire collection (e.g. use
+'25:50:75:100' to get four separate corpora that represent, respectively, 25%,
+50%, 75% and 100% of the full training set). The names of the corpora involve
+suffixes to the prefix specified in '--output'.""")
+    op.add_option("--permute", default="no",
+        choices=["no", "span", "volume"],
+        help="""Permute the spans before processing them, either at the level
+of individual spans (span), entire volumes (volume), or no permutation (no).
+Default is %default. When '--split-by volume', permutation by span only
+permutes within a given volume (as well as permuting the volumes themselves).
+Permutation seeds the random number generator to a specific value at the
+beginning so it is repeatable.""")
     op.add_option("--training-fraction", type='float', default=80,
         help="""Fraction of total articles to use for training.
 The absolute amount doesn't matter, only the value relative to the test
