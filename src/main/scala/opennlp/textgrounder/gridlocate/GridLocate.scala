@@ -112,16 +112,23 @@ English (en, eng); German (de, deu); Portuguese (pt, por).""")
 
   var input =
     ap.multiOption[String]("input", "i", "input-corpus", "ic",
-      help = """One or more training/testing corpora. The corpora are in the
-format of a textdb database (a type of flat-file database, with separate schema
-and data files). A corpus can be specified in any of the following ways:
-Either the data or schema file of the database; the common prefix of the
-two; or the directory containing them, provided there is only one textdb
-in the directory.
+      help = """One or more training/evaluation corpora. The corpora are
+in the format of a textdb database (a type of flat-file database, with
+separate schema and data files). A corpus can be specified in any of the
+following ways: Either the data or schema file of the database; the common
+prefix of the two; or the directory containing them, provided there is only
+one textdb in the directory.
 
-Training corpora can be specified either using '--input' or '--train',
-either of which may be repeated multiple times to specify multiple corpora.
-Corpora specified using '--train' are used only for training.
+Corpora can be specified using any of the three options '--input', '--train'
+or '--eval'. The options can be combined and any of them can be repeated
+multiple times to specify multiple corpora. Corpora specified using '--train'
+are used only for training; those specified using '--eval' are used only for
+evaluation. If '--eval' is not specified, corpora specified in '--input'
+are used for both training and evaluation, otherwise only for training.
+(When a corpus in '--input' is used for both training and evaluation, this
+does not entail evaluating on training data, because textdb corpora contain
+separate slices for training, devel and test. The choice of dev vs. test is
+specified using '--eval-set'.)
 
 A separate grid is created for each corpus, and test documents are evaluated
 against all cells in all grids.  This allows, for example, a given corpus to
@@ -152,7 +159,45 @@ Wikipedia article, etc.).""")
 
   var train =
     ap.multiOption[String]("train", "t",
-      help = """One or more training corpora. See '--input'.""")
+      help = """One or more training corpora, in the format of textdb
+databases. See '--input'.""")
+
+  var eval =
+    ap.multiOption[String]("eval", "e",
+      help = """One or more evaluation corpora. The expected format depends on
+the value of '--eval-format' (by default, textdb databases). See '--input'.""")
+
+  //// Eval input options
+  var eval_set =
+    ap.option[String]("eval-set", "es", metavar = "SET",
+      default = "dev",
+      // The first item of each must agree with the suffixes used, currently
+      // 'training', 'dev', 'test'.
+      aliasedChoices = Seq(Seq("training", "train"), Seq("dev", "devel"),
+        Seq("test")),
+      help = """Set of documents to evaluate ('train' or 'training' for the
+training set, 'dev' or 'devel' for the development set, 'test' for the test
+set). Default '%default'.""")
+
+  var eval_format =
+    ap.option[String]("f", "eval-format",
+      default = "textdb",
+      choices = Seq("textdb", "raw-text" //, "pcl-travel"
+      ),
+      help = """Format of evaluation corpus/corpora specified using '--eval'.
+The following formats are recognized:
+
+'textdb' is the default and specifies that the evaluation files are one or more
+textdb corpora, as for the training data.
+
+'raw-text' assumes that the evaluation files are raw text. In this case, the
+value of '--eval' can be either a single file or a directory, in which case
+all files in the directory will be considered.
+""")
+
+//'pcl-travel' is another alternative.  It assumes that each evaluation file
+//is in PCL-Travel XML format, and uses each chapter in the evaluation
+//file as a document to evaluate.""")
 
   def train_dirs =
     if (easyadapt) input.map((_, "1")) ++ train.map((_, "2"))
@@ -472,35 +517,6 @@ in the cell, if documents have their own salience values.""")
 //// Options indicating which documents to train on or evaluate
 trait GridLocateEvalParameters {
   this: GridLocateParameters =>
-
-  //// Eval input options
-  var eval_set =
-    ap.option[String]("eval-set", "es", metavar = "SET",
-      default = "dev",
-      // The first item of each must agree with the suffixes used, currently
-      // 'training', 'dev', 'test'.
-      aliasedChoices = Seq(Seq("training", "train"), Seq("dev", "devel"),
-        Seq("test")),
-      help = """Set of documents to evaluate ('train' or 'training' for the
-training set, 'dev' or 'devel' for the development set, 'test' for the test
-set). Default '%default'.""")
-
-  var eval_file =
-    ap.multiOption[String]("e", "eval-file", "ef",
-      metavar = "FILE",
-      help = """File or directory containing files to evaluate on.
-Multiple such files/directories can be given by specifying the option multiple
-times. If a directory is given, all files in the directory will be
-considered (but if an error occurs upon parsing a file, it will be ignored).
-Each file is read in and then geolocation is performed.
-
-If --eval-format=textdb (the default), this option can be omitted, in which
-case it defaults to the same locations as are specified for the training
-corpus or corpora. This does not mean that evaluation will happen on the
-training set, because generally a textdb corpus used for geolocation has
-separate slices for training, devel and test (identified by suffixes in the
-base name of the corpus). The particular slice used for evaluation is
-specified using '--eval-set'.""")
 
   //// Eval output options
   var results_file =

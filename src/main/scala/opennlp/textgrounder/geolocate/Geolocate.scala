@@ -369,33 +369,6 @@ uniform grid cell models.""")
 
   ////////////// Begin former GeolocateDocParameters
 
-  var eval_format =
-    ap.option[String]("f", "eval-format",
-      default = "textdb",
-      choices = Seq("textdb", "raw-text" //, "pcl-travel"
-      ),
-      help = """Format of evaluation file(s).  The evaluation files themselves
-are specified using --eval-file.  The following formats are
-recognized:
-
-'textdb' is the default and specifies that the evaluation files are one or more
-textdb corpora, as for the training data. In this case, '--eval-file' can be
-omitted, defaulting to the same location(s) as for the training data; see
-'--eval-file' for more information.
-
-'raw-text' assumes that the eval file is simply raw text.  (NOT YET
-IMPLEMENTED.)
-""")
-
-  if (ap.parsedValues) {
-    if (eval_format != "textdb" && eval_file.size == 0)
-      ap.error("Must specify evaluation file(s) using --eval-file")
-  }
-
-//'pcl-travel' is another alternative.  It assumes that each evaluation file
-//is in PCL-Travel XML format, and uses each chapter in the evaluation
-//file as a document to evaluate.""")
-
   override protected def ranker_choices = super.ranker_choices ++ Seq(
         Seq("salience-most-common-toponym", "salience-commontop"),
         Seq("cell-distribution-most-common-toponym",
@@ -1012,17 +985,16 @@ trait GeolocateDocumentDriver extends GeolocateDriver {
       Iterable()
     else {
       val eval_location =
-        if (params.eval_file.size == 0)
+        if (params.eval.size == 0)
           params.input
         else
-          params.eval_file
-
+          params.eval
       val results_iter =
         params.eval_format match {
 //          case "pcl-travel" => {
 //            val evalobj =
 //              new PCLTravelGeolocateDocEvaluator(ranker, grid,
-//                getfh, params.eval_file)
+//                getfh, params.eval)
 //            evalobj.evaluate_documents(evalobj.iter_document_stats)
 //          }
           case "textdb" => {
