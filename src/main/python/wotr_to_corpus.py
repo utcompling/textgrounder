@@ -264,6 +264,11 @@ def run():
         [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
   #split_frac_size = sum(split_fractions)
 
+  if not Opts.no_write:
+    outdir = os.path.dirname(Opts.output)
+    if not os.path.exists(outdir):
+      os.makedirs(outdir)
+
   vols_lines = permute_vols_lines(get_lines())
   # Total number of spans
   numspans = (len(vols_lines) if Opts.split_by == "span" else
