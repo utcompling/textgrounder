@@ -60,18 +60,11 @@ class CellDist[Co](
  * probability distribution over cells.
  */
 class CellDistFactory[Co] {
- /* Create a distribution over cells that is associated with a gram,
-  * based on the relative probabilities of the gram in the language models
-  * of the various cells.  That is, if we have a set of cells, each with a
-  * language model, then we can imagine conceptually inverting the process
-  * to generate a cell distribution over grams.  Basically, for a given gram,
-  * look to see what its probability is in all cells; normalize, and we have
-  * a cell distribution.
-  */
-  def get_cell_dist(grid: Grid[Co], gram: Gram) = {
-    val cellprobs = grid.iter_nonempty_cells.map { cell =>
-      (cell, cell.grid_lm.gram_prob(gram))
-    }
+  /**
+   * Create normalized cell dist from unnormalized dist.
+   */
+  def create_normalized_cell_dist(cellprobs: Iterable[(GridCell[Co], Double)]
+  ) = {
     // Normalize the probabilities; but if all probabilities are 0, then
     // we can't normalize, so leave as-is. This will happen, for example,
     // for words never seen in the entire corpus.
@@ -83,6 +76,31 @@ class CellDistFactory[Co] {
         (true, cellprobs.map { case (cell, prob) => (cell, prob / totalprob) })
 
     new CellDist[Co](norm_cellprobs, normalized)
+  }
+
+  /**
+   * Create a distribution over cells from the number of documents in
+   * each cell.
+   */
+  def get_cell_dist_from_doc_count(grid: Grid[Co]) = {
+    create_normalized_cell_dist(grid.iter_nonempty_cells.map { cell =>
+      (cell, cell.num_docs.toDouble)
+    })
+  }
+
+  /**
+   * Create a distribution over cells that is associated with a gram,
+   * based on the relative probabilities of the gram in the language models
+   * of the various cells.  That is, if we have a set of cells, each with a
+   * language model, then we can imagine conceptually inverting the process
+   * to generate a cell distribution over grams.  Basically, for a given gram,
+   * look to see what its probability is in all cells; normalize, and we have
+   * a cell distribution.
+   */
+  def get_cell_dist(grid: Grid[Co], gram: Gram) = {
+    create_normalized_cell_dist(grid.iter_nonempty_cells.map { cell =>
+      (cell, cell.grid_lm.gram_prob(gram))
+    })
   }
 
   /**

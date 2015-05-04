@@ -70,16 +70,27 @@ class GenerateKMLParameters(
   parser: ArgParser
 ) extends GeolocateParameters(parser) {
   //// Options used only in KML generation (--mode=generate-kml)
+  var kml_dist_type =
+    ap.option[String]("kml-dist-type", "kdt",
+      default = "words",
+      choices = Seq("words", "num-docs"),
+      help = """Value to use for generating KML. 'words' means use specific
+words, as specified in '--kml-words'; 'num-docs' means use the number of
+documents in a cell.""")
   var kml_words =
     ap.option[String]("k", "kml-words", "kw",
-      must = be_specified,
       help = """Words to generate KML distributions for, when
 --mode=generate-kml.  Each word should be separated by a comma.  A separate
 file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
+  if (ap.parsedValues) {
+    if (kml_dist_type == "words" && kml_words == null)
+      ap.error("Must specify --kml-words")
+  }
+
   // Same as above but a sequence
   var split_kml_words =
-    if (ap.parsedValues) kml_words.split(',')
+    if (ap.parsedValues && kml_dist_type == "words") kml_words.split(',')
     else Array[String]()
   var kml_prefix =
     ap.option[String]("kml-prefix", "kp",
@@ -118,11 +129,15 @@ class GenerateKMLDriver extends
     ) = {
     if (lm_type != "unigram")
       param_error("Only unigram language models supported with GenerateKML")
-    (factory: LangModelFactory) =>
-      new FilterUnigramLangModelBuilder(
-        factory, params.split_kml_words, !params.preserve_case_words,
-        the_stopwords, the_whitelist, params.minimum_word_count,
-        word_weights, missing_word_weight)
+    if (params.kml_dist_type == "words")
+      (factory: LangModelFactory) =>
+        new FilterUnigramLangModelBuilder(
+          factory, params.split_kml_words, !params.preserve_case_words,
+          the_stopwords, the_whitelist, params.minimum_word_count,
+          word_weights, missing_word_weight)
+    else
+      super.get_lang_model_builder_creator(lm_type, word_weights,
+        missing_word_weight)
   }
 
   /**
@@ -133,19 +148,30 @@ class GenerateKMLDriver extends
   def run() {
     val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord]
-    for (word <- params.split_kml_words) {
-      val gram = Unigram.to_index(word)
-      val celldist = cdist_factory.get_cell_dist(grid, gram)
+    val kmlparams = new KMLParameters()
+    kmlparams.kml_max_height = params.kml_max_height
+    kmlparams.kml_transform = params.kml_transform
+    kmlparams.kml_include_cell_names = params.kml_include_cell_names
+    if (params.kml_dist_type == "words") {
+      for (word <- params.split_kml_words) {
+        val gram = Unigram.to_index(word)
+        val celldist = cdist_factory.get_cell_dist(grid, gram)
+        if (!celldist.normalized) {
+          warning("""Non-normalized distribution, apparently word %s not seen anywhere.
+  Not generating an empty KML file.""", word)
+        } else {
+          SphereCellDist.generate_kml_file(grid, gram, celldist,
+            "%s%s.kml" format (params.kml_prefix, word),
+            kmlparams)
+        }
+      }
+    } else {
+      val celldist = cdist_factory.get_cell_dist_from_doc_count(grid)
       if (!celldist.normalized) {
-        warning("""Non-normalized distribution, apparently word %s not seen anywhere.
-Not generating an empty KML file.""", word)
+        warning("""Non-normalized distribution, not generating empty KML file.""")
       } else {
-        val kmlparams = new KMLParameters()
-        kmlparams.kml_max_height = params.kml_max_height
-        kmlparams.kml_transform = params.kml_transform
-        kmlparams.kml_include_cell_names = params.kml_include_cell_names
-        SphereCellDist.generate_kml_file(grid, gram, celldist,
-          "%s%s.kml" format (params.kml_prefix, word),
+        SphereCellDist.generate_kml_file(grid, Unigram.to_index("num-docs"),
+          celldist, "%s-num-docs.kml" format params.kml_prefix,
           kmlparams)
       }
     }
