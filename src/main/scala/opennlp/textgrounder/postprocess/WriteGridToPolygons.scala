@@ -49,9 +49,10 @@ multiple times, or by separating values by a comma.
 }
 
 /**
- * A one-off script for converting the polygons (rectangles, really)
- * and centroids encoded in the output of geolocate.WriteGrid
- * to a format more suitable for use with R.
+ * A script for converting the polygons (rectangles, really) and centroids
+ * encoded in the output of geolocate.WriteGrid to a format more suitable
+ * for use with R. We also output the density of documents (i.e. number of
+ * documents, normalized to produce a density) in each rectangle.
  */
 object WriteGridToPolygons extends ExperimentApp("WriteGridToPolygons") {
 
@@ -59,13 +60,21 @@ object WriteGridToPolygons extends ExperimentApp("WriteGridToPolygons") {
 
   def create_param_object(ap: ArgParser) = new WriteGridToPolygonsParameters(ap)
 
+  def read_normalized(file: String) = {
+    val rows =
+      (for (row <- TextDB.read_textdb(localfh, file)) yield (
+           row, row.gets("num-documents").toInt)).toIterable
+    val sum = rows.map(_._2).sum
+    rows.map { case (row, ndocs) => (row, ndocs.toDouble / sum) }
+  }
+
   def run_program(args: Array[String]) = {
-    val or = localfh.openw(params.output_rectangles)
-    or.println("lat  long  group")
-    val oc = localfh.openw(params.output_centroids)
-    oc.println("lat  long  group")
-    for ((row, group) <-
-         TextDB.read_textdb(localfh, params.input) zip Iterator.from(1)) {
+    val or = Option(params.output_rectangles).map(x => localfh.openw(x))
+    or.foreach(_.println("lat  long  group  density"))
+    val oc = Option(params.output_centroids).map(x => localfh.openw(x))
+    oc.foreach(_.println("lat  long  group  density"))
+    for (((row, density), group) <-
+         read_normalized(params.input) zip Stream.from(1)) {
       val location = row.gets("location")
       val Array(sw, ne) = location.split(":")
       val Array(swlat, swlong) = sw.split(",")
@@ -73,17 +82,21 @@ object WriteGridToPolygons extends ExperimentApp("WriteGridToPolygons") {
       if (swlat.toDouble > nelat.toDouble || swlong.toDouble > nelong.toDouble) {
         println(s"Skipped rectangle crossing the 180th parallel: $location")
       } else {
-        or.println(s"$swlat  $swlong  $group")
-        or.println(s"$nelat  $swlong  $group")
-        or.println(s"$nelat  $nelong  $group")
-        or.println(s"$swlat  $nelong   $group")
-        val centroid = row.gets("centroid")
-        val Array(clat, clong) = centroid.split(",")
-        oc.println(s"$clat  $clong  $group")
+        or.foreach { x =>
+          x.println(s"$swlat  $swlong  $group  $density")
+          x.println(s"$nelat  $swlong  $group  $density")
+          x.println(s"$nelat  $nelong  $group  $density")
+          x.println(s"$swlat  $nelong   $group  $density")
+        }
+        oc.foreach { x =>
+          val centroid = row.gets("centroid")
+          val Array(clat, clong) = centroid.split(",")
+          x.println(s"$clat  $clong  $group  $density")
+        }
       }
     }
-    or.close()
-    oc.close()
+    or.foreach(_.close())
+    oc.foreach(_.close())
     0
   }
 }
