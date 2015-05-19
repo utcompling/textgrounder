@@ -7,6 +7,19 @@ import sys
 import json
 import random
 
+# Convert War of the Rebellion (WOTR) spans (either true, i.e. as manually
+# annotated, or predicted, i.e. using a sequence model based on the manual
+# annotations to generate spans for the entire WOTR corpus) to a TextDB
+# corpus. The TextDB corpus will contain fields for the date, coordinate,
+# unigram counts and text.
+#
+# If we are using true spans, we need to specify '--spans' (the annotated
+# spans from Parse) and '--text' (the raw WOTR text); if we are using
+# predicted spans, we need to specify '--predicted-spans'. In addition,
+# we either need to specify '--output' (the prefix of the TextDB corpus)
+# or '--no-write' (don't write output, useful to get stats on the number of
+# spans).
+
 volume_user = {}
 volume_spans = {}
 volume_text = {}
@@ -131,14 +144,16 @@ def read_volume_spans():
         if inside_text:
           io_spans.append(["%s-%s" % (beg, end), coord, inside_text])
       if vol in volume_spans:
-        if len(volume_spans[vol]) > len(io_spans):
+        existing_coord_spans = len([x for x in volume_spans[vol] if x[1]])
+        new_coord_spans = len([x for x in io_spans if x[1]])
+        if existing_coord_spans > new_coord_spans:
           print "Volume %s: Not overwriting existing user %s spans with fewer spans from %s (%s < %s)" % (
-              vol, volume_user[vol], user, len(io_spans),
-              len(volume_spans[vol]))
+              vol, volume_user[vol], user, new_coord_spans,
+              existing_coord_spans)
         else:
           print "Volume %s: Overwriting existing user %s spans with spans from %s because more of them (%s > %s)" % (
-              vol, volume_user[vol], user, len(io_spans),
-              len(volume_spans[vol]))
+              vol, volume_user[vol], user, new_coord_spans,
+              existing_coord_spans)
           volume_user[vol] = user
           volume_spans[vol] = io_spans
       else:
@@ -185,7 +200,9 @@ def get_lines():
       countmap = intdict()
       for word in words:
         countmap[word] += 1
-      textfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
+      countsfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
+      textfield = (text.replace("%", "%25").replace("\t", "%09").
+          replace("\n", "%0A").replace("\r", "%0D").replace("\f", "%0C"))
       include = False
       lat = None
       lon = None
@@ -200,8 +217,8 @@ def get_lines():
           lat = 0.0
           lon = 0.0
       if include:
-        line = ("vol%s.%s\t%s\t%s\t%s\t%s,%s\t%s" % (
-          vol, span, vol, span, date, lat, lon, textfield))
+        line = ("vol%s.%s\t%s\t%s\t%s\t%s,%s\t%s\t%s" % (
+          vol, span, vol, span, date, lat, lon, countsfield, textfield))
         lines.append(line)
       #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
     vols_lines.append(lines)
@@ -331,7 +348,7 @@ def run():
     if not Opts.no_write:
       for split in split_names:
         outschemafile = open("%s-%s.schema.txt" % (outpref, split), "w")
-        print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts"
+        print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts\ttext"
         print >>outschemafile, "corpus-type\tgeneric"
         print >>outschemafile, "split\t%s" % split
         outschemafile.close()
