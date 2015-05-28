@@ -43,6 +43,8 @@ multiple times, or by separating values by a comma.
   var output_centroids =
     ap.option[String]("output-centroids", "oc",
       help = """File to output centroids to.""")
+  var geojson =
+    ap.flag("geojson", help = """Output in GeoJSON format.""")
 
   if (ap.parsedValues && debug != null)
     parse_debug_spec(debug)
@@ -70,17 +72,28 @@ object WriteGridToPolygons extends ExperimentApp("WriteGridToPolygons") {
 
   def run_program(args: Array[String]) = {
     val or = Option(params.output_rectangles).map(x => localfh.openw(x))
-    or.foreach(_.println("lat  long  group  density"))
     val oc = Option(params.output_centroids).map(x => localfh.openw(x))
-    oc.foreach(_.println("lat  long  group  density"))
+    if (!params.geojson) {
+      or.foreach(_.println("lat  long  group  density"))
+      oc.foreach(_.println("lat  long  group  density"))
+    }
     for (((row, density), group) <-
          read_normalized(params.input) zip Stream.from(1)) {
       val location = row.gets("location")
       val Array(sw, ne) = location.split(":")
       val Array(swlat, swlong) = sw.split(",")
       val Array(nelat, nelong) = ne.split(",")
+      val centroid = row.gets("centroid")
+      val Array(clat, clong) = centroid.split(",")
       if (swlat.toDouble > nelat.toDouble || swlong.toDouble > nelong.toDouble) {
         println(s"Skipped rectangle crossing the 180th parallel: $location")
+      } else if (params.geojson) {
+        or.foreach { x =>
+          x.println(s"""{ "type": "Polygon", "coordinates": [ [ [ $swlong, $swlat ], [ $swlong, $nelat ], [ $nelong, $nelat ], [ $nelong, $swlat ], [ $swlong, $swlat ] ] ] }""")
+        }
+        oc.foreach { x =>
+          x.println(s"""{ "type": "Point", "coordinates": [ $clong, $clat ] }""")
+        }
       } else {
         or.foreach { x =>
           x.println(s"$swlat  $swlong  $group  $density")
@@ -89,8 +102,6 @@ object WriteGridToPolygons extends ExperimentApp("WriteGridToPolygons") {
           x.println(s"$swlat  $nelong   $group  $density")
         }
         oc.foreach { x =>
-          val centroid = row.gets("centroid")
-          val Array(clat, clong) = centroid.split(",")
           x.println(s"$clat  $clong  $group  $density")
         }
       }
