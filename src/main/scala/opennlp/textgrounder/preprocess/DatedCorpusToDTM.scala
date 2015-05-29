@@ -63,18 +63,28 @@ the file in `--country-file`.""")
     help = """Size of time chunks in years for grouping documents.""")
 
   var output_prefix = ap.option[String]("output-prefix", "o", "op",
-    must = be_specified,
-    help = """Output prefix for DTM files.""")
+    help = """Output prefix for DTM files. If omitted, no files are output,
+but statistics are still printed.""")
 
   var preserve_case = ap.flag("preserve-case",
     help = """Preserve case of words when converting to DTM.""")
+
+  var from_to_timeslice = ap.flag("from-to-timeslice", "fts",
+    help = """If specified, output timeslices in FROM-TO format instead of just FROM.""")
+
+  var latex = ap.flag("latex",
+    help = """Output stats in LaTeX format instead of raw human-readable.""")
 
   var stopwords_file = ap.option[String]("stopwords-file", "sf",
     help = """File containing stopwords.""")
 }
 
 case class DMYDate(year: Int, month: Int, day: Int) {
-  def toMDY = "%s %s, %s" format (DMYDate.index_month_map(month), day, year)
+  def toMDY(short: Boolean = false) =
+    if (short)
+      "%02d/%02d/%d" format (month, day, year)
+    else
+      "%s %s, %s" format (DMYDate.index_month_map(month), day, year)
   def toDouble = {
     val cum_lengths =
       if (year % 4 == 0) DMYDate.cum_leap_month_lengths
@@ -231,40 +241,61 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
      * 5. foo-timeslice.dat: Description of each timeslice.
      */
     for ((cell, timeslice_map) <- slice_counts) {
-      val multfile = localfh.openw(params.output_prefix + "." + cell + "-mult.dat")
-      val seqfile = localfh.openw(params.output_prefix + "." + cell + "-seq.dat")
+      val pref = Option(params.output_prefix)
+      val multfile = pref.map(p => localfh.openw(p + "." + cell + "-mult.dat"))
+      val seqfile = pref.map(p => localfh.openw(p + "." + cell + "-seq.dat"))
       val vocabfile =
-        localfh.openw(params.output_prefix + "." + cell + "-vocab.dat")
-      val docfile = localfh.openw(params.output_prefix + "." + cell + "-doc.dat")
+        pref.map(p => localfh.openw(p + "." + cell + "-vocab.dat"))
+      val docfile = pref.map(p => localfh.openw(p + "." + cell + "-doc.dat"))
       val tsfile =
-        localfh.openw(params.output_prefix + "." + cell + "-timeslice.dat")
+        pref.map(p => localfh.openw(p + "." + cell + "-timeslice.dat"))
 
       val sorted_timeslices = timeslice_map.toSeq.sortBy(_._1)
-      seqfile.println(sorted_timeslices.size.toString)
+      seqfile.foreach(_.println(sorted_timeslices.size.toString))
       val memoizer = new StringGramAsIntMemoizer
+      if (params.latex) {
+        errprint("""\begin{tabular}{|c|c|c|}
+\hline
+From & To & #Docs \\
+\hline""")
+      }
       for ((sliceindex, docs) <- sorted_timeslices) {
-        seqfile.println(docs.size.toString)
+        seqfile.foreach(_.println(docs.size.toString))
         import DMYDate.ordering
         val mindate = docs.map(_.date).min
         val maxdate = docs.map(_.date).max
-        //val tslice = "%s-%s" format (mindate.toMDY, maxdate.toMDY)
-        val tslice = "%s" format mindate.toMDY
-        tsfile.println(tslice)
-        errprint("For cell %s, processing slice %s" format (cell, tslice))
+        val tslice =
+          if (params.from_to_timeslice)
+            "%s-%s" format (mindate.toMDY(), maxdate.toMDY())
+          else
+            "%s" format mindate.toMDY()
+        tsfile.foreach(_.println(tslice))
+        if (params.latex) {
+          errprint("""%s & %s & %s \\""" format (
+            mindate.toMDY(true), maxdate.toMDY(true), docs.size)
+          )
+        } else {
+          errprint("For cell %s, processing slice %s, count = %s" format
+            (cell, tslice, docs.size))
+        }
         for (doc <- docs) {
-          multfile.println(counts_to_lda(memoizer, doc.counts))
-          docfile.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
-            doc.date.toMDY, doc.counts))
+          multfile.foreach(_.println(counts_to_lda(memoizer, doc.counts)))
+          docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
+            doc.date.toMDY(), doc.counts)))
         }
       }
       for (i <- 0 to memoizer.maximum_index) {
-        vocabfile.println(memoizer.to_raw(i))
+        vocabfile.foreach(_.println(memoizer.to_raw(i)))
       }
-      multfile.close()
-      seqfile.close()
-      vocabfile.close()
-      docfile.close()
-      tsfile.close()
+      multfile.foreach(_.close())
+      seqfile.foreach(_.close())
+      vocabfile.foreach(_.close())
+      docfile.foreach(_.close())
+      tsfile.foreach(_.close())
+      if (params.latex) {
+        errprint("""\hline
+\end{tabular}""")
+      }
     }
     0
   }
