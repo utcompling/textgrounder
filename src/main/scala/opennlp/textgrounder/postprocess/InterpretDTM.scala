@@ -94,7 +94,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     val vocab = localfh.openr(params.input_prefix + "-vocab.dat").toIndexedSeq
 
     // Read timeslice file
-    val timeslices = localfh.openr(params.input_prefix + "-timeslice.dat").toIndexedSeq
+    val timeslices = localfh.openr(params.input_prefix + "-slice.dat").toIndexedSeq
 
     // For each topic, find the top words
     for (topic <- 0 until num_topics) {

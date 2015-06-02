@@ -20,6 +20,9 @@ package preprocess
 
 import collection.mutable
 
+import com.sromku.polygon._
+import net.liftweb
+
 import util.argparser._
 import util.collection._
 import util.experiment._
@@ -48,15 +51,21 @@ one textdb in the directory.""")
     choices = Seq("all", "grid", "country"),
     default = "all",
     help = """How to group documents by coordinate (all, by grid coordinate
-according to the grid size given in `--grid-size`, or by country according to
-the file in `--country-file`.""")
+according to the grid size given in `--grid-size`, or by country -- not
+implemented.""")
 
   var grid_size = ap.option[Double]("grid-size", "s", "gs",
     default = 5.0,
     help = """Grid size in degrees for grouping documents.""")
 
-  var country_file = ap.option[String]("country-file", "c", "cf",
-    help = """File containing mapping from coordinates to countries.""")
+  var region_slice = ap.flag("region-slice",
+    help = """Create slices across regions rather than time.""")
+
+  var region_file = ap.option[String]("region-file", "r", "rf",
+    help = """File listing Civil War regions, in a specific GeoJSON format.""")
+
+  var region_list = ap.option[String]("region-list", "rl",
+    help = """List of regions to use, in order, separated by commas.""")
 
   var time_size = ap.option[Double]("time-size", "t", "ts",
     default = 10.0,
@@ -77,6 +86,17 @@ but statistics are still printed.""")
 
   var stopwords_file = ap.option[String]("stopwords-file", "sf",
     help = """File containing stopwords.""")
+
+  var filter_regex = ap.option[String]("filter-regex", "fr",
+    help = """Regex to use to filter text of input documents. Not anchored at
+either end.""")
+
+  var max_lines = ap.option[Int]("max-lines", "ml",
+    help = """Max documents to process, for debugging.""")
+
+  var min_word_count = ap.option[Int]("min-word-count", "mwc",
+    help = """Minimum word count in corpus to keep word.""",
+    default = 1)
 }
 
 case class DMYDate(year: Int, month: Int, day: Int) {
@@ -137,13 +157,13 @@ object DMYDate {
  * 1. We group all paragraphs of all coordinates together into one document.
  * 2. We create separate documents for batches of points according to a grid,
  *    e.g. 5x5 degrees.
- * 3. We create separate documents for points according to country.
+ * 3. We create separate documents for points according to regions.
  *
  * We work as follows:
  *
  * 1. Read in all the paragraphs with their coordinates, from all files.
- * 2. For each coordinate, find the grid cell and time slice.
- * 3. For each grid cell across time slices, generate DTM data.
+ * 2. For each coordinate, find the grid cell and slice.
+ * 3. For each grid cell across slices, generate DTM data.
  */
 object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 
@@ -151,16 +171,43 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 
   def create_param_object(ap: ArgParser) = new DatedCorpusToDTMParameters(ap)
 
-  case class Document(title: String, coord: String, date: DMYDate, counts: String)
+  case class Document(title: String, coord: String, date: Option[DMYDate], counts: String)
 
-  // Map from cell ID's to years to sequences of documents.
+  def read_json_polygons(file: String) = {
+    val contents = reflect.io.File(file).slurp
+    val parsed = liftweb.json.parse(contents)
+    val regions =
+      (parsed \\ "features").values.asInstanceOf[List[Map[String, Any]]]
+    for (region <- regions) yield {
+      val props = region("properties").asInstanceOf[Map[String, Any]]
+      val id = props("id").asInstanceOf[BigInt].toInt
+      val name = props("name").asInstanceOf[String]
+      val coords = region("geometry").
+        asInstanceOf[Map[String,Any]]("coordinates").
+        asInstanceOf[List[List[List[Double]]]]
+      assert(coords.size == 1)
+      val polygon = Polygon.Builder()
+      for (List(long, lat) <- coords(0))
+        polygon.addVertex(new Point(long.toFloat, lat.toFloat))
+      (id, name, polygon.build())
+    }
+  }
+
+  lazy val regions = read_json_polygons(params.region_file)
+  lazy val region_list = params.region_list.split(",")
+  lazy val region_to_id = region_list.zipWithIndex.toMap
+  lazy val id_to_region = region_to_id.map { case (x,y) => (y,x) }
+
+  // Map from cell ID's to slice indices (e.g. years) to sequences of documents.
   val slice_counts = bufmapmap[String, Int, Document]()
 
-  def coord_to_cell(coord: String) = {
+  val corpus_word_counts = intmap[String]()
+
+  def coord_to_cell(coord: String): String = {
+    val Array(lat, long) = coord.split(",").map(_.toDouble)
     params.group match {
       case "all" => "all"
       case "grid" => {
-        val Array(lat, long) = coord.split(",").map(_.toDouble)
         val roundlat = (lat / params.grid_size).toInt * params.grid_size
         val roundlong = (long / params.grid_size).toInt * params.grid_size
         "%s,%s" format (roundlat, roundlong)
@@ -173,6 +220,29 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
     (date.toDouble / params.time_size).toInt
   }
 
+  def coord_to_region_id(coord: String): String = {
+    val Array(lat, long) = coord.split(",").map(_.toFloat)
+    for ((id, name, polygon) <- regions) {
+      // Check the point, but also check slightly jittered points in
+      // each of four directions in case we're exactly on a line (in
+      // which case we might get a false value for the regions on both
+      // sides of the line).
+      if (polygon.contains(new Point(long, lat)) ||
+          polygon.contains(new Point(long + 0.0001f, lat)) ||
+          polygon.contains(new Point(long - 0.0001f, lat)) ||
+          polygon.contains(new Point(long, lat + 0.0001f)) ||
+          polygon.contains(new Point(long, lat - 0.0001f)))
+        return name
+    }
+    return "unknown"
+  }
+
+  def coord_to_slice_id(coord: String) = {
+    val region_id = coord_to_region_id(coord)
+    // errprint("For coord %s, region_id %s", coord, region_id)
+    region_to_id.get(region_id)
+  }
+
   protected def read_stopwords = {
     if (params.stopwords_file == null)
       Set[String]()
@@ -181,47 +251,104 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
   }
 
   lazy val the_stopwords = read_stopwords
+  lazy val non_anchored_regex =
+    if (params.filter_regex == null) null
+    else "(?s).*" + params.filter_regex + ".*"
 
-  def process_file(file: String) {
+  def process_file(file: String, process_row: Row => Unit) {
     errprint("Processing %s ...", file)
     val task = new Meter("reading", "line")
-    TextDB.read_textdb(localfh, file).foreachMetered(task) { row =>
-      val title = row.gets("title")
-      val coord = row.gets("coord")
-      val date = DMYDate.parse(row.gets("date"))
-      val counts = row.gets("unigram-counts")
-      if (counts.size > 0 && date != None)
-        slice_counts(coord_to_cell(coord))(date_to_time_slice(date.get)) +=
-          Document(title, coord, date.get, counts)
+    TextDB.read_textdb(localfh, file).zipWithIndex.
+        foreachMetered(task) { case (row, index) =>
+      if (params.max_lines > 0 && index >= params.max_lines)
+        return
+      // errprint(Decoder.string(row.gets("text")))
+      if (non_anchored_regex == null || Decoder.string(row.gets("text")).
+          matches(non_anchored_regex)) {
+        process_row(row)
+      }
     }
   }
 
-  def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String) = {
-    val counts = Decoder.count_map_seq(countstr)
-    val tokens = counts.map(_._2).sum
-    val processed_counts = intmap[String]()
-    for ((word, count) <- counts) {
-      if (the_stopwords.size == 0 || !the_stopwords(word.toLowerCase)) {
-        if (params.preserve_case)
-          processed_counts(word) += count
-        else
-          processed_counts(word.toLowerCase) += count
+  def process_file_for_min_word_count(file: String) {
+    process_file(file, row => {
+      val counts = row.gets("unigram-counts")
+      for ((word, count) <- words_and_counts(counts, false))
+        corpus_word_counts(word) += count
+    })
+  }
+
+  def process_file_for_slices(file: String) {
+    process_file(file, row => {
+      val title = row.gets("title")
+      val coord = row.gets("coord")
+      val date: Option[DMYDate] = DMYDate.parse(row.gets("date"))
+      val counts = row.gets("unigram-counts")
+      if (counts.size > 0) {
+        val slice_id: Option[Int] =
+          if (params.region_slice) {
+            if (coord != "") coord_to_slice_id(coord)
+            else None
+          } else
+            date.map(x => date_to_time_slice(x))
+        slice_id.foreach { x =>
+          slice_counts(coord_to_cell(coord))(x) +=
+            Document(title, coord, date, counts)
+        }
       }
-    }
+    })
+  }
+
+  /**
+   * Yield words and counts in the given count map, canonicalizing the
+   * words in various ways, filtering stopwords, optionally lowercasing
+   * and optionally filtering words below the minimum count. The same
+   * word may be yielded more than once.
+   */
+  def words_and_counts(countstr: String, filter_min: Boolean) = {
+    val counts = Decoder.count_map_seq(countstr)
+    for ((rawword, count) <- counts;
+         // Do some processing on the words to handle most mistakes in
+         // word splitting
+         canonword = rawword.replace(".-", " ").
+           replaceAll("[^-a-zA-Z0-9,$']", " ").
+           replaceAll("([^0-9]),([^0-9])", "$1 $2").
+           replaceAll("""\$([^0-9]),([^0-9])""", "$1 $2").
+           replaceAll("-+", "-").
+           replaceAll("[-,$]$", "").
+           replaceAll("'s$", ""). // Remove possessive 's
+           trim;
+         word <- canonword.split(" +");
+         if word.size > 1;
+         if the_stopwords.size == 0 || !the_stopwords(word.toLowerCase);
+         nocaseword = if (params.preserve_case) word else word.toLowerCase;
+         if (!filter_min ||
+           corpus_word_counts(nocaseword) >= params.min_word_count)
+        ) yield (nocaseword, count)
+  }
+
+  def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String) = {
+    val processed_counts = intmap[String]()
+    for ((word, count) <- words_and_counts(countstr, true))
+      processed_counts(word) += count
     val ldastr =
       processed_counts.toSeq.sortBy(-_._2).map { case (word, count) =>
         "%s:%s" format (memoizer.to_index(word), count)
       }.mkString(" ")
-    processed_counts.size + " " + ldastr
+    val numtokens = processed_counts.size
+    if (numtokens == 0) None
+    else Some(processed_counts.size + " " + ldastr)
   }
 
   def run_program(args: Array[String]) = {
     for (file <- params.input)
-      process_file(file)
+      process_file_for_min_word_count(file)
+    for (file <- params.input)
+      process_file_for_slices(file)
     /* For each geographic slice, we output five files:
      *
      * 1. foo-mult.dat: DTM document file, listing documents, one per line,
-     *    sorted by timeslice. The format of a line is
+     *    sorted by slice. The format of a line is
      *
      *    NUMTOKENS INDEX:COUNT ...
      *
@@ -230,17 +357,17 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
      *    word converted into a zero-based index.
      *
      * 2. foo-seq.dat: DTM sequence file, listing the number of documents in
-     *    each successive timeslice. The first line is the number of
-     *    timeslices, and each successive line is the number of documents in
-     *    a given timeslice.
+     *    each successive lice. The first line is the number of
+     *    lices, and each successive line is the number of documents in
+     *    a given slice.
      *
      * 3. foo-vocab.dat: Listing of vocabulary, ordered by index.
      *
      * 4. foo-doc.dat: Description of each document in the DTM document file.
      *
-     * 5. foo-timeslice.dat: Description of each timeslice.
+     * 5. foo-slice.dat: Description of each slice.
      */
-    for ((cell, timeslice_map) <- slice_counts) {
+    for ((cell, slice_map) <- slice_counts) {
       val pref = Option(params.output_prefix)
       val multfile = pref.map(p => localfh.openw(p + "." + cell + "-mult.dat"))
       val seqfile = pref.map(p => localfh.openw(p + "." + cell + "-seq.dat"))
@@ -248,40 +375,51 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         pref.map(p => localfh.openw(p + "." + cell + "-vocab.dat"))
       val docfile = pref.map(p => localfh.openw(p + "." + cell + "-doc.dat"))
       val tsfile =
-        pref.map(p => localfh.openw(p + "." + cell + "-timeslice.dat"))
+        pref.map(p => localfh.openw(p + "." + cell + "-slice.dat"))
 
-      val sorted_timeslices = timeslice_map.toSeq.sortBy(_._1)
-      seqfile.foreach(_.println(sorted_timeslices.size.toString))
+      val sorted_slices = slice_map.toSeq.sortBy(_._1)
+      seqfile.foreach(_.println(sorted_slices.size.toString))
       val memoizer = new StringGramAsIntMemoizer
       if (params.latex) {
-        errprint("""\begin{tabular}{|c|c|c|}
+        errprint("""\begin{tabular}{%s|c|c|c|}
 \hline
-From & To & #Docs \\
-\hline""")
+%sFrom & To & #Docs \\
+\hline""",
+          if (params.region_slice) "|c" else "",
+          if (params.region_slice) "Region & " else ""
+        )
       }
-      for ((sliceindex, docs) <- sorted_timeslices) {
+      for ((sliceindex, docs) <- sorted_slices) {
         seqfile.foreach(_.println(docs.size.toString))
         import DMYDate.ordering
-        val mindate = docs.map(_.date).min
-        val maxdate = docs.map(_.date).max
-        val tslice =
-          if (params.from_to_timeslice)
+        val mindate = docs.flatMap(_.date).min
+        val maxdate = docs.flatMap(_.date).max
+        val slice_name =
+          if (params.region_slice)
+            id_to_region(sliceindex)
+          else if (params.from_to_timeslice)
             "%s-%s" format (mindate.toMDY(), maxdate.toMDY())
           else
             "%s" format mindate.toMDY()
-        tsfile.foreach(_.println(tslice))
+        tsfile.foreach(_.println(slice_name))
+        var doccount = 0
+        for (doc <- docs;
+             // Skip documents with no words after filtering for stopwords
+             // and --min-word-count
+             ldastr <- counts_to_lda(memoizer, doc.counts)) {
+          doccount += 1
+          multfile.foreach(_.println(ldastr))
+          docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
+            doc.date.map(_.toMDY()).getOrElse(""), doc.counts)))
+        }
         if (params.latex) {
-          errprint("""%s & %s & %s \\""" format (
-            mindate.toMDY(true), maxdate.toMDY(true), docs.size)
+          errprint("""%s%s & %s & %s \\""",
+            if (params.region_slice) slice_name + " & " else "",
+            mindate.toMDY(true), maxdate.toMDY(true), doccount
           )
         } else {
           errprint("For cell %s, processing slice %s, count = %s" format
-            (cell, tslice, docs.size))
-        }
-        for (doc <- docs) {
-          multfile.foreach(_.println(counts_to_lda(memoizer, doc.counts)))
-          docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
-            doc.date.toMDY(), doc.counts)))
+            (cell, slice_name, doccount))
         }
       }
       for (i <- 0 to memoizer.maximum_index) {
