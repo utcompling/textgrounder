@@ -44,7 +44,7 @@ package object table {
     // Make sure all lines have same number of columns
     lines foreach { line => assert_==(line.size, ncols) }
     val maxsize = lines.transpose.map { line =>
-      line.map { _.length}.max min maxcolsize
+      line.map { _.length}.max min maxcolsize max 1
     }
     maxsize.map { size => s"%-${size}s" } mkString " "
   }
