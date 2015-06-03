@@ -50,6 +50,11 @@ class InterpretDTMParameters(ap: ArgParser) {
   var topics = ap.option[String]("topics", "t",
     help = """Topics to display; numbers separated by commas.""")
 
+  var boldface = ap.option[String]("boldface", "b",
+    help = """Words to boldface. Format is WORD,WORD,... In place of
+a WORD can be WORD/TOPIC where TOPIC is a topic number to boldface
+only a word in a specific topic.""")
+
   var two_columns = ap.flag("two-columns", "tc",
     help = """Display topics as two columns.""")
 }
@@ -118,9 +123,20 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     // Compute remapped headings
     val timeslices = orig_timeslices.map { x => remap_headings.getOrElse(x, x) }
 
+    // Set of topics to include
     val topicset =
       if (params.topics == null) (0 until num_topics).toSet
       else params.topics.split(",").map(_.toInt).toSet
+
+    // Words in topics to boldface
+    var boldfacemap =
+      params.boldface.split(",").map { spec =>
+        if (spec contains "/") {
+          val Array(word, topic) = spec.split("/")
+          (word, topic.toInt)
+        } else
+          (spec, -1)
+      }.toMap
 
     // For each topic, find the top words
     val topic_top_words =
@@ -151,6 +167,23 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
         (seq_top_words, topic)
       }
 
+    // Maybe boldface some words
+    val bf_topic_top_words =
+      if (!params.latex) topic_top_words
+      else {
+        topic_top_words.map { case (words, topic) =>
+          (words.map { line =>
+            line.map { word =>
+              val bftopic = boldfacemap.getOrElse(word, -2)
+              if (bftopic == -1 || bftopic == topic)
+                """\textbf{%s}""" format word
+              else
+                word
+            }
+          }, topic)
+        }
+      }
+
     def paste_two_topics(topic_1: Seq[Seq[String]],
         topic_2: Seq[Seq[String]]) = {
       (topic_1 zip topic_2).map { case (x, y) => x ++ y }
@@ -160,7 +193,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
       if (params.latex)
         outprint("""\begin{tabular}{|%s|%s}""", "c|" * timeslices.size,
           "c|" * timeslices.size)
-      topic_top_words.sliding(2, 2).foreach { group =>
+      bf_topic_top_words.sliding(2, 2).foreach { group =>
         val ((tstr1, tstr2), headers, words) = group match {
           case Seq((tw1, topic1), (tw2, topic2)) => {
             (("Topic %s" format topic1, "Topic %s" format topic2),
@@ -199,7 +232,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     } else {
       if (params.latex)
         outprint("""\begin{tabular}{|%s}""", "c|" * timeslices.size)
-      for ((seq_top_words, topic) <- topic_top_words) {
+      for ((seq_top_words, topic) <- bf_topic_top_words) {
         if (params.latex) {
           outprint("""\hline
 \multicolumn{%s}{|c|}{Topic %s} \\
