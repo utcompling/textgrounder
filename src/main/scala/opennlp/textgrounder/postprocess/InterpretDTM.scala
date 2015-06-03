@@ -40,6 +40,9 @@ class InterpretDTMParameters(ap: ArgParser) {
   var words_per_topic = ap.option[Int]("words-per-topic", "w", "wpt",
     default = 10,
     help = """Number of top words per topic to display.""")
+
+  var latex = ap.flag("latex",
+    help = """Display in LaTeX format.""")
 }
 
 /**
@@ -122,7 +125,24 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
              index => vocab(index)
            }.toIndexedSeq
        }.toIndexedSeq.transpose
-      outprint(format_table(timeslices +: seq_top_words))
+      if (params.latex) {
+        outprint("""\begin{tabular}{|%s}
+\hline
+%s \\
+\hline
+\hline""",
+          "c|" * timeslices.size,
+          timeslices mkString " & "
+        )
+        for (line <- seq_top_words) {
+          outprint("""%s \\
+\hline""",
+            line mkString " & "
+          )
+        }
+        outprint("""\end{tabular}""")
+      } else
+        outprint(format_table(timeslices +: seq_top_words))
     }
   }
 
