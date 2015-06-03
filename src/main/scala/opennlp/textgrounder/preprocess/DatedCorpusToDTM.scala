@@ -97,6 +97,10 @@ either end.""")
   var min_word_count = ap.option[Int]("min-word-count", "mwc",
     help = """Minimum word count in corpus to keep word.""",
     default = 1)
+
+  var min_slice_count = ap.option[Int]("min-slice-count", "msc",
+    help = """Minimum document count in slice to keep it.""",
+    default = 1)
 }
 
 case class DMYDate(year: Int, month: Int, day: Int) {
@@ -322,7 +326,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
          if word.size > 1;
          if the_stopwords.size == 0 || !the_stopwords(word.toLowerCase);
          nocaseword = if (params.preserve_case) word else word.toLowerCase;
-         if (!filter_min ||
+         if (!filter_min || params.min_word_count <= 1 ||
            corpus_word_counts(nocaseword) >= params.min_word_count)
         ) yield (nocaseword, count)
   }
@@ -341,8 +345,10 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
   }
 
   def run_program(args: Array[String]) = {
-    for (file <- params.input)
-      process_file_for_min_word_count(file)
+    if (params.min_word_count > 1) {
+      for (file <- params.input)
+        process_file_for_min_word_count(file)
+    }
     for (file <- params.input)
       process_file_for_slices(file)
     /* For each geographic slice, we output five files:
@@ -402,24 +408,32 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           else
             "%s" format mindate.toMDY()
         tsfile.foreach(_.println(slice_name))
-        var doccount = 0
-        for (doc <- docs;
-             // Skip documents with no words after filtering for stopwords
-             // and --min-word-count
-             ldastr <- counts_to_lda(memoizer, doc.counts)) {
-          doccount += 1
-          multfile.foreach(_.println(ldastr))
-          docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
-            doc.date.map(_.toMDY()).getOrElse(""), doc.counts)))
-        }
-        if (params.latex) {
-          errprint("""%s%s & %s & %s \\""",
-            if (params.region_slice) slice_name + " & " else "",
-            mindate.toMDY(true), maxdate.toMDY(true), doccount
-          )
+        var docs_ldastr =
+          for (doc <- docs;
+               // Skip documents with no words after filtering for stopwords
+               // and --min-word-count
+               ldastr <- counts_to_lda(memoizer, doc.counts))
+            yield (doc, ldastr)
+        if (docs_ldastr.size < params.min_slice_count) {
+          if (!params.latex) {
+            errprint("Skipped because count %s < %s: cell %s, slice %s",
+              docs_ldastr.size, params.min_slice_count, cell, slice_name)
+          }
         } else {
-          errprint("For cell %s, processing slice %s, count = %s" format
-            (cell, slice_name, doccount))
+          for ((doc, ldastr) <- docs_ldastr) {
+            multfile.foreach(_.println(ldastr))
+            docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
+              doc.date.map(_.toMDY()).getOrElse(""), doc.counts)))
+          }
+          if (params.latex) {
+            errprint("""%s%s & %s & %s \\""",
+              if (params.region_slice) slice_name + " & " else "",
+              mindate.toMDY(true), maxdate.toMDY(true), docs_ldastr.size
+            )
+          } else {
+            errprint("For cell %s, processing slice %s, count = %s" format
+              (cell, slice_name, docs_ldastr.size))
+          }
         }
       }
       for (i <- 0 to memoizer.maximum_index) {
