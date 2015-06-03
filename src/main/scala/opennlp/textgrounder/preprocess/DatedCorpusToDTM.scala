@@ -383,8 +383,13 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       val tsfile =
         pref.map(p => localfh.openw(p + "." + cell + "-slice.dat"))
 
+      // Keep track of the slice counts for slices we keep, then write
+      // them out at the end to the sequence file. We do that because we
+      // need to write out the count of slices before the individual slice
+      // counts, and we don't know how many till after we've processed
+      // all the slices.
+      val slice_counts = mutable.Buffer[Int]()
       val sorted_slices = slice_map.toSeq.sortBy(_._1)
-      seqfile.foreach(_.println(sorted_slices.size.toString))
       val memoizer = new StringGramAsIntMemoizer
       if (params.latex) {
         errprint("""\begin{tabular}{%s|c|c|c|}
@@ -396,7 +401,6 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         )
       }
       for ((sliceindex, docs) <- sorted_slices) {
-        seqfile.foreach(_.println(docs.size.toString))
         import DMYDate.ordering
         val mindate = docs.flatMap(_.date).min
         val maxdate = docs.flatMap(_.date).max
@@ -404,10 +408,9 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           if (params.region_slice)
             id_to_region(sliceindex)
           else if (params.from_to_timeslice)
-            "%s-%s" format (mindate.toMDY(), maxdate.toMDY())
+            "%s-%s" format (mindate.toMDY(true), maxdate.toMDY(true))
           else
-            "%s" format mindate.toMDY()
-        tsfile.foreach(_.println(slice_name))
+            "%s" format mindate.toMDY(true)
         var docs_ldastr =
           for (doc <- docs;
                // Skip documents with no words after filtering for stopwords
@@ -420,6 +423,8 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
               docs_ldastr.size, params.min_slice_count, cell, slice_name)
           }
         } else {
+          tsfile.foreach(_.println(slice_name))
+          slice_counts += docs_ldastr.size
           for ((doc, ldastr) <- docs_ldastr) {
             multfile.foreach(_.println(ldastr))
             docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
@@ -439,6 +444,9 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       for (i <- 0 to memoizer.maximum_index) {
         vocabfile.foreach(_.println(memoizer.to_raw(i)))
       }
+      seqfile.foreach(_.println(slice_counts.size.toString))
+      for (count <- slice_counts)
+        seqfile.foreach(_.println(count.toString))
       multfile.foreach(_.close())
       seqfile.foreach(_.close())
       vocabfile.foreach(_.close())
