@@ -43,6 +43,15 @@ class InterpretDTMParameters(ap: ArgParser) {
 
   var latex = ap.flag("latex",
     help = """Display in LaTeX format.""")
+
+  var rename_headings = ap.option[String]("rename-headings", "rh",
+    help = """Rename headings, in the form FROM=TO,FROM=TO,....""")
+
+  var topics = ap.option[String]("topics", "t",
+    help = """Topics to display; numbers separated by commas.""")
+
+  var two_columns = ap.flag("two-columns", "tc",
+    help = """Display topics as two columns.""")
 }
 
 /**
@@ -97,52 +106,122 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
     val vocab = localfh.openr(params.input_prefix + "-vocab.dat").toIndexedSeq
 
     // Read timeslice file
-    val timeslices = localfh.openr(params.input_prefix + "-slice.dat").toIndexedSeq
+    val orig_timeslices = localfh.openr(params.input_prefix + "-slice.dat").toIndexedSeq
+
+    // Compute map to remap headings
+    val remap_headings =
+      if (params.rename_headings == null) Map[String,String]()
+      else params.rename_headings.split(",").map { _.split("=") }.map {
+        case Array(from, to) => (from, to)
+      }.toMap
+
+    // Compute remapped headings
+    val timeslices = orig_timeslices.map { x => remap_headings.getOrElse(x, x) }
+
+    val topicset =
+      if (params.topics == null) (0 until num_topics).toSet
+      else params.topics.split(",").map(_.toInt).toSet
 
     // For each topic, find the top words
-    for (topic <- 0 until num_topics) {
-      // Read the probabilities; we get an array of arrays, first indexed
-      // by timeslice, then by word
-      val log_probs = read_log_probs("%s/lda-seq/topic-%03d-var-e-log-prob.dat"
-        format (params.output_dir, topic), num_terms, seq_length)
-      // outprint("Log probs: %s" format log_probs.map(_.toIndexedSeq).toIndexedSeq)
-      outprint("For dir %s, topic %s:" format (dir, topic))
-      // For each timeslice, find the top N words by probability.
-      // Transpose the resulting array of arrays so we output the timeslice
-      // words in columns.
-      // val seq_top_word_probs =
-      //   log_probs.map { seq_topic_probs =>
-      //     seq_topic_probs.zipWithIndex.sortBy(-_._1).
-      //       take(params.words_per_topic).map {
-      //         case (prob, index) => "%s, %s" format (index, prob)
-      //       }.toIndexedSeq
-      //   }.toIndexedSeq.transpose
-      // outprint(format_table(timeslices +: seq_top_word_probs))
-      val seq_top_words =
-       log_probs.map { seq_topic_probs =>
-         seq_topic_probs.zipWithIndex.sortBy(-_._1).
-           take(params.words_per_topic).map(_._2).map {
-             index => vocab(index)
-           }.toIndexedSeq
-       }.toIndexedSeq.transpose
-      if (params.latex) {
-        outprint("""\begin{tabular}{|%s}
+    val topic_top_words =
+      for (topic <- 0 until num_topics; if topicset contains topic) yield {
+        // Read the probabilities; we get an array of arrays, first indexed
+        // by timeslice, then by word
+        val log_probs = read_log_probs("%s/lda-seq/topic-%03d-var-e-log-prob.dat"
+          format (params.output_dir, topic), num_terms, seq_length)
+        // outprint("Log probs: %s" format log_probs.map(_.toIndexedSeq).toIndexedSeq)
+        // For each timeslice, find the top N words by probability.
+        // Transpose the resulting array of arrays so we output the timeslice
+        // words in columns.
+        // val seq_top_word_probs =
+        //   log_probs.map { seq_topic_probs =>
+        //     seq_topic_probs.zipWithIndex.sortBy(-_._1).
+        //       take(params.words_per_topic).map {
+        //         case (prob, index) => "%s, %s" format (index, prob)
+        //       }.toIndexedSeq
+        //   }.toIndexedSeq.transpose
+        // outprint(format_table(timeslices +: seq_top_word_probs))
+        val seq_top_words =
+         log_probs.map { seq_topic_probs =>
+           seq_topic_probs.zipWithIndex.sortBy(-_._1).
+             take(params.words_per_topic).map(_._2).map {
+               index => vocab(index)
+             }.toIndexedSeq
+         }.toIndexedSeq.transpose
+        (seq_top_words, topic)
+      }
+
+    def paste_two_topics(topic_1: Seq[Seq[String]],
+        topic_2: Seq[Seq[String]]) = {
+      (topic_1 zip topic_2).map { case (x, y) => x ++ y }
+    }
+
+    if (params.two_columns) {
+      if (params.latex)
+        outprint("""\begin{tabular}{|%s|%s}""", "c|" * timeslices.size,
+          "c|" * timeslices.size)
+      topic_top_words.sliding(2, 2).foreach { group =>
+        val ((tstr1, tstr2), headers, words) = group match {
+          case Seq((tw1, topic1), (tw2, topic2)) => {
+            (("Topic %s" format topic1, "Topic %s" format topic2),
+             timeslices ++ timeslices,
+             paste_two_topics(tw1, tw2))
+          }
+          case Seq((tw1, topic1)) => {
+            (("Topic %s" format topic1, ""),
+             timeslices ++ timeslices.map(x => ""),
+             paste_two_topics(tw1, tw1.map { x => x.map(y => "") }))
+          }
+        }
+        if (params.latex) {
+          outprint("""\hline
+\multicolumn{%s}{|c||}{%s} & \multicolumn{%s}{|c|}{%s} \\
 \hline
 %s \\
 \hline
 \hline""",
-          "c|" * timeslices.size,
-          timeslices mkString " & "
-        )
-        for (line <- seq_top_words) {
-          outprint("""%s \\
-\hline""",
-            line mkString " & "
+            timeslices.size, tstr1, timeslices.size, tstr2,
+            headers mkString " & "
           )
+          for (line <- words) {
+            outprint("""%s \\
+\hline""",
+              line mkString " & "
+            )
+          }
+        } else {
+          outprint("For dir %s: %s, %s" format (dir, tstr1, tstr2))
+          outprint(format_table(headers +: words))
         }
+      }
+      if (params.latex)
         outprint("""\end{tabular}""")
-      } else
-        outprint(format_table(timeslices +: seq_top_words))
+    } else {
+      if (params.latex)
+        outprint("""\begin{tabular}{|%s}""", "c|" * timeslices.size)
+      for ((seq_top_words, topic) <- topic_top_words) {
+        if (params.latex) {
+          outprint("""\hline
+\multicolumn{%s}{|c|}{Topic %s} \\
+\hline
+%s \\
+\hline
+\hline""",
+            timeslices.size, topic, timeslices mkString " & "
+          )
+          for (line <- seq_top_words) {
+            outprint("""%s \\
+\hline""",
+              line mkString " & "
+            )
+          }
+        } else {
+          outprint("For dir %s, topic %s:" format (dir, topic))
+          outprint(format_table(timeslices +: seq_top_words))
+        }
+      }
+      if (params.latex)
+        outprint("""\end{tabular}""")
     }
   }
 
