@@ -130,13 +130,16 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
 
     // Words in topics to boldface
     var boldfacemap =
-      params.boldface.split(",").map { spec =>
-        if (spec contains "/") {
-          val Array(word, topic) = spec.split("/")
-          (word, topic.toInt)
-        } else
-          (spec, -1)
-      }.toMap
+      if (params.boldface == null) Map[String, Int]()
+      else {
+        params.boldface.split(",").map { spec =>
+          if (spec contains "/") {
+            val Array(word, topic) = spec.split("/")
+            (word, topic.toInt)
+          } else
+            (spec, -1)
+        }.toMap
+      }
 
     // For each topic, find the top words
     val topic_top_words =
@@ -176,7 +179,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
             line.map { word =>
               val bftopic = boldfacemap.getOrElse(word, -2)
               if (bftopic == -1 || bftopic == topic)
-                """\textbf{%s}""" format word
+                """\textbf{\textcolor{red}{%s}}""" format word
               else
                 word
             }
