@@ -129,8 +129,8 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
       else params.topics.split(",").map(_.toInt).toSet
 
     // Words in topics to boldface
-    var boldfacemap =
-      if (params.boldface == null) Map[String, Int]()
+    var boldfaceterms =
+      if (params.boldface == null) Set[(String, Int)]()
       else {
         params.boldface.split(",").map { spec =>
           if (spec contains "/") {
@@ -138,7 +138,7 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
             (word, topic.toInt)
           } else
             (spec, -1)
-        }.toMap
+        }.toSet
       }
 
     // For each topic, find the top words
@@ -177,9 +177,9 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
         topic_top_words.map { case (words, topic) =>
           (words.map { line =>
             line.map { word =>
-              val bftopic = boldfacemap.getOrElse(word, -2)
-              if (bftopic == -1 || bftopic == topic)
-                """\textbf{\textcolor{red}{%s}}""" format word
+              if (boldfaceterms.contains((word, topic)) ||
+                  boldfaceterms.contains((word, -1)))
+                """\textit{\textbf{\textcolor{blue}{%s}}}""" format word
               else
                 word
             }
@@ -194,8 +194,9 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
 
     if (params.two_columns) {
       if (params.latex)
-        outprint("""\begin{tabular}{|%s|%s}""", "c|" * timeslices.size,
-          "c|" * timeslices.size)
+        outprint("""\begin{tabular}{|%s|%s|}""", "c" * timeslices.size,
+          "c" * timeslices.size)
+      var first = true
       bf_topic_top_words.sliding(2, 2).foreach { group =>
         val ((tstr1, tstr2), headers, words) = group match {
           case Seq((tw1, topic1), (tw2, topic2)) => {
@@ -210,18 +211,20 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
           }
         }
         if (params.latex) {
-          outprint("""\hline
-\multicolumn{%s}{|c||}{%s} & \multicolumn{%s}{|c|}{%s} \\
+          if (first)
+            outprint("""\hline""")
+          else
+            outprint("""\hhline{|%s|%s|}""", "=" * timeslices.size,
+              "=" * timeslices.size)
+          outprint("""\multicolumn{%s}{|c}{%s} & \multicolumn{%s}{|c|}{%s} \\
 \hline
 %s \\
-\hline
 \hline""",
             timeslices.size, tstr1, timeslices.size, tstr2,
             headers mkString " & "
           )
           for (line <- words) {
-            outprint("""%s \\
-\hline""",
+            outprint("""%s \\""",
               line mkString " & "
             )
           }
@@ -229,25 +232,29 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
           outprint("For dir %s: %s, %s" format (dir, tstr1, tstr2))
           outprint(format_table(headers +: words))
         }
+        first = false
       }
       if (params.latex)
-        outprint("""\end{tabular}""")
+        outprint("""\hline
+\end{tabular}""")
     } else {
       if (params.latex)
-        outprint("""\begin{tabular}{|%s}""", "c|" * timeslices.size)
+        outprint("""\begin{tabular}{|%s|}""", "c" * timeslices.size)
+      var first = true
       for ((seq_top_words, topic) <- bf_topic_top_words) {
         if (params.latex) {
-          outprint("""\hline
-\multicolumn{%s}{|c|}{Topic %s} \\
+          if (first)
+            outprint("""\hline""")
+          else
+            outprint("""\hhline{|%s|}""", "=" * timeslices.size)
+          outprint("""\multicolumn{%s}{|c|}{Topic %s} \\
 \hline
 %s \\
-\hline
 \hline""",
             timeslices.size, topic, timeslices mkString " & "
           )
           for (line <- seq_top_words) {
-            outprint("""%s \\
-\hline""",
+            outprint("""%s \\""",
               line mkString " & "
             )
           }
@@ -255,9 +262,11 @@ object InterpretDTM extends ExperimentApp("InterpretDTM") {
           outprint("For dir %s, topic %s:" format (dir, topic))
           outprint(format_table(timeslices +: seq_top_words))
         }
+        first = false
       }
       if (params.latex)
-        outprint("""\end{tabular}""")
+        outprint("""\hline
+\end{tabular}""")
     }
   }
 
