@@ -29,6 +29,7 @@ import util.experiment._
 import util.io.localfh
 import util.math._
 import util.metering._
+import util.numeric.pretty_double
 import util.print._
 import util.table._
 import util.textdb._
@@ -58,8 +59,14 @@ implemented.""")
     default = 5.0,
     help = """Grid size in degrees for grouping documents.""")
 
-  var region_slice = ap.flag("region-slice",
-    help = """Create slices across regions rather than time.""")
+  var slice = ap.option[String]("slice",
+    choices = Seq("time", "region", "latitude", "longitude"),
+    default = "time",
+    help = """How to create slices. Default is 'time' in years; also
+'latitude', 'longitude' and 'region' (arbitrarily-shaped regions, as
+specified by '--region-file' and '--region-list'). For 'time', 'latitude'
+and 'longitude', see '--slice-size', '--min-slice-value',
+'--max-slice-value', '--min-slice-count'.""")
 
   var region_file = ap.option[String]("region-file", "r", "rf",
     help = """File listing Civil War regions, in a specific GeoJSON format.""")
@@ -67,9 +74,9 @@ implemented.""")
   var region_list = ap.option[String]("region-list", "rl",
     help = """List of regions to use, in order, separated by commas.""")
 
-  var time_size = ap.option[Double]("time-size", "t", "ts",
-    default = 10.0,
-    help = """Size of time chunks in years for grouping documents.""")
+  var slice_size = ap.option[Double]("slice-size", "ss",
+    default = 1.0,
+    help = """Size of slices for grouping documents.""")
 
   var output_prefix = ap.option[String]("output-prefix", "o", "op",
     help = """Output prefix for DTM files. If omitted, no files are output,
@@ -101,6 +108,14 @@ either end.""")
   var min_slice_count = ap.option[Int]("min-slice-count", "msc",
     help = """Minimum document count in slice to keep it.""",
     default = 1)
+
+  var min_slice_value = ap.option[Double]("min-slice-value", "minsv",
+    help = """Minimum value of slice (year, latitude, longitude) to keep.""",
+    default = Double.MinValue)
+
+  var max_slice_value = ap.option[Double]("max-slice-value", "maxsv",
+    help = """Maxmimum value of slice (year, latitude, longitude) to keep.""",
+    default = Double.MaxValue)
 }
 
 case class DMYDate(year: Int, month: Int, day: Int) {
@@ -197,10 +212,15 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
     }
   }
 
-  lazy val regions = read_json_polygons(params.region_file)
-  lazy val region_list = params.region_list.split(",")
-  lazy val region_to_id = region_list.zipWithIndex.toMap
-  lazy val id_to_region = region_to_id.map { case (x,y) => (y,x) }
+  lazy val region_to_polygon = read_json_polygons(params.region_file).map {
+      case (origid, name, polygon) => (name, polygon)
+    }.toMap
+  lazy val indexed_region_list =
+    params.region_list.split(",").toSeq.zipWithIndex
+  lazy val regions = indexed_region_list.map {
+      case (region, id) => (id, region, region_to_polygon(region))
+    }
+  lazy val id_to_region = indexed_region_list.map { case (x,y) => (y,x) }.toMap
 
   // Map from cell ID's to slice indices (e.g. years) to sequences of documents.
   val slice_counts = bufmapmap[String, Int, Document]()
@@ -221,30 +241,38 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
   }
 
   def date_to_time_slice(date: DMYDate) = {
-    (date.toDouble / params.time_size).toInt
+    (date.toDouble / params.slice_size).toInt
   }
 
-  def coord_to_region_id(coord: String): String = {
+  // Convert coordinate to list of regions. We can have multiple regions
+  // to allow e.g. for a circular specification of regions, with the same
+  // region appearing at the beginning and the end.
+  def coord_to_region_ids(coord: String) = {
     val Array(lat, long) = coord.split(",").map(_.toFloat)
-    for ((id, name, polygon) <- regions) {
-      // Check the point, but also check slightly jittered points in
-      // each of four directions in case we're exactly on a line (in
-      // which case we might get a false value for the regions on both
-      // sides of the line).
-      if (polygon.contains(new Point(long, lat)) ||
-          polygon.contains(new Point(long + 0.0001f, lat)) ||
-          polygon.contains(new Point(long - 0.0001f, lat)) ||
-          polygon.contains(new Point(long, lat + 0.0001f)) ||
-          polygon.contains(new Point(long, lat - 0.0001f)))
-        return name
-    }
-    return "unknown"
+    for ((id, name, polygon) <- regions;
+        // Check the point, but also check slightly jittered points in
+        // each of four directions in case we're exactly on a line (in
+        // which case we might get a false value for the regions on both
+        // sides of the line).
+        if polygon.contains(new Point(long, lat)) ||
+           polygon.contains(new Point(long + 0.00001f, lat)) ||
+           polygon.contains(new Point(long - 0.00001f, lat)) ||
+           polygon.contains(new Point(long, lat + 0.00001f)) ||
+           polygon.contains(new Point(long, lat - 0.00001f)))
+      yield (id, name)
   }
 
-  def coord_to_slice_id(coord: String) = {
-    val region_id = coord_to_region_id(coord)
-    // errprint("For coord %s, region_id %s", coord, region_id)
-    region_to_id.get(region_id)
+  def coord_to_slice_ids(coord: String) = {
+    val Array(lat, long) = coord.split(",").map(_.toDouble)
+    params.slice match {
+      case "region" => {
+        val region_ids = coord_to_region_ids(coord)
+        // errprint("For coord %s, region_ids %s", coord, region_ids)
+        region_ids.map { case (id, name) => id }
+      }
+      case "latitude" => Seq((lat / params.slice_size).toInt)
+      case "longitude" => Seq((long / params.slice_size).toInt)
+    }
   }
 
   protected def read_stopwords = {
@@ -289,13 +317,12 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       val date: Option[DMYDate] = DMYDate.parse(row.gets("date"))
       val counts = row.gets("unigram-counts")
       if (counts.size > 0) {
-        val slice_id: Option[Int] =
-          if (params.region_slice) {
-            if (coord != "") coord_to_slice_id(coord)
-            else None
-          } else
-            date.map(x => date_to_time_slice(x))
-        slice_id.foreach { x =>
+        val slice_ids =
+          if (params.slice == "time")
+            date.map(x => date_to_time_slice(x)).toSeq
+          else if (coord != "") coord_to_slice_ids(coord)
+          else Seq[Int]()
+        slice_ids.foreach { x =>
           slice_counts(coord_to_cell(coord))(x) +=
             Document(title, coord, date, counts)
         }
@@ -396,21 +423,25 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 \hline
 %sFrom & To & #Docs \\
 \hline""",
-          if (params.region_slice) "|c" else "",
-          if (params.region_slice) "Region & " else ""
+          if (params.slice != "time") "|c" else "",
+          if (params.slice != "time") "Region & " else ""
         )
       }
       for ((sliceindex, docs) <- sorted_slices) {
         import DMYDate.ordering
         val mindate = docs.flatMap(_.date).min
         val maxdate = docs.flatMap(_.date).max
+        val slice_value = sliceindex * params.slice_size
         val slice_name =
-          if (params.region_slice)
+          if (params.slice == "region")
             id_to_region(sliceindex)
-          else if (params.from_to_timeslice)
-            "%s-%s" format (mindate.toMDY(true), maxdate.toMDY(true))
-          else
-            "%s" format mindate.toMDY(true)
+          else if (params.slice == "time") {
+            if (params.from_to_timeslice)
+              "%s-%s" format (mindate.toMDY(true), maxdate.toMDY(true))
+            else
+              "%s" format mindate.toMDY(true)
+          } else
+            pretty_double(slice_value)
         var docs_ldastr =
           for (doc <- docs;
                // Skip documents with no words after filtering for stopwords
@@ -422,6 +453,16 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
             errprint("Skipped because count %s < %s: cell %s, slice %s",
               docs_ldastr.size, params.min_slice_count, cell, slice_name)
           }
+        } else if (slice_value < params.min_slice_value) {
+          if (!params.latex) {
+            errprint("Skipped because value %s < min value %s: cell %s slice %s",
+              slice_value, params.min_slice_value, cell, slice_name)
+          }
+        } else if (slice_value > params.max_slice_value) {
+          if (!params.latex) {
+            errprint("Skipped because value %s > max value %s: cell %s slice %s",
+              slice_value, params.max_slice_value, cell, slice_name)
+          }
         } else {
           tsfile.foreach(_.println(slice_name))
           slice_counts += docs_ldastr.size
@@ -432,7 +473,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           }
           if (params.latex) {
             errprint("""%s%s & %s & %s \\""",
-              if (params.region_slice) slice_name + " & " else "",
+              if (params.slice != "time") slice_name + """\dgr & """ else "",
               mindate.toMDY(true), maxdate.toMDY(true), docs_ldastr.size
             )
           } else {
