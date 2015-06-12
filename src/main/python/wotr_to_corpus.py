@@ -283,7 +283,7 @@ def run():
 
   if not Opts.no_write:
     outdir = os.path.dirname(Opts.output)
-    if not os.path.exists(outdir):
+    if outdir and not os.path.exists(outdir):
       os.makedirs(outdir)
 
   vols_lines = permute_vols_lines(get_lines())
