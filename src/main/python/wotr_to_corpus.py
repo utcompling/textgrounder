@@ -86,9 +86,46 @@ def parse_coord(coord):
     lat, lon = latlons
     return float(lat.strip()), float(lon.strip())
 
+class Geomstats(object):
+  def __init__(self):
+    self.numpoly = 0
+    self.nummultipoly = 0
+    self.numpoint = 0
+    self.numpolypoint = 0
+    self.numgeom = 0
+
+  def add_stats(self, stats):
+    self.numpoly += stats.numpoly
+    self.nummultipoly += stats.nummultipoly
+    self.numpoint += stats.numpoint
+    self.numpolypoint += stats.numpolypoint
+    self.numgeom += stats.numgeom
+
+  def print_stats(self):
+    print "Number of geometries: %s" % self.numgeom
+    print "Number of individual points: %s" % self.numpoint
+    print "Number of multi-polygons: %s" % self.nummultipoly
+    print "Number of polygons: %s" % self.numpoly
+    print "Number of polygon points: %s" % self.numpolypoint
+    print "Number of total points (individual or polygon): %s" % (
+        self.numpoint + self.numpolypoint)
+    print "Number of geometric elements (individual points or polygons): %s" % (
+        self.numpoint + self.numpoly)
+    print "Average points per polygon: %.2f" % (
+        self.numpoly and float(self.numpolypoint) / self.numpoly or 0.0)
+    print "Average geometric elements per geometry: %.2f" % (
+        self.numgeom and float(self.numpoint + self.numpoly) / self.numgeom or 0.0)
+    print "Average polygons per geometry: %.3f" % (
+        self.numgeom and float(self.numpoly) / self.numgeom or 0.0)
+    print "Average individual points per geometry: %.2f" % (
+        self.numgeom and float(self.numpoint) / self.numgeom or 0.0)
+    print "Average total points per geometry: %.2f" % (
+        self.numgeom and float(self.numpoint + self.numpolypoint) / self.numgeom or 0.0)
+
 def parse_geom(geom):
   splitgeoms = re.split("@@", geom)
   geompoints = []
+  stats = Geomstats()
   for g in splitgeoms:
     if not g:
       continue
@@ -101,19 +138,24 @@ def parse_geom(geom):
     coords = js['coordinates']
     if ty == "Point":
       geompoints.append(coords)
+      stats.numpoint += 1
     elif ty == "MultiPolygon":
       if len(coords) > 1:
         print "Don't know what to do with top-level multiple coords: %s" % coords
+      stats.nummultipoly += 1
       coords = coords[0]
       centroids = []
       for polygon in coords:
+        stats.numpoly += 1
+        stats.numpolypoint += len(polygon)
         centroids.append(centroid(polygon))
       geompoints.append(centroid(centroids))
     else:
       print "Unrecognized type %s in coord spec %s" % (ty, g)
   cent = centroid(geompoints)
   if cent:
-    return [cent[1], cent[0]]
+    stats.numgeom += 1
+    return [cent[1], cent[0]], stats
   else:
     return None
 
@@ -126,7 +168,7 @@ def read_volume_spans():
     else:
       user = m.group(1)
       vol = m.group(2)
-      print "Parsing spans for user %s, volume %s" % (user, vol)
+      print "Parsing spans for user %s, volume %s ..." % (user, vol),
       spantext = open(Opts.spans + "/" + spanfile).read()
       splitspans = re.split(r"\|", spantext)
       spans = []
@@ -134,15 +176,22 @@ def read_volume_spans():
         spanparts = re.split(r"\$", span)
         spanbegin = int(spanparts[1])
         spanend = int(spanparts[2])
-        spancoord = parse_geom(spanparts[3])
-        spans.append([spanbegin, spanend, spancoord])
+        spancoordstats = parse_geom(spanparts[3])
+        spancoord = None
+        spanstats = None
+        if spancoordstats:
+          spancoord, spanstats = spancoordstats
+        spans.append([spanbegin, spanend, spancoord, spanstats])
       io_spans = []
       voltext = volume_text[vol]
       ind = 0
-      for beg, end, coord in spans:
+      for beg, end, coord, stats in spans:
         inside_text = voltext[beg:end].strip()
         if inside_text:
-          io_spans.append(["%s-%s" % (beg, end), coord, inside_text])
+          io_spans.append(["%s-%s" % (beg, end), coord, stats, inside_text])
+      print "%s spans, %s with geometries" % (len(io_spans),
+          len([x for x in io_spans if x[1]]))
+
       if vol in volume_spans:
         existing_coord_spans = len([x for x in volume_spans[vol] if x[1]])
         new_coord_spans = len([x for x in io_spans if x[1]])
@@ -160,6 +209,26 @@ def read_volume_spans():
         volume_user[vol] = user
         volume_spans[vol] = io_spans
 
+def output_span_stats():
+  totalstats = Geomstats()
+  numvol = 0
+  numspan = 0
+  numgeom = 0
+  for vol, spans in volume_spans.iteritems():
+    numvol += 1
+    for span, coord, stats, text in spans:
+      numspan += 1
+      if stats:
+        totalstats.add_stats(stats)
+        numgeom += 1
+  print "Number of volumes: %s" % numvol
+  print "Number of spans: %s" % numspan
+  print "Number of geometries: %s" % numgeom
+  print "Average spans per volume: %.2f" % (float(numspan) / numvol)
+  print "Average geometries per volume: %.2f" % (float(numgeom) / numvol)
+  print "Fraction of spans with geometries: %.3f" % (float(numgeom) / numspan)
+  totalstats.print_stats()
+
 def read_predicted_spans():
   for spanfile in os.listdir(Opts.predicted_spans):
     m = re.match(r"([0-9]+)\.", spanfile)
@@ -175,18 +244,33 @@ def read_predicted_spans():
       for span in re.finditer(r'^-----+ BEGIN SPAN -----+$(.*?)^-----+ END SPAN -----+$', filetext, re.M | re.S):
         spantext = span.group(1)
         if not Opts.filter_regex or re.search(Opts.filter_regex, spantext):
-          spans.append(["%s" % spanno, None, spantext])
+          spans.append(["%s" % spanno, None, None, spantext])
         spanno += 1
       volume_spans[vol] = spans
 
+def average(values):
+  return float(sum(values)) / len(values)
+
 def get_lines():
+  alltypes = set()
+  numvols = 0
+  numalltokens = 0
+  numspans = 0
+  vols_numtypes = []
+  spans_numtypes = []
   vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = []
   for vol in vols:
     print "Processing volume %s" % vol
+    voltypes = set()
+    numvoltokens = 0
+    numvolspans = 0
+    numvols += 1
     lines = []
     last_date = None
-    for span, coord, text in volume_spans[vol]:
+    for span, coord, stats, text in volume_spans[vol]:
+      numvolspans += 1
+      numspans += 1
       date = find_date(text)
       if date:
         last_date = date
@@ -200,6 +284,11 @@ def get_lines():
       countmap = intdict()
       for word in words:
         countmap[word] += 1
+        voltypes.add(word)
+        alltypes.add(word)
+        numvoltokens += 1
+        numalltokens += 1
+      spans_numtypes.append(len(countmap))
       countsfield = ' '.join(["%s:%s" % (x,y) for x,y in countmap.iteritems()])
       textfield = (text.replace("%", "%25").replace("\t", "%09").
           replace("\n", "%0A").replace("\r", "%0D").replace("\f", "%0C"))
@@ -222,6 +311,16 @@ def get_lines():
         lines.append(line)
       #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
     vols_lines.append(lines)
+    vols_numtypes.append(len(voltypes))
+  print "Total tokens: %s" % numalltokens
+  print "Total types: %s" % len(alltypes)
+  print "Number of volumes: %s" % numvols
+  print "Number of spans: %s" % numspans
+  print "Average tokens per volume: %.2f" % (float(numalltokens) / numvols)
+  print "Average tokens per span: %.2f" % (float(numalltokens) / numspans)
+  print "Average spans per volume: %.2f" % (float(numspans) / numvols)
+  print "Average types per volume: %.2f" % (average(vols_numtypes))
+  print "Average types per span: %.2f" % (average(spans_numtypes))
   return vols_lines
 
 def flatten(lol):
@@ -267,6 +366,8 @@ def run():
   else:
     read_volume_text()
     read_volume_spans()
+
+  output_span_stats()
 
   lc_values_str = [x for x in re.split(":", Opts.learning_curve)]
   lc_values = [float(x) for x in lc_values_str]
