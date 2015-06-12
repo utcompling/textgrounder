@@ -382,71 +382,65 @@ def run():
         [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
   #split_frac_size = sum(split_fractions)
 
-  if not Opts.no_write:
-    outdir = os.path.dirname(Opts.output)
-    if outdir and not os.path.exists(outdir):
-      os.makedirs(outdir)
-
+  # Get the entire set of lines
   vols_lines = permute_vols_lines(get_lines())
-  # Total number of spans
-  numspans = (len(vols_lines) if Opts.split_by == "span" else
-      sum(len(x) for x in vols_lines))
 
-  for lcval, lcfrac in zip(lc_values_str, lc_fractions):
-    split_count = [0, 0, 0]
-    split_names = ['training', 'dev', 'test']
-    spancount = 0
-    if len(lc_values_str) == 1:
-      outpref = Opts.output
-    else:
-      outpref = "%s-%s" % (Opts.output, lcval)
-      print "Learning curve prefix: %s" % outpref
-    if Opts.no_write:
-      split_files = [None, None, None]
-    else:
-      split_files = [open("%s-%s.data.txt" % (outpref, split), "w")
-        for split in split_names]
-    split_gen = next_split_set(
-        split_fractions,
-        [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
-    if Opts.split_by == 'span':
-      for line in vols_lines:
-        split = split_gen.next()
+  # Now split into training/dev/test sections
+  split_count = [0, 0, 0]
+  split_names = ['training', 'dev', 'test']
+  split_lines = [[], [], []]
+  spancount = 0
+  split_gen = next_split_set(
+      split_fractions,
+      [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
+  if Opts.split_by == 'span':
+    for line in vols_lines:
+      split = split_gen.next()
+      spancount += 1
+      split_count[split] += 1
+      split_lines[split].append(line)
+  elif Opts.split_by == 'volume':
+    volsize = None
+    for lines in vols_lines:
+      # send() is weird. Sending a value causes the last yield in the generator
+      # to return with a value, then the code loops around and eventually
+      # executes another yield, whose value is returned by send(). The
+      # first time, we have to send None. Because of the way next_split_set()
+      # is written, we have to save the length of the volume and send it
+      # the next go around.
+      split = split_gen.send(volsize)
+      volsize = len(lines)
+      for line in lines:
         spancount += 1
         split_count[split] += 1
-        if not Opts.no_write:
-          uniprint(line, outfile=split_files[split])
-        if float(spancount) / numspans >= lcfrac:
-          break
-    elif Opts.split_by == 'volume':
-      volsize = None
-      outerbreak = False
-      for lines in vols_lines:
-        # send() is weird. Sending a value causes the last yield in the generator
-        # to return with a value, then the code loops around and eventually
-        # executes another yield, whose value is returned by send(). The
-        # first time, we have to send None. Because of the way next_split_set()
-        # is written, we have to save the length of the volume and send it
-        # the next go around.
-        split = split_gen.send(volsize)
-        volsize = len(lines)
+        split_lines[split].append(line)
+
+  # Output total size of sections
+  for split in xrange(len(split_names)):
+    print "Total %s count: %s" % (split_names[split], split_count[split])
+
+  # Handle learning-curve fractions of training set
+  for lcval, lcfrac in zip(lc_values_str, lc_fractions):
+    training_size = int(lcfrac * split_count[0])
+    print "Learning curve value %s, training count: %s" % (lcval, training_size)
+    if not Opts.no_write:
+      if len(lc_values_str) == 1:
+        outpref = Opts.output
+      else:
+        outpref = Opts.output % lcval
+        print "Learning curve prefix for value %s: %s" % (lcval, outpref)
+      outdir = os.path.dirname(outpref)
+      if outdir and not os.path.exists(outdir):
+        os.makedirs(outdir)
+      for split in xrange(len(split_names)):
+        splitfile = open("%s-%s.data.txt" % (outpref, split_names[split]), "w")
+        if split == 0: # training
+          lines = split_lines[split][0:training_size]
+        else:
+          lines = split_lines[split]
         for line in lines:
-          spancount += 1
-          split_count[split] += 1
-          if not Opts.no_write:
-            uniprint(line, outfile=split_files[split])
-          if float(spancount) / numspans >= lcfrac:
-            outerbreak = True
-            break
-        if outerbreak:
-          break
-    if not Opts.no_write:
-      for file in split_files:
-        file.close()
-    for split in xrange(3):
-      print "count for %s: %s" % (split_names[split], split_count[split])
-    print "total count: %s / %s" % (spancount, numspans)
-    if not Opts.no_write:
+          uniprint(line, outfile=splitfile)
+        splitfile.close()
       for split in split_names:
         outschemafile = open("%s-%s.schema.txt" % (outpref, split), "w")
         print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts\ttext"
@@ -471,7 +465,10 @@ class WOTRToCorpus(NLPProgram):
     op.add_option('--filter-regex',
         help="Regex to filter spans.")
     op.add_option("-o", "--output",
-        help="""Output prefix for TextDB corpora.""",
+        help="""Output prefix for TextDB corpora.  If learning curves are
+given, should have %s in it, where the learning curve value will be
+substituted (should be in a directory name, and directories will be created
+as necessary).""",
         metavar="FILE")
     op.add_option("--include-non-coord-paras",
         help="""Include paragraphs without coordinates, supplying 0,0 as the
