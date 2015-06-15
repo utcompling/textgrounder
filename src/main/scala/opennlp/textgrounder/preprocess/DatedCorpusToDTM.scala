@@ -25,6 +25,7 @@ import net.liftweb
 
 import util.argparser._
 import util.collection._
+import util.error.assert_==
 import util.experiment._
 import util.io.localfh
 import util.math._
@@ -162,7 +163,10 @@ object DMYDate {
         case mdyre(m, d, y) => Some(DMYDate(y.toInt, month_index_map(m.toLowerCase), d.toInt))
         case myre(m, y) => Some(DMYDate(y.toInt, month_index_map(m.toLowerCase), 1))
         case yre(y) => Some(DMYDate(y.toInt, 1, 1))
-        case "" => None
+        case "" => {
+          errprint("Blank date")
+          None
+        }
         case _ => {
           errprint("Unable to parse date: %s" format str)
           None
@@ -312,9 +316,13 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
   def process_file_for_min_word_count(file: String, stats: WordStats) {
     process_file(file, row => {
       val counts = row.gets("unigram-counts")
-      for ((word, count) <- words_and_counts(counts, false, stats))
+      var filtered_row_counts = 0
+      for ((word, count) <- words_and_counts(counts, false, stats)) {
+        filtered_row_counts += count
         corpus_word_counts(word) += count
-      stats.num_lines += 1
+      }
+      if (filtered_row_counts > 0)
+        stats.num_docs_post_filtering += 1
     })
   }
 
@@ -336,7 +344,10 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
             Document(title, coord, date, counts)
         }
         sampled_lines += 1
-      }
+      } else {
+         errprint("Skipped document %s, %s, %s because empty counts",
+           title, coord, date)
+       }
     }
 
     if (params.random_sample < 100.0) {
@@ -366,7 +377,8 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
     val lc_types = mutable.Set[String]()
     var filtered_numtokens = 0
     val filtered_types = mutable.Set[String]()
-    var num_lines = 0
+    var num_docs_pre_filtering = 0
+    var num_docs_post_filtering = 0
 
     def print(prefix: String) {
       errprint("%sRaw number of tokens: %s", prefix, raw_numtokens)
@@ -379,7 +391,25 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       errprint("%sLowercase number of types: %s", prefix, lc_types.size)
       errprint("%sFiltered number of tokens: %s", prefix, filtered_numtokens)
       errprint("%sFiltered number of types: %s", prefix, filtered_types.size)
-      errprint("%sNumber of documents: %s", prefix, num_lines)
+      errprint("%sNumber of documents pre-filtering: %s", prefix,
+        num_docs_pre_filtering)
+      errprint("%sNumber of documents post-filtering: %s", prefix,
+        num_docs_post_filtering)
+    }
+
+    def add(y: WordStats) {
+      raw_numtokens += y.raw_numtokens
+      raw_types ++= y.raw_types
+      canon_numtokens += y.canon_numtokens
+      canon_types ++= y.canon_types
+      stopped_numtokens += y.stopped_numtokens
+      stopped_types ++= y.stopped_types
+      lc_numtokens += y.lc_numtokens
+      lc_types ++= y.lc_types
+      filtered_numtokens += y.filtered_numtokens
+      filtered_types ++= y.filtered_types
+      num_docs_pre_filtering += y.num_docs_pre_filtering
+      num_docs_post_filtering += y.num_docs_post_filtering
     }
   }
 
@@ -392,6 +422,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
   def words_and_counts(countstr: String, filter_min: Boolean,
       stats: WordStats) = {
     val counts = Decoder.count_map_seq(countstr)
+    stats.num_docs_pre_filtering += 1
     for ((rawword0, count) <- counts;
          rawword1 = { stats.raw_numtokens += count;
                      stats.raw_types += rawword0; rawword0 };
@@ -422,18 +453,30 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         ) yield (nocaseword2, count)
   }
 
-  def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String,
-      stats: WordStats) = {
+  def counts_to_processed_countmap(countstr: String, stats: WordStats) = {
     val processed_counts = intmap[String]()
     for ((word, count) <- words_and_counts(countstr, true, stats))
       processed_counts(word) += count
+    val numtypes = processed_counts.size
+    if (numtypes == 0) {
+      errprint("Skipped document with words [%s] because no tokens after stopwording/filtering",
+        countstr)
+      None
+    } else {
+      stats.num_docs_post_filtering += 1
+      Some(processed_counts)
+    }
+  }
+
+  def countmap_to_lda(memoizer: StringGramAsIntMemoizer,
+      counts: collection.Map[String, Int]) = {
     val ldastr =
-      processed_counts.toSeq.sortBy(-_._2).map { case (word, count) =>
+      counts.toSeq.sortBy(-_._2).map { case (word, count) =>
         "%s:%s" format (memoizer.to_index(word), count)
       }.mkString(" ")
-    val numtokens = processed_counts.size
-    if (numtokens == 0) None
-    else Some(processed_counts.size + " " + ldastr)
+    val numtypes = counts.size
+    assert(numtypes > 0)
+    "%s %s" format (numtypes, ldastr)
   }
 
   def run_program(args: Array[String]) = {
@@ -490,7 +533,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       val sorted_slices = slice_map.toSeq.sortBy(_._1)
       val memoizer = new StringGramAsIntMemoizer
       if (params.latex) {
-        errprint("""\begin{tabular}{%s|c|c|c|}
+        outprint("""\begin{tabular}{%s|c|c|c|}
 \hline
 %sFrom & To & #Docs \\
 \hline""",
@@ -498,8 +541,13 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           if (params.slice != "year") "Region & " else ""
         )
       }
-      val stats = new WordStats
+      // Stats on all slices
+      val all_slice_stats = new WordStats
+      // Stats on slices actually sent to LDA
+      val lda_slice_stats = new WordStats
+      var num_lda_docs = 0
       for ((sliceindex, docs) <- sorted_slices) {
+        var this_slice_stats = new WordStats
         import DMYDate.ordering
         val mindate = docs.flatMap(_.date).min
         val maxdate = docs.flatMap(_.date).max
@@ -514,62 +562,70 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
               "%s" format mindate.toMDY(true)
           } else
             pretty_double(slice_value)
-        var docs_ldastr =
+        var docs_countmap =
           for (doc <- docs;
                // Skip documents with no words after filtering for stopwords
                // and --min-word-count
-               ldastr <- counts_to_lda(memoizer, doc.counts, stats))
-            yield (doc, ldastr)
-        if (docs_ldastr.size < params.min_slice_count) {
-          if (!params.latex) {
-            errprint("Skipped because count %s < %s: cell %s, slice %s",
-              docs_ldastr.size, params.min_slice_count, cell, slice_name)
-          }
+               countmap <- counts_to_processed_countmap(doc.counts,
+                 this_slice_stats))
+            yield (doc, countmap)
+        all_slice_stats.add(this_slice_stats)
+        if (docs_countmap.size < params.min_slice_count) {
+          errprint("Skipped because count %s < %s: cell %s, slice %s",
+            docs_countmap.size, params.min_slice_count, cell, slice_name)
         } else if (slice_value < params.min_slice_value) {
-          if (!params.latex) {
-            errprint("Skipped because value %s < min value %s: cell %s slice %s",
-              slice_value, params.min_slice_value, cell, slice_name)
-          }
+          errprint("Skipped because value %s < min value %s (count %s): cell %s slice %s",
+            slice_value, params.min_slice_value, docs_countmap.size, cell,
+            slice_name)
         } else if (slice_value > params.max_slice_value) {
-          if (!params.latex) {
-            errprint("Skipped because value %s > max value %s: cell %s slice %s",
-              slice_value, params.max_slice_value, cell, slice_name)
-          }
+          errprint("Skipped because value %s > max value %s (count %s): cell %s slice %s",
+            slice_value, params.max_slice_value, docs_countmap.size, cell,
+            slice_name)
         } else {
           tsfile.foreach(_.println(slice_name))
-          slice_counts += docs_ldastr.size
-          stats.num_lines += docs_ldastr.size
-          for ((doc, ldastr) <- docs_ldastr) {
-            multfile.foreach(_.println(ldastr))
+          slice_counts += docs_countmap.size
+          num_lda_docs += docs_countmap.size
+          lda_slice_stats.add(this_slice_stats)
+          for ((doc, countmap) <- docs_countmap) {
+            multfile.foreach(_.println(countmap_to_lda(memoizer, countmap)))
             docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
               doc.date.map(_.toMDY()).getOrElse(""), doc.counts)))
           }
           if (params.latex) {
-            errprint("""%s%s & %s & %s \\""",
+            outprint("""%s%s & %s & %s \\""",
               if (params.slice != "year") slice_name + """\dgr & """ else "",
-              mindate.toMDY(true), maxdate.toMDY(true), docs_ldastr.size
+              mindate.toMDY(true), maxdate.toMDY(true), docs_countmap.size
             )
           } else {
             errprint("For cell %s, processing slice %s, count = %s" format
-              (cell, slice_name, docs_ldastr.size))
+              (cell, slice_name, docs_countmap.size))
           }
         }
       }
-      errprint("Statistics on random-sampled corpus, cell %s:", cell)
-      stats.print("  ")
+      errprint("Statistics on all slices in random-sampled portion of corpus (minus docs with unparsable dates), cell %s:", cell)
+      all_slice_stats.print("  ")
+      errprint("Statistics on slices sent to LDA in random-sampled portion of corpus (minus docs with unparsable dates), cell %s:", cell)
+      lda_slice_stats.print("  ")
+      errprint("Number of documents sent to LDA: %s", num_lda_docs)
+      errprint("Number of slices sent to LDA: %s", slice_counts.size)
+      errprint("Size of vocabulary sent to LDA: %s", memoizer.number_of_indices)
       for (i <- 0 to memoizer.maximum_index) {
         vocabfile.foreach(_.println(memoizer.to_raw(i)))
       }
       seqfile.foreach(_.println(slice_counts.size.toString))
-      for (count <- slice_counts)
+      var all_slice_counts = 0
+      for (count <- slice_counts) {
+        all_slice_counts += count
         seqfile.foreach(_.println(count.toString))
+      }
+      assert_==(all_slice_counts, num_lda_docs)
       multfile.foreach(_.close())
       seqfile.foreach(_.close())
       vocabfile.foreach(_.close())
       docfile.foreach(_.close())
       tsfile.foreach(_.close())
       if (params.latex) {
-        errprint("""\hline
+        outprint("""\hline
 \end{tabular}""")
       }
     }
