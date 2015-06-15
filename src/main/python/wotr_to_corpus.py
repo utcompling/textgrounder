@@ -418,6 +418,7 @@ def run():
   # Output total size of sections
   for split in xrange(len(split_names)):
     print "Total %s count: %s" % (split_names[split], split_count[split])
+  print "Total count: %s" % sum(split_count)
 
   # Handle learning-curve fractions of training set
   for lcval, lcfrac in zip(lc_values_str, lc_fractions):
@@ -427,7 +428,7 @@ def run():
       if len(lc_values_str) == 1:
         outpref = Opts.output
       else:
-        outpref = Opts.output % lcval
+        outpref = Opts.output.replace("%s", lcval)
         print "Learning curve prefix for value %s: %s" % (lcval, outpref)
       outdir = os.path.dirname(outpref)
       if outdir and not os.path.exists(outdir):
