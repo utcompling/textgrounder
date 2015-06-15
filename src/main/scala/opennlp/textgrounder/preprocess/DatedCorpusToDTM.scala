@@ -114,8 +114,12 @@ either end.""")
     default = Double.MinValue)
 
   var max_slice_value = ap.option[Double]("max-slice-value", "maxsv",
-    help = """Maxmimum value of slice (year, latitude, longitude) to keep.""",
+    help = """Maximum value of slice (year, latitude, longitude) to keep.""",
     default = Double.MaxValue)
+
+  var random_sample = ap.option[Double]("random-sample", "rs",
+    help = """Select a random sample of lines, of the specified percent.""",
+    default = 100.0)
 }
 
 case class DMYDate(year: Int, month: Int, day: Int) {
@@ -302,16 +306,18 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
     }
   }
 
-  def process_file_for_min_word_count(file: String) {
+  def process_file_for_min_word_count(file: String, stats: WordStats) {
     process_file(file, row => {
       val counts = row.gets("unigram-counts")
-      for ((word, count) <- words_and_counts(counts, false))
+      for ((word, count) <- words_and_counts(counts, false, stats))
         corpus_word_counts(word) += count
+      stats.num_lines += 1
     })
   }
 
-  def process_file_for_slices(file: String) {
-    process_file(file, row => {
+  def process_file_for_slices(file: String) = {
+    var sampled_lines = 0
+    def process_row(row: Row) {
       val title = row.gets("title")
       val coord = row.gets("coord")
       val date: Option[DMYDate] = DMYDate.parse(row.gets("date"))
@@ -326,8 +332,52 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           slice_counts(coord_to_cell(coord))(x) +=
             Document(title, coord, date, counts)
         }
+        sampled_lines += 1
       }
-    })
+    }
+
+    if (params.random_sample < 100.0) {
+      val rows = mutable.Buffer[Row]()
+      process_file(file, row => {
+        rows += row
+      })
+      val rand = new scala.util.Random()
+      rand.setSeed(2349876134L)
+      rand.shuffle(rows).take(
+        (rows.size * (params.random_sample / 100.0)).toInt).
+        foreach(process_row)
+    } else
+      process_file(file, process_row)
+
+    sampled_lines
+  }
+
+  class WordStats {
+    var raw_numtokens = 0
+    val raw_types = mutable.Set[String]()
+    var canon_numtokens = 0
+    val canon_types = mutable.Set[String]()
+    var stopped_numtokens = 0
+    val stopped_types = mutable.Set[String]()
+    var lc_numtokens = 0
+    val lc_types = mutable.Set[String]()
+    var filtered_numtokens = 0
+    val filtered_types = mutable.Set[String]()
+    var num_lines = 0
+
+    def print(prefix: String) {
+      errprint("%sRaw number of tokens: %s", prefix, raw_numtokens)
+      errprint("%sRaw number of types: %s", prefix, raw_types.size)
+      errprint("%sCanonicalized number of tokens: %s", prefix, canon_numtokens)
+      errprint("%sCanonicalized number of types: %s", prefix, canon_types.size)
+      errprint("%sStopped number of tokens: %s", prefix, stopped_numtokens)
+      errprint("%sStopped number of types: %s", prefix, stopped_types.size)
+      errprint("%sLowercase number of tokens: %s", prefix, lc_numtokens)
+      errprint("%sLowercase number of types: %s", prefix, lc_types.size)
+      errprint("%sFiltered number of tokens: %s", prefix, filtered_numtokens)
+      errprint("%sFiltered number of types: %s", prefix, filtered_types.size)
+      errprint("%sNumber of documents: %s", prefix, num_lines)
+    }
   }
 
   /**
@@ -336,12 +386,15 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
    * and optionally filtering words below the minimum count. The same
    * word may be yielded more than once.
    */
-  def words_and_counts(countstr: String, filter_min: Boolean) = {
+  def words_and_counts(countstr: String, filter_min: Boolean,
+      stats: WordStats) = {
     val counts = Decoder.count_map_seq(countstr)
-    for ((rawword, count) <- counts;
+    for ((rawword0, count) <- counts;
+         rawword1 = { stats.raw_numtokens += count;
+                     stats.raw_types += rawword0; rawword0 };
          // Do some processing on the words to handle most mistakes in
          // word splitting
-         canonword = rawword.replace(".-", " ").
+         canonword = rawword1.replace(".-", " ").
            replaceAll("[^-a-zA-Z0-9,$']", " ").
            replaceAll("([^0-9]),([^0-9])", "$1 $2").
            replaceAll("""\$([^0-9]),([^0-9])""", "$1 $2").
@@ -349,18 +402,27 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
            replaceAll("[-,$]$", "").
            replaceAll("'s$", ""). // Remove possessive 's
            trim;
-         word <- canonword.split(" +");
-         if word.size > 1;
-         if the_stopwords.size == 0 || !the_stopwords(word.toLowerCase);
-         nocaseword = if (params.preserve_case) word else word.toLowerCase;
+         word0 <- canonword.split(" +");
+         if word0.size > 1;
+         word1 = { stats.canon_numtokens += count;
+                   stats.canon_types += word0; word0 };
+         if the_stopwords.size == 0 || !the_stopwords(word1.toLowerCase);
+         word2 = { stats.stopped_numtokens += count;
+                   stats.stopped_types += word1; word1 };
+         nocaseword0 = if (params.preserve_case) word2 else word2.toLowerCase;
+         nocaseword1 = { stats.lc_numtokens += count;
+                         stats.lc_types += nocaseword0; nocaseword0 };
          if (!filter_min || params.min_word_count <= 1 ||
-           corpus_word_counts(nocaseword) >= params.min_word_count)
-        ) yield (nocaseword, count)
+           corpus_word_counts(nocaseword1) >= params.min_word_count);
+         nocaseword2 = { stats.filtered_numtokens += count;
+                         stats.filtered_types += nocaseword1; nocaseword1 }
+        ) yield (nocaseword2, count)
   }
 
-  def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String) = {
+  def counts_to_lda(memoizer: StringGramAsIntMemoizer, countstr: String,
+      stats: WordStats) = {
     val processed_counts = intmap[String]()
-    for ((word, count) <- words_and_counts(countstr, true))
+    for ((word, count) <- words_and_counts(countstr, true, stats))
       processed_counts(word) += count
     val ldastr =
       processed_counts.toSeq.sortBy(-_._2).map { case (word, count) =>
@@ -373,11 +435,17 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 
   def run_program(args: Array[String]) = {
     if (params.min_word_count > 1) {
+      val stats = new WordStats
       for (file <- params.input)
-        process_file_for_min_word_count(file)
+        process_file_for_min_word_count(file, stats)
+      errprint("Statistics on full corpus:")
+      stats.print("  ")
     }
+    var sampled_lines = 0
     for (file <- params.input)
-      process_file_for_slices(file)
+      sampled_lines += process_file_for_slices(file)
+    errprint("Number of random-sampled lines in full corpus: %s",
+      sampled_lines)
     /* For each geographic slice, we output five files:
      *
      * 1. foo-mult.dat: DTM document file, listing documents, one per line,
@@ -427,6 +495,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           if (params.slice != "time") "Region & " else ""
         )
       }
+      val stats = new WordStats
       for ((sliceindex, docs) <- sorted_slices) {
         import DMYDate.ordering
         val mindate = docs.flatMap(_.date).min
@@ -446,7 +515,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           for (doc <- docs;
                // Skip documents with no words after filtering for stopwords
                // and --min-word-count
-               ldastr <- counts_to_lda(memoizer, doc.counts))
+               ldastr <- counts_to_lda(memoizer, doc.counts, stats))
             yield (doc, ldastr)
         if (docs_ldastr.size < params.min_slice_count) {
           if (!params.latex) {
@@ -466,6 +535,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         } else {
           tsfile.foreach(_.println(slice_name))
           slice_counts += docs_ldastr.size
+          stats.num_lines += docs_ldastr.size
           for ((doc, ldastr) <- docs_ldastr) {
             multfile.foreach(_.println(ldastr))
             docfile.foreach(_.println("%s\t%s\t%s\t%s" format (doc.title, doc.coord,
@@ -482,6 +552,8 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           }
         }
       }
+      errprint("Statistics on random-sampled corpus, cell %s:", cell)
+      stats.print("  ")
       for (i <- 0 to memoizer.maximum_index) {
         vocabfile.foreach(_.println(memoizer.to_raw(i)))
       }
