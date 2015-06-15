@@ -53,18 +53,20 @@ one textdb in the directory.""")
     default = "all",
     help = """How to group documents by coordinate (all, by grid coordinate
 according to the grid size given in `--grid-size`, or by country -- not
-implemented.""")
+implemented). This is independent of the slicing specified using '--slice';
+rather, separate sets of DTM files are generated for each group. Never
+really used.""")
 
   var grid_size = ap.option[Double]("grid-size", "s", "gs",
     default = 5.0,
-    help = """Grid size in degrees for grouping documents.""")
+    help = """Grid size in degrees for grouping documents using '--group'.""")
 
   var slice = ap.option[String]("slice",
-    choices = Seq("time", "region", "latitude", "longitude"),
-    default = "time",
-    help = """How to create slices. Default is 'time' in years; also
+    choices = Seq("year", "region", "latitude", "longitude"),
+    default = "year",
+    help = """How to create slices. Default is 'year' (time in years); also
 'latitude', 'longitude' and 'region' (arbitrarily-shaped regions, as
-specified by '--region-file' and '--region-list'). For 'time', 'latitude'
+specified by '--region-file' and '--region-list'). For 'year', 'latitude'
 and 'longitude', see '--slice-size', '--min-slice-value',
 '--max-slice-value', '--min-slice-count'.""")
 
@@ -76,7 +78,8 @@ and 'longitude', see '--slice-size', '--min-slice-value',
 
   var slice_size = ap.option[Double]("slice-size", "ss",
     default = 1.0,
-    help = """Size of slices for grouping documents.""")
+    help = """Size of slices for grouping documents. Not applicable to
+'--slice region'.""")
 
   var output_prefix = ap.option[String]("output-prefix", "o", "op",
     help = """Output prefix for DTM files. If omitted, no files are output,
@@ -324,7 +327,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
       val counts = row.gets("unigram-counts")
       if (counts.size > 0) {
         val slice_ids =
-          if (params.slice == "time")
+          if (params.slice == "year")
             date.map(x => date_to_time_slice(x)).toSeq
           else if (coord != "") coord_to_slice_ids(coord)
           else Seq[Int]()
@@ -491,8 +494,8 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
 \hline
 %sFrom & To & #Docs \\
 \hline""",
-          if (params.slice != "time") "|c" else "",
-          if (params.slice != "time") "Region & " else ""
+          if (params.slice != "year") "|c" else "",
+          if (params.slice != "year") "Region & " else ""
         )
       }
       val stats = new WordStats
@@ -504,7 +507,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
         val slice_name =
           if (params.slice == "region")
             id_to_region(sliceindex)
-          else if (params.slice == "time") {
+          else if (params.slice == "year") {
             if (params.from_to_timeslice)
               "%s-%s" format (mindate.toMDY(true), maxdate.toMDY(true))
             else
@@ -543,7 +546,7 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           }
           if (params.latex) {
             errprint("""%s%s & %s & %s \\""",
-              if (params.slice != "time") slice_name + """\dgr & """ else "",
+              if (params.slice != "year") slice_name + """\dgr & """ else "",
               mindate.toMDY(true), maxdate.toMDY(true), docs_ldastr.size
             )
           } else {
