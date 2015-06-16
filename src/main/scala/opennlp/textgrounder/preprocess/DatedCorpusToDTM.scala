@@ -90,7 +90,10 @@ but statistics are still printed.""")
     help = """Preserve case of words when converting to DTM.""")
 
   var from_to_timeslice = ap.flag("from-to-timeslice", "fts",
-    help = """If specified, output timeslices in FROM-TO format instead of just FROM.""")
+    help = """If specified, output timeslices in FROM-TO format instead of numeric.""")
+
+  var from_timeslice = ap.flag("from-timeslice", "fs",
+    help = """If specified, output timeslices in FROM format instead of numeric.""")
 
   var latex = ap.flag("latex",
     help = """Output stats in LaTeX format instead of raw human-readable.""")
@@ -558,8 +561,10 @@ object DatedCorpusToDTM extends ExperimentApp("DatedCorpusToDTM") {
           else if (params.slice == "year") {
             if (params.from_to_timeslice)
               "%s-%s" format (mindate.toMDY(true), maxdate.toMDY(true))
-            else
+            else if (params.from_timeslice)
               "%s" format mindate.toMDY(true)
+            else
+              pretty_double(slice_value)
           } else
             pretty_double(slice_value)
         var docs_countmap =
