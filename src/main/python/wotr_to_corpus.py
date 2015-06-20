@@ -496,7 +496,7 @@ the last value, which should represent the entire collection (e.g. use
 '25:50:75:100' to get four separate corpora that represent, respectively, 25%,
 50%, 75% and 100% of the full training set). The names of the corpora involve
 suffixes to the prefix specified in '--output'.""")
-    op.add_option("--permute", default="no",
+    op.add_option("--permute", default="span",
         choices=["no", "span", "volume"],
         help="""Permute the spans before processing them, either at the level
 of individual spans (span), entire volumes (volume), or no permutation (no).
