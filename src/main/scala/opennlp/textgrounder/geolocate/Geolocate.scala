@@ -33,7 +33,7 @@ import util.collection._
 import util.error._
 import util.experiment._
 import util.io.localfh
-import util.numeric.format_double
+import util.numeric.{format_double, pretty_double}
 import util.os._
 import util.print.{errprint, outprint}
 import util.spherical._
@@ -1103,7 +1103,7 @@ object GeolocateDocumentTag extends
       case null => ""
       case d:Double => {
         if (d == d.toLong) "%s" format d.toLong
-        else format_double(d)
+        else pretty_double(d, sigdigits = 5)
       }
       case seq:Seq[_] => seqvalonly()(value)
       // Eliminate embedded spaces, which cause various problems in filenames
