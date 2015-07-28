@@ -259,31 +259,8 @@ def get_lines():
   vols_numtypes = []
   spans_numtypes = []
   vols = [vol for vol in volume_spans]
-  if Opts.order_volumes:
-    user_vol_times = {}
-    for line in open(Opts.order_volumes, "r"):
-      line = line.strip()
-      m = re.match(r"^.*?user=(.*?), vol=(.*?),.*? createdAt=([0-9]+) .*$", line)
-      if not m:
-        print "WARNING: Can't parse line: [%s]" % line
-      else:
-        user_vol_times[(m.group(1), m.group(2))] = int(m.group(3))
-    # Decorate volumes with appropriate time
-    decorated_vols = []
-    for vol in vols:
-      time = user_vol_times.get((volume_user[vol], vol))
-      if not time:
-        print "WARNING: Can't find createdAt time for user=%s vol=%s" % (
-            volume_user[vol], vol)
-      decorated_vols.append((vol, time))
-    # Sort and de-decorate
-    vols = [vol for vol, time in sorted(decorated_vols, key=lambda x:x[1])]
-    print "Order of volumes:"
-    for vol in vols:
-      print "  %s" % vol
-  else:
-    # If no time info for ordering vols, order by volume number
-    vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
+  # Originally, order by volume number
+  vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = []
   for vol in vols:
     print "Processing volume %s" % vol
@@ -335,7 +312,7 @@ def get_lines():
           vol, span, vol, span, date, lat, lon, countsfield, textfield))
         lines.append(line)
       #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
-    vols_lines.append(lines)
+    vols_lines.append((vol, lines))
     vols_numtypes.append(len(voltypes))
   print "Total tokens: %s" % numalltokens
   print "Total types: %s" % len(alltypes)
@@ -348,30 +325,30 @@ def get_lines():
   print "Average types per span: %.2f" % (average(spans_numtypes))
   return vols_lines
 
-def flatten(lol):
-  return [item for x in lol for item in x]
+def copy_vols_lines(vols_lines):
+  return [(vol, [line for line in lines]) for vol, lines in vols_lines]
+
+def flatten_vols_lines(vols_lines):
+  return [line for vol, lines in vols_lines for line in lines]
+
+def init_permutation():
+  random.seed("The quick brown fox jumps over the lazy dog")
 
 # Permute vols_lines; also flatten if '--split-by span' (necessary in
 # case we permute by span, so we do this in any case).
 def permute_vols_lines(vols_lines):
-  random.seed("The quick brown fox jumps over the lazy dog")
+  # Copy since random.shuffle is destructive
+  vols_lines = copy_vols_lines(vols_lines)
   permute_opt = Opts.permute
-  if not Opts.permute:
-    if Opts.order_volumes:
-      permute_opt = "span-only"
-    else:
-      permute_opt = "span"
   # If permute by span, we need to permute within volumes if split by volume,
   # else flatten and then permute to get permutation across volumes.
-  if permute_opt in ["span", "span-only"]:
+  if permute_opt == "span":
     if Opts.split_by == "volume":
-      for lines in vols_lines:
+      for vol, lines in vols_lines:
         random.shuffle(lines)
-      if permute_opt == "span":
-        # Also permute the volumes themselves
-        random.shuffle(vols_lines)
+      random.shuffle(vols_lines)
     else:
-      vols_lines = flatten(vols_lines)
+      vols_lines = flatten_vols_lines(vols_lines)
       random.shuffle(vols_lines)
     return vols_lines
   # Otherwise, if permute by volume, permute volumes. Then in any case,
@@ -381,7 +358,7 @@ def permute_vols_lines(vols_lines):
   if Opts.split_by == "volume":
     return vols_lines
   else:
-    return flatten(vols_lines)
+    return flatten_vols_lines(vols_lines)
 
 # Given an a file, split the lines based on the split fractions, creating
 # training, dev and test files.
@@ -415,71 +392,102 @@ def run():
   #split_frac_size = sum(split_fractions)
 
   # Get the entire set of lines
-  vols_lines = permute_vols_lines(get_lines())
+  orig_vols_lines = get_lines()
+  init_permutation()
+  for repeat in xrange(Opts.repeat):
+    print "Repeat #%s" % (repeat + 1)
+    vols_lines = permute_vols_lines(orig_vols_lines)
 
-  # Now split into training/dev/test sections
-  split_count = [0, 0, 0]
-  split_names = ['training', 'dev', 'test']
-  split_lines = [[], [], []]
-  spancount = 0
-  split_gen = next_split_set(
-      split_fractions,
-      [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
-  if Opts.split_by == 'span':
-    for line in vols_lines:
-      split = split_gen.next()
-      spancount += 1
-      split_count[split] += 1
-      split_lines[split].append(line)
-  elif Opts.split_by == 'volume':
-    volsize = None
-    for lines in vols_lines:
-      # send() is weird. Sending a value causes the last yield in the generator
-      # to return with a value, then the code loops around and eventually
-      # executes another yield, whose value is returned by send(). The
-      # first time, we have to send None. Because of the way next_split_set()
-      # is written, we have to save the length of the volume and send it
-      # the next go around.
-      split = split_gen.send(volsize)
-      volsize = len(lines)
-      for line in lines:
+    # Now split into training/dev/test sections
+    split_count = [0, 0, 0]
+    split_names = ['training', 'dev', 'test']
+    split_lines = [[], [], []]
+    spancount = 0
+    split_gen = next_split_set(
+        split_fractions,
+        [Opts.max_training_size, Opts.max_dev_size, Opts.max_test_size])
+    if Opts.split_by == 'span':
+      for line in vols_lines:
+        split = split_gen.next()
         spancount += 1
         split_count[split] += 1
         split_lines[split].append(line)
+    elif Opts.split_by == 'volume':
+      volsize = None
+      # First split up the lines, keeping the volume structure
+      for vol, lines in vols_lines:
+        # send() is weird. Sending a value causes the last yield in the generator
+        # to return with a value, then the code loops around and eventually
+        # executes another yield, whose value is returned by send(). The
+        # first time, we have to send None. Because of the way next_split_set()
+        # is written, we have to save the length of the volume and send it
+        # the next go around.
+        split = split_gen.send(volsize)
+        volsize = len(lines)
+        spancount += volsize
+        split_count[split] += volsize
+        split_lines[split].append((vol, lines))
+      # Maybe reorder by createdAt time
+      if Opts.order_volumes:
+        user_vol_times = {}
+        for line in open(Opts.order_volumes, "r"):
+          line = line.strip()
+          m = re.match(r"^.*?user=(.*?), vol=(.*?),.*? createdAt=([0-9]+) .*$", line)
+          if not m:
+            print "WARNING: Can't parse line: [%s]" % line
+          else:
+            user_vol_times[(m.group(1), m.group(2))] = int(m.group(3))
+        # Decorate volumes with appropriate time
+        decorated_vols = []
+        for vol, lines in split_lines[0]:
+          time = user_vol_times.get((volume_user[vol], vol))
+          if not time:
+            print "WARNING: Can't find createdAt time for user=%s vol=%s" % (
+                volume_user[vol], vol)
+          decorated_vols.append((vol, time, lines))
+        # Sort and de-decorate
+        split_lines[0] = [(vol, lines) for vol, time, lines in
+            sorted(decorated_vols, key=lambda x:x[1])]
+        print "Order of volumes:"
+        for vol, lines in split_lines[0]:
+          print "  %s" % vol
+      # Now flatten
+      for split in xrange(len(split_lines)):
+        split_lines[split] = flatten_vols_lines(split_lines[split])
 
-  # Output total size of sections
-  for split in xrange(len(split_names)):
-    print "Total %s count: %s" % (split_names[split], split_count[split])
-  print "Total count: %s" % sum(split_count)
+    # Output total size of sections
+    for split in xrange(len(split_names)):
+      print "Total %s count: %s" % (split_names[split], split_count[split])
+    print "Total count: %s" % sum(split_count)
 
-  # Handle learning-curve fractions of training set
-  for lcval, lcfrac in zip(lc_values_str, lc_fractions):
-    training_size = int(lcfrac * split_count[0])
-    print "Learning curve value %s, training count: %s" % (lcval, training_size)
-    if not Opts.no_write:
-      if len(lc_values_str) == 1:
-        outpref = Opts.output
-      else:
-        outpref = Opts.output.replace("%s", lcval)
-        print "Learning curve prefix for value %s: %s" % (lcval, outpref)
-      outdir = os.path.dirname(outpref)
-      if outdir and not os.path.exists(outdir):
-        os.makedirs(outdir)
-      for split in xrange(len(split_names)):
-        splitfile = open("%s-%s.data.txt" % (outpref, split_names[split]), "w")
-        if split == 0: # training
-          lines = split_lines[split][0:training_size]
+    # Handle learning-curve fractions of training set
+    for lcval, lcfrac in zip(lc_values_str, lc_fractions):
+      training_size = int(lcfrac * split_count[0])
+      print "Learning curve value %s, training count: %s" % (lcval, training_size)
+      if not Opts.no_write:
+        if len(lc_values_str) == 1:
+          outpref = Opts.output
         else:
-          lines = split_lines[split]
-        for line in lines:
-          uniprint(line, outfile=splitfile)
-        splitfile.close()
-      for split in split_names:
-        outschemafile = open("%s-%s.schema.txt" % (outpref, split), "w")
-        print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts\ttext"
-        print >>outschemafile, "corpus-type\tgeneric"
-        print >>outschemafile, "split\t%s" % split
-        outschemafile.close()
+          outpref = Opts.output.replace("%s", lcval).replace("%r", str(repeat + 1))
+          print "Learning curve prefix for value %s: %s" % (lcval, outpref)
+        outdir = os.path.dirname(outpref)
+        if outdir and not os.path.exists(outdir):
+          os.makedirs(outdir)
+        for split in xrange(len(split_names)):
+          splitfile = open("%s-%s.data.txt" % (outpref, split_names[split]), "w")
+          if split == 0: # training
+            lines = split_lines[split][0:training_size]
+          else:
+            lines = split_lines[split]
+          for line in lines:
+            uniprint(line, outfile=splitfile)
+          splitfile.close()
+        for split in split_names:
+          outschemafile = open("%s-%s.schema.txt" % (outpref, split), "w")
+          print >>outschemafile, "title\tvol\tspan\tdate\tcoord\tunigram-counts\ttext"
+          print >>outschemafile, "corpus-type\tgeneric"
+          print >>outschemafile, "split\t%s" % split
+          outschemafile.close()
 
 class WOTRToCorpus(NLPProgram):
   def populate_options(self, op):
@@ -528,19 +536,20 @@ the last value, which should represent the entire collection (e.g. use
 '25:50:75:100' to get four separate corpora that represent, respectively, 25%,
 50%, 75% and 100% of the full training set). The names of the corpora involve
 suffixes to the prefix specified in '--output'.""")
-    op.add_option("--permute",
-        choices=["no", "span", "span-only", "volume"],
+    op.add_option("--permute", default="span",
+        choices=["no", "span", "volume"],
         help="""Permute the spans before processing them, either at the level
-of individual spans and volumes (span), spans only (span-only), entire volumes
-(volume), or no permutation (no). Default is 'span' unless '--order-volumes'
-is given, in which case it is 'span-only'. When '--split-by volume',
-permutation by span only permutes within a given volume (as well as permuting
-the volumes themselves if 'span' rather than 'span-only' is given).
-Permutation seeds the random number generator to a specific value at the
-beginning so it is repeatable.""")
+of individual spans and volumes (span), entire volumes (volume), or no
+permutation (no). Default is 'span'. When '--split-by volume', permutation by
+span only permutes within a given volume (as well as permuting the volumes
+themselves if 'span' rather than 'span-only' is given). Permutation seeds the
+random number generator to a specific value at the beginning so it is
+repeatable.""")
     op.add_option("--order-volumes",
         help="""File containing output from download-docgeo-spans.js, used
 to order the volumes by createdAt time.""")
+    op.add_option("--repeat", default=1, type='int',
+        help="""Number of times to repeat generation of files.""")
     op.add_option("--training-fraction", type='float', default=80,
         help="""Fraction of total articles to use for training.
 The absolute amount doesn't matter, only the value relative to the test
@@ -577,6 +586,8 @@ A value of 0 means no maximum. Default %default.""",
       self.need('text')
     if not Opts.no_write:
       self.need('output')
+    if Opts.order_volumes and Opts.split_by != "volume":
+      op.error("With --order-volumes, must have --split-by volume")
 
   def implement_main(self, opts, params, args):
     run()
