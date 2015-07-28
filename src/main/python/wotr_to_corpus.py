@@ -258,7 +258,32 @@ def get_lines():
   numspans = 0
   vols_numtypes = []
   spans_numtypes = []
-  vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
+  vols = [vol for vol in volume_spans]
+  if Opts.order_volumes:
+    user_vol_times = {}
+    for line in open(Opts.order_volumes, "r"):
+      line = line.strip()
+      m = re.match(r"^.*?user=(.*?), vol=(.*?),.*? createdAt=([0-9]+) .*$", line)
+      if not m:
+        print "WARNING: Can't parse line: [%s]" % line
+      else:
+        user_vol_times[(m.group(1), m.group(2))] = int(m.group(3))
+    # Decorate volumes with appropriate time
+    decorated_vols = []
+    for vol in vols:
+      time = user_vol_times.get((volume_user[vol], vol))
+      if not time:
+        print "WARNING: Can't find createdAt time for user=%s vol=%s" % (
+            volume_user[vol], vol)
+      decorated_vols.append((vol, time))
+    # Sort and de-decorate
+    vols = [vol for vol, time in sorted(decorated_vols, key=lambda x:x[1])]
+    print "Order of volumes:"
+    for vol in vols:
+      print "  %s" % vol
+  else:
+    # If no time info for ordering vols, order by volume number
+    vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
   vols_lines = []
   for vol in vols:
     print "Processing volume %s" % vol
@@ -330,21 +355,28 @@ def flatten(lol):
 # case we permute by span, so we do this in any case).
 def permute_vols_lines(vols_lines):
   random.seed("The quick brown fox jumps over the lazy dog")
+  permute_opt = Opts.permute
+  if not Opts.permute:
+    if Opts.order_volumes:
+      permute_opt = "span-only"
+    else:
+      permute_opt = "span"
   # If permute by span, we need to permute within volumes if split by volume,
   # else flatten and then permute to get permutation across volumes.
-  if Opts.permute == "span":
+  if permute_opt in ["span", "span-only"]:
     if Opts.split_by == "volume":
       for lines in vols_lines:
         random.shuffle(lines)
-      # Also permute the volumes themselves
-      random.shuffle(vols_lines)
+      if permute_opt == "span":
+        # Also permute the volumes themselves
+        random.shuffle(vols_lines)
     else:
       vols_lines = flatten(vols_lines)
       random.shuffle(vols_lines)
     return vols_lines
   # Otherwise, if permute by volume, permute volumes. Then in any case,
   # flatten in split by span.
-  if Opts.permute == "volume":
+  if permute_opt == "volume":
     random.shuffle(vols_lines)
   if Opts.split_by == "volume":
     return vols_lines
@@ -496,14 +528,19 @@ the last value, which should represent the entire collection (e.g. use
 '25:50:75:100' to get four separate corpora that represent, respectively, 25%,
 50%, 75% and 100% of the full training set). The names of the corpora involve
 suffixes to the prefix specified in '--output'.""")
-    op.add_option("--permute", default="span",
-        choices=["no", "span", "volume"],
+    op.add_option("--permute",
+        choices=["no", "span", "span-only", "volume"],
         help="""Permute the spans before processing them, either at the level
-of individual spans (span), entire volumes (volume), or no permutation (no).
-Default is %default. When '--split-by volume', permutation by span only
-permutes within a given volume (as well as permuting the volumes themselves).
+of individual spans and volumes (span), spans only (span-only), entire volumes
+(volume), or no permutation (no). Default is 'span' unless '--order-volumes'
+is given, in which case it is 'span-only'. When '--split-by volume',
+permutation by span only permutes within a given volume (as well as permuting
+the volumes themselves if 'span' rather than 'span-only' is given).
 Permutation seeds the random number generator to a specific value at the
 beginning so it is repeatable.""")
+    op.add_option("--order-volumes",
+        help="""File containing output from download-docgeo-spans.js, used
+to order the volumes by createdAt time.""")
     op.add_option("--training-fraction", type='float', default=80,
         help="""Fraction of total articles to use for training.
 The absolute amount doesn't matter, only the value relative to the test
