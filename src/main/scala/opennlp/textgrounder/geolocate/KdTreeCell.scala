@@ -428,10 +428,14 @@ class KdTreeGrid(
     // to something else yields a set, the duplicate items are erased,
     // which is almost never what's desired. So we should never return
     // a Set when an Iterable is called for.
-    (for (leaf <- leaf_nodes) yield {
-      assert_>(leaf.size, 0)
-      nodes_to_cell(leaf)
-    }).toIndexedSeq
+    (for {
+      leaf <- leaf_nodes
+      cell = {
+        assert_>(leaf.size, 0)
+        nodes_to_cell(leaf)
+      }
+      if !cell.is_empty // can be empty if there is a bounding-box restriction
+    } yield cell).toIndexedSeq
   }
 
   override def output_ranking_data(docid: String,

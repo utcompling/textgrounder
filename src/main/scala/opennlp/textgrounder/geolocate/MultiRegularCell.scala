@@ -603,7 +603,7 @@ class MultiRegularGrid(
     assert(all_cells_computed)
     (for {
       v <- corner_to_multi_cell.values
-      if (!v.is_empty)
+      if !v.is_empty
     } yield v).toIndexedSeq
   }
 
