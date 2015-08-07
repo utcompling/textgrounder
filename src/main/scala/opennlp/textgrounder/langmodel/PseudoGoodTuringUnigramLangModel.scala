@@ -40,9 +40,10 @@ import util.print.errprint
 class PseudoGoodTuringUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,
+    normlm: Boolean,
     tf_idf: Boolean
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, interpolate_string == "yes", tf_idf
+  create_builder, interpolate_string == "yes", tf_idf, normlm
 ) {
   // Total number of types seen once
   var total_num_types_seen_once = 0

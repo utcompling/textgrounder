@@ -394,6 +394,9 @@ away.""")
    ap.flag("tf-idf", "tfidf",
       help = """Adjust word counts according to TF-IDF weighting (i.e.
 downweight words that occur in many documents).""")
+ var normalize_lang_model =
+   ap.flag("normalize-lang-model", "nlm",
+      help = """L2-normalize counts in language models.""")
 
   var stopwords_file =
     ap.option[String]("stopwords-file",
@@ -1705,7 +1708,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Dirichlet factor must be >= 0, but is %g"
           format dirichlet_factor)
       new DirichletUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf, dirichlet_factor)
+        interpolate, params.tf_idf, params.normalize_lang_model,
+        dirichlet_factor)
     }
     else if (lm == "jelinek-mercer") {
       val jelinek_factor = params.parser.parseSubParams(lm, lmparams,
@@ -1714,13 +1718,14 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
         param_error("Jelinek factor must be between 0.0 and 1.0, but is %g"
           format jelinek_factor)
       new JelinekMercerUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf, jelinek_factor)
+        interpolate, params.tf_idf, params.normalize_lang_model,
+        jelinek_factor)
     }
     else {
       if (lmparams.contains(':'))
         param_error("Parameters not allowed for pseudo-Good-Turing")
       new PseudoGoodTuringUnigramLangModelFactory(create_builder,
-        interpolate, params.tf_idf)
+        interpolate, params.tf_idf, params.normalize_lang_model)
     }
   }
 

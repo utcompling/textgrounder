@@ -27,9 +27,10 @@ class JelinekMercerUnigramLangModelFactory(
     create_builder: LangModelFactory => LangModelBuilder,
     interpolate_string: String,
     tf_idf: Boolean,
+    normlm: Boolean,
     val jelinek_factor: Double
 ) extends DiscountedUnigramLangModelFactory(
-  create_builder, interpolate_string != "no", tf_idf
+  create_builder, interpolate_string != "no", tf_idf, normlm
 ) {
   def create_lang_model = new JelinekMercerUnigramLangModel(this)
 }

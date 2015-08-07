@@ -1281,6 +1281,7 @@ object GeolocateDocumentTag extends
         case _ => ""
       }),
       ("tf-idf", default),
+      ("normalize-lang-model", echo("normLM")),
       ("naive-bayes-prior-weight", short("nbpweight")),
       ("naive-bayes-prior", full("nbprior")),
       ("naive-bayes-features", full("nbfeats")),

@@ -29,7 +29,8 @@ import util.debug._
 abstract class DiscountedUnigramLangModelFactory(
   create_builder: LangModelFactory => LangModelBuilder,
   val interpolate: Boolean,
-  val tf_idf: Boolean
+  val tf_idf: Boolean,
+  val normlm: Boolean
 ) extends UnigramLangModelFactory {
   val builder = create_builder(this)
 
@@ -208,12 +209,28 @@ abstract class DiscountedUnigramLangModel(
          * appropriately in certain circumstances (e.g. during cosine similarity
          * or sum-frequency). The sum-frequency is probably messed up by this
          * since it may mess up the denominator of the TF part.
+         *
+         * OTOH, modifying the counts like this is exactly what we want when
+         * using gram-doc-count using VW.
          */
         if (idf <= 0)
           idf = 0.0001
         set_gram(word, count*idf)
       }
     }
+
+    // As for tf-idf, we directly modify the counts, which we do mostly for
+    // gram-doc-count using VW.
+    if (factory.normlm) {
+      var sumsq = 0.0
+      for ((word, count) <- iter_grams)
+        sumsq += count * count
+      sumsq = 1.0 / math.sqrt(sumsq)
+      for ((word, count) <- iter_grams_for_modify) {
+        set_gram(word, count*sumsq)
+      }
+    }
+
     normalization_factor = num_tokens
     // assert(normalization_factor > 0,
     //  "Zero normalization factor for lm %s" format this)
