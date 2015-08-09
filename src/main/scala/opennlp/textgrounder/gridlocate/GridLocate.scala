@@ -1294,6 +1294,34 @@ by commas. If not specified, load at all levels.""")
   val load_vw_submodels_levels_set =
     parse_submodel_levels(load_vw_submodels_levels)
 
+  var load_vw_featmask =
+    ap.option[String]("load-vw-featmask", "lvfm",
+      default = "",
+      help = """Load a saved Vowpal Wabbit model as a feature mask. This
+is used to implement L1 under BFGS: Do L1 under SGD, saving the model, and
+load the saved model as a feature mask under BFGS. When doing hierarchical
+classification, only applies at the top level (see '--load-vw-subfeatmask').""")
+
+  var load_vw_subfeatmask =
+    ap.option[String]("load-vw-subfeatmask", "lvsfm",
+      default = "",
+      help = """Load a saved Vowpal Wabbit submodel as a feature mask
+during hierarchical classification. This is used to implement L1 under
+BFGS: Do L1 under SGD, saving the model, and load the saved model as a
+feature mask under BFGS. The filename should have %l and %i in it, which
+will be replaced by the level and classifier index, respectively.""")
+
+  // FIXME! Do we need this? Probably not.
+  var load_vw_subfeatmask_levels =
+    ap.option[String]("load-vw-subfeatmask-levels", "lvsfml",
+      default = "",
+      help = """If specified, load a saved Vowpal Wabbit submodel as a
+feature mask only at the given level(s). The value should be one or more
+numbers separated by commas. If not specified, load at all levels.""")
+
+  val load_vw_subfeatmask_levels_set =
+    parse_submodel_levels(load_vw_subfeatmask_levels)
+
   var vw_args =
     ap.option[String]("vw-args",
       default = "",
@@ -2689,9 +2717,17 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
           else
             ""
         } else params.load_vw_model
+      val load_vw_featmask =
+        if (level > 1) {
+          val spec = params.load_vw_subfeatmask_levels_set
+          if (spec.size == 0 || spec(level))
+            replace_level_index(params.load_vw_subfeatmask)
+          else
+            ""
+        } else params.load_vw_featmask
       val (classifier, featvec_factory) =
         create_vowpal_wabbit_classifier(grid, candidates, docs_cells,
-          save_vw_model, load_vw_model, vw_args,
+          save_vw_model, load_vw_model, load_vw_featmask, vw_args,
           cost_sensitive = cost_sensitive)
       new VowpalWabbitGridRanker[Co](ranker_name, grid, classifier,
         featvec_factory, cost_sensitive = cost_sensitive)
@@ -2799,7 +2835,8 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
       // reloading the training documents when we are loading a pre-saved
       // model. See comment in create_hierarchical_classifier_ranker.
       docs_cells: => Iterator[(GridDoc[Co], GridCell[Co])],
-      save_vw_model: String, load_vw_model: String, vw_args: String,
+      save_vw_model: String, load_vw_model: String,
+      load_vw_featmask: String, vw_args: String,
       cost_sensitive: Boolean) = {
     val featvec_factory =
       create_classify_doc_featvec_factory(attach_label = false,
@@ -2895,7 +2932,11 @@ trait GridLocateDriver[Co] extends HadoopableArgParserExperimentDriver {
             Seq("--" + multiclass_arg, s"$num_labels")
           } else {
             Seq("--" + params.vw_multiclass, s"$num_labels")
-          })
+          }) ++
+          (if (load_vw_featmask != "") Seq("--feature_mask", load_vw_featmask)
+           else Seq[String]()
+          )
+
         trainer(feats_filename, save_vw_model,
           split_vw_args(vw_args) ++ extra_args)
       }
