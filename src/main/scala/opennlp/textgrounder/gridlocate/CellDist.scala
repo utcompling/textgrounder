@@ -36,7 +36,8 @@ import langmodel.{Gram,LangModel}
 
 class CellDist[Co](
   val cellprobs: Iterable[(GridCell[Co], Double)],
-  val normalized: Boolean
+  val normalized: Boolean,
+  val empty: Boolean
 ) {
   /**
    * Return a ranked list of all the cells. We may need to add the
@@ -63,29 +64,35 @@ class CellDistFactory[Co] {
   /**
    * Create normalized cell dist from unnormalized dist.
    */
-  def create_normalized_cell_dist(cellprobs: Iterable[(GridCell[Co], Double)]
+  def create_normalized_cell_dist(cellprobs: Iterable[(GridCell[Co], Double)],
+    normalize: Boolean = true
   ) = {
     // Normalize the probabilities; but if all probabilities are 0, then
     // we can't normalize, so leave as-is. This will happen, for example,
     // for words never seen in the entire corpus.
     val totalprob = cellprobs.map(_._2).sum
-    val (normalized, norm_cellprobs) =
+    val (normalized, empty, norm_cellprobs) =
       if (totalprob == 0)
-        (false, cellprobs)
+        (false, true, cellprobs)
+      else if (!normalize)
+        (false, false, cellprobs)
       else
-        (true, cellprobs.map { case (cell, prob) => (cell, prob / totalprob) })
+        (true, false, cellprobs.map {
+          case (cell, prob) => (cell, prob / totalprob)
+        })
 
-    new CellDist[Co](norm_cellprobs, normalized)
+    new CellDist[Co](norm_cellprobs, normalized, empty)
   }
 
   /**
    * Create a distribution over cells from the number of documents in
    * each cell.
    */
-  def get_cell_dist_from_doc_count(grid: Grid[Co]) = {
+  def get_cell_dist_from_doc_count(grid: Grid[Co],
+      normalize: Boolean = true) = {
     create_normalized_cell_dist(grid.iter_nonempty_cells.map { cell =>
       (cell, cell.num_docs.toDouble)
-    })
+    }, normalize)
   }
 
   /**
@@ -149,6 +156,6 @@ class CellDistFactory[Co] {
       cellprobs.map { case (cell, cellprob) =>
         (cell, total_norm_factor * cellprob)
       }
-    new CellDist[Co](normed_cell_probs.toIndexedSeq, normalized)
+    new CellDist[Co](normed_cell_probs.toIndexedSeq, normalized, normalized)
   }
 }

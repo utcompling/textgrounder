@@ -59,11 +59,13 @@ class KMLParameters {
   val look_at_tilt = 53.454348562403
   val look_at_heading = 0
 
-  var kml_max_height: Double = _
+  var kml_scaling_factor: Double = _
 
   var kml_transform: String = _
 
   var kml_include_cell_names: Boolean = _
+
+  var no_normalize = false
 }
 
 class GenerateKMLParameters(
@@ -107,11 +109,14 @@ when generating KML (--mode=generate-kml), possibly to try and make the
 low values more visible.  Possibilities are 'none' (no transformation),
 'log' (take the log), and 'logsquared' (negative of squared log).  Default
 '%default'.""")
-  var kml_max_height =
-    ap.option[Double]("kml-max-height", "kmh",
+  var kml_scaling_factor =
+    ap.option[Double]("kml-scaling-factor", "ksf",
       default = 2000000.0,
       must = be_>(0.0),
-      help = """Height of highest bar, in meters.  Default %default.""")
+      help = """Scaling factor to convert to meters.  Default %default.""")
+  var no_normalize =
+    ap.flag("no-normalize", "nn",
+      help = """Don't normalize counts to produce probability dist.""")
   var kml_include_cell_names =
     ap.flag("kml-include-cell-names", "kicn", "kml-names",
       help = """Include name of each cell in KML. Name comes from
@@ -149,14 +154,15 @@ class GenerateKMLDriver extends
     val grid = initialize_grid
     val cdist_factory = new CellDistFactory[SphereCoord]
     val kmlparams = new KMLParameters()
-    kmlparams.kml_max_height = params.kml_max_height
+    kmlparams.kml_scaling_factor = params.kml_scaling_factor
     kmlparams.kml_transform = params.kml_transform
     kmlparams.kml_include_cell_names = params.kml_include_cell_names
+    kmlparams.no_normalize = params.no_normalize
     if (params.kml_dist_type == "words") {
       for (word <- params.split_kml_words) {
         val gram = Unigram.to_index(word)
         val celldist = cdist_factory.get_cell_dist(grid, gram)
-        if (!celldist.normalized) {
+        if (celldist.empty) {
           warning("""Non-normalized distribution, apparently word %s not seen anywhere.
   Not generating an empty KML file.""", word)
         } else {
@@ -166,9 +172,10 @@ class GenerateKMLDriver extends
         }
       }
     } else {
-      val celldist = cdist_factory.get_cell_dist_from_doc_count(grid)
-      if (!celldist.normalized) {
-        warning("""Non-normalized distribution, not generating empty KML file.""")
+      val celldist = cdist_factory.get_cell_dist_from_doc_count(grid,
+        !params.no_normalize)
+      if (celldist.empty) {
+        warning("""Empty distribution, not generating empty KML file.""")
       } else {
         SphereCellDist.generate_kml_file(grid, Unigram.to_index("num-docs"),
           celldist, "%s-num-docs.kml" format params.kml_prefix,

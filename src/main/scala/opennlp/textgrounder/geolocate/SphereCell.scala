@@ -90,13 +90,14 @@ abstract class PolygonalCell(
   def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double,
       params: KMLParameters) = {
     val offprob = xfprob - xf_minprob
-    val fracprob = offprob / (xf_maxprob - xf_minprob)
+    val normfracprob = offprob / (xf_maxprob - xf_minprob)
+    val fracprob = if (params.no_normalize) xfprob else normfracprob
     val boundary = get_inner_boundary
     val first = boundary.head
     val coordtext = "\n" + (
       for (coord <- boundary ++ Iterable(first)) yield (
         "%s,%s,%s" format (
-          coord.long, coord.lat, fracprob * params.kml_max_height)
+          coord.long, coord.lat, fracprob * params.kml_scaling_factor)
         )).mkString("\n") + "\n"
     val name = most_salient_point
 
@@ -107,7 +108,7 @@ abstract class PolygonalCell(
     val color = Array(0.0, 0.0, 0.0)
     for (i <- 0 until 3) {
       color(i) = (KMLConstants.kml_mincolor(i) +
-        fracprob * (
+        normfracprob * (
           KMLConstants.kml_maxcolor(i) - KMLConstants.kml_mincolor(i)))
     }
     // Original color dc0155ff
