@@ -126,6 +126,7 @@ def parse_geom(geom):
   splitgeoms = re.split("@@", geom)
   geompoints = []
   stats = Geomstats()
+  json_geoms = []
   for g in splitgeoms:
     if not g:
       continue
@@ -134,6 +135,7 @@ def parse_geom(geom):
     except:
       print "Error parsing JSON of <%s>, splitgeoms=<%s>" % (g, splitgeoms)
       raise
+    json_geoms.append(js)
     ty = js['type']
     coords = js['coordinates']
     if ty == "Point":
@@ -155,7 +157,7 @@ def parse_geom(geom):
   cent = centroid(geompoints)
   if cent:
     stats.numgeom += 1
-    return [cent[1], cent[0]], stats
+    return [cent[1], cent[0]], json_geoms, stats
   else:
     return None
 
@@ -180,19 +182,20 @@ def read_volume_spans():
         spancoord = None
         spanstats = None
         if spancoordstats:
-          spancoord, spanstats = spancoordstats
-        spans.append([spanbegin, spanend, spancoord, spanstats])
+          spancoord, spangeoms, spanstats = spancoordstats
+        spans.append([spanbegin, spanend, spancoord, spangeoms, spanstats])
       io_spans = []
       voltext = volume_text[vol]
       ind = 0
-      for beg, end, coord, stats in spans:
+      for beg, end, coord, jsongeoms, stats in spans:
         inside_text = voltext[beg:end].strip()
         if inside_text:
-          io_spans.append(["%s-%s" % (beg, end), coord, stats, inside_text])
+          io_spans.append(["%s-%s" % (beg, end), coord, jsongeoms, stats, inside_text])
       print "%s spans, %s with geometries" % (len(io_spans),
           len([x for x in io_spans if x[1]]))
 
       if vol in volume_spans:
+        # x[1] here refers to the coordinate
         existing_coord_spans = len([x for x in volume_spans[vol] if x[1]])
         new_coord_spans = len([x for x in io_spans if x[1]])
         if existing_coord_spans > new_coord_spans:
@@ -216,7 +219,7 @@ def output_span_stats():
   numgeom = 0
   for vol, spans in volume_spans.iteritems():
     numvol += 1
-    for span, coord, stats, text in spans:
+    for span, coord, jsongeoms, stats, text in spans:
       numspan += 1
       if stats:
         totalstats.add_stats(stats)
@@ -244,7 +247,7 @@ def read_predicted_spans():
       for span in re.finditer(r'^-----+ BEGIN SPAN -----+$(.*?)^-----+ END SPAN -----+$', filetext, re.M | re.S):
         spantext = span.group(1)
         if not Opts.filter_regex or re.search(Opts.filter_regex, spantext):
-          spans.append(["%s" % spanno, None, None, spantext])
+          spans.append(["%s" % spanno, None, None, None, spantext])
         spanno += 1
       volume_spans[vol] = spans
 
@@ -270,7 +273,7 @@ def get_lines():
     numvols += 1
     lines = []
     last_date = None
-    for span, coord, stats, text in volume_spans[vol]:
+    for span, coord, jsongeoms, stats, text in volume_spans[vol]:
       numvolspans += 1
       numspans += 1
       date = find_date(text)
@@ -324,6 +327,44 @@ def get_lines():
   print "Average types per volume: %.2f" % (average(vols_numtypes))
   print "Average types per span: %.2f" % (average(spans_numtypes))
   return vols_lines
+
+def get_jsons():
+  vols = [vol for vol in volume_spans]
+  # Originally, order by volume number
+  vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
+  vols_jsons = []
+  for vol in vols:
+    print "Processing volume %s" % vol
+    jsons = []
+    last_date = None
+    for span, coord, jsongeoms, stats, text in volume_spans[vol]:
+      date = find_date(text)
+      if date:
+        last_date = date
+      if not date:
+        date = last_date
+      if not date:
+        #print "No date"
+        date = ""
+      include = False
+      lat = None
+      lon = None
+      if coord:
+        lat, lon = coord
+      if lat is not None and lon is not None:
+        if not Opts.suppress_coord_paras:
+          include = True
+      else:
+        if Opts.include_non_coord_paras:
+          include = True
+          lat = 0.0
+          lon = 0.0
+      if include:
+        json = {'geo':jsongeoms, 'text':text, 'centroid':[lon, lat],
+            'span':span, 'date':date}
+        jsons.append(json)
+    vols_jsons.append((vol, jsons))
+  return vols_jsons
 
 def copy_vols_lines(vols_lines):
   return [(vol, [line for line in lines]) for vol, lines in vols_lines]
@@ -390,6 +431,15 @@ def run():
     split_fractions = (
         [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
   #split_frac_size = sum(split_fractions)
+
+  # If JSON output requested, do it now.
+  if Opts.output_json:
+    json_output = []
+    vols_jsons = get_jsons()
+    for vol, jsons in vols_jsons:
+      json_output.append({'vol':vol, 'spans':jsons})
+    with open(Opts.output_json, 'wb') as w:
+      json.dump(json_output, w, indent=5)
 
   # Get the entire set of lines
   orig_vols_lines = get_lines()
@@ -510,6 +560,9 @@ class WOTRToCorpus(NLPProgram):
 given, should have %s in it, where the learning curve value will be
 substituted (should be in a directory name, and directories will be created
 as necessary).""",
+        metavar="FILE")
+    op.add_option("--output-json",
+        help="""Output file to store JSON data into.""",
         metavar="FILE")
     op.add_option("--include-non-coord-paras",
         help="""Include paragraphs without coordinates, supplying 0,0 as the
