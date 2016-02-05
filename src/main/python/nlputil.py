@@ -586,7 +586,7 @@ class StatusMessage(object):
 # each time it is run), and spreads out the instances as much as possible.
 # For example, if all values are equal, it will cycle successively through
 # the different split files; if the values are [1, 1.5, 1], the output
-# will be [1, 2, 3, 2, 1, 2, 3, ...]; etc.
+# will be [0, 1, 2, 1, 0, 1, 2, ...]; etc.
 #
 # If MAX_SPLIT_SIZE is specified, it should be a list of the same length
 # as SPLIT_FRACTIONS, giving the maximum number of values in a given split.
