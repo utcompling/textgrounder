@@ -216,17 +216,29 @@ def output_span_stats():
   totalstats = Geomstats()
   numvol = 0
   numspan = 0
+  numspan_mostly_geometried = 0
+  numgeomspan_mostly_geometried = 0
   numgeom = 0
   for vol, spans in volume_spans.iteritems():
     numvol += 1
+    num_spans_in_volume = 0
+    num_geomspans_in_volume = 0
     for span, coord, jsongeoms, stats, text in spans:
       numspan += 1
+      num_spans_in_volume += 1
       if stats:
         totalstats.add_stats(stats)
         numgeom += 1
+        num_geomspans_in_volume += 1
+    if num_geomspans_in_volume * 2 >= num_spans_in_volume:
+      numspan_mostly_geometried += num_spans_in_volume
+      numgeomspan_mostly_geometried += num_geomspans_in_volume
+
   print "Number of volumes: %s" % numvol
   print "Number of spans: %s" % numspan
+  print "Number of spans in mostly-geometried volumes: %s" % numspan_mostly_geometried
   print "Number of geometries: %s" % numgeom
+  print "Number of geometries in mostly-geometried volumes: %s" % numgeomspan_mostly_geometried
   print "Average spans per volume: %.2f" % (float(numspan) / numvol)
   print "Average geometries per volume: %.2f" % (float(numgeom) / numvol)
   print "Fraction of spans with geometries: %.3f" % (float(numgeom) / numspan)
@@ -254,7 +266,7 @@ def read_predicted_spans():
 def average(values):
   return float(sum(values)) / len(values)
 
-def get_lines():
+def get_spans():
   alltypes = set()
   numvols = 0
   numalltokens = 0
@@ -313,7 +325,7 @@ def get_lines():
       if include:
         line = ("vol%s.%s\t%s\t%s\t%s\t%s,%s\t%s\t%s" % (
           vol, span, vol, span, date, lat, lon, countsfield, textfield))
-        lines.append(line)
+        lines.append((vol, countsfield, line, date, span, coord, jsongeoms, stats, text))
       #uniprint("%s\t%s,%s" % (' '.join(words), lat, lon))
     vols_lines.append((vol, lines))
     vols_numtypes.append(len(voltypes))
@@ -328,43 +340,15 @@ def get_lines():
   print "Average types per span: %.2f" % (average(spans_numtypes))
   return vols_lines
 
-def get_jsons():
-  vols = [vol for vol in volume_spans]
-  # Originally, order by volume number
-  vols = sorted([vol for vol in volume_spans], key=lambda x:int(x))
-  vols_jsons = []
-  for vol in vols:
-    print "Processing volume %s" % vol
-    jsons = []
-    last_date = None
-    for span, coord, jsongeoms, stats, text in volume_spans[vol]:
-      date = find_date(text)
-      if date:
-        last_date = date
-      if not date:
-        date = last_date
-      if not date:
-        #print "No date"
-        date = ""
-      include = False
-      lat = None
-      lon = None
-      if coord:
-        lat, lon = coord
-      if lat is not None and lon is not None:
-        if not Opts.suppress_coord_paras:
-          include = True
-      else:
-        if Opts.include_non_coord_paras:
-          include = True
-          lat = 0.0
-          lon = 0.0
-      if include:
-        json = {'geo':jsongeoms, 'text':text, 'centroid':[lon, lat],
-            'span':span, 'date':date}
-        jsons.append(json)
-    vols_jsons.append((vol, jsons))
-  return vols_jsons
+def get_json(spandata):
+  vol, countsfield, line, date, span, coord, jsongeoms, stats, text = spandata
+  if coord:
+    lat, lon = coord
+  else:
+    lat = 0.0
+    lon = 0.0
+  return {'geo':jsongeoms, 'text':text, 'counts':countsfield,
+      'centroid':[lon, lat], 'vol':vol, 'span':span, 'date':date}
 
 def copy_vols_lines(vols_lines):
   return [(vol, [line for line in lines]) for vol, lines in vols_lines]
@@ -432,21 +416,25 @@ def run():
         [Opts.training_fraction, Opts.dev_fraction, Opts.test_fraction])
   #split_frac_size = sum(split_fractions)
 
-  # If JSON output requested, do it now.
-  if Opts.output_json:
+  # Get the entire set of spans and lines
+  orig_vols_spans = get_spans()
+
+  # If JSON-by-vol output requested, do it now.
+  if Opts.output_json_by_vol:
     json_output = []
-    vols_jsons = get_jsons()
-    for vol, jsons in vols_jsons:
+    for vol, lines in orig_vols_spans:
+      print "Processing volume %s for json-by-vol" % vol
+      jsons = []
+      for line in lines:
+        jsons.append(get_json(line))
       json_output.append({'vol':vol, 'spans':jsons})
-    with open(Opts.output_json, 'wb') as w:
+    with open(Opts.output_json_by_vol, 'wb') as w:
       json.dump(json_output, w, indent=5)
 
-  # Get the entire set of lines
-  orig_vols_lines = get_lines()
   init_permutation()
   for repeat in xrange(Opts.repeat):
     print "Repeat #%s" % (repeat + 1)
-    vols_lines = permute_vols_lines(orig_vols_lines)
+    vols_lines = permute_vols_lines(orig_vols_spans)
 
     # Now split into training/dev/test sections
     split_count = [0, 0, 0]
@@ -529,7 +517,7 @@ def run():
             lines = split_lines[split][0:training_size]
           else:
             lines = split_lines[split]
-          for line in lines:
+          for vol, countsfield, line, date, span, coord, jsongeoms, stats, text in lines:
             uniprint(line, outfile=splitfile)
           splitfile.close()
         for split in split_names:
@@ -538,6 +526,23 @@ def run():
           print >>outschemafile, "corpus-type\tgeneric"
           print >>outschemafile, "split\t%s" % split
           outschemafile.close()
+
+      # If JSON-by-split output requested, do it now.
+      if Opts.output_json_by_split:
+        json_output = []
+        for split in xrange(len(split_names)):
+          splitname = split_names[split]
+          if split == 0: # training
+            lines = split_lines[split][0:training_size]
+          else:
+            lines = split_lines[split]
+          jsons = []
+          for line in lines:
+            jsons.append(get_json(line))
+          json_output.append({'split':splitname, 'spans':jsons})
+        with open(Opts.output_json_by_split, 'wb') as w:
+          json.dump(json_output, w, indent=5)
+
 
 class WOTRToCorpus(NLPProgram):
   def populate_options(self, op):
@@ -561,8 +566,11 @@ given, should have %s in it, where the learning curve value will be
 substituted (should be in a directory name, and directories will be created
 as necessary).""",
         metavar="FILE")
-    op.add_option("--output-json",
-        help="""Output file to store JSON data into.""",
+    op.add_option("--output-json-by-vol",
+        help="""Output file to store JSON-by-volume data into.""",
+        metavar="FILE")
+    op.add_option("--output-json-by-split",
+        help="""Output file to store JSON-by-split data into.""",
         metavar="FILE")
     op.add_option("--include-non-coord-paras",
         help="""Include paragraphs without coordinates, supplying 0,0 as the
